@@ -8,8 +8,11 @@
 #ifndef SRC_STM_HPP_
 #define SRC_STM_HPP_
 
+#include <cassert>
 #include <atomic>
 #include <memory>
+#include <iostream>
+using namespace std;
 
 namespace alpha {
 namespace concurrent {
@@ -22,7 +25,7 @@ class stm {
 public:
 	template <typename... Args>
 	stm( Args... args )
-	  : sp_tobj_( std::make_shared<transactional_obj>( args... ) )
+	  : atomic_p_tobj_( new transactional_obj( args... ) )
 	{
 	}
 
@@ -33,8 +36,8 @@ public:
 	 */
 	std::shared_ptr<const T> read_value( void ) const
 	{
-		std::shared_ptr<transactional_obj> sp_old_tobj = std::atomic_load( &sp_tobj_ );
-		return sp_old_tobj->read_value();
+		transactional_obj*	p_old_tobj = atomic_p_tobj_.load();
+		return p_old_tobj->read_value();
 	}
 
 	/*!
@@ -56,19 +59,30 @@ public:
 			expected        = state::ACTIVE;
 			sp_atomic_state = std::make_shared<std::atomic<state>>( expected );
 
-			std::shared_ptr<transactional_obj> sp_old_tobj = std::atomic_load( &sp_tobj_ );
+			transactional_obj*	p_old_tobj = nullptr;
 
 			while ( true ) {
-				auto sp_read_value = sp_old_tobj->read_value();
+				p_old_tobj = atomic_p_tobj_.load();
+				auto sp_read_value = p_old_tobj->read_value();
 
-				std::shared_ptr<transactional_obj> sp_new_tobj = std::make_shared<transactional_obj>( std::move( sp_read_value ), modify_func( *sp_read_value ), sp_atomic_state );
+				transactional_obj*	p_new_tobj = new transactional_obj( std::move( sp_read_value ), modify_func( *sp_read_value ), sp_atomic_state );
 
-				if ( std::atomic_compare_exchange_weak( &sp_tobj_, &sp_old_tobj, std::move( sp_new_tobj ) ) ) {
+				if ( atomic_p_tobj_.compare_exchange_weak( p_old_tobj, p_new_tobj ) ) {
+					// How to avoid memory leak of old tobj pointer.
 					break;
+				} else {
+					delete p_new_tobj;
 				}
 			}
 		} while ( !sp_atomic_state->compare_exchange_weak( expected, state::COMMITED ) );
 	}
+
+#if	0
+	bool is_lock_free(void)
+	{
+		return std::atomic_is_lock_free(&sp_tobj_);
+	}
+#endif
 
 private:
 	enum class state {
@@ -87,15 +101,15 @@ private:
 		{
 		}
 
-		transactional_obj( std::shared_ptr<const T> sp_old_value_arg, const T& w_value, std::shared_ptr<std::atomic<state>> sp_owner_arg )
-		  : sp_old_value_( sp_old_value_arg )
+		transactional_obj( std::shared_ptr<const T>&& sp_old_value_arg, const T& w_value, std::shared_ptr<std::atomic<state>> sp_owner_arg )
+		  : sp_old_value_( std::move(sp_old_value_arg) )
 		  , sp_new_value_( std::make_shared<T>( w_value ) )
 		  , sp_owner_( sp_owner_arg )
 		{
 		}
 
-		transactional_obj( std::shared_ptr<const T> sp_old_value_arg, const T&& w_value, std::shared_ptr<std::atomic<state>> sp_owner_arg )
-		  : sp_old_value_( sp_old_value_arg )
+		transactional_obj( std::shared_ptr<const T>&& sp_old_value_arg, const T&& w_value, std::shared_ptr<std::atomic<state>> sp_owner_arg )
+		  : sp_old_value_( std::move(sp_old_value_arg) )
 		  , sp_new_value_( std::make_shared<T>( std::move( w_value ) ) )
 		  , sp_owner_( sp_owner_arg )
 		{
@@ -115,7 +129,7 @@ private:
 					continue;
 				} else {
 					// メモリ破壊等による回復不可能なエラー。
-					exit( 1 );
+					assert( owners_status == state::ACTIVE );
 				}
 			}
 		}
@@ -125,7 +139,7 @@ private:
 		std::shared_ptr<std::atomic<state>> const sp_owner_;
 	};
 
-	std::shared_ptr<transactional_obj> sp_tobj_;   // need to be accessed by atomic style.
+	std::atomic<transactional_obj*> atomic_p_tobj_;   // need to be accessed by atomic style.
 };
 
 }   // namespace concurrent

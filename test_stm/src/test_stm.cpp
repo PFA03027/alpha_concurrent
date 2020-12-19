@@ -15,7 +15,9 @@
 
 using namespace std;
 
-alpha::concurrent::stm<uintptr_t> stm_counter( 0 );
+constexpr int       num_thread = 256;
+constexpr uintptr_t	loop_num = 100000;
+
 
 pthread_barrier_t barrier;
 
@@ -25,12 +27,14 @@ pthread_barrier_t barrier;
  */
 void* func( void* data )
 {
+	alpha::concurrent::stm<uintptr_t>*	p_target = reinterpret_cast<alpha::concurrent::stm<uintptr_t>*>( data );
+
 	pthread_barrier_wait( &barrier );
 
-	uintptr_t loop_count = reinterpret_cast<uintptr_t>( data );
+	uintptr_t loop_count = loop_num;
 
 	while ( loop_count-- != 0 ) {
-		stm_counter.read_modify_write( []( uintptr_t a ) { return a + 1; } );
+		p_target->read_modify_write( []( uintptr_t a ) -> uintptr_t { return a + 1; } );
 	}
 
 	return reinterpret_cast<void*>( 1 );
@@ -40,14 +44,15 @@ int main( int argc, char* argv[] )
 {
 	cout << "!!!Hello World!!!" << endl;   // prints !!!Hello World!!!
 
-	int       num_thread = 256;
-	uintptr_t num_loop   = 100000;
+	alpha::concurrent::stm<uintptr_t> stm_counter( 0 );
+
+//	cout << (stm_counter.is_lock_free() ? "lock free" : "NOT lock free") << endl;
 
 	pthread_barrier_init( &barrier, NULL, num_thread + 1 );
 	pthread_t* threads = new pthread_t[num_thread];
 
 	for ( int i = 0; i < num_thread; i++ ) {
-		pthread_create( &threads[i], NULL, func, reinterpret_cast<void*>( num_loop ) );
+		pthread_create( &threads[i], NULL, func, reinterpret_cast<void*>( &stm_counter ) );
 	}
 
 	pthread_barrier_wait( &barrier );
@@ -64,9 +69,9 @@ int main( int argc, char* argv[] )
 	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
 	// に等しくなるはず。
 	sum = *( stm_counter.read_value() );
-	std::cout << "Expect: " << num_thread * num_loop << std::endl;
+	std::cout << "Expect: " << num_thread * loop_num << std::endl;
 	std::cout << "Sum: " << sum << std::endl;
-	if ( sum == num_thread * num_loop ) {
+	if ( sum == num_thread * loop_num ) {
 		std::cout << "OK!" << std::endl;
 	} else {
 		std::cout << "NGGGGGGgggggg!" << std::endl;
