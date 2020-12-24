@@ -57,7 +57,7 @@
                                 								
                                 <option id="gnu.cpp.compiler.option.other.other.1107712140" name="その他のフラグ" superClass="gnu.cpp.compiler.option.other.other" useByScannerDiscovery="false" value="-c -fmessage-length=0 -std=c++17" valueType="string"/>
                                 								
-                                <option id="gnu.cpp.compiler.option.dialect.std.1232008206" superClass="gnu.cpp.compiler.option.dialect.std" useByScannerDiscovery="true" value="gnu.cpp.compiler.dialect.default" valueType="enumerated"/>
+                                <option id="gnu.cpp.compiler.option.dialect.std.1232008206" name="言語標準" superClass="gnu.cpp.compiler.option.dialect.std" useByScannerDiscovery="true" value="gnu.cpp.compiler.dialect.default" valueType="enumerated"/>
                                 								
                                 <inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.2140616620" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
                                 							
