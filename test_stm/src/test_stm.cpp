@@ -15,9 +15,8 @@
 
 using namespace std;
 
-constexpr int       num_thread = 256;
-constexpr uintptr_t	loop_num = 100000;
-
+constexpr int       num_thread = 3;
+constexpr uintptr_t loop_num   = 100000;
 
 pthread_barrier_t barrier;
 
@@ -27,7 +26,7 @@ pthread_barrier_t barrier;
  */
 void* func( void* data )
 {
-	alpha::concurrent::stm<uintptr_t>*	p_target = reinterpret_cast<alpha::concurrent::stm<uintptr_t>*>( data );
+	alpha::concurrent::stm<uintptr_t>* p_target = reinterpret_cast<alpha::concurrent::stm<uintptr_t>*>( data );
 
 	pthread_barrier_wait( &barrier );
 
@@ -46,7 +45,7 @@ int main( int argc, char* argv[] )
 
 	alpha::concurrent::stm<uintptr_t> stm_counter( 0 );
 
-//	cout << (stm_counter.is_lock_free() ? "lock free" : "NOT lock free") << endl;
+	//	cout << (stm_counter.is_lock_free() ? "lock free" : "NOT lock free") << endl;
 
 	pthread_barrier_init( &barrier, NULL, num_thread + 1 );
 	pthread_t* threads = new pthread_t[num_thread];
