@@ -11,12 +11,16 @@
 #ifndef SRC_HAZARD_PTR_HPP_
 #define SRC_HAZARD_PTR_HPP_
 
+#include <pthread.h>
+
 #include <atomic>
 #include <chrono>
 #include <list>
 #include <memory>
 #include <mutex>
 #include <thread>
+
+#define USE_PTHREAD_THREAD_LOCAL_STORAGE   //!<	Use pthread thread local storage instead of thread_local
 
 namespace alpha {
 namespace concurrent {
@@ -207,6 +211,10 @@ private:
 template <typename T>
 class hazard_node_glist {
 public:
+#ifdef USE_PTHREAD_THREAD_LOCAL_STORAGE
+	pthread_key_t tls_key;   //!<	key for thread local storage of POSIX.
+#endif
+
 	static hazard_node_glist& get_instance( void );
 
 	~hazard_node_glist()
@@ -269,9 +277,31 @@ public:
 	}
 
 private:
+#ifdef USE_PTHREAD_THREAD_LOCAL_STORAGE
+	static void destr_fn( void* parm )
+	{
+		//		printf( "thread local destructor now being called -- " );
+
+		node_for_pointer<T>* p_target_node = reinterpret_cast<node_for_pointer<T>*>( parm );
+
+		p_target_node->head_thread_local_retire_list_.try_delete_instance();
+		p_target_node->release_owner();
+
+		//		printf( "thread local destructor is done.\n" );
+		return;
+	}
+#endif
+
 	hazard_node_glist( void )
 	  : head_node_( *this )
 	{
+#ifdef USE_PTHREAD_THREAD_LOCAL_STORAGE
+		int status = pthread_key_create( &tls_key, destr_fn );
+		if ( status < 0 ) {
+			printf( "pthread_key_create failed, errno=%d", errno );
+			exit( 1 );
+		}
+#endif
 	}
 
 	node_for_pointer<T> head_node_;
@@ -281,7 +311,7 @@ private:
 template <typename T>
 hazard_node_glist<T>& hazard_node_glist<T>::get_instance( void )
 {
-	static hazard_node_glist<T> singleton;
+	static hazard_node_glist<T> singleton;   //!<	singleton instance and delay evaluation is expected.
 
 	return singleton;
 }
@@ -307,15 +337,25 @@ class hazard_ptr {
 public:
 	hazard_ptr( void )
 	{
-		check_local_strage();
+		check_local_storage();
 		//		p_hzd_ptr_node_ = hazard_ptr_internal::hazard_node_glist<T>::get_instance().request_hazard_ptr_node();
 	}
 
 	~hazard_ptr( void )
 	{
-		check_local_strage();
+		check_local_storage();
 
+		p_hzd_ptr_node_->head_thread_local_retire_list_.try_delete_instance();
 		p_hzd_ptr_node_->release_owner();
+		p_hzd_ptr_node_ = nullptr;
+
+#ifdef USE_PTHREAD_THREAD_LOCAL_STORAGE
+		int status;
+		status = pthread_setspecific( hazard_ptr_internal::hazard_node_glist<T>::get_instance().tls_key, (void*)nullptr );
+		if ( status < 0 ) {
+			printf( "pthread_setspecific failed, errno %d", errno );
+		}
+#endif
 	}
 
 	/*!
@@ -333,7 +373,7 @@ public:
 	 */
 	inline void regist_ptr_as_hazard_ptr( T* p_target )
 	{
-		check_local_strage();
+		check_local_storage();
 
 		p_hzd_ptr_node_->p_target_ = p_target;
 		std::atomic_thread_fence( std::memory_order_release );
@@ -347,7 +387,7 @@ public:
 	 */
 	inline void clear_hazard_ptr( void )
 	{
-		check_local_strage();
+		check_local_storage();
 
 		p_hzd_ptr_node_->p_target_ = nullptr;
 		std::atomic_thread_fence( std::memory_order_release );
@@ -361,7 +401,7 @@ public:
 	 */
 	void try_delete_instance( void )
 	{
-		check_local_strage();
+		check_local_storage();
 
 		std::atomic_thread_fence( std::memory_order_acquire );
 		T* p_try_delete            = p_hzd_ptr_node_->p_target_;
@@ -382,22 +422,66 @@ public:
 	}
 
 private:
-	void check_local_strage( void )
+	void check_local_storage( void )
 	{
 		if ( p_hzd_ptr_node_ == nullptr ) {
 			p_hzd_ptr_node_ = hazard_ptr_internal::hazard_node_glist<T>::get_instance().request_hazard_ptr_node();
+
+#ifdef USE_PTHREAD_THREAD_LOCAL_STORAGE
+			int status;
+			status = pthread_setspecific( hazard_ptr_internal::hazard_node_glist<T>::get_instance().tls_key, (void*)p_hzd_ptr_node_ );
+			if ( status < 0 ) {
+				printf( "pthread_setspecific failed, errno %d", errno );
+				pthread_exit( (void*)1 );
+			}
+#else
+			dest_inst_.pp_hzd_ptr_node_ = &p_hzd_ptr_node_;
+#endif
 		}
 	}
 
+#ifdef USE_PTHREAD_THREAD_LOCAL_STORAGE
 	static __thread hazard_ptr_internal::node_for_pointer<T>* p_hzd_ptr_node_;
 	// C++11で、thread_localが使用可能となるが、g++でコンパイルした場合、スレッド終了時のdestructor処理実行時に、
 	// すでにメモリ領域が破壊されている場合があるため、destructor処理の正常動作が期待できない。
 	// そのため、その点を明示する意図として __thread を使用する。
 	// また、 __thread の変数は、暗黙的にゼロ初期化されていることを前提としている。
+#else
+	static thread_local hazard_ptr_internal::node_for_pointer<T>* p_hzd_ptr_node_;
+
+	struct destructor_func {
+		hazard_ptr_internal::node_for_pointer<T>** pp_hzd_ptr_node_ = nullptr;
+
+		~destructor_func()
+		{
+			//			printf( "thread local destructor now being called -- " );
+
+			if ( pp_hzd_ptr_node_ == nullptr ) return;
+			if ( *pp_hzd_ptr_node_ == nullptr ) return;
+
+			node_for_pointer<T>* p_target_node = reinterpret_cast<node_for_pointer<T>*>( parm );
+
+			( *pp_hzd_ptr_node_ )->head_thread_local_retire_list_.try_delete_instance();
+			( *pp_hzd_ptr_node_ )->release_owner();
+
+			//			printf( "thread local destructor is done.\n" );
+			return;
+		}
+
+		static thread_local destructor_func dest_inst_;
+	};
+#endif
 };
 
+#ifdef USE_PTHREAD_THREAD_LOCAL_STORAGE
 template <typename T>
 __thread hazard_ptr_internal::node_for_pointer<T>* hazard_ptr<T>::p_hzd_ptr_node_;
+#else
+template <typename T>
+thread_local hazard_ptr_internal::node_for_pointer<T>* hazard_ptr<T>::p_hzd_ptr_node_ = nullptr;
+template <typename T>
+thread_local hazard_ptr<T>::destructor_func hazard_ptr<T>::dest_inst_;
+#endif
 
 /*!
  * @breif	scoped reference control support class for hazard_ptr
