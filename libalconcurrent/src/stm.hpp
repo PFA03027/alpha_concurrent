@@ -12,7 +12,6 @@
 #include <cassert>
 #include <iostream>
 #include <memory>
-//using namespace std;
 
 #include "hazard_ptr.hpp"
 
@@ -157,9 +156,6 @@ private:
 	hazard_ptr<transactional_obj> tobj_hazard_ptr;
 };
 
-//template <typename T>
-//thread_local hazard_ptr<typename stm<T>::transactional_obj> stm<T>::tobj_hazard_ptr;
-//__thread hazard_ptr<typename stm<T>::transactional_obj> stm<T>::tobj_hazard_ptr;
 
 }   // namespace concurrent
 }   // namespace alpha

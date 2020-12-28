@@ -459,17 +459,14 @@ private:
 			if ( pp_hzd_ptr_node_ == nullptr ) return;
 			if ( *pp_hzd_ptr_node_ == nullptr ) return;
 
-			node_for_pointer<T>* p_target_node = reinterpret_cast<node_for_pointer<T>*>( parm );
-
 			( *pp_hzd_ptr_node_ )->head_thread_local_retire_list_.try_delete_instance();
 			( *pp_hzd_ptr_node_ )->release_owner();
 
 			//			printf( "thread local destructor is done.\n" );
 			return;
 		}
-
-		static thread_local destructor_func dest_inst_;
 	};
+	static thread_local destructor_func dest_inst_;
 #endif
 };
 
@@ -480,7 +477,7 @@ __thread hazard_ptr_internal::node_for_pointer<T>* hazard_ptr<T>::p_hzd_ptr_node
 template <typename T>
 thread_local hazard_ptr_internal::node_for_pointer<T>* hazard_ptr<T>::p_hzd_ptr_node_ = nullptr;
 template <typename T>
-thread_local hazard_ptr<T>::destructor_func hazard_ptr<T>::dest_inst_;
+thread_local typename hazard_ptr<T>::destructor_func hazard_ptr<T>::dest_inst_;
 #endif
 
 /*!
