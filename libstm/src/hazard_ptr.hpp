@@ -297,11 +297,14 @@ class hazard_ptr {
 public:
 	hazard_ptr( void )
 	{
-		p_hzd_ptr_node_ = hzd_glist_.request_hazard_ptr_node();
+		check_local_strage();
+		//		p_hzd_ptr_node_ = hzd_glist_.request_hazard_ptr_node();
 	}
 
 	~hazard_ptr( void )
 	{
+		check_local_strage();
+
 		p_hzd_ptr_node_->release_owner();
 	}
 
@@ -320,6 +323,8 @@ public:
 	 */
 	inline void regist_ptr_as_hazard_ptr( T* p_target )
 	{
+		check_local_strage();
+
 		p_hzd_ptr_node_->p_target_ = p_target;
 		std::atomic_thread_fence( std::memory_order_release );
 	}
@@ -332,6 +337,8 @@ public:
 	 */
 	inline void clear_hazard_ptr( void )
 	{
+		check_local_strage();
+
 		p_hzd_ptr_node_->p_target_ = nullptr;
 		std::atomic_thread_fence( std::memory_order_release );
 	}
@@ -344,6 +351,8 @@ public:
 	 */
 	void try_delete_instance( void )
 	{
+		check_local_strage();
+
 		std::atomic_thread_fence( std::memory_order_acquire );
 		T* p_try_delete            = p_hzd_ptr_node_->p_target_;
 		p_hzd_ptr_node_->p_target_ = nullptr;
@@ -363,10 +372,24 @@ public:
 	}
 
 private:
-	hazard_ptr_internal::node_for_pointer<T>* p_hzd_ptr_node_;
+	void check_local_strage( void )
+	{
+		if ( p_hzd_ptr_node_ == nullptr ) {
+			p_hzd_ptr_node_ = hzd_glist_.request_hazard_ptr_node();
+		}
+	}
+
+	static __thread hazard_ptr_internal::node_for_pointer<T>* p_hzd_ptr_node_;
+	// C++11で、thread_localが使用可能となるが、g++でコンパイルした場合、スレッド終了時のdestructor処理実行時に、
+	// すでにメモリ領域が破壊されている場合があるため、destructor処理の正常動作が期待できない。
+	// そのため、その点を明示する意図として __thread を使用する。
+	// また、 __thread の変数は、暗黙的にゼロ初期化されていることを前提としている。
 
 	static hazard_ptr_internal::hazard_node_glist<T> hzd_glist_;
 };
+
+template <typename T>
+__thread hazard_ptr_internal::node_for_pointer<T>* hazard_ptr<T>::p_hzd_ptr_node_;
 
 // グローバル変数で宣言されるハザードポインタリストを最初に定義する必要があるため、先に宣言する。
 template <typename T>

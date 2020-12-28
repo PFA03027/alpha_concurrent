@@ -61,15 +61,15 @@ public:
 			expected        = state::ACTIVE;
 			sp_atomic_state = std::make_shared<std::atomic<state>>( expected );
 
-			transactional_obj* p_old_tobj = atomic_p_tobj_.load();
+			transactional_obj*                       p_old_tobj = atomic_p_tobj_.load();
+			hazard_ptr_scoped_ref<transactional_obj> hzrd_scp( tobj_hazard_ptr );
 
 			while ( true ) {
+
 				while ( true ) {
 					tobj_hazard_ptr.regist_ptr_as_hazard_ptr( p_old_tobj );
-					if ( atomic_p_tobj_.compare_exchange_weak( p_old_tobj, tobj_hazard_ptr.p_hazard_ptr_ ) ) {
+					if ( atomic_p_tobj_.compare_exchange_weak( p_old_tobj, p_old_tobj ) ) {
 						break;
-					} else {
-						tobj_hazard_ptr.deregist_ptr_and_sweep();
 					}
 				}
 				// ここまでで、ハザードポインターに登録したポインターが有効であることであることの確認が取れた。
@@ -81,32 +81,21 @@ public:
 				transactional_obj* p_new_tobj = new transactional_obj( std::move( sp_read_value ), modify_func( *sp_read_value ), sp_atomic_state );
 
 				if ( atomic_p_tobj_.compare_exchange_weak( p_old_tobj, p_new_tobj ) ) {
-					// How to avoid memory leak of old tobj pointer.
-					// p_tobj_hazard_ptrの先のデータは参照作業が完了したため、
-					// どのスレッドのハザードポインターにも登録されていなければ、削除を行う。
-					// 参照が終わったので、ハザードポインタにnullptrを設定する。
-					tobj_hazard_ptr.deregist_ptr_and_sweep();
+					// p_old_tobjに対し、置き換えが成功＝削除権を獲得
+					tobj_hazard_ptr.try_delete_instance();
 					break;
 				} else {
 					// 更新失敗。準備していた新しい値の為のオブジェクトは削除する。
 					delete p_new_tobj;
-
-					// p_old_tobjには、新たなターゲットポインタが格納されているので、次のループで使用する。
-					// また、p_tobj_hazard_ptrの先のデータは参照作業が完了したため、
-					// どのスレッドのハザードポインターにも登録されていなければ、削除を行う。
-					// 参照が終わったので、ハザードポインタにnullptrを設定する。
-					tobj_hazard_ptr.deregist_ptr_and_sweep();
 				}
 			}
 		} while ( !sp_atomic_state->compare_exchange_weak( expected, state::COMMITED ) );
 	}
 
-#if 0
-	bool is_lock_free(void)
+	static int debug_get_glist_size( void )
 	{
-		return std::atomic_is_lock_free(&sp_tobj_);
+		return hazard_ptr<transactional_obj>::debug_get_glist_size();
 	}
-#endif
 
 private:
 	enum class state {
@@ -163,12 +152,14 @@ private:
 		std::shared_ptr<std::atomic<state>> const sp_owner_;
 	};
 
-	std::atomic<transactional_obj*>                   atomic_p_tobj_;   // need to be accessed by atomic style.
-	thread_local static hazard_ptr<transactional_obj> tobj_hazard_ptr;
+	std::atomic<transactional_obj*> atomic_p_tobj_;   // need to be accessed by atomic style.
+													  //	static thread_local hazard_ptr<transactional_obj> tobj_hazard_ptr;
+	hazard_ptr<transactional_obj> tobj_hazard_ptr;
 };
 
-template <typename T>
-thread_local typename hazard_ptr<typename stm<T>::transactional_obj> stm<T>::tobj_hazard_ptr;
+//template <typename T>
+//thread_local hazard_ptr<typename stm<T>::transactional_obj> stm<T>::tobj_hazard_ptr;
+//__thread hazard_ptr<typename stm<T>::transactional_obj> stm<T>::tobj_hazard_ptr;
 
 }   // namespace concurrent
 }   // namespace alpha

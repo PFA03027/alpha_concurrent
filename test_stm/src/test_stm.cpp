@@ -6,17 +6,19 @@
 // Description : Hello World in C++, Ansi-style
 //============================================================================
 
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <iostream>
 #include <pthread.h>
 #include <stdint.h>
-
-#include <iostream>
+#include <thread>
 
 #include "stm.hpp"
 
 using namespace std;
 
-constexpr int       num_thread = 256;
-constexpr uintptr_t loop_num   = 100000;
+constexpr uintptr_t g_loop_num = 10000 * 256;
 
 pthread_barrier_t barrier;
 
@@ -24,9 +26,8 @@ pthread_barrier_t barrier;
  * 各スレッドのメインルーチン。
  * stmへのカウントアップを繰り返す。
  */
-void* func_refarencing( void* data )
+void func( alpha::concurrent::stm<uintptr_t>* p_target, int loop_num, int* p_ans )
 {
-	alpha::concurrent::stm<uintptr_t>* p_target = reinterpret_cast<alpha::concurrent::stm<uintptr_t>*>( data );
 
 	pthread_barrier_wait( &barrier );
 
@@ -36,34 +37,45 @@ void* func_refarencing( void* data )
 		p_target->read_modify_write( []( uintptr_t a ) -> uintptr_t { return a + 1; } );
 	}
 
-	return reinterpret_cast<void*>( 1 );
+	*p_ans = 1;
+	return;
 }
 
-int main( int argc, char* argv[] )
+void test_case1( int num_thread, int loop_num )
 {
-	cout << "!!!Hello World!!!" << endl;   // prints !!!Hello World!!!
+	cout << "!!!Ready!!!" << endl;   // prints !!!Hello World!!!
 
 	alpha::concurrent::stm<uintptr_t> stm_counter( 0 );
 
 	//	cout << (stm_counter.is_lock_free() ? "lock free" : "NOT lock free") << endl;
 
 	pthread_barrier_init( &barrier, NULL, num_thread + 1 );
-	pthread_t* threads = new pthread_t[num_thread];
+	std::thread* threads     = new std::thread[num_thread];
+	int*         threads_ans = new int[num_thread];
 
 	for ( int i = 0; i < num_thread; i++ ) {
-		pthread_create( &threads[i], NULL, func_refarencing, reinterpret_cast<void*>( &stm_counter ) );
+		threads[i] = std::move(
+			std::thread( func, &stm_counter, loop_num, &( threads_ans[i] ) ) );
 	}
 
+	std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 	cout << "!!!GO!!!" << endl;   // prints !!!Hello World!!!
+
+	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
+
 	pthread_barrier_wait( &barrier );
 
-	uintptr_t sum = 0;
+	int sum = 0;
 	for ( int i = 0; i < num_thread; i++ ) {
-		uintptr_t e;
-		pthread_join( threads[i], reinterpret_cast<void**>( &e ) );
-		std::cout << "Thread " << i << ": last dequeued = " << e << std::endl;
-		sum += e;
+		threads[i].join();
+		//		std::cout << "Thread " << i << ": last dequeued = " << threads_ans[i] << std::endl;
+		sum += threads_ans[i];
 	}
+
+	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
+
+	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
+	std::cout << "thread is " << num_thread << "  Exec time: " << diff.count() << std::endl;
 
 	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
 	// に等しくなるはず。
@@ -76,7 +88,21 @@ int main( int argc, char* argv[] )
 		std::cout << "NGGGGGGgggggg!" << std::endl;
 	}
 
+	printf( "glist_size: %d\n",
+	        alpha::concurrent::stm<uintptr_t>::debug_get_glist_size() );
+
 	delete[] threads;
+	delete[] threads_ans;
+
+	return;
+}
+int main( int argc, char* argv[] )
+{
+	cout << "!!!Hello World!!!" << endl;   // prints !!!Hello World!!!
+
+	for ( int i = 1; i <= 256; i = i * 2 ) {
+		test_case1( i, g_loop_num / i );
+	}
 
 	cout << "!!!Good-by World!!!" << endl;   // prints !!!Hello World!!!
 	return 0;
