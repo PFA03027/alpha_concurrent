@@ -207,10 +207,7 @@ private:
 template <typename T>
 class hazard_node_glist {
 public:
-	hazard_node_glist( void )
-	  : head_node_( *this )
-	{
-	}
+	static hazard_node_glist& get_instance( void );
 
 	~hazard_node_glist()
 	{
@@ -272,9 +269,22 @@ public:
 	}
 
 private:
+	hazard_node_glist( void )
+	  : head_node_( *this )
+	{
+	}
+
 	node_for_pointer<T> head_node_;
 	int                 glist_count_ = 0;
 };
+
+template <typename T>
+hazard_node_glist<T>& hazard_node_glist<T>::get_instance( void )
+{
+	static hazard_node_glist<T> singleton;
+
+	return singleton;
+}
 
 }   // namespace hazard_ptr_internal
 
@@ -298,7 +308,7 @@ public:
 	hazard_ptr( void )
 	{
 		check_local_strage();
-		//		p_hzd_ptr_node_ = hzd_glist_.request_hazard_ptr_node();
+		//		p_hzd_ptr_node_ = hazard_ptr_internal::hazard_node_glist<T>::get_instance().request_hazard_ptr_node();
 	}
 
 	~hazard_ptr( void )
@@ -368,14 +378,14 @@ public:
 
 	static int debug_get_glist_size( void )
 	{
-		return hzd_glist_.debug_get_glist_size();
+		return hazard_ptr_internal::hazard_node_glist<T>::get_instance().debug_get_glist_size();
 	}
 
 private:
 	void check_local_strage( void )
 	{
 		if ( p_hzd_ptr_node_ == nullptr ) {
-			p_hzd_ptr_node_ = hzd_glist_.request_hazard_ptr_node();
+			p_hzd_ptr_node_ = hazard_ptr_internal::hazard_node_glist<T>::get_instance().request_hazard_ptr_node();
 		}
 	}
 
@@ -384,16 +394,10 @@ private:
 	// すでにメモリ領域が破壊されている場合があるため、destructor処理の正常動作が期待できない。
 	// そのため、その点を明示する意図として __thread を使用する。
 	// また、 __thread の変数は、暗黙的にゼロ初期化されていることを前提としている。
-
-	static hazard_ptr_internal::hazard_node_glist<T> hzd_glist_;
 };
 
 template <typename T>
 __thread hazard_ptr_internal::node_for_pointer<T>* hazard_ptr<T>::p_hzd_ptr_node_;
-
-// グローバル変数で宣言されるハザードポインタリストを最初に定義する必要があるため、先に宣言する。
-template <typename T>
-hazard_ptr_internal::hazard_node_glist<T> hazard_ptr<T>::hzd_glist_;
 
 /*!
  * @breif	scoped reference control support class for hazard_ptr
