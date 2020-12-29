@@ -14,11 +14,10 @@
 #include <pthread.h>
 
 #include <atomic>
-#include <chrono>
-#include <list>
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <tuple>
 
 #define USE_PTHREAD_THREAD_LOCAL_STORAGE   //!<	Use pthread thread local storage instead of thread_local
 
@@ -32,93 +31,6 @@ enum class ocupied_status {
 	USING
 };
 
-template <typename T>
-class hazard_node_glist;
-
-/*!
- * @breif	削除予定のインスタンスへのポインタ集合のリスト
- *
- * @note
- * スレッドストレージに割り当てたいが、スレッドストレージに割り当てた場合、なぜかdestruct処理が正常に動作しない。
- * destructorが動作する時点で、割り当てられていたメモリエリアがすでに破棄されているように見える。
- *
- */
-template <typename T>
-class thd_local_pointer_list_for_delete {
-public:
-	thd_local_pointer_list_for_delete( hazard_node_glist<T>& r_hzd_node_glist )
-	  : hzd_glist_ref_( r_hzd_node_glist )
-	{
-	}
-
-	~thd_local_pointer_list_for_delete()
-	{
-		//		printf( "thd_local_pointer_list_for_delete's destructor: size: %lld\n", delete_candidate_list_.size() );
-		//		fflush( NULL );
-		if ( delete_candidate_list_.size() == 0 ) return;
-		return;
-
-		// 残っているポインタを削除する。
-		// スレッドローカルストレージなので、削除されるのは、スレッドが終了するとき。
-		// スレッド終了時点では、リアルタイム処理性等の制約からは解放されているとする。
-		// 制約から解放されているので、スリープしつつも、残っているポインタのインスタンスを確実に解放する。
-		for ( auto& e : delete_candidate_list_ ) {
-			//			printf( "Checking, %p\n", e );
-			int i;
-			for ( i = 10; i > 0; i-- ) {
-				if ( hzd_glist_ref_.scan( e ) ) {
-					// まだ、ハザードポインタリストに存在したので、とりあえず、待つ。
-					std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
-				} else {
-					delete e;
-					break;
-				}
-			}
-			if ( i == 0 ) {
-				// 削除に失敗した。
-				// TODO: 一旦、リークで放置。本当は、グローバルな何かに、移管するべき。。。
-				printf( "Error: Fail to delete\n" );
-			}
-		}
-	}
-
-	void emplace_back( T* p_new_candidate )
-	{
-		delete_candidate_list_.emplace_back( p_new_candidate );
-		//		printf( "added, %p\n", delete_candidate_list_.front() );
-		return;
-	}
-
-	void try_delete_instance( void )
-	{
-		//		printf( "thd_local_pointer_list_for_delete.try_delete_instance: size: %lld\n", delete_candidate_list_.size() );
-
-		for ( auto& e : delete_candidate_list_ ) {
-			//			printf( "Checking in try, %p\n", e );
-			//			fflush( NULL );
-			if ( hzd_glist_ref_.scan( e ) ) {
-				// ハザードポインタリストに対象ポインタが存在したので、次回の削除に回す。
-				// nothing to do
-				//				printf( "Skip try_delete_instance().\n" );
-				//				fflush( NULL );
-			} else {
-				// ハザードポインタリストに対象ポインタが存在しなかったので、誰も参照していない。
-				// よって、削除する。
-				delete e;
-				e = nullptr;
-			}
-		}
-		delete_candidate_list_.remove( nullptr );
-
-		//		printf( "thd_local_pointer_list_for_delete.try_delete_instance end: size: %lld\n", delete_candidate_list_.size() );
-		return;
-	}
-
-private:
-	std::list<T*>         delete_candidate_list_;
-	hazard_node_glist<T>& hzd_glist_ref_;
-};
-
 /*!
  * @breif	ハザードポインタとしてキープするためのノード。
  *
@@ -129,13 +41,11 @@ private:
  *
  */
 template <typename T>
-struct node_for_pointer {
-	T*                                   p_target_ = nullptr;
-	thd_local_pointer_list_for_delete<T> head_thread_local_retire_list_;
+struct node_for_hazard_ptr {
+	T* p_target_ = nullptr;
 
-	node_for_pointer( hazard_node_glist<T>& r_hzd_node_glist )
-	  : head_thread_local_retire_list_( r_hzd_node_glist )
-	  , status_( ocupied_status::USING )
+	node_for_hazard_ptr( void )
+	  : status_( ocupied_status::USING )
 	  , next_( 0 )
 	{
 	}
@@ -178,25 +88,127 @@ struct node_for_pointer {
 		return;
 	}
 
-	node_for_pointer* get_next( void )
+	node_for_hazard_ptr* get_next( void )
 	{
 		return next_.load();
 	}
 
-	void set_next( node_for_pointer* p_new_next )
+	void set_next( node_for_hazard_ptr* p_new_next )
 	{
 		next_.store( p_new_next );
 		return;
 	}
 
-	bool next_CAS( node_for_pointer** pp_expect_ptr, node_for_pointer* p_desired_ptr )
+	bool next_CAS( node_for_hazard_ptr** pp_expect_ptr, node_for_hazard_ptr* p_desired_ptr )
 	{
 		return next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
 	}
 
 private:
-	std::atomic<ocupied_status>    status_;
-	std::atomic<node_for_pointer*> next_;
+	std::atomic<ocupied_status>       status_;
+	std::atomic<node_for_hazard_ptr*> next_;
+};
+
+/*!
+ * @breif	削除予定のポインタをキープするためのノード。
+ *
+ * 追加するのは、各スレッド。
+ * 実際に削除するのは、削除専用スレッド
+ *
+ */
+template <typename T>
+struct node_for_delete_ptr {
+
+	node_for_delete_ptr( T* p_delete_ptr_arg = nullptr )
+	  : p_target_delete_( p_delete_ptr_arg )
+	  , next_( nullptr )
+	{
+	}
+
+	~node_for_delete_ptr()
+	{
+		delete p_target_delete_.load();
+		return;
+	}
+
+	void clear_delete_ptr( void )
+	{
+		p_target_delete_.store( nullptr );
+		return;
+	}
+
+	T* get_delete_ptr( void )
+	{
+		return p_target_delete_.load();
+	}
+
+	bool is_emptry( void )
+	{
+		return p_target_delete_.load() == nullptr;
+	}
+
+	bool try_to_set_delete_ptr( T* p_delete_ptr_arg )
+	{
+		T* p_cur = p_target_delete_.load();
+
+		if ( p_cur != nullptr ) return false;
+
+		return p_target_delete_.compare_exchange_strong( p_cur, p_delete_ptr_arg );
+	}
+
+	// 登録されているポインタに対して、削除を行う。呼び出し前にハザードポインタに存在しないことを確認すること。
+	void do_delete_ptr( void )
+	{
+		T* p_del = p_target_delete_.load();
+		delete p_del;
+		p_target_delete_.store( nullptr );
+
+		return;
+	}
+
+	node_for_delete_ptr* get_next( void )
+	{
+		return next_.load();
+	}
+
+	void set_next( node_for_delete_ptr* p_new_next )
+	{
+		next_.store( p_new_next );
+		return;
+	}
+
+	bool next_CAS( node_for_delete_ptr** pp_expect_ptr, node_for_delete_ptr* p_desired_ptr )
+	{
+		return next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
+	}
+
+private:
+	std::atomic<T*>                   p_target_delete_;
+	std::atomic<node_for_delete_ptr*> next_;
+};
+
+class Garbage_collector;
+
+class hazard_node_glist_base {
+public:
+	hazard_node_glist_base( void );
+
+	virtual ~hazard_node_glist_base();
+
+protected:
+	// ハザードポインタに存在するかどうかを確認してから削除を行う。
+	virtual void try_clean_up_delete_ptr( void ) = 0;
+
+	void post_trigger_gc( void );
+
+	void deregist_self_from_list( void );
+
+private:
+	void regist_self_to_list( void );
+	void add_one_new_glist_node( void );
+
+	friend Garbage_collector;
+	static node_for_delete_ptr<hazard_node_glist_base> head_node_glist_;
 };
 
 /*!
@@ -209,7 +221,7 @@ private:
  *
  */
 template <typename T>
-class hazard_node_glist {
+class hazard_node_glist : public hazard_node_glist_base {
 public:
 #ifdef USE_PTHREAD_THREAD_LOCAL_STORAGE
 	pthread_key_t tls_key;   //!<	key for thread local storage of POSIX.
@@ -219,18 +231,29 @@ public:
 
 	~hazard_node_glist()
 	{
-		node_for_pointer<T>* p_cur = head_node_.get_next();
-		while ( p_cur != nullptr ) {
-			node_for_pointer<T>* p_nxt = p_cur->get_next();
-			delete p_cur;
-			p_cur = p_nxt;
+		{
+			node_for_hazard_ptr<T>* p_cur = hazard_ptr_head_node_.get_next();
+			while ( p_cur != nullptr ) {
+				node_for_hazard_ptr<T>* p_nxt = p_cur->get_next();
+				delete p_cur;
+				p_cur = p_nxt;
+			}
+		}
+
+		{
+			node_for_delete_ptr<T>* p_cur = delete_ptr_head_node_.get_next();
+			while ( p_cur != nullptr ) {
+				node_for_delete_ptr<T>* p_nxt = p_cur->get_next();
+				delete p_cur;
+				p_cur = p_nxt;
+			}
 		}
 	}
 
-	node_for_pointer<T>* request_hazard_ptr_node( void )
+	node_for_hazard_ptr<T>* request_hazard_ptr_node( void )
 	{
 		// 空きノードを探す。
-		node_for_pointer<T>* p_ans = head_node_.get_next();
+		node_for_hazard_ptr<T>* p_ans = hazard_ptr_head_node_.get_next();
 		while ( p_ans != nullptr ) {
 			if ( p_ans->get_status() == ocupied_status::UNUSED ) {
 				if ( p_ans->try_to_get_owner() ) {
@@ -241,25 +264,98 @@ public:
 		}
 
 		// 空きノードが見つからなかったので、新しいノードを用意する。
-		p_ans = new node_for_pointer<T>( *this );
-		node_for_pointer<T>* p_next_check;
-		p_next_check = head_node_.get_next();
-		while ( true ) {
-			p_ans->set_next( p_next_check );
-			if ( head_node_.next_CAS( &p_next_check, p_ans ) ) {
-				break;
-			}
-		}
-		glist_count_++;
+		p_ans = add_one_new_hazard_ptr_node();
 
 		//		printf( "glist is added.\n" );
 		return p_ans;
 	}
 
-	bool scan( T* p_chk )
+	void regist_delete_ptr( T* p_delete_target )
 	{
-		bool                 ans        = false;
-		node_for_pointer<T>* p_cur_node = head_node_.get_next();
+		// 空きノードを探す。
+		node_for_delete_ptr<T>* p_ans = delete_ptr_head_node_.get_next();
+		while ( p_ans != nullptr ) {
+			if ( p_ans->is_emptry() ) {
+				if ( p_ans->try_to_set_delete_ptr( p_delete_target ) ) {
+					post_trigger_gc();
+					return;
+				}
+			}
+			p_ans = p_ans->get_next();
+		}
+
+		// 空きノードが見つからなかったので、新しいノードを用意する。
+		add_one_new_delete_ptr_node( p_delete_target );
+
+//		printf( "glist is added.\n" );
+
+		post_trigger_gc();
+
+		return;
+	}
+
+	std::tuple<int, int> debug_get_glist_size( void )
+	{
+		return std::tuple<int, int>( glist_hzrd_ptr_node_count_, glist_dlt_ptr_node_count_ );
+	}
+
+private:
+	/*!
+	 * @breif	新しいノードを用意し、リストに追加する。
+	 *
+	 * 追加したノードは、USING状態で返される。
+	 *
+	 * @return	追加した新しいノードへのポインタ
+	 */
+	node_for_hazard_ptr<T>* add_one_new_hazard_ptr_node( void )
+	{
+		node_for_hazard_ptr<T>* p_ans = new node_for_hazard_ptr<T>();
+		node_for_hazard_ptr<T>* p_next_check;
+		p_next_check = hazard_ptr_head_node_.get_next();
+		while ( true ) {
+			p_ans->set_next( p_next_check );
+			if ( hazard_ptr_head_node_.next_CAS( &p_next_check, p_ans ) ) {
+				break;
+			}
+		}
+		glist_hzrd_ptr_node_count_++;
+
+		//		printf( "glist is added.\n" );
+		return p_ans;
+	}
+
+	/*!
+	 * @breif	新しいノードを用意し、削除リストに追加する。
+	 *
+	 * 空ノードを追加する場合は、引数にnullptrを指定する。
+	 */
+	void add_one_new_delete_ptr_node( T* p_target_node_ )
+	{
+		node_for_delete_ptr<T>* p_ans = new node_for_delete_ptr<T>( p_target_node_ );
+		node_for_delete_ptr<T>* p_next_check;
+		p_next_check = delete_ptr_head_node_.get_next();
+		while ( true ) {
+			p_ans->set_next( p_next_check );
+			if ( delete_ptr_head_node_.next_CAS( &p_next_check, p_ans ) ) {
+				break;
+			}
+		}
+		glist_dlt_ptr_node_count_++;
+
+		//		printf( "glist is added.\n" );
+		return;
+	}
+
+	/*!
+	 * @breif	指定されたポインタが、ハザードポインタに存在するかどうかを確認する。
+	 *
+	 * @retval	true	ハザードポインタに存在する。
+	 * @retval	false	ハザードポインタに存在しない。
+	 */
+	bool scan_hazard_ptr( T* p_chk )
+	{
+		bool                    ans        = false;
+		node_for_hazard_ptr<T>* p_cur_node = hazard_ptr_head_node_.get_next();
 		while ( p_cur_node != nullptr ) {
 			std::atomic_thread_fence( std::memory_order_acquire );
 			if ( p_cur_node->p_target_ == p_chk ) {
@@ -271,20 +367,30 @@ public:
 		return ans;
 	}
 
-	int debug_get_glist_size( void )
+	// ハザードポインタに存在するかどうかを確認してから削除を行う。
+	void try_clean_up_delete_ptr( void ) override
 	{
-		return glist_count_;
+		node_for_delete_ptr<T>* p_ans = delete_ptr_head_node_.get_next();
+		while ( p_ans != nullptr ) {
+			if ( !( p_ans->is_emptry() ) ) {
+				T* p_chk_del_ptr = p_ans->get_delete_ptr();
+				if ( !( scan_hazard_ptr( p_chk_del_ptr ) ) ) {
+					p_ans->do_delete_ptr();
+				}
+			}
+			p_ans = p_ans->get_next();
+		}
 	}
 
-private:
 #ifdef USE_PTHREAD_THREAD_LOCAL_STORAGE
 	static void destr_fn( void* parm )
 	{
 		//		printf( "thread local destructor now being called -- " );
 
-		node_for_pointer<T>* p_target_node = reinterpret_cast<node_for_pointer<T>*>( parm );
+		if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。
 
-		p_target_node->head_thread_local_retire_list_.try_delete_instance();
+		node_for_hazard_ptr<T>* p_target_node = reinterpret_cast<node_for_hazard_ptr<T>*>( parm );
+
 		p_target_node->release_owner();
 
 		//		printf( "thread local destructor is done.\n" );
@@ -293,7 +399,7 @@ private:
 #endif
 
 	hazard_node_glist( void )
-	  : head_node_( *this )
+	  : hazard_ptr_head_node_()
 	{
 #ifdef USE_PTHREAD_THREAD_LOCAL_STORAGE
 		int status = pthread_key_create( &tls_key, destr_fn );
@@ -304,8 +410,11 @@ private:
 #endif
 	}
 
-	node_for_pointer<T> head_node_;
-	int                 glist_count_ = 0;
+	node_for_hazard_ptr<T> hazard_ptr_head_node_;
+	int                    glist_hzrd_ptr_node_count_ = 0;
+
+	node_for_delete_ptr<T> delete_ptr_head_node_;
+	int                    glist_dlt_ptr_node_count_ = 0;
 };
 
 template <typename T>
@@ -345,7 +454,6 @@ public:
 	{
 		check_local_storage();
 
-		p_hzd_ptr_node_->head_thread_local_retire_list_.try_delete_instance();
 		p_hzd_ptr_node_->release_owner();
 		p_hzd_ptr_node_ = nullptr;
 
@@ -396,10 +504,9 @@ public:
 	/*!
 	 * @breif	hazard pointer support class
 	 *
-	 * 現在設定されているハザードポインタに対し、参照権を獲得している状態から削除権を獲得した状態へ変更するとともに、
-	 * 削除が可能であれば、削除を行う。
+	 * 現在設定されているハザードポインタに対し、参照権を獲得している状態から削除権を獲得した状態として、削除候補リストへ登録する。
 	 */
-	void try_delete_instance( void )
+	void move_hazard_ptr_to_del_list( void )
 	{
 		check_local_storage();
 
@@ -408,15 +515,12 @@ public:
 		p_hzd_ptr_node_->p_target_ = nullptr;
 		std::atomic_thread_fence( std::memory_order_release );
 
-		if ( p_try_delete != nullptr ) {
-			p_hzd_ptr_node_->head_thread_local_retire_list_.emplace_back( p_try_delete );
-		}
-		p_hzd_ptr_node_->head_thread_local_retire_list_.try_delete_instance();
+		hazard_ptr_internal::hazard_node_glist<T>::get_instance().regist_delete_ptr( p_try_delete );
 
 		return;
 	}
 
-	static int debug_get_glist_size( void )
+	static std::tuple<int, int> debug_get_glist_size( void )
 	{
 		return hazard_ptr_internal::hazard_node_glist<T>::get_instance().debug_get_glist_size();
 	}
@@ -441,16 +545,16 @@ private:
 	}
 
 #ifdef USE_PTHREAD_THREAD_LOCAL_STORAGE
-	static __thread hazard_ptr_internal::node_for_pointer<T>* p_hzd_ptr_node_;
+	static __thread hazard_ptr_internal::node_for_hazard_ptr<T>* p_hzd_ptr_node_;
 	// C++11で、thread_localが使用可能となるが、g++でコンパイルした場合、スレッド終了時のdestructor処理実行時に、
 	// すでにメモリ領域が破壊されている場合があるため、destructor処理の正常動作が期待できない。
 	// そのため、その点を明示する意図として __thread を使用する。
 	// また、 __thread の変数は、暗黙的にゼロ初期化されていることを前提としている。
 #else
-	static thread_local hazard_ptr_internal::node_for_pointer<T>* p_hzd_ptr_node_;
+	static thread_local hazard_ptr_internal::node_for_hazard_ptr<T>* p_hzd_ptr_node_;
 
 	struct destructor_func {
-		hazard_ptr_internal::node_for_pointer<T>** pp_hzd_ptr_node_ = nullptr;
+		hazard_ptr_internal::node_for_hazard_ptr<T>** pp_hzd_ptr_node_ = nullptr;
 
 		~destructor_func()
 		{
@@ -459,7 +563,7 @@ private:
 			if ( pp_hzd_ptr_node_ == nullptr ) return;
 			if ( *pp_hzd_ptr_node_ == nullptr ) return;
 
-			( *pp_hzd_ptr_node_ )->head_thread_local_retire_list_.try_delete_instance();
+			( *pp_hzd_ptr_node_ )->head_thread_local_retire_list_.move_hazard_ptr_to_del_list();
 			( *pp_hzd_ptr_node_ )->release_owner();
 
 			//			printf( "thread local destructor is done.\n" );
@@ -472,10 +576,10 @@ private:
 
 #ifdef USE_PTHREAD_THREAD_LOCAL_STORAGE
 template <typename T>
-__thread hazard_ptr_internal::node_for_pointer<T>* hazard_ptr<T>::p_hzd_ptr_node_;
+__thread hazard_ptr_internal::node_for_hazard_ptr<T>* hazard_ptr<T>::p_hzd_ptr_node_;
 #else
 template <typename T>
-thread_local hazard_ptr_internal::node_for_pointer<T>* hazard_ptr<T>::p_hzd_ptr_node_ = nullptr;
+thread_local hazard_ptr_internal::node_for_hazard_ptr<T>* hazard_ptr<T>::p_hzd_ptr_node_ = nullptr;
 template <typename T>
 thread_local typename hazard_ptr<T>::destructor_func hazard_ptr<T>::dest_inst_;
 #endif

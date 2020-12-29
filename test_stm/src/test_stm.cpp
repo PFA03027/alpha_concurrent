@@ -18,7 +18,8 @@
 
 using namespace std;
 
-constexpr uintptr_t g_loop_num = 10000 * 256;
+//constexpr uintptr_t g_loop_num = 10000 * 256;
+constexpr uintptr_t g_loop_num = 10 * 256;
 
 pthread_barrier_t barrier;
 
@@ -88,8 +89,8 @@ void test_case1( int num_thread, int loop_num )
 		std::cout << "NGGGGGGgggggg!" << std::endl;
 	}
 
-	printf( "glist_size: %d\n",
-	        alpha::concurrent::stm<uintptr_t>::debug_get_glist_size() );
+	auto [hzrd_size, del_size] = alpha::concurrent::stm<uintptr_t>::debug_get_glist_size();
+	printf( "glist_size: hazard ptr=%d, del ptr=%d\n", hzrd_size, del_size );
 
 	delete[] threads;
 	delete[] threads_ans;
@@ -100,7 +101,7 @@ int main( int argc, char* argv[] )
 {
 	cout << "!!!Hello World!!!" << endl;   // prints !!!Hello World!!!
 
-	for ( int i = 1; i <= 256; i = i * 2 ) {
+	for ( int i = 1; i <= 128; i = i * 2 ) {
 		test_case1( i, g_loop_num / i );
 	}
 

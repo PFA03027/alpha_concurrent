@@ -2,16 +2,17 @@
  Semi lock-free concurrent software asset
 
 # Pre-requirement
-* C++17 standard is required.
+* C++17 standard and library are required.
 * POSIX pthread thread local storage API is required.
+* POSIX semaphore API is required.
 
 # hazard_ptr.hpp
-Generalized hazard pointer support package.
+Generalized hazard pointer support package.  GC thread will delete the memory.
 The below is non lock-free point.
 * This classes in this header use new operator to allocate thread local hazard pointer management class.
   This point is not lock-free. On the other hand only this allocation  happened when a thread accesses a hazard pointer class at first.
-* This classes in this header use std::list<T> to store the retired pointer. std::list<T> may allocate the memory from heap.
-  This point is not lock-free.
+
+[Caution] The internal delete list is also lock-free. but, in case of high CPU load, list traversing cost is dramatically increased.
 
 # stm.hpp
 This is experimental code of STM.

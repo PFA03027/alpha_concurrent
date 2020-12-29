@@ -78,7 +78,7 @@ void* func_delete_owner( void* data )
 
 		std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
 
-		hazard_ptr_to.try_delete_instance();
+		hazard_ptr_to.move_hazard_ptr_to_del_list();
 	}
 
 	uintptr_t ans = 0;
@@ -112,6 +112,8 @@ int test_case1( void )
 		sum += e;
 	}
 
+	//	std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+
 	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
 	// に等しくなるはず。
 	std::cout << "Expect: 1" << std::endl;
@@ -124,8 +126,8 @@ int test_case1( void )
 
 	delete[] threads;
 
-	printf( "glist_size: %d\n",
-	        alpha::concurrent::hazard_ptr<delete_test>::debug_get_glist_size() );
+	auto [hzrd_size, del_size] = alpha::concurrent::hazard_ptr<delete_test>::debug_get_glist_size();
+	printf( "glist_size: hazard ptr=%d, del ptr=%d\n", hzrd_size, del_size );
 
 	return 0;
 }

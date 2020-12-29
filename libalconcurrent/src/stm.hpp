@@ -81,7 +81,7 @@ public:
 
 				if ( atomic_p_tobj_.compare_exchange_weak( p_old_tobj, p_new_tobj ) ) {
 					// p_old_tobjに対し、置き換えが成功＝削除権を獲得
-					tobj_hazard_ptr.try_delete_instance();
+					tobj_hazard_ptr.move_hazard_ptr_to_del_list();
 					break;
 				} else {
 					// 更新失敗。準備していた新しい値の為のオブジェクトは削除する。
@@ -91,7 +91,7 @@ public:
 		} while ( !sp_atomic_state->compare_exchange_weak( expected, state::COMMITED ) );
 	}
 
-	static int debug_get_glist_size( void )
+	static std::tuple<int, int> debug_get_glist_size( void )
 	{
 		return hazard_ptr<transactional_obj>::debug_get_glist_size();
 	}
@@ -155,7 +155,6 @@ private:
 													  //	static thread_local hazard_ptr<transactional_obj> tobj_hazard_ptr;
 	hazard_ptr<transactional_obj> tobj_hazard_ptr;
 };
-
 
 }   // namespace concurrent
 }   // namespace alpha
