@@ -18,8 +18,8 @@
 
 using namespace std;
 
-//constexpr uintptr_t g_loop_num = 10000 * 256;
-constexpr uintptr_t g_loop_num = 10 * 256;
+constexpr uintptr_t g_loop_num = 10000 * 256;
+//constexpr uintptr_t g_loop_num = 10 * 256;
 
 pthread_barrier_t barrier;
 
@@ -47,6 +47,7 @@ void test_case1( int num_thread, int loop_num )
 	cout << "!!!Ready!!!" << endl;   // prints !!!Hello World!!!
 
 	alpha::concurrent::stm<uintptr_t> stm_counter( 0 );
+	alpha::concurrent::stm<intptr_t>  tmp_stm_counter( 0 );
 
 	//	cout << (stm_counter.is_lock_free() ? "lock free" : "NOT lock free") << endl;
 
@@ -95,13 +96,16 @@ void test_case1( int num_thread, int loop_num )
 	delete[] threads;
 	delete[] threads_ans;
 
+	std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+
 	return;
 }
+
 int main( int argc, char* argv[] )
 {
 	cout << "!!!Hello World!!!" << endl;   // prints !!!Hello World!!!
 
-	for ( int i = 1; i <= 128; i = i * 2 ) {
+	for ( int i = 1; i <= 64; i = i * 2 ) {
 		test_case1( i, g_loop_num / i );
 	}
 

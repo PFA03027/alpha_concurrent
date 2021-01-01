@@ -75,6 +75,8 @@ private:
 	std::thread thd_garbage_collector;
 
 	bool loop_flag = true;
+
+	int max_delete_instances = 0;
 };
 
 Garbage_collector& Garbage_collector::get_instance( void )
@@ -87,28 +89,43 @@ Garbage_collector& Garbage_collector::get_instance( void )
 void Garbage_collector::thread_Garbage_collector( void )
 {
 	//	printf( "GC thread has started\n" );
-	while ( get_instance().do_continue() ) {
-		sem_wait( &get_instance().sem_t_garbage_collection_trigger );
 
-		//		printf( "GC starts now\n" );
+	int interval_count = 0;
+	do {
+		interval_count++;
+		if ( interval_count > ( NUM_OF_PRE_ALLOCATED_NODES / 2 ) ) {
+			interval_count = 0;
 
-		{
-			std::lock_guard<std::mutex> lock( get_instance().glist_access_mtx_ );
+			printf( "GC starts now\n" );
 
-			//			printf( "get glist lock now\n" );
+			int del_count = 0;
 
-			node_for_delete_ptr<hazard_node_glist_base>* p_cur = hazard_node_glist_base::head_node_glist_.get_next();
-			while ( p_cur != nullptr ) {
-				if ( !( p_cur->is_emptry() ) ) {
-					hazard_node_glist_base* p_glist = p_cur->get_delete_ptr();
-					p_glist->try_clean_up_delete_ptr();
+			{
+				std::lock_guard<std::mutex> lock( get_instance().glist_access_mtx_ );
+
+				printf( "get glist lock now\n" );
+
+				node_for_delete_ptr<hazard_node_glist_base>* p_cur = hazard_node_glist_base::head_node_glist_.get_next();
+				while ( p_cur != nullptr ) {
+					if ( !( p_cur->is_emptry() ) ) {
+						hazard_node_glist_base* p_glist = p_cur->get_delete_ptr();
+						del_count += p_glist->try_clean_up_delete_ptr();
+					}
+					p_cur = p_cur->get_next();
 				}
-				p_cur = p_cur->get_next();
 			}
+
+			if ( get_instance().max_delete_instances < del_count ) {
+				get_instance().max_delete_instances = del_count;
+			}
+
+			printf( "GC done now: del_count=%d\n", del_count );
 		}
 
-		//		printf( "GC done now\n" );
-	}
+		sem_wait( &get_instance().sem_t_garbage_collection_trigger );
+	} while ( get_instance().do_continue() );
+
+	printf( "max deletion count: %d\n", get_instance().max_delete_instances );
 
 	return;
 }
@@ -135,7 +152,7 @@ void hazard_node_glist_base::add_one_new_glist_node( void )
 
 void hazard_node_glist_base::regist_self_to_list( void )
 {
-	// 空きノードを探す。
+	// 空きノードを探す。空きノードは存在しないはずだけど、探してみる。
 	node_for_delete_ptr<hazard_node_glist_base>* p_ans = head_node_glist_.get_next();
 	while ( p_ans != nullptr ) {
 		if ( p_ans->is_emptry() ) {
@@ -155,6 +172,8 @@ void hazard_node_glist_base::regist_self_to_list( void )
 
 void hazard_node_glist_base::deregist_self_from_list( void )
 {
+	std::lock_guard<std::mutex> lock( Garbage_collector::get_instance().glist_access_mtx_ );
+
 	node_for_delete_ptr<hazard_node_glist_base>* p_cur_node = head_node_glist_.get_next();
 	while ( p_cur_node != nullptr ) {
 		std::atomic_thread_fence( std::memory_order_acquire );
@@ -168,8 +187,6 @@ void hazard_node_glist_base::deregist_self_from_list( void )
 	if ( p_cur_node == nullptr ) {
 		printf( "Error: fail to find own pointer in list.\n" );
 	}
-
-	return;
 
 	return;
 }
@@ -188,11 +205,9 @@ hazard_node_glist_base::hazard_node_glist_base( void )
 
 hazard_node_glist_base::~hazard_node_glist_base()
 {
-	std::lock_guard<std::mutex> lock( Garbage_collector::get_instance().glist_access_mtx_ );
-
 	//	printf( "glist destructor is called\n" );
 
-	deregist_self_from_list();
+	//	deregist_self_from_list();
 
 	return;
 }
