@@ -13,10 +13,10 @@
 
 #include "lf_fifo.hpp"
 
-constexpr int            num_thread = 32;
+constexpr int            num_thread = 8;
 constexpr std::uintptr_t loop_num   = 100000;
 
-using test_fifo_type_part = alpha::concurrent::internal::fifo_nd_list<std::uintptr_t>;
+using test_fifo_type_part = alpha::concurrent::internal::fifo_nd_list<std::uintptr_t, 0, 1>;
 
 pthread_barrier_t barrier;
 
@@ -202,7 +202,8 @@ void* func_test_fifo( void* data )
 		p_test_obj->push( v );
 		auto [pop_flag, vv] = p_test_obj->pop();
 		if ( !pop_flag ) {
-			printf( "Buggggggg!!!  %llu\n", v );
+			printf( "Bugggggggyyyy!!!  %llu\n", v );
+			printf( "fifo size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
 		v = vv + 1;
@@ -257,6 +258,7 @@ int main( void )
 	std::cout << "!!!Start World!!!" << std::endl;   // prints !!!Hello World!!!
 
 	for ( int i = 0; i < num_thread; i++ ) {
+		std::cout << "!!! " << i << " World!!!" << std::endl;   // prints !!!Hello World!!!
 		//			test_case1();
 		//		test_case2();
 		test_case3();

@@ -42,12 +42,13 @@ namespace concurrent {
  * インスタンスが削除される前に、アクセスするスレッドは、参照権の破棄としてrelease_owner()を呼び出すこと。
  *
  */
-template <typename T, int N>
+template <typename T, int N, bool CHK_RANGE_NARROW = false>
 class hazard_ptr {
 public:
-	using hzrd_type                    = T;
-	using hzrd_pointer                 = T*;
-	static constexpr int hzrd_max_slot = N;
+	using hzrd_type                       = T;
+	using hzrd_pointer                    = T*;
+	static constexpr int  hzrd_max_slot   = N;
+	static constexpr bool hzrd_range_narrow = CHK_RANGE_NARROW;
 
 	hazard_ptr( void )
 	{
@@ -77,7 +78,7 @@ public:
 			if ( status < 0 ) {
 				printf( "pthread_setspecific failed, errno %d", errno );
 			}
-//			printf( "Release owner\n" );
+			//			printf( "Release owner\n" );
 		}
 	}
 
@@ -132,19 +133,14 @@ public:
 		p_hzd_ptr_node_->clear_hazard_ptr_all();
 	}
 
-	bool chk_ptr_in_hazard_list( T* p_chk_ptr )
+	bool check_ptr_in_hazard_list( T* p_chk_ptr )
 	{
-		return hazard_ptr::check_ptr_in_hazard_list( p_chk_ptr );
-	}
-
-	static bool check_ptr_in_hazard_list( T* p_chk_ptr )
-	{
-		return hazard_node_head::get_instance().check_ptr_in_hazard_list( p_chk_ptr );
+		return get_head_instance().check_ptr_in_hazard_list( p_chk_ptr );
 	}
 
 	static int debug_get_glist_size( void )
 	{
-		return hazard_node_head::get_instance().get_node_count();
+		return get_head_instance().get_node_count();
 	}
 
 private:
@@ -231,7 +227,7 @@ private:
 
 		static void destr_fn( void* parm )
 		{
-//			printf( "thread local destructor now being called -- " );
+			//			printf( "thread local destructor now being called -- " );
 
 			if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
 
@@ -239,7 +235,7 @@ private:
 
 			p_target_node->release_owner();
 
-//			printf( "thread local destructor is done.\n" );
+			//			printf( "thread local destructor is done.\n" );
 			return;
 		}
 
@@ -273,6 +269,15 @@ private:
 
 	////////////////////////////////////////////////////////////////////////////////
 	struct hazard_node_head {
+		hazard_node_head( void )
+		  : head_( nullptr )
+		  , node_count_( 0 )
+		{
+			for ( int i = 0; i < NUM_OF_PRE_ALLOCATED_NODES; i++ ) {
+				auto p_hzrd_ptr_node = add_one_new_hazard_ptr_node();
+				p_hzrd_ptr_node->release_owner();
+			}
+		}
 
 		static hazard_node_head& get_instance( void )
 		{
@@ -287,7 +292,7 @@ private:
 			while ( p_ans != nullptr ) {
 				if ( p_ans->get_status() == ocupied_status::UNUSED ) {
 					if ( p_ans->try_to_get_owner() ) {
-//						printf( "node is allocated.\n" );
+						//						printf( "node is allocated.\n" );
 						return p_ans;
 					}
 				}
@@ -327,16 +332,6 @@ private:
 		}
 
 	private:
-		hazard_node_head( void )
-		  : head_( nullptr )
-		  , node_count_( 0 )
-		{
-			for ( int i = 0; i < NUM_OF_PRE_ALLOCATED_NODES; i++ ) {
-				auto p_hzrd_ptr_node = add_one_new_hazard_ptr_node();
-				p_hzrd_ptr_node->release_owner();
-			}
-		}
-
 		/*!
 		 * @breif	新しいノードを用意し、リストに追加する。
 		 *
@@ -355,7 +350,7 @@ private:
 			} while ( !cas_success );   // CASが成功するまで繰り返す。
 			node_count_++;
 
-//			printf( "glist is added.\n" );
+			//			printf( "glist is added.\n" );
 			return p_ans;
 		}
 
@@ -368,9 +363,20 @@ private:
 		std::atomic<int>                  node_count_;
 	};
 
+	hazard_node_head& get_head_instance( void )
+	{
+		if ( CHK_RANGE_NARROW ) {
+			return head_;
+		} else {
+			return hazard_node_head::get_instance();
+		}
+	}
+
+	hazard_node_head head_;
+
 	void allocate_local_storage( void )
 	{
-		p_hzd_ptr_node_ = hazard_node_head::get_instance().allocate_hazard_ptr_node();
+		p_hzd_ptr_node_ = get_head_instance().allocate_hazard_ptr_node();
 
 		int status;
 		status = pthread_setspecific( tls_key, (void*)p_hzd_ptr_node_ );
@@ -378,7 +384,7 @@ private:
 			printf( "pthread_setspecific failed, errno %d", errno );
 			pthread_exit( (void*)1 );
 		}
-//		printf( "pthread_setspecific set pointer to tls.\n" );
+		//		printf( "pthread_setspecific set pointer to tls.\n" );
 	}
 
 	inline void check_local_storage( void )
@@ -396,8 +402,8 @@ private:
 	pthread_key_t tls_key;   //!<	key for thread local storage of POSIX.
 };
 
-template <typename T, int N>
-__thread typename hazard_ptr<T, N>::node_for_hazard_ptr* hazard_ptr<T, N>::p_hzd_ptr_node_;
+template <typename T, int N, bool CHK_RANGE_NARROW>
+__thread typename hazard_ptr<T, N, CHK_RANGE_NARROW>::node_for_hazard_ptr* hazard_ptr<T, N, CHK_RANGE_NARROW>::p_hzd_ptr_node_;
 
 /*!
  * @breif	scoped reference control support class for hazard_ptr
@@ -405,10 +411,10 @@ __thread typename hazard_ptr<T, N>::node_for_hazard_ptr* hazard_ptr<T, N>::p_hzd
  * スコープベースでの、参照権の解放制御をサポートするクラス。
  * 削除権を確保する場合は、スコープアウトする前に、try_delete_instance()を呼び出すこと。
  */
-template <typename T, int N>
+template <typename T, int N, bool CHK_RANGE_NARROW>
 class hazard_ptr_scoped_ref {
 public:
-	hazard_ptr_scoped_ref( hazard_ptr<T, N>& ref, int idx_arg )
+	hazard_ptr_scoped_ref( hazard_ptr<T, N, CHK_RANGE_NARROW>& ref, int idx_arg )
 	  : idx_( idx_arg )
 	  , monitor_ref_( ref )
 	{
@@ -420,15 +426,15 @@ public:
 	}
 
 private:
-	int               idx_;
-	hazard_ptr<T, N>& monitor_ref_;
+	int                                 idx_;
+	hazard_ptr<T, N, CHK_RANGE_NARROW>& monitor_ref_;
 };
 
 /*!
  * @breif	推論補助
  */
 template <class HZD_PTR>
-hazard_ptr_scoped_ref( HZD_PTR&, int ) -> hazard_ptr_scoped_ref<typename HZD_PTR::hzrd_type, HZD_PTR::hzrd_max_slot>;
+hazard_ptr_scoped_ref( HZD_PTR&, int ) -> hazard_ptr_scoped_ref<typename HZD_PTR::hzrd_type, HZD_PTR::hzrd_max_slot, HZD_PTR::hzrd_range_narrow>;
 
 }   // namespace concurrent
 }   // namespace alpha
