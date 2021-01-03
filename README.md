@@ -28,6 +28,7 @@ Non lock free behavior cases are below;
 
 # stm.hpp
 This is experimental code of STM.
+Not resolved the memory leak issue yet.
 
 
 # License

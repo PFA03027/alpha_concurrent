@@ -141,7 +141,7 @@ public:
 		return get_head_instance().check_ptr_in_hazard_list( p_chk_ptr );
 	}
 
-	static int debug_get_glist_size( void )
+	int debug_get_glist_size( void )
 	{
 		return get_head_instance().get_node_count();
 	}

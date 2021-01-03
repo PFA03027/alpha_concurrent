@@ -88,10 +88,11 @@ void test_case1( int num_thread, int loop_num )
 		std::cout << "OK!" << std::endl;
 	} else {
 		std::cout << "NGGGGGGgggggg!" << std::endl;
+		exit( 1 );
 	}
 
-	auto [hzrd_size, del_size] = alpha::concurrent::stm<uintptr_t>::debug_get_glist_size();
-	printf( "glist_size: hazard ptr=%d, del ptr=%d\n", hzrd_size, del_size );
+	auto hzrd_size = stm_counter.debug_get_glist_size();
+	printf( "glist_size: hazard ptr=%d\n", hzrd_size );
 
 	delete[] threads;
 	delete[] threads_ans;
