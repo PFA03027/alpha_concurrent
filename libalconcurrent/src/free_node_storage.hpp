@@ -187,13 +187,19 @@ public:
 	template <typename ALLOC_NODE_T, typename TFUNC>
 	ALLOC_NODE_T* allocate( TFUNC pred )
 	{
-		static_assert( std::is_base_of<node_of_list, ALLOC_NODE_T>::value == true, "ALLOC_NODE_T is base of node_of_list" );
-
 		node_pointer p_ans = node_list_.pop();
 
 		if ( p_ans != nullptr ) {
-			if ( pred( p_ans ) ) {
-				return (ALLOC_NODE_T*)p_ans;
+			ALLOC_NODE_T* p_down_casted_ans = dynamic_cast<ALLOC_NODE_T*>( p_ans );   // TODO: lock free ?
+			if ( p_down_casted_ans != nullptr ) {
+				if ( pred( p_down_casted_ans ) ) {
+					return p_down_casted_ans;
+				}
+			} else {
+				// 最初の番兵データ以外で、もし、ダウンキャストに失敗したら、そもそも不具合であるし、不要なので、削除する。
+				//				printf( "Warning: fail to down cast\n" );
+				//				recycle( p_ans );
+				delete p_ans;
 			}
 		}
 
@@ -220,25 +226,15 @@ private:
 	template <typename ALLOC_NODE_T>
 	inline ALLOC_NODE_T* allocate_new_node( void )
 	{
+		static_assert( std::is_base_of<node_of_list, ALLOC_NODE_T>::value == true, "ALLOC_NODE_T is base of node_of_list" );
+
+		//		printf( "allocated new node\n" );
+
 		allocated_node_count_++;
 		return new ALLOC_NODE_T();
 	}
 
 	static void destr_fn( void* parm );
-#if 0
-	{
-		//			printf( "thread local destructor now being called -- " );
-
-		if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
-
-		thread_local_fifo_list* p_target_node = reinterpret_cast<thread_local_fifo_list*>( parm );
-
-		delete p_target_node;
-
-		//			printf( "thread local destructor is done.\n" );
-		return;
-	}
-#endif
 
 	void allocate_local_storage( void );
 
@@ -252,7 +248,7 @@ private:
 		return p_ans;
 	}
 
-	static constexpr int num_recycle_exec = 2;   //!< recycle処理を行うノード数。処理量が一定化するために、ループ回数を定数化する。２以上とする事。
+	static constexpr int num_recycle_exec = 16;   //!< recycle処理を行うノード数。処理量が一定化するために、ループ回数を定数化する。２以上とする事。
 
 	std::atomic<int> allocated_node_count_;
 

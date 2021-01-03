@@ -18,11 +18,6 @@ thread_local_fifo_list::thread_local_fifo_list( void )
   : head_( nullptr )
   , tail_( nullptr )
 {
-	node_pointer p_initial_node = new node_type();
-
-	head_ = p_initial_node;
-	tail_ = p_initial_node;
-
 	return;
 }
 
@@ -31,7 +26,6 @@ thread_local_fifo_list::~thread_local_fifo_list()
 	node_pointer p_cur = head_;
 
 	if ( p_cur != nullptr ) {
-		// 先頭ノードは番兵のため、nullptrであることはありえないが、チェックする。
 		do {
 			node_pointer const p_nxt = p_cur->get_next( next_slot_idx_ );
 			delete p_cur;
@@ -46,23 +40,31 @@ void thread_local_fifo_list::push( thread_local_fifo_list::node_pointer const p_
 {
 	p_push_node->set_next( nullptr, next_slot_idx_ );
 
-	tail_->set_next( p_push_node, next_slot_idx_ );
-	tail_ = p_push_node;
+	if ( head_ != nullptr ) {
+		tail_->set_next( p_push_node, next_slot_idx_ );
+		tail_ = p_push_node;
+	} else {
+		head_ = p_push_node;
+		tail_ = p_push_node;
+	}
 
 	return;
 }
 
 thread_local_fifo_list::node_pointer thread_local_fifo_list::pop( void )
 {
-	node_pointer p_ans = head_;
-
-	if ( head_ == tail_ ) {
-		// 番兵ノードしかないので、FIFOキューは空。
+	if ( head_ == nullptr ) {
 		return nullptr;
 	}
 
+	node_pointer p_ans = head_;
+
 	node_pointer p_cur_next = head_->get_next( next_slot_idx_ );
 	head_                   = p_cur_next;
+
+	if ( head_ == nullptr ) {
+		tail_ = nullptr;
+	}
 
 	return p_ans;
 }
@@ -234,29 +236,26 @@ int free_nd_storage::get_allocated_num( void )
 	return allocated_node_count_.load();
 }
 
-#if 1
 void free_nd_storage::destr_fn( void* parm )
 {
-	printf( "thread local destructor now being called -- %p -- ", parm );
+	//	printf( "thread local destructor now being called -- %p -- ", parm );
 	fflush( NULL );
 
 	if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
 
 	thread_local_fifo_list* p_target_node = reinterpret_cast<thread_local_fifo_list*>( parm );
+	delete p_target_node;   // TODO: なぜか、エラーになる。。。
 
-	delete p_target_node;
-
-	printf( "thread local destructor is done.\n" );
+	//	printf( "thread local destructor is done.\n" );
 	fflush( NULL );
 	return;
 }
-#endif
 
 void free_nd_storage::allocate_local_storage( void )
 {
 	p_tls_fifo__ = new thread_local_fifo_list();
 
-	printf( "allocate thread_local_fifo_list -- %p\n", p_tls_fifo__ );
+	//	printf( "allocate thread_local_fifo_list -- %p\n", p_tls_fifo__ );
 	fflush( NULL );
 
 	int status;

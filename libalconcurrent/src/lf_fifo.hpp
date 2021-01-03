@@ -293,7 +293,7 @@ public:
 		int pre_alloc_nodes = 0   //!< [in]	number of pre-allocated internal free node
 	)
 	{
-		free_nd_.pre_allocate<fifo_type>( pre_alloc_nodes );
+		free_nd_.pre_allocate<fifo_node_type>( pre_alloc_nodes );
 		return;
 	}
 
@@ -307,8 +307,8 @@ public:
 	)
 	{
 		fifo_node_pointer p_new_node = free_nd_.allocate<fifo_node_type>(
-			[this]( free_node_pointer p_chk_node ) {
-				return !( this->fifo_.check_hazard_list( (fifo_node_pointer)p_chk_node ) );
+			[this]( fifo_node_pointer p_chk_node ) {
+				return !( this->fifo_.check_hazard_list( p_chk_node ) );
 				//				return false;
 			} );
 
@@ -367,8 +367,8 @@ private:
 	using free_node_type       = typename free_nd_storage_type::node_type;
 	using free_node_pointer    = typename free_nd_storage_type::node_pointer;
 	using fifo_type            = internal::fifo_nd_list<T>;
-	using fifo_node_type       = typename internal::fifo_nd_list<T>::node_type;
-	using fifo_node_pointer    = typename internal::fifo_nd_list<T>::node_pointer;
+	using fifo_node_type       = typename fifo_type::node_type;
+	using fifo_node_pointer    = typename fifo_type::node_pointer;
 
 	fifo_type            fifo_;
 	free_nd_storage_type free_nd_;

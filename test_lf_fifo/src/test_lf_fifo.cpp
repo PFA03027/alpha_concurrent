@@ -13,7 +13,7 @@
 
 #include "lf_fifo.hpp"
 
-constexpr int            num_thread = 1;   // Tested until 64.
+constexpr int            num_thread = 32;   // Tested until 64.
 constexpr std::uintptr_t loop_num   = 100000;
 
 using test_fifo_type_part = alpha::concurrent::internal::fifo_nd_list<std::uintptr_t>;
@@ -216,7 +216,8 @@ void* func_test_fifo( void* data )
 
 int test_case3( void )
 {
-	test_fifo_type* p_test_obj = new test_fifo_type( num_thread * 2 );
+	//	test_fifo_type* p_test_obj = new test_fifo_type( num_thread * 2 );
+	test_fifo_type* p_test_obj = new test_fifo_type();
 
 	pthread_barrier_init( &barrier, NULL, num_thread + 1 );
 	pthread_t* threads = new pthread_t[num_thread];
@@ -261,7 +262,7 @@ int main( void )
 {
 	std::cout << "!!!Start World!!!" << std::endl;   // prints !!!Hello World!!!
 
-	for ( int i = 0; i < 64; i++ ) {
+	for ( int i = 0; i < 4; i++ ) {
 		std::cout << "!!! " << i << " World!!!" << std::endl;   // prints !!!Hello World!!!
 																//		test_case1();
 																//		test_case2();
