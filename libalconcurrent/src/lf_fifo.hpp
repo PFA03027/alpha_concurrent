@@ -4,7 +4,9 @@
  * lock free fifo
  *
  *  Created on: 2020/12/31
- *      Author: alpha
+ *      Author: Teruaki Ata
+ *
+ * Copyright (C) 2020 by Teruaki Ata <PFA03027@nifty.com>
  */
 
 #ifndef SRC_LF_FIFO_HPP_
@@ -355,7 +357,7 @@ public:
 	using node_type                       = node_of_list<T, NEXT_SLOT_LINES>;
 	using node_pointer                    = node_of_list<T, NEXT_SLOT_LINES>*;
 
-	free_nd_storage( void )
+	free_nd_storage( int pre_alloc_nodes = 0 )
 	  : allocated_node_count_( 0 )
 	{
 		int status = pthread_key_create( &tls_key, destr_fn );
@@ -364,6 +366,10 @@ public:
 			exit( 1 );
 		}
 		check_local_storage();
+
+		for ( int i = 0; i < pre_alloc_nodes; i++ ) {
+			recycle( allocate_new_node() );
+		}
 	}
 
 	~free_nd_storage()
@@ -419,8 +425,7 @@ public:
 		}
 
 		// ここに来たら、利用可能なfree nodeがなかったこと示すので、新しいノードをヒープから確保する。
-		allocated_node_count_++;
-		return new node_type();
+		return allocate_new_node();
 	}
 
 	int get_allocated_num( void )
@@ -429,6 +434,12 @@ public:
 	}
 
 private:
+	inline node_pointer allocate_new_node( void )
+	{
+		allocated_node_count_++;
+		return new node_type();
+	}
+
 	static void destr_fn( void* parm )
 	{
 		//			printf( "thread local destructor now being called -- " );
@@ -663,23 +674,45 @@ private:
 }   // namespace internal
 
 /*!
- * @breif	リスト型のFIFOキュー
+ * @breif	semi-lock free FIFO type queue
  *
- * Tは、trivially copyableでなければならい。
+ * Type T should be trivially copyable.
+ *
+ * In case of no avialable free node that carries a value, new node is allocated from heap internally. @n
+ * In this case, this queue may be locked. And push() may trigger this behavior.
+ *
+ * On the other hand, used free node will be recycled without a memory allocation. In this case, push() is lock free.
+ *
+ * To reduce lock behavior, pre-allocated nodes are effective. @n
+ * get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
  *
  * @note
+ * To resolve ABA issue, this FIFO queue uses hazard pointer approach.
  */
 template <typename T>
 class fifo_list {
 public:
 	using value_type = T;
 
-	fifo_list( void )
+	/*!
+	 * @breif	Constructor
+	 */
+	fifo_list(
+		int pre_alloc_nodes = 0   //!< [in]	number of pre-allocated internal free node
+		)
+	  : free_nd_( pre_alloc_nodes )
 	{
 		return;
 	}
 
-	void push( const T& cont_arg )
+	/*!
+	 * @breif	Push a value to this FIFO queue
+	 *
+	 * cont_arg will copy to FIFO queue.
+	 */
+	void push(
+		const T& cont_arg   //!< [in]	a value to push this FIFO queue
+	)
 	{
 		node_pointer p_new_node = free_nd_.allocate(
 			[this]( node_pointer p_chk_node ) {
@@ -693,6 +726,12 @@ public:
 		return;
 	}
 
+	/*!
+	 * @breif	Pop a value from this FIFO queue
+	 *
+	 * @return	1st element: true=success to pop a value, false=no value to pop
+	 * @return	2nd element: a value that is pop. In case that 1st element is true, 2nd element is valid.
+	 */
 	std::tuple<bool, value_type> pop( void )
 	{
 		auto [p_poped_node, ans_value] = fifo_.pop();
@@ -704,16 +743,27 @@ public:
 		return std::tuple<bool, value_type>( true, ans_value );
 	}
 
+	/*!
+	 * @breif	number of the queued values in FIFO
+	 *
+	 * @warning
+	 * This FIFO will be access by several thread concurrently. So, true number of this FIFO queue may be changed when caller uses the returned value.
+	 */
 	int get_size( void )
 	{
 		return fifo_.get_size();
 	}
 
+	/*!
+	 * @breif	get the total number of the allocated internal nodes
+	 *
+	 * @warning
+	 * This FIFO will be access by several thread concurrently. So, true number of this FIFO queue may be changed when caller uses the returned value.
+	 */
 	int get_allocated_num( void )
 	{
 		return free_nd_.get_allocated_num();
 	}
-
 
 private:
 	using free_nd_storage_type              = internal::free_nd_storage<T>;

@@ -4,15 +4,27 @@
 # Pre-requirement
 * C++17 standard and library are required.
 * POSIX pthread thread local storage API is required.
-* POSIX semaphore API is required.
 
-# hazard_ptr.hpp
-Generalized hazard pointer support package.  GC thread will delete the memory.
-The below is non lock-free point.
-* This classes in this header use new operator to allocate thread local hazard pointer management class.
-  This point is not lock-free. On the other hand only this allocation  happened when a thread accesses a hazard pointer class at first.
+# fifo_list class in lf_fifo.hpp
+Semi-lock free FIFO type queue
 
-[Caution] The internal delete list is also lock-free. but, in case of high CPU load, list traversing cost is dramatically increased.
+Template 1st parameter T should be trivially copyable.
+
+In case of no avialable free node that carries a value, new node is allocated from heap internally.
+In this case, this queue may be locked. And push() may trigger this behavior.
+
+On the other hand, used free node will be recycled without a memory allocation. In this case, push() is lock free.
+
+To reduce lock behavior, pre-allocated nodes are effective.
+get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
+
+## Supplement
+To resolve ABA issue, this FIFO queue uses hazard pointer approach.
+
+Non lock free behavior cases are below;
+* Construct a instance itself.
+* Any initial API call by each thread.
+* push() call in case of no free internal node.
 
 # stm.hpp
 This is experimental code of STM.

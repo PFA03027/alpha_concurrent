@@ -1,8 +1,8 @@
 //============================================================================
 // Name        : test_hazard_ptr.cpp
-// Author      : alpha
+// Author      :
 // Version     :
-// Copyright   : PFA03027@nifty.com
+// Copyright   : Copyright (C) 2020 by Teruaki Ata <PFA03027@nifty.com>
 // Description : Hello World in C++, Ansi-style
 //============================================================================
 

@@ -2,7 +2,9 @@
  * stm.hpp
  *
  *  Created on: 2020/12/17
- *      Author: alpha
+ *      Author: Teruaki Ata
+ *
+ * Copyright (C) 2020 by Teruaki Ata <PFA03027@nifty.com>
  */
 
 #ifndef SRC_STM_HPP_

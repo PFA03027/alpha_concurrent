@@ -2,7 +2,7 @@
 // Name        : test_stm.cpp
 // Author      :
 // Version     :
-// Copyright   : Your copyright notice
+// Copyright   : Copyright (C) 2020 by Teruaki Ata <PFA03027@nifty.com>
 // Description : Hello World in C++, Ansi-style
 //============================================================================
 
