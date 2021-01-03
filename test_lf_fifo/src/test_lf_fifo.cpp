@@ -13,7 +13,7 @@
 
 #include "lf_fifo.hpp"
 
-constexpr int            num_thread = 4;   // Tested until 64.
+constexpr int            num_thread = 1;   // Tested until 64.
 constexpr std::uintptr_t loop_num   = 100000;
 
 using test_fifo_type_part = alpha::concurrent::internal::fifo_nd_list<std::uintptr_t>;
@@ -110,7 +110,7 @@ int test_case1( void )
 	std::cout << "Expect: " << std::to_string( num_thread * loop_num ) << std::endl;
 	std::cout << "Sum:    " << sum << std::endl;
 	if ( sum == num_thread * loop_num ) {
-		std::cout << "OK!" << std::endl;
+		std::cout << "OK! test_case1()" << std::endl;
 	} else {
 		std::cout << "NGGGGGGgggggg!" << std::endl;
 		exit( 1 );
@@ -176,7 +176,7 @@ int test_case2( void )
 	std::cout << "Expect: " << std::to_string( num_thread * loop_num ) << std::endl;
 	std::cout << "Sum:    " << sum << std::endl;
 	if ( sum == num_thread * loop_num ) {
-		std::cout << "OK!" << std::endl;
+		std::cout << "OK! test_case2()" << std::endl;
 	} else {
 		std::cout << "NGGGGGGgggggg!" << std::endl;
 		exit( 1 );
@@ -244,7 +244,7 @@ int test_case3( void )
 	std::cout << "Expect: " << std::to_string( num_thread * loop_num ) << std::endl;
 	std::cout << "Sum:    " << sum << std::endl;
 	if ( sum == num_thread * loop_num ) {
-		std::cout << "OK!" << std::endl;
+		std::cout << "OK! test_case3()" << std::endl;
 	} else {
 		std::cout << "NGGGGGGgggggg!" << std::endl;
 		exit( 1 );
@@ -263,8 +263,8 @@ int main( void )
 
 	for ( int i = 0; i < 64; i++ ) {
 		std::cout << "!!! " << i << " World!!!" << std::endl;   // prints !!!Hello World!!!
-		test_case1();
-		test_case2();
+																//		test_case1();
+																//		test_case2();
 		test_case3();
 	}
 

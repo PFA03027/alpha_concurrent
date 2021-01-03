@@ -45,7 +45,7 @@ namespace concurrent {
  * インスタンスが削除される前に、アクセスするスレッドは、参照権の破棄としてrelease_owner()を呼び出すこと。
  *
  */
-template <typename T, int N, bool CHK_RANGE_NARROW = false>
+template <typename T, int N, bool CHK_RANGE_NARROW = true>
 class hazard_ptr {
 public:
 	using hzrd_type                       = T;
