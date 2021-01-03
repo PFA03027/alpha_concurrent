@@ -16,7 +16,7 @@
 constexpr int            num_thread = 4;   // Tested until 64.
 constexpr std::uintptr_t loop_num   = 100000;
 
-using test_fifo_type_part = alpha::concurrent::internal::fifo_nd_list<std::uintptr_t, 0, 1>;
+using test_fifo_type_part = alpha::concurrent::internal::fifo_nd_list<std::uintptr_t>;
 
 pthread_barrier_t barrier;
 
