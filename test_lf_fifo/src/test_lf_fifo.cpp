@@ -13,7 +13,7 @@
 
 #include "lf_fifo.hpp"
 
-constexpr int            num_thread = 8;
+constexpr int            num_thread = 64;
 constexpr std::uintptr_t loop_num   = 100000;
 
 using test_fifo_type_part = alpha::concurrent::internal::fifo_nd_list<std::uintptr_t, 0, 1>;
@@ -54,6 +54,7 @@ void* func_pop( void* data )
 		if ( p_node == nullptr ) {
 			printf( "Gyaaaa!!!\n" );
 			return reinterpret_cast<void*>( v );
+			exit( 1 );
 		}
 		v++;
 		//		delete p_node;
@@ -178,6 +179,7 @@ int test_case2( void )
 		std::cout << "OK!" << std::endl;
 	} else {
 		std::cout << "NGGGGGGgggggg!" << std::endl;
+		exit( 1 );
 	}
 
 	delete[] threads;
@@ -250,6 +252,8 @@ int test_case3( void )
 
 	delete[] threads;
 
+	delete p_test_obj;
+
 	return 0;
 }
 
@@ -259,8 +263,8 @@ int main( void )
 
 	for ( int i = 0; i < num_thread; i++ ) {
 		std::cout << "!!! " << i << " World!!!" << std::endl;   // prints !!!Hello World!!!
-		//			test_case1();
-		//		test_case2();
+		test_case1();
+		test_case2();
 		test_case3();
 	}
 

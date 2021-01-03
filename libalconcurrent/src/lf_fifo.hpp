@@ -25,7 +25,7 @@ namespace internal {
  *
  * Tは、trivially copyableでなければならい。
  */
-template <typename T, int NEXT_SLOTS = 2>
+template <typename T, int NEXT_SLOTS = 3>
 struct node_of_list {
 
 	node_of_list( void )
@@ -94,6 +94,75 @@ private:
 };
 
 /*!
+ * @breif	フリーノードを管理するクラスで使用するスレッドローカルストレージのリスト型のFIFOキュークラス
+ */
+template <typename T, int NEXT_SLOTS_IDX = 1, int NEXT_SLOTS = 3>
+class thread_local_fifo_list {
+public:
+	using value_type   = T;
+	using node_type    = node_of_list<T, NEXT_SLOTS>;
+	using node_pointer = node_of_list<T, NEXT_SLOTS>*;
+
+	thread_local_fifo_list( void )
+	  : head_( nullptr )
+	  , tail_( nullptr )
+	{
+		node_pointer p_initial_node = new node_type();
+		head_                       = p_initial_node;
+		tail_                       = p_initial_node;
+
+		return;
+	}
+
+	~thread_local_fifo_list()
+	{
+		node_pointer p_cur = head_;
+
+		if ( p_cur != nullptr ) {
+			// 先頭ノードは番兵のため、nullptrであることはありえないが、チェックする。
+			do {
+				node_pointer const p_nxt = p_cur->get_next( next_slot_idx_ );
+				delete p_cur;
+				p_cur = p_nxt;
+			} while ( p_cur != nullptr );
+		}
+
+		return;
+	}
+
+	void push( node_pointer const p_push_node )
+	{
+		p_push_node->set_next( nullptr, next_slot_idx_ );
+
+		tail_->set_next( p_push_node, next_slot_idx_ );
+		tail_ = p_push_node;
+
+		return;
+	}
+
+	node_pointer pop( void )
+	{
+		node_pointer p_ans = head_;
+
+		if ( head_ == tail_ ) {
+			// 番兵ノードしかないので、FIFOキューは空。
+			return nullptr;
+		}
+
+		node_pointer p_cur_next = head_->get_next( next_slot_idx_ );
+		head_                   = p_cur_next;
+
+		return p_ans;
+	}
+
+private:
+	static constexpr int next_slot_idx_ = NEXT_SLOTS_IDX;
+
+	node_pointer head_;
+	node_pointer tail_;
+};
+
+/*!
  * @breif	フリーノードを管理するクラスの基本となるリスト型のFIFOキュークラス
  *
  * Tは、trivially copyableでなければならい。
@@ -102,31 +171,19 @@ private:
  * https://www.slideshare.net/kumagi/lock-free-safe?next_slideshow=1 @n
  * 明記はされていないが、必ずノードが１つ残る構造。
  */
-template <typename T, int NEXT_SLOTS = 2>
-class fifo_free_nd_list_one_line {
+template <typename T, int NEXT_SLOTS_IDX = 0, int NEXT_SLOTS = 3>
+class fifo_free_nd_list {
 public:
 	static constexpr int hzrd_max_slot_ = 5;
 	using value_type                    = T;
 	using node_type                     = node_of_list<T, NEXT_SLOTS>;
 	using node_pointer                  = node_of_list<T, NEXT_SLOTS>*;
 
-	fifo_free_nd_list_one_line( void )
+	fifo_free_nd_list( void )
 	  : next_slot_idx_( 0 )
 	  , head_( nullptr )
 	  , tail_( nullptr )
 	{
-		return;
-	}
-
-	/*!
-	 * @breif	このクラスが使用するnextポインタのスロットインデックスを指定する。
-	 *
-	 * このAPI呼び出しによるスロットインデックスの指定は、全てのAPIの使用前に実施しなければならない。
-	 */
-	void set_slot_idx( int idx_arg )
-	{
-		next_slot_idx_ = idx_arg;
-
 		node_pointer p_initial_node = new node_type();
 		head_.store( p_initial_node );
 		tail_.store( p_initial_node );
@@ -134,7 +191,7 @@ public:
 		return;
 	}
 
-	~fifo_free_nd_list_one_line()
+	~fifo_free_nd_list()
 	{
 		node_pointer p_cur = head_.load();
 		head_.store( nullptr );
@@ -197,8 +254,7 @@ public:
 	 * @warning
 	 * 管理ノードは、使用中の可能性がある。ハザードポインタに登録されていないことの確認が完了するまで、管理ノードの破棄や、APIを呼び出しで、値を変更してはならない。
 	 */
-	template <typename TFUNC>
-	node_pointer pop( TFUNC pred )
+	node_pointer pop( void )
 	{
 		scoped_hazard_ref scoped_ref_first( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_FIRST );
 		scoped_hazard_ref scoped_ref_last( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_LAST );
@@ -233,9 +289,6 @@ public:
 				if ( p_cur_next == nullptr ) {
 					// headが他のスレッドでpopされた。
 					continue;
-				}
-				if ( !pred( p_cur_first ) ) {
-					return nullptr;
 				}
 				// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
 				// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
@@ -303,16 +356,14 @@ public:
 	using node_pointer                    = node_of_list<T, NEXT_SLOT_LINES>*;
 
 	free_nd_storage( void )
-	  : shd_rcy_idx_( 0 )
-	  , shd_alc_idx_( 0 )
-	  , allocated_node_count_( 0 )
+	  : allocated_node_count_( 0 )
 	{
-		for ( int i = 0; i < free_node_lines_; i++ ) {
-			node_list_lines_[i].set_slot_idx( i + 1 );
+		int status = pthread_key_create( &tls_key, destr_fn );
+		if ( status < 0 ) {
+			printf( "pthread_key_create failed, errno=%d", errno );
+			exit( 1 );
 		}
-		for ( int i = 0; i < free_node_lines_; i++ ) {
-			recycle( new node_type() );
-		}
+		check_local_storage();
 	}
 
 	~free_nd_storage()
@@ -322,21 +373,22 @@ public:
 
 	void recycle( node_pointer p_retire_node )
 	{
-		// push先のラインがなるべくばらけるように、最初のチェックラインを順番に回すようにする。
-		int cur_idx  = shd_rcy_idx_.load();
-		int stop_idx = cur_idx;
-		shd_rcy_idx_.store( ( ( cur_idx + 1 ) < free_node_lines_ ) ? ( cur_idx + 1 ) : 0 );
+		thread_local_fifo_list<T>* p_tls_fifo_ = check_local_storage();
 
-		do {
-			cur_idx = ( ( cur_idx + 1 ) < free_node_lines_ ) ? ( cur_idx + 1 ) : 0;
-			if ( !( node_list_lines_[cur_idx].check_hazard_list( p_retire_node ) ) ) {
-				// this slot line has no collision b/w p_retire_node and hazard pointers on this slot line.
-				node_list_lines_[cur_idx].push( p_retire_node );
-				return;
+		if ( p_retire_node == nullptr ) return;
+
+		p_tls_fifo_->push( p_retire_node );
+
+		for ( int i = 0; i < num_recycle_exec; i++ ) {
+			node_pointer p_chk = p_tls_fifo_->pop();
+			if ( p_chk == nullptr ) break;
+			if ( node_list_.check_hazard_list( p_chk ) ) {
+				p_tls_fifo_->push( p_chk );   // 差し戻し
+			} else {
+				node_list_.push( p_chk );
 			}
-		} while ( cur_idx != stop_idx );
+		}
 
-		printf( "Error: this route indecates logic error in allocate() API.\n" );
 		return;
 	}
 
@@ -358,50 +410,77 @@ public:
 	template <typename TFUNC>
 	node_pointer allocate( TFUNC pred )
 	{
-		// pop元のラインがなるべくばらけるように、最初のチェックラインを順番に回すようにする。
-		int stop_idx = shd_alc_idx_.load();
-		int cur_idx  = ( ( stop_idx + 1 ) < free_node_lines_ ) ? ( stop_idx + 1 ) : 0;
-		shd_alc_idx_.store( cur_idx );
+		node_pointer p_ans = node_list_.pop();
 
-		while ( cur_idx != stop_idx ) {
-			node_pointer p_available_node = node_list_lines_[cur_idx].pop(
-				[this, cur_idx, &pred]( node_pointer p_chk_node ) {
-					if ( p_chk_node != nullptr ) {
-						if ( !pred( p_chk_node ) ) return false;
-						for ( int i = 0; i < free_node_lines_; i++ ) {
-							if ( i == cur_idx ) continue;
-
-							if ( !( this->node_list_lines_[i].check_hazard_list( p_chk_node ) ) ) {
-								// p_chk_node has no collision of a slot line.
-								return true;
-							}
-						}
-					}
-					return false;
-				} );
-
-			if ( p_available_node != nullptr ) {
-				return p_available_node;
+		if ( p_ans != nullptr ) {
+			if ( pred( p_ans ) ) {
+				return p_ans;
 			}
-
-			cur_idx = ( ( cur_idx + 1 ) < free_node_lines_ ) ? ( cur_idx + 1 ) : 0;
 		}
 
-		allocated_node_count_++;
-
 		// ここに来たら、利用可能なfree nodeがなかったこと示すので、新しいノードをヒープから確保する。
+		allocated_node_count_++;
 		return new node_type();
 	}
 
-private:
-	static constexpr int free_node_lines_ = NEXT_SLOT_LINES - 1;
+	int get_allocated_num( void )
+	{
+		return allocated_node_count_.load();
+	}
 
-	std::atomic<int>                               shd_rcy_idx_;
-	std::atomic<int>                               shd_alc_idx_;
-	fifo_free_nd_list_one_line<T, NEXT_SLOT_LINES> node_list_lines_[free_node_lines_];
+private:
+	static void destr_fn( void* parm )
+	{
+		//			printf( "thread local destructor now being called -- " );
+
+		if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
+
+		thread_local_fifo_list<T>* p_target_node = reinterpret_cast<thread_local_fifo_list<T>*>( parm );
+
+		delete p_target_node;
+
+		//			printf( "thread local destructor is done.\n" );
+		return;
+	}
+
+	void allocate_local_storage( void )
+	{
+		p_tls_fifo__ = new thread_local_fifo_list<T>();
+
+		int status;
+		status = pthread_setspecific( tls_key, (void*)p_tls_fifo__ );
+		if ( status < 0 ) {
+			printf( "pthread_setspecific failed, errno %d", errno );
+			pthread_exit( (void*)1 );
+		}
+		//		printf( "pthread_setspecific set pointer to tls.\n" );
+	}
+
+	inline thread_local_fifo_list<T>* check_local_storage( void )
+	{
+		thread_local_fifo_list<T>* p_ans = p_tls_fifo__;
+		if ( p_ans == nullptr ) {
+			allocate_local_storage();
+			p_ans = p_tls_fifo__;
+		}
+		return p_ans;
+	}
+
+	static constexpr int num_recycle_exec = 2;   //!< recycle処理を行うノード数。処理量が一定化するために、ループ回数を定数化する。２以上とする事。
 
 	std::atomic<int> allocated_node_count_;
+
+	fifo_free_nd_list<T> node_list_;
+
+	static thread_local thread_local_fifo_list<T>* p_tls_fifo__;
+
+	pthread_key_t tls_key;   //!<	key for thread local storage of POSIX.
+
+	//	friend pthread_key_create;
 };
+
+template <typename T, int NEXT_SLOT_LINES>
+thread_local thread_local_fifo_list<T>* free_nd_storage<T, NEXT_SLOT_LINES>::p_tls_fifo__;
 
 /*!
  * @breif	リスト型のFIFOキューの基本要素となるFIFOキュークラス
@@ -630,10 +709,16 @@ public:
 		return fifo_.get_size();
 	}
 
+	int get_allocated_num( void )
+	{
+		return free_nd_.get_allocated_num();
+	}
+
+
 private:
-	using free_nd_storage_type              = internal::free_nd_storage<T, 4>;
+	using free_nd_storage_type              = internal::free_nd_storage<T>;
 	static constexpr int num_of_slot_lines_ = free_nd_storage_type::next_slot_lines_;
-	using fifo_type                         = internal::fifo_nd_list<T, 0, num_of_slot_lines_>;
+	using fifo_type                         = internal::fifo_nd_list<T, 2, num_of_slot_lines_>;
 	using node_type                         = typename free_nd_storage_type::node_type;
 	using node_pointer                      = typename free_nd_storage_type::node_pointer;
 
