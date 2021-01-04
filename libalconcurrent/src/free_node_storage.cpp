@@ -212,9 +212,9 @@ free_nd_storage::~free_nd_storage()
 
 void free_nd_storage::recycle( free_nd_storage::node_pointer p_retire_node )
 {
-	thread_local_fifo_list* p_tls_fifo_ = check_local_storage();
-
 	if ( p_retire_node == nullptr ) return;
+
+	thread_local_fifo_list* p_tls_fifo_ = check_local_storage();
 
 	p_tls_fifo_->push( p_retire_node );
 
