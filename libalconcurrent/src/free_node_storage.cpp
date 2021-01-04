@@ -193,7 +193,9 @@ bool fifo_free_nd_list::check_hazard_list( fifo_free_nd_list::node_pointer const
 
 ////////////////////////////////////////////////////////////////////////////
 
+#if 0
 thread_local thread_local_fifo_list* free_nd_storage::p_tls_fifo__;
+#endif
 
 free_nd_storage::free_nd_storage( void )
   : allocated_node_count_( 0 )
@@ -209,6 +211,13 @@ free_nd_storage::free_nd_storage( void )
 free_nd_storage::~free_nd_storage()
 {
 	printf( "Final: new node is allocated -> %d\n", allocated_node_count_.load() );
+
+	// メモリリークが起きるけど、やってみる。
+	int status = pthread_key_delete( tls_key );
+	if ( status < 0 ) {
+		printf( "pthread_key_create failed, errno=%d", errno );
+		exit( 1 );
+	}
 }
 
 void free_nd_storage::recycle( free_nd_storage::node_pointer p_retire_node )
@@ -252,6 +261,7 @@ void free_nd_storage::destr_fn( void* parm )
 	return;
 }
 
+#if 0
 void free_nd_storage::allocate_local_storage( void )
 {
 	p_tls_fifo__ = new thread_local_fifo_list();
@@ -267,6 +277,7 @@ void free_nd_storage::allocate_local_storage( void )
 	}
 	//		printf( "pthread_setspecific set pointer to tls.\n" );
 }
+#endif
 
 }   // namespace internal
 }   // namespace concurrent
