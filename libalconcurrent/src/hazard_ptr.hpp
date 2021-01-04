@@ -22,9 +22,9 @@
 #include <mutex>
 #include <thread>
 
-#define USE_PTHREAD_THREAD_LOCAL_STORAGE   //!<	Use pthread thread local storage instead of thread_local
+#include "dynamic_tls.hpp"
+
 #define NUM_OF_PRE_ALLOCATED_NODES ( 0 )   //!< 事前に用意する管理ノード数。空きノードがあれば、それを流用するので、mallocが発生しない。
-#define ENABLE_DELETE_ON_THE_SPOT          //!< 管理ポインタの削除が可能な場合、即座に削除する。ただし、delete演算子が実行されるため、ヒープ操作によるlockが発生する。
 
 namespace alpha {
 namespace concurrent {
@@ -45,44 +45,19 @@ namespace concurrent {
  * インスタンスが削除される前に、アクセスするスレッドは、参照権の破棄としてrelease_owner()を呼び出すこと。
  *
  */
-template <typename T, int N, bool CHK_RANGE_NARROW = true>
+template <typename T, int N>
 class hazard_ptr {
 public:
-	using hzrd_type                       = T;
-	using hzrd_pointer                    = T*;
-	static constexpr int  hzrd_max_slot   = N;
-	static constexpr bool hzrd_range_narrow = CHK_RANGE_NARROW;
+	using hzrd_type                    = T;
+	using hzrd_pointer                 = T*;
+	static constexpr int hzrd_max_slot = N;
 
 	hazard_ptr( void )
 	{
-		int status = pthread_key_create( &tls_key, node_for_hazard_ptr::destr_fn );
-		if ( status < 0 ) {
-			printf( "pthread_key_create failed, errno=%d", errno );
-			exit( 1 );
-		}
-		check_local_storage();
 	}
 
 	~hazard_ptr( void )
 	{
-		release_owner();
-
-		pthread_key_delete( tls_key );
-	}
-
-	void release_owner( void )
-	{
-		if ( p_hzd_ptr_node_ != nullptr ) {
-			p_hzd_ptr_node_->release_owner();
-			p_hzd_ptr_node_ = nullptr;
-
-			int status;
-			status = pthread_setspecific( tls_key, (void*)nullptr );
-			if ( status < 0 ) {
-				printf( "pthread_setspecific failed, errno %d", errno );
-			}
-			//			printf( "Release owner\n" );
-		}
 	}
 
 	/*!
@@ -105,7 +80,7 @@ public:
 			return;
 		}
 
-		check_local_storage();
+		node_for_hazard_ptr* p_hzd_ptr_node_ = check_local_storage();
 
 		p_hzd_ptr_node_->set_hazard_ptr( p_target, idx );
 	}
@@ -118,8 +93,7 @@ public:
 	 */
 	inline void clear_hazard_ptr( int idx )
 	{
-		check_local_storage();
-
+		node_for_hazard_ptr* p_hzd_ptr_node_ = check_local_storage();
 		p_hzd_ptr_node_->clear_hazard_ptr( idx );
 	}
 
@@ -131,8 +105,7 @@ public:
 	 */
 	inline void clear_hazard_ptr_all( void )
 	{
-		if ( p_hzd_ptr_node_ == nullptr ) return;
-
+		node_for_hazard_ptr* p_hzd_ptr_node_ = check_local_storage();
 		p_hzd_ptr_node_->clear_hazard_ptr_all();
 	}
 
@@ -366,47 +339,25 @@ private:
 		std::atomic<int>                  node_count_;
 	};
 
-	hazard_node_head& get_head_instance( void )
-	{
-		if ( CHK_RANGE_NARROW ) {
-			return head_;
-		} else {
-			return hazard_node_head::get_instance();
-		}
-	}
-
 	hazard_node_head head_;
 
-	void allocate_local_storage( void )
+	hazard_node_head& get_head_instance( void )
 	{
-		p_hzd_ptr_node_ = get_head_instance().allocate_hazard_ptr_node();
+		return head_;
+	}
 
-		int status;
-		status = pthread_setspecific( tls_key, (void*)p_hzd_ptr_node_ );
-		if ( status < 0 ) {
-			printf( "pthread_setspecific failed, errno %d", errno );
-			pthread_exit( (void*)1 );
+	inline node_for_hazard_ptr* check_local_storage( void )
+	{
+		node_for_hazard_ptr* p_ans = p_hzd_ptr_node__.get_tls_instance(nullptr);
+		if ( p_ans == nullptr ) {
+			p_ans                               = get_head_instance().allocate_hazard_ptr_node();
+			p_hzd_ptr_node__.get_tls_instance() = p_ans;
 		}
-		//		printf( "pthread_setspecific set pointer to tls.\n" );
+		return p_ans;
 	}
 
-	inline void check_local_storage( void )
-	{
-		if ( p_hzd_ptr_node_ == nullptr ) allocate_local_storage();
-	}
-
-	static __thread node_for_hazard_ptr* p_hzd_ptr_node_;
-	// C++11で、thread_localが使用可能となるが、g++でコンパイルした場合、スレッド終了時のdestructor処理実行時に、
-	// すでにメモリ領域が破壊されている場合があるため、destructor処理の正常動作が期待できない。
-	// (スレッド終了時のpthread_key_create()で登録したデストラクタ関数の呼ばれる振る舞いから、thread_localのメモリ領域破棄とdestructorの実行が並行して行われている模様)
-	// そのため、その点を明示する意図として __thread を使用する。
-	// また、 __thread の変数は、暗黙的にゼロ初期化されていることを前提としている。
-
-	pthread_key_t tls_key;   //!<	key for thread local storage of POSIX.
+	dynamic_tls<node_for_hazard_ptr*> p_hzd_ptr_node__;
 };
-
-template <typename T, int N, bool CHK_RANGE_NARROW>
-__thread typename hazard_ptr<T, N, CHK_RANGE_NARROW>::node_for_hazard_ptr* hazard_ptr<T, N, CHK_RANGE_NARROW>::p_hzd_ptr_node_;
 
 /*!
  * @breif	scoped reference control support class for hazard_ptr
@@ -414,10 +365,10 @@ __thread typename hazard_ptr<T, N, CHK_RANGE_NARROW>::node_for_hazard_ptr* hazar
  * スコープベースでの、参照権の解放制御をサポートするクラス。
  * 削除権を確保する場合は、スコープアウトする前に、try_delete_instance()を呼び出すこと。
  */
-template <typename T, int N, bool CHK_RANGE_NARROW>
+template <typename T, int N>
 class hazard_ptr_scoped_ref {
 public:
-	hazard_ptr_scoped_ref( hazard_ptr<T, N, CHK_RANGE_NARROW>& ref, int idx_arg )
+	hazard_ptr_scoped_ref( hazard_ptr<T, N>& ref, int idx_arg )
 	  : idx_( idx_arg )
 	  , monitor_ref_( ref )
 	{
@@ -429,15 +380,15 @@ public:
 	}
 
 private:
-	int                                 idx_;
-	hazard_ptr<T, N, CHK_RANGE_NARROW>& monitor_ref_;
+	int               idx_;
+	hazard_ptr<T, N>& monitor_ref_;
 };
 
 /*!
  * @breif	推論補助
  */
 template <class HZD_PTR>
-hazard_ptr_scoped_ref( HZD_PTR&, int ) -> hazard_ptr_scoped_ref<typename HZD_PTR::hzrd_type, HZD_PTR::hzrd_max_slot, HZD_PTR::hzrd_range_narrow>;
+hazard_ptr_scoped_ref( HZD_PTR&, int ) -> hazard_ptr_scoped_ref<typename HZD_PTR::hzrd_type, HZD_PTR::hzrd_max_slot>;
 
 }   // namespace concurrent
 }   // namespace alpha

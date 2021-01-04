@@ -98,7 +98,7 @@ public:
 	using value_type                    = T;
 	using node_type                     = fifo_node<T>;
 	using node_pointer                  = node_type*;
-	using hazard_ptr_storage            = hazard_ptr<node_type, hzrd_max_slot_, true>;
+	using hazard_ptr_storage            = hazard_ptr<node_type, hzrd_max_slot_>;
 
 	fifo_nd_list( void )
 	  : head_( nullptr )
@@ -245,7 +245,7 @@ private:
 	fifo_nd_list operator=( const fifo_nd_list& ) = delete;
 	fifo_nd_list operator=( fifo_nd_list&& ) = delete;
 
-	using scoped_hazard_ref = hazard_ptr_scoped_ref<node_type, hzrd_max_slot_, true>;
+	using scoped_hazard_ref = hazard_ptr_scoped_ref<node_type, hzrd_max_slot_>;
 
 	enum class hazard_ptr_idx : int {
 		PUSH_FUNC_LAST = 0,

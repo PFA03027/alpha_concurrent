@@ -193,31 +193,14 @@ bool fifo_free_nd_list::check_hazard_list( fifo_free_nd_list::node_pointer const
 
 ////////////////////////////////////////////////////////////////////////////
 
-#if 0
-thread_local thread_local_fifo_list* free_nd_storage::p_tls_fifo__;
-#endif
-
 free_nd_storage::free_nd_storage( void )
   : allocated_node_count_( 0 )
 {
-	int status = pthread_key_create( &tls_key, destr_fn );
-	if ( status < 0 ) {
-		printf( "pthread_key_create failed, errno=%d", errno );
-		exit( 1 );
-	}
-	check_local_storage();
 }
 
 free_nd_storage::~free_nd_storage()
 {
-	printf( "Final: new node is allocated -> %d\n", allocated_node_count_.load() );
-
-	// メモリリークが起きるけど、やってみる。
-	int status = pthread_key_delete( tls_key );
-	if ( status < 0 ) {
-		printf( "pthread_key_create failed, errno=%d", errno );
-		exit( 1 );
-	}
+	printf( "Final: number of the allocated nodes -> %d\n", allocated_node_count_.load() );
 }
 
 void free_nd_storage::recycle( free_nd_storage::node_pointer p_retire_node )
@@ -254,7 +237,7 @@ void free_nd_storage::destr_fn( void* parm )
 	if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
 
 	thread_local_fifo_list* p_target_node = reinterpret_cast<thread_local_fifo_list*>( parm );
-	delete p_target_node;   // TODO: なぜか、エラーになる。。。
+	delete p_target_node;
 
 	//	printf( "thread local destructor is done.\n" );
 	fflush( NULL );

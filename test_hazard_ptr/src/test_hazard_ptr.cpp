@@ -33,7 +33,7 @@ private:
 	char dummy[1024 * 1024];
 };
 
-constexpr int       num_thread = 256;
+constexpr int       num_thread = 128;
 constexpr uintptr_t loop_num   = 100000;
 
 alpha::concurrent::hazard_ptr<delete_test, 1> hazard_ptr_to;

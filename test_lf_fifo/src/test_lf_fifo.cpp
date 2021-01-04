@@ -13,7 +13,7 @@
 
 #include "lf_fifo.hpp"
 
-constexpr int            num_thread = 128;   // Tested until 128.
+constexpr int            num_thread = 8;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 100000;
 
 using test_fifo_type_part = alpha::concurrent::internal::fifo_nd_list<std::uintptr_t>;
@@ -100,9 +100,10 @@ int test_case1( void )
 		sum += e;
 	}
 
+	std::cout << "!!!Check!!!" << std::endl;   // prints !!!Hello World!!!
 	auto [p_node, val] = p_test_obj->pop();
 	if ( p_node != nullptr ) {
-		// 全部読み出し完了していないといけないけれど、余りがあった。
+		// 全部読み出し完了いることが必要だが、残っていた。
 		printf( "Gyaaaa!!!\n" );
 		return 1;
 	}
@@ -117,6 +118,8 @@ int test_case1( void )
 	}
 
 	delete[] threads;
+
+	delete p_test_obj;
 
 	return 0;
 }
@@ -214,7 +217,7 @@ void* func_test_fifo( void* data )
 	return reinterpret_cast<void*>( v );
 }
 
-std::tuple<uintptr_t, uintptr_t> func_test_fifo2( test_fifo_type* p_test_obj[2] )
+std::tuple<uintptr_t, uintptr_t> func_test_fifo2( test_fifo_type* p_test_obj[] )
 {
 
 	typename test_fifo_type::value_type v1 = 0;
@@ -301,8 +304,8 @@ int main( void )
 
 	for ( int i = 0; i < 4; i++ ) {
 		std::cout << "!!! " << i << " World!!!" << std::endl;   // prints !!!Hello World!!!
-																//		test_case1();
-																//		test_case2();
+		test_case1();
+		test_case2();
 		test_case3();
 	}
 
