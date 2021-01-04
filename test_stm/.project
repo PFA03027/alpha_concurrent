@@ -3,7 +3,7 @@
 	<name>test_stm</name>
 	<comment></comment>
 	<projects>
-		<project>libstm</project>
+		<project>libalconcurrent</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>

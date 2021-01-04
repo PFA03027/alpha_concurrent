@@ -21,6 +21,7 @@
 
 #include <pthread.h>
 
+#include <atomic>
 #include <memory>
 
 namespace alpha {
@@ -28,39 +29,22 @@ namespace concurrent {
 
 namespace internal {
 
-class tls_key_container {
-public:
-	tls_key_container( pthread_key_t tls_key_arg )
-	  : tls_key( tls_key_arg )
-	{
-		//		printf( "pthread_key_create key= %d\n", tls_key );
-	}
-
-	~tls_key_container()
-	{
-		int status = pthread_key_delete( tls_key );
-		if ( status < 0 ) {
-			printf( "pthread_key_delete failed, errno=%d\n", errno );
-			exit( 1 );
-		}
-		//		printf( "pthread_key_delete key = %d\n", tls_key );
-	}
-
-private:
-	pthread_key_t tls_key;   //!<	key for thread local storage of POSIX.
-};
-
 template <typename T>
 class tls_data_container {
 public:
 	using value_type = T;
 
-	T value;
+	enum class ocupied_status {
+		UNUSED,
+		USING
+	};
 
-	template <typename... Args>
-	tls_data_container( const std::shared_ptr<tls_key_container>& tls_key_cont_arg, Args... args )
-	  : value( args... )
-	  , sp_tls_key_cont( tls_key_cont_arg )
+	T* p_value;
+
+	tls_data_container( void )
+	  : p_value( nullptr )
+	  , status_( ocupied_status::USING )
+	  , next_( nullptr )
 	{
 		//		printf( "tls_data_container::constructor is allocated - %p\n", this );
 	}
@@ -68,10 +52,52 @@ public:
 	~tls_data_container()
 	{
 		//		printf( "tls_data_container::destructor is called     - %p\n", this );
+		delete p_value;
+	}
+
+	void release_owner( void )
+	{
+		delete p_value;
+		p_value = nullptr;
+		status_.store( ocupied_status::UNUSED );
+		return;
+	}
+
+	bool try_to_get_owner( void )
+	{
+		ocupied_status cur;
+		cur = get_status();
+		if ( cur != ocupied_status::UNUSED ) {
+			return false;
+		}
+
+		return status_.compare_exchange_strong( cur, ocupied_status::USING );
+	}
+
+	ocupied_status get_status( void )
+	{
+		return status_.load();
+	}
+
+	tls_data_container* get_next( void )
+	{
+		return next_.load();
+	}
+
+	void set_next( tls_data_container* p_new_next )
+	{
+		next_.store( p_new_next );
+		return;
+	}
+
+	bool next_CAS( tls_data_container** pp_expect_ptr, tls_data_container* p_desired_ptr )
+	{
+		return next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
 	}
 
 private:
-	std::shared_ptr<tls_key_container> sp_tls_key_cont;   //!<	key for thread local storage of POSIX.
+	std::atomic<ocupied_status>      status_;
+	std::atomic<tls_data_container*> next_;
 };
 
 }   // namespace internal
@@ -83,20 +109,33 @@ public:
 	using value_reference = T&;
 
 	dynamic_tls( void )
+	  : head_( nullptr )
 	{
 		int status = pthread_key_create( &tls_key, destr_fn );
 		if ( status < 0 ) {
 			printf( "pthread_key_create failed, errno=%d", errno );
 			exit( 1 );
 		}
-
-		sp_key_cont = std::make_shared<internal::tls_key_container>( tls_key );
 	}
 
 	~dynamic_tls()
 	{
 		//		printf( "dynamic_tls::destructor is called\n" );
-		delete_tls_instance();
+
+		int status = pthread_key_delete( tls_key );
+		if ( status < 0 ) {
+			printf( "pthread_key_delete failed, errno=%d\n", errno );
+			exit( 1 );
+		}
+
+		// メモリリークが無いように、スレッドローカルストレージを削除する
+		// この処理と、スレッド終了処理によるdestr_fn()の同時呼び出しは、不定動作とする。
+		internal::tls_data_container<T>* p_cur = head_.load();
+		while ( p_cur != nullptr ) {
+			internal::tls_data_container<T>* p_nxt = p_cur->get_next();
+			delete p_cur;
+			p_cur = p_nxt;
+		}
 	}
 
 	template <typename... Args>
@@ -105,7 +144,11 @@ public:
 		// pthread_getspecific()が、ロックフリーであることを祈る。
 		internal::tls_data_container<T>* p_tls = reinterpret_cast<internal::tls_data_container<T>*>( pthread_getspecific( tls_key ) );
 		if ( p_tls == nullptr ) {
-			p_tls = new internal::tls_data_container<T>( sp_key_cont, args... );
+			p_tls = allocate_free_tls_container();
+			if ( p_tls == nullptr ) {
+				p_tls = new internal::tls_data_container<T>();
+			}
+			p_tls->p_value = new T( args... );   // move assigner is required...
 
 			int status;
 			status = pthread_setspecific( tls_key, (void*)p_tls );
@@ -115,7 +158,7 @@ public:
 			}
 		}
 
-		return p_tls->value;
+		return *( p_tls->p_value );
 	}
 
 private:
@@ -126,31 +169,32 @@ private:
 		if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
 
 		internal::tls_data_container<T>* p_target_node = reinterpret_cast<internal::tls_data_container<T>*>( parm );
-		delete p_target_node;
+		p_target_node->release_owner();
 
 		return;
 	}
 
-	void delete_tls_instance( void )
+	internal::tls_data_container<T>* allocate_free_tls_container( void )
 	{
-		// pthread_getspecific()が、ロックフリーであることを祈る。
-		internal::tls_data_container<T>* p_tls = reinterpret_cast<internal::tls_data_container<T>*>( pthread_getspecific( tls_key ) );
-		if ( p_tls == nullptr ) return;
-
-		// keyが消される前に、nullptr登録を終える。
-		int status = pthread_setspecific( tls_key, nullptr );
-		if ( status < 0 ) {
-			printf( "pthread_setspecific failed for delete thread local instance, errno %d", errno );
+		// 空きノードを探す。
+		internal::tls_data_container<T>* p_ans = head_.load();
+		while ( p_ans != nullptr ) {
+			if ( p_ans->get_status() == internal::tls_data_container<T>::ocupied_status::UNUSED ) {
+				if ( p_ans->try_to_get_owner() ) {
+					//						printf( "node is allocated.\n" );
+					return p_ans;
+				}
+			}
+			p_ans = p_ans->get_next();
 		}
 
-		delete p_tls;
-
-		return;
+		//			printf( "glist is added.\n" );
+		return p_ans;
 	}
 
 	pthread_key_t tls_key;   //!<	key for thread local storage of POSIX.
 
-	std::shared_ptr<internal::tls_key_container> sp_key_cont;   //!<	shared pointer to key container
+	std::atomic<internal::tls_data_container<T>*> head_;
 };
 
 }   // namespace concurrent
