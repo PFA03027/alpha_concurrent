@@ -1,8 +1,9 @@
-/*
- * stm.hpp
- *
- *  Created on: 2020/12/17
- *      Author: Teruaki Ata
+/*!
+ * @file	stm.hpp
+ * @brief
+ * @author	Teruaki Ata
+ * @date	Created on 2020/12/17
+ * @details
  *
  * Copyright (C) 2020 by Teruaki Ata <PFA03027@nifty.com>
  */

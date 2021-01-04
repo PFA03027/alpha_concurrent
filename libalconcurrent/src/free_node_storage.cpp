@@ -1,10 +1,11 @@
-/*
- * free_node_storage.cpp
+/*!
+ * @file	free_node_storage.hpp
+ * @brief
+ * @author	Teruaki Ata
+ * @date	Created on 2021/01/03
+ * @details
  *
- *  Created on: 2021/01/03
- *      Author: Teruaki Ata
- *
- * Copyright (C) 2020 by Teruaki Ata <PFA03027@nifty.com>
+ * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
 #include "free_node_storage.hpp"
