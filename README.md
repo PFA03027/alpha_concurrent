@@ -26,10 +26,22 @@ Non lock free behavior cases are below;
 * Any initial API call by each thread.
 * push() call in case of no free internal node.
 
+
+# dynamic_tls class in dynamic_tls.hpp
+Support dynamic allocatable thread local storage.
+
+When allocating dynamic allocatable thread local storage for a thread, it is not lock free. This will be happened by 1st access of a value instance.
+After allocation, this class may be lock free. This depends whether pthread_getspecific() is lock free or not.
+
 # stm.hpp
 This is experimental code of STM.
 Not resolved the memory leak issue yet.
 
+
+# Important points
+Whether the provided class is lock-free depends on whether the POSIX API for thread-local storage is lock-free.
+
+If the POSIX thread-local storage API is lock-free, the main operations such as push () / pop () will behave as lock-free.
 
 # License
 License type: 0BSD license

@@ -134,8 +134,8 @@ private:
 	fifo_free_nd_list operator=( const fifo_free_nd_list& ) = delete;
 	fifo_free_nd_list operator=( fifo_free_nd_list&& ) = delete;
 
-	using hazard_ptr_storage = hazard_ptr<node_of_list, hzrd_max_slot_, true>;
-	using scoped_hazard_ref  = hazard_ptr_scoped_ref<node_of_list, hzrd_max_slot_, true>;
+	using hazard_ptr_storage = hazard_ptr<node_of_list, hzrd_max_slot_>;
+	using scoped_hazard_ref  = hazard_ptr_scoped_ref<node_of_list, hzrd_max_slot_>;
 
 	enum class hazard_ptr_idx : int {
 		PUSH_FUNC_LAST = 0,
@@ -238,32 +238,9 @@ private:
 
 	static void destr_fn( void* parm );
 
-#if 0
-	void allocate_local_storage( void );
-#endif
-
 	inline thread_local_fifo_list* check_local_storage( void )
 	{
-#if 0
-		thread_local_fifo_list* p_ans = p_tls_fifo__;
-		if ( p_ans == nullptr ) {
-			allocate_local_storage();
-			p_ans = p_tls_fifo__;
-		}
-#else
-		// pthread_getspecific()が、ロックフリーであることを祈る。
-		thread_local_fifo_list* p_ans = reinterpret_cast<thread_local_fifo_list*>( pthread_getspecific( tls_key ) );
-		if ( p_ans == nullptr ) {
-			p_ans = new thread_local_fifo_list();
-
-			int status;
-			status = pthread_setspecific( tls_key, (void*)p_ans );
-			if ( status < 0 ) {
-				printf( "pthread_setspecific failed, errno %d", errno );
-				pthread_exit( (void*)1 );
-			}
-		}
-#endif
+		thread_local_fifo_list* p_ans = &( tls_fifo_.get_tls_instance() );
 		return p_ans;
 	}
 
@@ -273,11 +250,7 @@ private:
 
 	fifo_free_nd_list node_list_;
 
-#if 0
-//	static thread_local thread_local_fifo_list* p_tls_fifo__;
-#endif
-
-	pthread_key_t tls_key;   //!<	key for thread local storage of POSIX.
+	dynamic_tls<thread_local_fifo_list> tls_fifo_;
 
 	//	friend pthread_key_create;
 };
