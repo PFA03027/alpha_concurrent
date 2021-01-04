@@ -1,10 +1,9 @@
-/*
- * lf_fifo.hpp
- *
- * lock free fifo
- *
- *  Created on: 2020/12/31
- *      Author: Teruaki Ata
+/*!
+ * @file	lf_fifo.hpp
+ * @brief
+ * @author	Teruaki Ata
+ * @date	Created on 2020/12/31
+ * @details
  *
  * Copyright (C) 2020 by Teruaki Ata <PFA03027@nifty.com>
  */

@@ -1,10 +1,9 @@
-/*
- * lf_fifo.hpp
- *
- * lock free fifo
- *
- *  Created on: 2020/12/31
- *      Author: Teruaki Ata
+/*!
+ * @file	free_node_storage.hpp
+ * @brief
+ * @author	Teruaki Ata
+ * @date	Created on 2020/12/31
+ * @details
  *
  * Copyright (C) 2020 by Teruaki Ata <PFA03027@nifty.com>
  */
@@ -239,15 +238,32 @@ private:
 
 	static void destr_fn( void* parm );
 
+#if 0
 	void allocate_local_storage( void );
+#endif
 
 	inline thread_local_fifo_list* check_local_storage( void )
 	{
+#if 0
 		thread_local_fifo_list* p_ans = p_tls_fifo__;
 		if ( p_ans == nullptr ) {
 			allocate_local_storage();
 			p_ans = p_tls_fifo__;
 		}
+#else
+		// pthread_getspecific()が、ロックフリーであることを祈る。
+		thread_local_fifo_list* p_ans = reinterpret_cast<thread_local_fifo_list*>( pthread_getspecific( tls_key ) );
+		if ( p_ans == nullptr ) {
+			p_ans = new thread_local_fifo_list();
+
+			int status;
+			status = pthread_setspecific( tls_key, (void*)p_ans );
+			if ( status < 0 ) {
+				printf( "pthread_setspecific failed, errno %d", errno );
+				pthread_exit( (void*)1 );
+			}
+		}
+#endif
 		return p_ans;
 	}
 
@@ -257,7 +273,9 @@ private:
 
 	fifo_free_nd_list node_list_;
 
-	static thread_local thread_local_fifo_list* p_tls_fifo__;
+#if 0
+//	static thread_local thread_local_fifo_list* p_tls_fifo__;
+#endif
 
 	pthread_key_t tls_key;   //!<	key for thread local storage of POSIX.
 

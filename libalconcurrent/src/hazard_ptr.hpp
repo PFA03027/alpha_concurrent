@@ -1,14 +1,14 @@
-/*
- * hazard_ptr.hpp
- *
- *  Created on: 2020/12/24
- *      Author: Teruaki Ata
+/*!
+ * @file	hazard_ptr.hpp
+ * @brief
+ * @author	Teruaki Ata
+ * @date	Created on 2020/12/24
+ * @details
  *
  *  US Patent of Hazard pointer algrithm: US20040107227A1 is now abandoned.
  *  https://patents.google.com/patent/US20040107227
  *
- *
- *  Copyright (C) 2020 by Teruaki Ata <PFA03027@nifty.com>
+ * Copyright (C) 2020 by Teruaki Ata <PFA03027@nifty.com>
  */
 
 #ifndef SRC_HAZARD_PTR_HPP_
