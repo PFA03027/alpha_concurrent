@@ -218,7 +218,7 @@ void free_nd_storage::recycle( free_nd_storage::node_pointer p_retire_node )
 
 	p_tls_fifo_->push( p_retire_node );
 
-	for ( int i = 0; i < num_recycle_exec; i++ ) {
+	for ( int i = 0; i < 2; i++ ) {
 		node_pointer p_chk = p_tls_fifo_->pop();
 		if ( p_chk == nullptr ) break;
 		if ( node_list_.check_hazard_list( p_chk ) ) {

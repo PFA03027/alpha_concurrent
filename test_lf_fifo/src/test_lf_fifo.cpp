@@ -13,7 +13,7 @@
 
 #include "lf_fifo.hpp"
 
-constexpr int            num_thread = 32;   // Tested until 64.
+constexpr int            num_thread = 8;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 100000;
 
 using test_fifo_type_part = alpha::concurrent::internal::fifo_nd_list<std::uintptr_t>;
@@ -123,7 +123,7 @@ int test_case1( void )
 
 /**
  * 各スレッドのメインルーチン。
- * stmへのカウントアップを繰り返す。
+ * テスト目的上、メモリリークが発生するが、想定通りの振る舞い。
  */
 void* func_test_fifo2( void* data )
 {
@@ -216,7 +216,7 @@ void* func_test_fifo( void* data )
 
 int test_case3( void )
 {
-	//	test_fifo_type* p_test_obj = new test_fifo_type( num_thread * 2 );
+	//	test_fifo_type* p_test_obj = new test_fifo_type( num_thread );
 	test_fifo_type* p_test_obj = new test_fifo_type();
 
 	pthread_barrier_init( &barrier, NULL, num_thread + 1 );
@@ -264,8 +264,8 @@ int main( void )
 
 	for ( int i = 0; i < 4; i++ ) {
 		std::cout << "!!! " << i << " World!!!" << std::endl;   // prints !!!Hello World!!!
-																//		test_case1();
-																//		test_case2();
+		test_case1();
+		test_case2();
 		test_case3();
 	}
 
