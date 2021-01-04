@@ -101,7 +101,7 @@ void* func_delete_owner( void* data )
 		//		hazard_ptr_to.move_hazard_ptr_to_del_list();
 	}
 
-	while ( hazard_ptr_to.chk_ptr_in_hazard_list( p_test_obj ) ) {
+	while ( hazard_ptr_to.check_ptr_in_hazard_list( p_test_obj ) ) {
 		std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
 	}
 
@@ -125,7 +125,7 @@ int test_case1( void )
 
 	pthread_create( &threads[0], NULL, func_delete_owner, reinterpret_cast<void*>( &atm_p_test_obj ) );
 	for ( int i = 1; i <= num_thread; i++ ) {
-//		std::cout << "Thread " << i << " is created." << std::endl;
+		//		std::cout << "Thread " << i << " is created." << std::endl;
 		pthread_create( &threads[i], NULL, func_refarencing, reinterpret_cast<void*>( &atm_p_test_obj ) );
 	}
 
@@ -166,8 +166,8 @@ int main( void )
 {
 	std::cout << "!!!Start World!!!" << std::endl;   // prints !!!Hello World!!!
 
-		for ( int i = 0; i < num_thread; i++ ) {
-//	for ( int i = 0; i < 1; i++ ) {
+	for ( int i = 0; i < num_thread; i++ ) {
+		//	for ( int i = 0; i < 1; i++ ) {
 		test_case1();
 	}
 
