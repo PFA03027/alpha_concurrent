@@ -138,8 +138,8 @@ public:
 		}
 	}
 
-	template <typename... Args>
-	value_reference get_tls_instance( Args... args )
+	template <typename TFUNC>
+	value_reference get_tls_instance_pred( TFUNC pred )
 	{
 		// pthread_getspecific()が、ロックフリーであることを祈る。
 		internal::tls_data_container<T>* p_tls = reinterpret_cast<internal::tls_data_container<T>*>( pthread_getspecific( tls_key ) );
@@ -148,7 +148,7 @@ public:
 			if ( p_tls == nullptr ) {
 				p_tls = new internal::tls_data_container<T>();
 			}
-			p_tls->p_value = new T( args... );   // move assigner is required...
+			p_tls->p_value = pred();
 
 			int status;
 			status = pthread_setspecific( tls_key, (void*)p_tls );
@@ -159,6 +159,12 @@ public:
 		}
 
 		return *( p_tls->p_value );
+	}
+
+	template <typename... Args>
+	value_reference get_tls_instance( Args... args )
+	{
+		return get_tls_instance_pred( [&args...]() { return new T( args... ); } );
 	}
 
 private:
