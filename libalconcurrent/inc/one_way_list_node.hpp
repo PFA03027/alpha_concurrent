@@ -1,11 +1,11 @@
 /*!
  * @file	one_way_list_node.hpp
- * @brief
- * @author	alpha
+ * @brief	node class definition for one way list type structure as a internal common class
+ * @author	Teruaki Ata
  * @date	Created on 2021/01/09
  * @details
  *
- * Copyright (C) 2021 by alpha <e-mail address>
+ * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
 #ifndef ONE_WAY_LIST_NODE_HPP_
@@ -16,7 +16,6 @@
 #include <tuple>
 
 #include "free_node_storage.hpp"
-
 
 namespace alpha {
 namespace concurrent {
@@ -82,9 +81,7 @@ private:
 
 }   // namespace internal
 
-}
-}
-
-
+}   // namespace concurrent
+}   // namespace alpha
 
 #endif /* ONE_WAY_LIST_NODE_HPP_ */

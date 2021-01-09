@@ -176,7 +176,7 @@ private:
 }   // namespace internal
 
 /*!
- * @breif	semi-lock free FIFO type queue
+ * @breif	semi-lock free Stack type queue
  *
  * Type T should be trivially copyable.
  *
@@ -189,7 +189,7 @@ private:
  * get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
  *
  * @note
- * To resolve ABA issue, this FIFO queue uses hazard pointer approach.
+ * To resolve ABA issue, this Stack queue uses hazard pointer approach.
  */
 template <typename T>
 class stack_list {
