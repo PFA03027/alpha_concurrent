@@ -1,6 +1,6 @@
 /*!
  * @file	lf_fifo.hpp
- * @brief
+ * @brief	semi Lock free FIFO
  * @author	Teruaki Ata
  * @date	Created on 2020/12/31
  * @details
@@ -15,70 +15,14 @@
 #include <memory>
 #include <tuple>
 
-#include "free_node_storage.hpp"
 #include "hazard_ptr.hpp"
+#include "free_node_storage.hpp"
+#include "one_way_list_node.hpp"
 
 namespace alpha {
 namespace concurrent {
 
 namespace internal {
-
-template <typename T>
-struct fifo_node : public node_of_list {
-	using value_type = T;
-
-	fifo_node( void )
-	  : target_()
-	  , next_( nullptr )
-	{
-	}
-
-	fifo_node( const T& cont_arg )
-	  : target_( cont_arg )
-	  , next_( nullptr )
-	{
-	}
-
-	virtual ~fifo_node()
-	{
-		return;
-	}
-
-	T get_value( void ) const
-	{
-		std::atomic_thread_fence( std::memory_order_acquire );
-		return target_;
-	}
-
-	void set_value( const T& value_arg )
-	{
-		target_ = value_arg;
-		std::atomic_thread_fence( std::memory_order_release );
-	}
-
-	fifo_node* get_next( void )
-	{
-		std::atomic_thread_fence( std::memory_order_acquire );
-		return next_.load();
-	}
-
-	void set_next( fifo_node* p_new_next )
-	{
-		std::atomic_thread_fence( std::memory_order_acquire );
-		next_.store( p_new_next );
-		return;
-	}
-
-	bool next_CAS( fifo_node** pp_expect_ptr, fifo_node* p_desired_ptr )
-	{
-		std::atomic_thread_fence( std::memory_order_acquire );
-		return next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
-	}
-
-private:
-	value_type              target_;
-	std::atomic<fifo_node*> next_;
-};
 
 /*!
  * @breif	リスト型のFIFOキューの基本要素となるFIFOキュークラス
@@ -96,7 +40,7 @@ class fifo_nd_list {
 public:
 	static constexpr int hzrd_max_slot_ = 5;
 	using value_type                    = T;
-	using node_type                     = fifo_node<T>;
+	using node_type                     = one_way_list_node<T>;
 	using node_pointer                  = node_type*;
 	using hazard_ptr_storage            = hazard_ptr<node_type, hzrd_max_slot_>;
 
@@ -130,6 +74,12 @@ public:
 		return;
 	}
 
+	/*!
+	 * @breif	FIFOキューへノードをPushする。
+	 *
+	 * @warning
+	 * 引数の管理ノードは、事前にcheck_hazard_list()を使用してハザードポインタに登録されていないことを確認していること。
+	 */
 	void push( node_pointer const p_push_node )
 	{
 		p_push_node->set_next( nullptr );
@@ -262,7 +212,7 @@ private:
 	hazard_ptr_storage hzrd_ptr_;
 };
 
-}   // namespace internal
+}
 
 /*!
  * @breif	semi-lock free FIFO type queue
