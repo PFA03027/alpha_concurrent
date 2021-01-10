@@ -76,7 +76,7 @@ public:
 	inline void regist_ptr_as_hazard_ptr( T* p_target, int idx )
 	{
 		if ( idx >= N ) {
-			printf( "Error: the requested index is over max index." );
+			LogOutput(log_type::ERR, "Error: the requested index is over max index." );
 			return;
 		}
 
@@ -203,7 +203,7 @@ private:
 
 		static void destr_fn( void* parm )
 		{
-			//			printf( "thread local destructor now being called -- " );
+			LogOutput(log_type::DEBUG, "thread local destructor now being called -- " );
 
 			if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
 
@@ -211,7 +211,7 @@ private:
 
 			p_target_node->release_owner();
 
-			//			printf( "thread local destructor is done.\n" );
+			LogOutput(log_type::DEBUG, "thread local destructor is done.\n" );
 			return;
 		}
 
@@ -268,7 +268,7 @@ private:
 			while ( p_ans != nullptr ) {
 				if ( p_ans->get_status() == ocupied_status::UNUSED ) {
 					if ( p_ans->try_to_get_owner() ) {
-						//						printf( "node is allocated.\n" );
+						LogOutput(log_type::DEBUG, "node is allocated.\n" );
 						return p_ans;
 					}
 				}
@@ -278,7 +278,7 @@ private:
 			// 空きノードが見つからなかったので、新しいノードを用意する。
 			p_ans = add_one_new_hazard_ptr_node();
 
-			//			printf( "glist is added.\n" );
+			LogOutput(log_type::DEBUG, "glist is added.\n" );
 			return p_ans;
 		}
 
@@ -326,7 +326,7 @@ private:
 			} while ( !cas_success );   // CASが成功するまで繰り返す。
 			node_count_++;
 
-			//			printf( "glist is added.\n" );
+			LogOutput(log_type::DEBUG, "glist is added.\n" );
 			return p_ans;
 		}
 

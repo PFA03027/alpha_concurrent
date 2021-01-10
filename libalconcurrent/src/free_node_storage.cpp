@@ -200,7 +200,7 @@ free_nd_storage::free_nd_storage( void )
 
 free_nd_storage::~free_nd_storage()
 {
-	printf( "Final: number of the allocated nodes -> %d\n", allocated_node_count_.load() );
+	LogOutput(log_type::DEBUG, "Final: number of the allocated nodes -> %d\n", allocated_node_count_.load() );
 }
 
 void free_nd_storage::recycle( free_nd_storage::node_pointer p_retire_node )
@@ -231,36 +231,17 @@ int free_nd_storage::get_allocated_num( void )
 
 void free_nd_storage::destr_fn( void* parm )
 {
-	//	printf( "thread local destructor now being called -- %p -- ", parm );
-	fflush( NULL );
+	LogOutput(log_type::DEBUG, "thread local destructor now being called -- %p -- ", parm );
 
 	if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
 
 	thread_local_fifo_list* p_target_node = reinterpret_cast<thread_local_fifo_list*>( parm );
 	delete p_target_node;
 
-	//	printf( "thread local destructor is done.\n" );
-	fflush( NULL );
+	LogOutput(log_type::DEBUG, "thread local destructor is done.\n" );
 	return;
 }
 
-#if 0
-void free_nd_storage::allocate_local_storage( void )
-{
-	p_tls_fifo__ = new thread_local_fifo_list();
-
-	//	printf( "allocate thread_local_fifo_list -- %p\n", p_tls_fifo__ );
-	fflush( NULL );
-
-	int status;
-	status = pthread_setspecific( tls_key, (void*)p_tls_fifo__ );
-	if ( status < 0 ) {
-		printf( "pthread_setspecific failed, errno %d", errno );
-		pthread_exit( (void*)1 );
-	}
-	//		printf( "pthread_setspecific set pointer to tls.\n" );
-}
-#endif
 
 }   // namespace internal
 }   // namespace concurrent

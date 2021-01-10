@@ -24,6 +24,8 @@
 #include <atomic>
 #include <memory>
 
+#include "conf_logger.hpp"
+
 namespace alpha {
 namespace concurrent {
 
@@ -46,12 +48,12 @@ public:
 	  , status_( ocupied_status::USING )
 	  , next_( nullptr )
 	{
-		//		printf( "tls_data_container::constructor is allocated - %p\n", this );
+		LogOutput( log_type::DEBUG, "tls_data_container::constructor is allocated - %p\n", this );
 	}
 
 	~tls_data_container()
 	{
-		//		printf( "tls_data_container::destructor is called     - %p\n", this );
+		LogOutput( log_type::DEBUG, "tls_data_container::destructor is called     - %p\n", this );
 		delete p_value;
 	}
 
@@ -113,18 +115,18 @@ public:
 	{
 		int status = pthread_key_create( &tls_key, destr_fn );
 		if ( status < 0 ) {
-			printf( "pthread_key_create failed, errno=%d", errno );
+			LogOutput(log_type::ERR, "pthread_key_create failed, errno=%d", errno );
 			exit( 1 );
 		}
 	}
 
 	~dynamic_tls()
 	{
-		//		printf( "dynamic_tls::destructor is called\n" );
+		LogOutput( log_type::DEBUG, "dynamic_tls::destructor is called\n" );
 
 		int status = pthread_key_delete( tls_key );
 		if ( status < 0 ) {
-			printf( "pthread_key_delete failed, errno=%d\n", errno );
+			LogOutput(log_type::ERR, "pthread_key_delete failed, errno=%d\n", errno );
 			exit( 1 );
 		}
 
@@ -153,7 +155,7 @@ public:
 			int status;
 			status = pthread_setspecific( tls_key, (void*)p_tls );
 			if ( status < 0 ) {
-				printf( "pthread_setspecific failed, errno %d", errno );
+				LogOutput(log_type::ERR, "pthread_setspecific failed, errno %d", errno );
 				pthread_exit( (void*)1 );
 			}
 		}
@@ -170,7 +172,7 @@ public:
 private:
 	static void destr_fn( void* parm )
 	{
-		//		printf( "dynamic_tls::destr_fn is called              - %p\n", parm );
+		LogOutput( log_type::DEBUG, "dynamic_tls::destr_fn is called              - %p\n", parm );
 
 		if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
 
@@ -187,14 +189,14 @@ private:
 		while ( p_ans != nullptr ) {
 			if ( p_ans->get_status() == internal::tls_data_container<T>::ocupied_status::UNUSED ) {
 				if ( p_ans->try_to_get_owner() ) {
-					//						printf( "node is allocated.\n" );
+					LogOutput(log_type::DEBUG, "node is allocated.\n" );
 					return p_ans;
 				}
 			}
 			p_ans = p_ans->get_next();
 		}
 
-		//			printf( "glist is added.\n" );
+		LogOutput(log_type::DEBUG, "glist is added.\n" );
 		return p_ans;
 	}
 
