@@ -50,8 +50,8 @@ public:
 
 	~lifo_nd_list()
 	{
-		node_pointer p_cur = head_.load();
-		head_.store( nullptr );
+		node_pointer p_cur = head_.load( std::memory_order_acquire );
+		head_.store( nullptr, std::memory_order_release );
 
 		if ( p_cur != nullptr ) {
 			do {
@@ -77,9 +77,9 @@ public:
 		scoped_hazard_ref scoped_ref_cur( hzrd_ptr_, (int)hazard_ptr_idx::PUSH_FUNC_FIRST );
 
 		while ( true ) {
-			node_pointer p_cur_top = head_.load();
+			node_pointer p_cur_top = head_.load( std::memory_order_acquire );
 			hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_top, (int)hazard_ptr_idx::PUSH_FUNC_FIRST );
-			if ( p_cur_top != head_.load() ) continue;
+			if ( p_cur_top != head_.load( std::memory_order_acquire ) ) continue;
 
 			p_push_node->set_next( p_cur_top );
 
@@ -111,9 +111,9 @@ public:
 		scoped_hazard_ref scoped_ref_next( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_NEXT );
 
 		while ( true ) {
-			node_pointer p_cur_first = head_.load();
+			node_pointer p_cur_first = head_.load( std::memory_order_acquire );
 			hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_first, (int)hazard_ptr_idx::POP_FUNC_FIRST );
-			if ( p_cur_first != head_.load() ) continue;
+			if ( p_cur_first != head_.load( std::memory_order_acquire ) ) continue;
 
 			if ( p_cur_first == nullptr ) {
 				// FIFOキューは空。
@@ -150,7 +150,7 @@ public:
 
 	int get_size( void )
 	{
-		return size_count_.load();
+		return size_count_.load( std::memory_order_acquire );
 	}
 
 private:

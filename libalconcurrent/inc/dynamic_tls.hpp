@@ -61,7 +61,7 @@ public:
 	{
 		delete p_value;
 		p_value = nullptr;
-		status_.store( ocupied_status::UNUSED );
+		status_.store( ocupied_status::UNUSED, std::memory_order_release );
 		return;
 	}
 
@@ -78,17 +78,17 @@ public:
 
 	ocupied_status get_status( void )
 	{
-		return status_.load();
+		return status_.load( std::memory_order_acquire );
 	}
 
 	tls_data_container* get_next( void )
 	{
-		return next_.load();
+		return next_.load( std::memory_order_acquire );
 	}
 
 	void set_next( tls_data_container* p_new_next )
 	{
-		next_.store( p_new_next );
+		next_.store( p_new_next, std::memory_order_release );
 		return;
 	}
 
@@ -115,7 +115,7 @@ public:
 	{
 		int status = pthread_key_create( &tls_key, destr_fn );
 		if ( status < 0 ) {
-			LogOutput(log_type::ERR, "pthread_key_create failed, errno=%d", errno );
+			LogOutput( log_type::ERR, "pthread_key_create failed, errno=%d", errno );
 			exit( 1 );
 		}
 	}
@@ -126,13 +126,13 @@ public:
 
 		int status = pthread_key_delete( tls_key );
 		if ( status < 0 ) {
-			LogOutput(log_type::ERR, "pthread_key_delete failed, errno=%d\n", errno );
+			LogOutput( log_type::ERR, "pthread_key_delete failed, errno=%d\n", errno );
 			exit( 1 );
 		}
 
 		// メモリリークが無いように、スレッドローカルストレージを削除する
 		// この処理と、スレッド終了処理によるdestr_fn()の同時呼び出しは、不定動作とする。
-		internal::tls_data_container<T>* p_cur = head_.load();
+		internal::tls_data_container<T>* p_cur = head_.load( std::memory_order_acquire );
 		while ( p_cur != nullptr ) {
 			internal::tls_data_container<T>* p_nxt = p_cur->get_next();
 			delete p_cur;
@@ -155,7 +155,7 @@ public:
 			int status;
 			status = pthread_setspecific( tls_key, (void*)p_tls );
 			if ( status < 0 ) {
-				LogOutput(log_type::ERR, "pthread_setspecific failed, errno %d", errno );
+				LogOutput( log_type::ERR, "pthread_setspecific failed, errno %d", errno );
 				pthread_exit( (void*)1 );
 			}
 		}
@@ -185,18 +185,18 @@ private:
 	internal::tls_data_container<T>* allocate_free_tls_container( void )
 	{
 		// 空きノードを探す。
-		internal::tls_data_container<T>* p_ans = head_.load();
+		internal::tls_data_container<T>* p_ans = head_.load( std::memory_order_acquire );
 		while ( p_ans != nullptr ) {
 			if ( p_ans->get_status() == internal::tls_data_container<T>::ocupied_status::UNUSED ) {
 				if ( p_ans->try_to_get_owner() ) {
-					LogOutput(log_type::DEBUG, "node is allocated.\n" );
+					LogOutput( log_type::DEBUG, "node is allocated.\n" );
 					return p_ans;
 				}
 			}
 			p_ans = p_ans->get_next();
 		}
 
-		LogOutput(log_type::DEBUG, "glist is added.\n" );
+		LogOutput( log_type::DEBUG, "glist is added.\n" );
 		return p_ans;
 	}
 

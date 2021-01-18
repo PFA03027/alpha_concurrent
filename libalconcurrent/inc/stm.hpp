@@ -40,7 +40,7 @@ public:
 	 */
 	std::shared_ptr<const T> read_value( void ) const
 	{
-		transactional_obj* p_old_tobj = atomic_p_tobj_.load();
+		transactional_obj* p_old_tobj = atomic_p_tobj_.load( std::memory_order_acquire );
 		return p_old_tobj->read_value();
 	}
 
@@ -63,7 +63,7 @@ public:
 			expected        = state::ACTIVE;
 			sp_atomic_state = std::make_shared<std::atomic<state>>( expected );
 
-			transactional_obj*                       p_old_tobj = atomic_p_tobj_.load();
+			transactional_obj*    p_old_tobj = atomic_p_tobj_.load( std::memory_order_acquire );
 			hazard_ptr_scoped_ref hzrd_scp( tobj_hazard_ptr, 0 );
 
 			while ( true ) {

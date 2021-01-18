@@ -15,8 +15,8 @@
 #include <memory>
 #include <tuple>
 
-#include "hazard_ptr.hpp"
 #include "free_node_storage.hpp"
+#include "hazard_ptr.hpp"
 #include "one_way_list_node.hpp"
 
 namespace alpha {
@@ -50,17 +50,17 @@ public:
 	  , size_count_( 0 )
 	{
 		node_pointer p_initial_node = new node_type();
-		head_.store( p_initial_node );
-		tail_.store( p_initial_node );
+		head_.store( p_initial_node, std::memory_order_release );
+		tail_.store( p_initial_node, std::memory_order_release );
 
 		return;
 	}
 
 	~fifo_nd_list()
 	{
-		node_pointer p_cur = head_.load();
-		head_.store( nullptr );
-		tail_.store( nullptr );
+		node_pointer p_cur = head_.load( std::memory_order_acquire );
+		head_.store( nullptr, std::memory_order_release );
+		tail_.store( nullptr, std::memory_order_release );
 
 		if ( p_cur != nullptr ) {
 			// 先頭ノードは番兵のため、nullptrであることはありえないが、チェックする。
@@ -88,9 +88,9 @@ public:
 		scoped_hazard_ref scoped_ref_nxt( hzrd_ptr_, (int)hazard_ptr_idx::PUSH_FUNC_NEXT );
 
 		while ( true ) {
-			node_pointer p_cur_last = tail_.load();
+			node_pointer p_cur_last = tail_.load( std::memory_order_acquire );
 			hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_last, (int)hazard_ptr_idx::PUSH_FUNC_LAST );
-			if ( p_cur_last != tail_.load() ) continue;
+			if ( p_cur_last != tail_.load( std::memory_order_acquire ) ) continue;
 
 			node_pointer p_cur_next = p_cur_last->get_next();
 			hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_next, (int)hazard_ptr_idx::PUSH_FUNC_NEXT );
@@ -130,14 +130,14 @@ public:
 		scoped_hazard_ref scoped_ref_next( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_NEXT );
 
 		while ( true ) {
-			node_pointer p_cur_first = head_.load();
-			node_pointer p_cur_last  = tail_.load();
+			node_pointer p_cur_first = head_.load( std::memory_order_acquire );
+			node_pointer p_cur_last  = tail_.load( std::memory_order_acquire );
 
 			hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_first, (int)hazard_ptr_idx::POP_FUNC_FIRST );
-			if ( p_cur_first != head_.load() ) continue;
+			if ( p_cur_first != head_.load( std::memory_order_acquire ) ) continue;
 
 			hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_last, (int)hazard_ptr_idx::POP_FUNC_LAST );
-			if ( p_cur_last != tail_.load() ) continue;
+			if ( p_cur_last != tail_.load( std::memory_order_acquire ) ) continue;
 
 			node_pointer p_cur_next = p_cur_first->get_next();
 			hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_next, (int)hazard_ptr_idx::POP_FUNC_NEXT );
@@ -186,7 +186,7 @@ public:
 
 	int get_size( void )
 	{
-		return size_count_.load();
+		return size_count_.load( std::memory_order_acquire );
 	}
 
 private:
@@ -212,7 +212,7 @@ private:
 	hazard_ptr_storage hzrd_ptr_;
 };
 
-}
+}   // namespace internal
 
 /*!
  * @breif	semi-lock free FIFO type queue

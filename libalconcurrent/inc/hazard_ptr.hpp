@@ -76,7 +76,7 @@ public:
 	inline void regist_ptr_as_hazard_ptr( T* p_target, int idx )
 	{
 		if ( idx >= N ) {
-			LogOutput(log_type::ERR, "Error: the requested index is over max index." );
+			LogOutput( log_type::ERR, "Error: the requested index is over max index." );
 			return;
 		}
 
@@ -162,8 +162,8 @@ private:
 		{
 			for ( auto& e : p_target_ ) {
 				e = nullptr;
-				std::atomic_thread_fence( std::memory_order_release );
 			}
+			std::atomic_thread_fence( std::memory_order_release );
 			return;
 		}
 
@@ -177,8 +177,8 @@ private:
 		{
 			if ( get_status() == ocupied_status::UNUSED ) return false;
 
+			std::atomic_thread_fence( std::memory_order_acquire );
 			for ( auto& e : p_target_ ) {
-				std::atomic_thread_fence( std::memory_order_acquire );
 				if ( e == p_chk_ptr ) return true;
 			}
 
@@ -187,12 +187,12 @@ private:
 
 		node_for_hazard_ptr* get_next( void )
 		{
-			return next_.load();
+			return next_.load( std::memory_order_acquire );
 		}
 
 		void set_next( node_for_hazard_ptr* p_new_next )
 		{
-			next_.store( p_new_next );
+			next_.store( p_new_next, std::memory_order_release );
 			return;
 		}
 
@@ -203,7 +203,7 @@ private:
 
 		static void destr_fn( void* parm )
 		{
-			LogOutput(log_type::DEBUG, "thread local destructor now being called -- " );
+			LogOutput( log_type::DEBUG, "thread local destructor now being called -- " );
 
 			if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
 
@@ -211,14 +211,14 @@ private:
 
 			p_target_node->release_owner();
 
-			LogOutput(log_type::DEBUG, "thread local destructor is done.\n" );
+			LogOutput( log_type::DEBUG, "thread local destructor is done.\n" );
 			return;
 		}
 
 		void release_owner( void )
 		{
 			clear_hazard_ptr_all();
-			status_.store( ocupied_status::UNUSED );
+			status_.store( ocupied_status::UNUSED, std::memory_order_release );
 			return;
 		}
 
@@ -235,7 +235,7 @@ private:
 
 		ocupied_status get_status( void )
 		{
-			return status_.load();
+			return status_.load( std::memory_order_acquire );
 		}
 
 	private:
@@ -264,11 +264,11 @@ private:
 		node_for_hazard_ptr* allocate_hazard_ptr_node( void )
 		{
 			// 空きノードを探す。
-			node_for_hazard_ptr* p_ans = head_.load();
+			node_for_hazard_ptr* p_ans = head_.load( std::memory_order_acquire );
 			while ( p_ans != nullptr ) {
 				if ( p_ans->get_status() == ocupied_status::UNUSED ) {
 					if ( p_ans->try_to_get_owner() ) {
-						LogOutput(log_type::DEBUG, "node is allocated.\n" );
+						LogOutput( log_type::DEBUG, "node is allocated.\n" );
 						return p_ans;
 					}
 				}
@@ -278,7 +278,7 @@ private:
 			// 空きノードが見つからなかったので、新しいノードを用意する。
 			p_ans = add_one_new_hazard_ptr_node();
 
-			LogOutput(log_type::DEBUG, "glist is added.\n" );
+			LogOutput( log_type::DEBUG, "glist is added.\n" );
 			return p_ans;
 		}
 
@@ -290,7 +290,7 @@ private:
 		 */
 		bool check_ptr_in_hazard_list( T* p_chk_ptr )
 		{
-			node_for_hazard_ptr* p_ans = head_.load();
+			node_for_hazard_ptr* p_ans = head_.load( std::memory_order_acquire );
 			while ( p_ans != nullptr ) {
 				if ( p_ans->get_status() == ocupied_status::USING ) {
 					if ( p_ans->check_hazard_ptr( p_chk_ptr ) ) {
@@ -304,7 +304,7 @@ private:
 
 		int get_node_count( void )
 		{
-			return node_count_.load();
+			return node_count_.load( std::memory_order_acquire );
 		}
 
 	private:
@@ -318,7 +318,7 @@ private:
 		node_for_hazard_ptr* add_one_new_hazard_ptr_node( void )
 		{
 			node_for_hazard_ptr* p_ans        = new node_for_hazard_ptr();
-			node_for_hazard_ptr* p_next_check = head_.load();
+			node_for_hazard_ptr* p_next_check = head_.load( std::memory_order_acquire );
 			bool                 cas_success  = false;
 			do {
 				p_ans->set_next( p_next_check );
@@ -326,7 +326,7 @@ private:
 			} while ( !cas_success );   // CASが成功するまで繰り返す。
 			node_count_++;
 
-			LogOutput(log_type::DEBUG, "glist is added.\n" );
+			LogOutput( log_type::DEBUG, "glist is added.\n" );
 			return p_ans;
 		}
 
@@ -348,7 +348,7 @@ private:
 
 	inline node_for_hazard_ptr* check_local_storage( void )
 	{
-		node_for_hazard_ptr* p_ans = p_hzd_ptr_node__.get_tls_instance(nullptr);
+		node_for_hazard_ptr* p_ans = p_hzd_ptr_node__.get_tls_instance( nullptr );
 		if ( p_ans == nullptr ) {
 			p_ans                               = get_head_instance().allocate_hazard_ptr_node();
 			p_hzd_ptr_node__.get_tls_instance() = p_ans;

@@ -35,7 +35,7 @@ struct node_of_list {
 	node_of_list( void )
 	{
 		for ( auto& e : next_ ) {
-			e.store( nullptr );
+			e.store( nullptr, std::memory_order_release );
 		}
 	}
 
@@ -46,20 +46,17 @@ struct node_of_list {
 
 	node_of_list* get_next( next_slot_idx cur_slot_idx )
 	{
-		std::atomic_thread_fence( std::memory_order_acquire );
-		return next_[(int)cur_slot_idx].load();
+		return next_[(int)cur_slot_idx].load( std::memory_order_acquire );
 	}
 
 	void set_next( node_of_list* p_new_next, next_slot_idx cur_slot_idx )
 	{
-		std::atomic_thread_fence( std::memory_order_acquire );
-		next_[(int)cur_slot_idx].store( p_new_next );
+		next_[(int)cur_slot_idx].store( p_new_next, std::memory_order_release );
 		return;
 	}
 
 	bool next_CAS( node_of_list** pp_expect_ptr, node_of_list* p_desired_ptr, next_slot_idx cur_slot_idx )
 	{
-		std::atomic_thread_fence( std::memory_order_acquire );
 		return next_[(int)cur_slot_idx].compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
 	}
 
@@ -199,7 +196,7 @@ public:
 				}
 			} else {
 				// 最初の番兵データ以外で、もし、ダウンキャストに失敗したら、そもそも不具合であるし、不要なので、削除する。
-				LogOutput(log_type::DEBUG, "Info: fail to down cast\n" );
+				LogOutput( log_type::DEBUG, "Info: fail to down cast\n" );
 				delete p_ans;
 			}
 		}
@@ -229,7 +226,7 @@ private:
 	{
 		static_assert( std::is_base_of<node_of_list, ALLOC_NODE_T>::value == true, "ALLOC_NODE_T is base of node_of_list" );
 
-		LogOutput(log_type::DEBUG, "allocated new node\n" );
+		LogOutput( log_type::DEBUG, "allocated new node\n" );
 
 		allocated_node_count_++;
 		return new ALLOC_NODE_T();

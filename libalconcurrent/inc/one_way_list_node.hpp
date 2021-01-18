@@ -57,20 +57,17 @@ struct one_way_list_node : public node_of_list {
 
 	one_way_list_node* get_next( void )
 	{
-		std::atomic_thread_fence( std::memory_order_acquire );
-		return next_.load();
+		return next_.load( std::memory_order_acquire );
 	}
 
 	void set_next( one_way_list_node* p_new_next )
 	{
-		std::atomic_thread_fence( std::memory_order_acquire );
-		next_.store( p_new_next );
+		next_.store( p_new_next, std::memory_order_release );
 		return;
 	}
 
 	bool next_CAS( one_way_list_node** pp_expect_ptr, one_way_list_node* p_desired_ptr )
 	{
-		std::atomic_thread_fence( std::memory_order_acquire );
 		return next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
 	}
 

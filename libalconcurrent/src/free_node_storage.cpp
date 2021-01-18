@@ -75,17 +75,17 @@ fifo_free_nd_list::fifo_free_nd_list( void )
   , tail_( nullptr )
 {
 	node_pointer p_initial_node = new node_type();
-	head_.store( p_initial_node );
-	tail_.store( p_initial_node );
+	head_.store( p_initial_node, std::memory_order_release );
+	tail_.store( p_initial_node, std::memory_order_release );
 
 	return;
 }
 
 fifo_free_nd_list::~fifo_free_nd_list()
 {
-	node_pointer p_cur = head_.load();
-	head_.store( nullptr );
-	tail_.store( nullptr );
+	node_pointer p_cur = head_.load( std::memory_order_acquire );
+	head_.store( nullptr, std::memory_order_release );
+	tail_.store( nullptr, std::memory_order_release );
 
 	if ( p_cur != nullptr ) {
 		// 先頭ノードは番兵のため、nullptrであることはありえないが、チェックする。
@@ -107,11 +107,11 @@ void fifo_free_nd_list::push( fifo_free_nd_list::node_pointer const p_push_node 
 	scoped_hazard_ref scoped_ref_nxt( hzrd_ptr_, (int)hazard_ptr_idx::PUSH_FUNC_NEXT );
 
 	while ( true ) {
-		node_pointer p_cur_last = tail_.load();
+		node_pointer p_cur_last = tail_.load( std::memory_order_acquire );
 
 		hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_last, (int)hazard_ptr_idx::PUSH_FUNC_LAST );
 
-		if ( p_cur_last != tail_.load() ) continue;
+		if ( p_cur_last != tail_.load( std::memory_order_acquire ) ) continue;
 
 		node_pointer p_cur_next = p_cur_last->get_next( next_slot_idx_ );
 		hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_next, (int)hazard_ptr_idx::PUSH_FUNC_NEXT );
@@ -144,14 +144,14 @@ fifo_free_nd_list::node_pointer fifo_free_nd_list::pop( void )
 	scoped_hazard_ref scoped_ref_next( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_NEXT );
 
 	while ( true ) {
-		node_pointer p_cur_first = head_.load();
-		node_pointer p_cur_last  = tail_.load();
+		node_pointer p_cur_first = head_.load( std::memory_order_acquire );
+		node_pointer p_cur_last  = tail_.load( std::memory_order_acquire );
 
 		hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_first, (int)hazard_ptr_idx::POP_FUNC_FIRST );
-		if ( p_cur_first != head_.load() ) continue;
+		if ( p_cur_first != head_.load( std::memory_order_acquire ) ) continue;
 
 		hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_last, (int)hazard_ptr_idx::POP_FUNC_LAST );
-		if ( p_cur_last != tail_.load() ) continue;
+		if ( p_cur_last != tail_.load( std::memory_order_acquire ) ) continue;
 
 		node_pointer p_cur_next = p_cur_first->get_next( next_slot_idx_ );
 		hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_next, (int)hazard_ptr_idx::POP_FUNC_NEXT );
@@ -200,7 +200,7 @@ free_nd_storage::free_nd_storage( void )
 
 free_nd_storage::~free_nd_storage()
 {
-	LogOutput(log_type::DEBUG, "Final: number of the allocated nodes -> %d\n", allocated_node_count_.load() );
+	LogOutput( log_type::DEBUG, "Final: number of the allocated nodes -> %d\n", allocated_node_count_.load( std::memory_order_acquire ) );
 }
 
 void free_nd_storage::recycle( free_nd_storage::node_pointer p_retire_node )
@@ -226,22 +226,21 @@ void free_nd_storage::recycle( free_nd_storage::node_pointer p_retire_node )
 
 int free_nd_storage::get_allocated_num( void )
 {
-	return allocated_node_count_.load();
+	return allocated_node_count_.load( std::memory_order_acquire );
 }
 
 void free_nd_storage::destr_fn( void* parm )
 {
-	LogOutput(log_type::DEBUG, "thread local destructor now being called -- %p -- ", parm );
+	LogOutput( log_type::DEBUG, "thread local destructor now being called -- %p -- ", parm );
 
 	if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
 
 	thread_local_fifo_list* p_target_node = reinterpret_cast<thread_local_fifo_list*>( parm );
 	delete p_target_node;
 
-	LogOutput(log_type::DEBUG, "thread local destructor is done.\n" );
+	LogOutput( log_type::DEBUG, "thread local destructor is done.\n" );
 	return;
 }
-
 
 }   // namespace internal
 }   // namespace concurrent
