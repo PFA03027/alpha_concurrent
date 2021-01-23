@@ -41,11 +41,11 @@ void thread_local_fifo_list::push( thread_local_fifo_list::node_pointer const p_
 {
 	p_push_node->set_next( nullptr, next_slot_idx_ );
 
-	if ( head_ != nullptr ) {
-		tail_->set_next( p_push_node, next_slot_idx_ );
+	if ( is_empty() ) {
+		head_ = p_push_node;
 		tail_ = p_push_node;
 	} else {
-		head_ = p_push_node;
+		tail_->set_next( p_push_node, next_slot_idx_ );
 		tail_ = p_push_node;
 	}
 
@@ -54,7 +54,7 @@ void thread_local_fifo_list::push( thread_local_fifo_list::node_pointer const p_
 
 thread_local_fifo_list::node_pointer thread_local_fifo_list::pop( void )
 {
-	if ( head_ == nullptr ) {
+	if ( is_empty() ) {
 		return nullptr;
 	}
 
@@ -74,10 +74,6 @@ fifo_free_nd_list::fifo_free_nd_list( void )
   : head_( nullptr )
   , tail_( nullptr )
 {
-	node_pointer p_initial_node = new node_type();
-	head_.store( p_initial_node, std::memory_order_release );
-	tail_.store( p_initial_node, std::memory_order_release );
-
 	return;
 }
 
@@ -98,6 +94,21 @@ fifo_free_nd_list::~fifo_free_nd_list()
 
 	return;
 }
+
+
+void fifo_free_nd_list::initial_push( fifo_free_nd_list::node_pointer const p_push_node )
+{
+	if(	(head_.load() != nullptr) || (tail_.load() != nullptr) ) {
+		LogOutput( log_type::ERR, "Because already this fifo_free_nd_list instance has sentinel node, fail to initial_push()." );
+		return;
+	}
+
+	head_.store( p_push_node, std::memory_order_release );
+	tail_.store( p_push_node, std::memory_order_release );
+
+	return;
+}
+
 
 void fifo_free_nd_list::push( fifo_free_nd_list::node_pointer const p_push_node )
 {
@@ -203,13 +214,17 @@ free_nd_storage::~free_nd_storage()
 	LogOutput( log_type::DEBUG, "Final: number of the allocated nodes -> %d", allocated_node_count_.load( std::memory_order_acquire ) );
 }
 
-void free_nd_storage::recycle( free_nd_storage::node_pointer p_retire_node )
+bool free_nd_storage::recycle( free_nd_storage::node_pointer p_retire_node )
 {
-	if ( p_retire_node == nullptr ) return;
-
 	thread_local_fifo_list* p_tls_fifo_ = check_local_storage();
 
-	p_tls_fifo_->push( p_retire_node );
+	if ( p_retire_node != nullptr ) {
+		p_tls_fifo_->push( p_retire_node );
+	}
+
+	if(p_tls_fifo_->is_empty()) {
+		return false;
+	}
 
 	for ( int i = 0; i < 2; i++ ) {
 		node_pointer p_chk = p_tls_fifo_->pop();
@@ -221,7 +236,7 @@ void free_nd_storage::recycle( free_nd_storage::node_pointer p_retire_node )
 		}
 	}
 
-	return;
+	return true;
 }
 
 int free_nd_storage::get_allocated_num( void )

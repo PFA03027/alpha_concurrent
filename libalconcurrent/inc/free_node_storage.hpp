@@ -85,6 +85,11 @@ public:
 
 	node_pointer pop( void );
 
+	inline bool is_empty( void )
+	{
+		return head_ == nullptr;
+	}
+
 private:
 	thread_local_fifo_list( const thread_local_fifo_list& ) = delete;
 	thread_local_fifo_list( thread_local_fifo_list&& )      = delete;
@@ -113,6 +118,8 @@ public:
 	fifo_free_nd_list( void );
 
 	~fifo_free_nd_list();
+
+	void initial_push( node_pointer const p_push_node );
 
 	void push( node_pointer const p_push_node );
 
@@ -161,7 +168,14 @@ public:
 
 	~free_nd_storage();
 
-	void recycle( node_pointer p_retire_node );
+	/*!
+	 * @breif	ローカルストレージのノードリストからフリーノードリストへの登録を試みる
+	 *
+	 * @return	フリーノードリストへの登録の試みが実施できたかどうかを返す。
+	 * @retval	true	ローカルストレージのノードリストにリストが残っていて、フリーノードリストへの登録を試みることができた。
+	 * @retval	false	ローカルストレージのノードリストが空で、フリーノードリストへの登録を試みることはできなかった。
+	 */
+	bool recycle( node_pointer p_retire_node );
 
 	/*!
 	 * @breif	フリーノードを取り出す。
@@ -181,11 +195,17 @@ public:
 	 *
 	 */
 	template <typename ALLOC_NODE_T, typename TFUNC>
-	ALLOC_NODE_T* allocate( TFUNC pred )
+	ALLOC_NODE_T* allocate( bool does_allow_allocate, TFUNC pred )
 	{
 		for ( int i = 0; i < num_recycle_exec; i++ ) {
 			node_pointer p_ans = node_list_.pop();
-			if ( p_ans == nullptr ) break;
+			if ( p_ans == nullptr ) {
+				if ( recycle( nullptr ) ) {
+					continue;
+				} else {
+					break;   // ローカルストレージが空で、かつフリーノードリストも空なので、フリーノードを取り出せる可能性は低い。よって、ループを抜ける。
+				}
+			}
 
 			ALLOC_NODE_T* p_down_casted_ans = dynamic_cast<ALLOC_NODE_T*>( p_ans );   // TODO: lock free ?
 			if ( p_down_casted_ans != nullptr ) {
@@ -195,19 +215,25 @@ public:
 					recycle( p_ans );
 				}
 			} else {
-				// 最初の番兵データ以外で、もし、ダウンキャストに失敗したら、そもそも不具合であるし、不要なので、削除する。
-				LogOutput( log_type::DEBUG, "Info: fail to down cast" );
+				// もし、ダウンキャストに失敗したら、そもそも不具合であるし、不要なので、削除する。
+				LogOutput( log_type::ERR, "Info: fail to down cast. discard the node that have unexpected type." );
 				delete p_ans;
 			}
 		}
 
-		// ここに来たら、利用可能なfree nodeがなかったこと示すので、新しいノードをヒープから確保する。
-		return allocate_new_node<ALLOC_NODE_T>();
+		if ( does_allow_allocate ) {
+			// ここに来たら、利用可能なfree nodeがなかったこと示すので、新しいノードをヒープから確保する。
+			return allocate_new_node<ALLOC_NODE_T>();
+		} else {
+			return nullptr;
+		}
 	}
 
 	template <typename ALLOC_NODE_T>
-	void pre_allocate( int pre_alloc_nodes )
+	void init_and_pre_allocate( int pre_alloc_nodes )
 	{
+		node_list_.initial_push( (node_pointer)allocate_new_node<ALLOC_NODE_T>() );
+
 		for ( int i = 0; i < pre_alloc_nodes; i++ ) {
 			recycle( (node_pointer)allocate_new_node<ALLOC_NODE_T>() );
 		}

@@ -180,6 +180,7 @@ private:
  *
  * Type T should be trivially copyable.
  *
+ * In case that template parameter ALLOW_TO_ALLOCATE is true, @n
  * In case of no avialable free node that carries a value, new node is allocated from heap internally. @n
  * In this case, this queue may be locked. And push() may trigger this behavior.
  *
@@ -188,35 +189,50 @@ private:
  * To reduce lock behavior, pre-allocated nodes are effective. @n
  * get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
  *
+ * In case that template parameter ALLOW_TO_ALLOCATE is true, @n
+ * In case of no avialable free node, push() member function will return false. In this case, it fail to push a value @n
+ * User side should recover this condition by User side itself.
+ *
  * @note
  * To resolve ABA issue, this Stack queue uses hazard pointer approach.
  */
-template <typename T>
+template <typename T, bool ALLOW_TO_ALLOCATE = true>
 class stack_list {
 public:
 	using value_type = T;
 
 	/*!
 	 * @breif	Constructor
+	 *
+	 * In case that ALLOW_TO_ALLOCATE is false, argument pre_alloc_nodes must be equal or than 1.
+	 * This value should be at least the number of CPUs.
+	 * Also, it is recommended to double the number of threads to access.
 	 */
 	stack_list(
-		int pre_alloc_nodes = 0   //!< [in]	number of pre-allocated internal free node
+		unsigned int pre_alloc_nodes = 1   //!< [in]	number of pre-allocated internal free node
 	)
 	{
-		free_nd_.pre_allocate<lifo_node_type>( pre_alloc_nodes );
+		if ( !ALLOW_TO_ALLOCATE && ( pre_alloc_nodes < 1 ) ) {
+			LogOutput( log_type::WARN, "Warning: in case that ALLOW_TO_ALLOCATE is false, argument pre_alloc_nodes must be equal or than 1, now %d. Therefore it will be modified to 1. This value should be at least the number of CPUs. Also, it is recommended to double the number of threads to access.", pre_alloc_nodes );
+			pre_alloc_nodes = 1;
+		}
+
+		free_nd_.init_and_pre_allocate<lifo_node_type>( pre_alloc_nodes );
 		return;
 	}
 
 	/*!
-	 * @breif	Push a value to this FIFO queue
+	 * @breif	Push a value to this LIFO stack
 	 *
-	 * cont_arg will copy to FIFO queue.
+	 * cont_arg will copy to LIFO stack.
 	 */
-	void push(
-		const T& cont_arg   //!< [in]	a value to push this FIFO queue
-	)
+	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
+	auto push(
+		const T& cont_arg   //!< [in]	a value to push this LIFO queue
+		) -> typename std::enable_if<BOOL_VALUE, void>::type
 	{
 		lifo_node_pointer p_new_node = free_nd_.allocate<lifo_node_type>(
+			true,
 			[this]( lifo_node_pointer p_chk_node ) {
 				return !( this->lifo_.check_hazard_list( p_chk_node ) );
 				//				return false;
@@ -226,6 +242,37 @@ public:
 
 		lifo_.push( p_new_node );
 		return;
+	}
+
+	/*!
+	 * @breif	Push a value to this LIFO stack
+	 *
+	 * cont_arg will copy to LIFO stack.
+	 *
+	 * @return	success or fail to push
+	 * @retval	true	success to push copy value of cont_arg to LIFO
+	 * @retval	false	fail to push cont_arg value to LIFO
+	 */
+	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
+	auto push(
+		const T& cont_arg   //!< [in]	a value to push this LIFO queue
+		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
+	{
+		lifo_node_pointer p_new_node = free_nd_.allocate<lifo_node_type>(
+			false,
+			[this]( lifo_node_pointer p_chk_node ) {
+				return !( this->lifo_.check_hazard_list( p_chk_node ) );
+				//				return false;
+			} );
+
+		if ( p_new_node != nullptr ) {
+			p_new_node->set_value( cont_arg );
+
+			lifo_.push( p_new_node );
+			return true;
+		} else {
+			return false;
+		}
 	}
 
 	/*!
