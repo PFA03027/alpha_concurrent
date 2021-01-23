@@ -21,7 +21,7 @@ class default_logger : public logger_if_abst {
 		const char*  p_log_str       //!< [in]	pointer log string
 		) override
 	{
-		printf( "%s", p_log_str );
+		printf( "%s\n", p_log_str );
 //		fflush( NULL );
 		return;
 	}

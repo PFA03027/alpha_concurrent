@@ -196,7 +196,7 @@ public:
 				}
 			} else {
 				// 最初の番兵データ以外で、もし、ダウンキャストに失敗したら、そもそも不具合であるし、不要なので、削除する。
-				LogOutput( log_type::DEBUG, "Info: fail to down cast\n" );
+				LogOutput( log_type::DEBUG, "Info: fail to down cast" );
 				delete p_ans;
 			}
 		}
@@ -226,7 +226,7 @@ private:
 	{
 		static_assert( std::is_base_of<node_of_list, ALLOC_NODE_T>::value == true, "ALLOC_NODE_T is base of node_of_list" );
 
-		LogOutput( log_type::DEBUG, "allocated new node\n" );
+		LogOutput( log_type::DEBUG, "allocated new node" );
 
 		allocated_node_count_++;
 		return new ALLOC_NODE_T();

@@ -200,7 +200,7 @@ free_nd_storage::free_nd_storage( void )
 
 free_nd_storage::~free_nd_storage()
 {
-	LogOutput( log_type::DEBUG, "Final: number of the allocated nodes -> %d\n", allocated_node_count_.load( std::memory_order_acquire ) );
+	LogOutput( log_type::DEBUG, "Final: number of the allocated nodes -> %d", allocated_node_count_.load( std::memory_order_acquire ) );
 }
 
 void free_nd_storage::recycle( free_nd_storage::node_pointer p_retire_node )
@@ -238,7 +238,7 @@ void free_nd_storage::destr_fn( void* parm )
 	thread_local_fifo_list* p_target_node = reinterpret_cast<thread_local_fifo_list*>( parm );
 	delete p_target_node;
 
-	LogOutput( log_type::DEBUG, "thread local destructor is done.\n" );
+	LogOutput( log_type::DEBUG, "thread local destructor is done." );
 	return;
 }
 

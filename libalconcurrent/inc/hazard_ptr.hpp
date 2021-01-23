@@ -211,7 +211,7 @@ private:
 
 			p_target_node->release_owner();
 
-			LogOutput( log_type::DEBUG, "thread local destructor is done.\n" );
+			LogOutput( log_type::DEBUG, "thread local destructor is done." );
 			return;
 		}
 
@@ -268,7 +268,7 @@ private:
 			while ( p_ans != nullptr ) {
 				if ( p_ans->get_status() == ocupied_status::UNUSED ) {
 					if ( p_ans->try_to_get_owner() ) {
-						LogOutput( log_type::DEBUG, "node is allocated.\n" );
+						LogOutput( log_type::DEBUG, "node is allocated." );
 						return p_ans;
 					}
 				}
@@ -278,7 +278,7 @@ private:
 			// 空きノードが見つからなかったので、新しいノードを用意する。
 			p_ans = add_one_new_hazard_ptr_node();
 
-			LogOutput( log_type::DEBUG, "glist is added.\n" );
+			LogOutput( log_type::DEBUG, "glist is added." );
 			return p_ans;
 		}
 
@@ -326,7 +326,7 @@ private:
 			} while ( !cas_success );   // CASが成功するまで繰り返す。
 			node_count_++;
 
-			LogOutput( log_type::DEBUG, "glist is added.\n" );
+			LogOutput( log_type::DEBUG, "glist is added." );
 			return p_ans;
 		}
 

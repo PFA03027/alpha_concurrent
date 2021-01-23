@@ -48,12 +48,12 @@ public:
 	  , status_( ocupied_status::USING )
 	  , next_( nullptr )
 	{
-		LogOutput( log_type::DEBUG, "tls_data_container::constructor is allocated - %p\n", this );
+		LogOutput( log_type::DEBUG, "tls_data_container::constructor is allocated - %p", this );
 	}
 
 	~tls_data_container()
 	{
-		LogOutput( log_type::DEBUG, "tls_data_container::destructor is called     - %p\n", this );
+		LogOutput( log_type::DEBUG, "tls_data_container::destructor is called     - %p", this );
 		delete p_value;
 	}
 
@@ -122,11 +122,11 @@ public:
 
 	~dynamic_tls()
 	{
-		LogOutput( log_type::DEBUG, "dynamic_tls::destructor is called\n" );
+		LogOutput( log_type::DEBUG, "dynamic_tls::destructor is called" );
 
 		int status = pthread_key_delete( tls_key );
 		if ( status < 0 ) {
-			LogOutput( log_type::ERR, "pthread_key_delete failed, errno=%d\n", errno );
+			LogOutput( log_type::ERR, "pthread_key_delete failed, errno=%d", errno );
 			exit( 1 );
 		}
 
@@ -172,7 +172,7 @@ public:
 private:
 	static void destr_fn( void* parm )
 	{
-		LogOutput( log_type::DEBUG, "dynamic_tls::destr_fn is called              - %p\n", parm );
+		LogOutput( log_type::DEBUG, "dynamic_tls::destr_fn is called              - %p", parm );
 
 		if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
 
@@ -189,14 +189,14 @@ private:
 		while ( p_ans != nullptr ) {
 			if ( p_ans->get_status() == internal::tls_data_container<T>::ocupied_status::UNUSED ) {
 				if ( p_ans->try_to_get_owner() ) {
-					LogOutput( log_type::DEBUG, "node is allocated.\n" );
+					LogOutput( log_type::DEBUG, "node is allocated." );
 					return p_ans;
 				}
 			}
 			p_ans = p_ans->get_next();
 		}
 
-		LogOutput( log_type::DEBUG, "glist is added.\n" );
+		LogOutput( log_type::DEBUG, "glist is added." );
 		return p_ans;
 	}
 
