@@ -221,16 +221,15 @@ private:
  *
  * In case that template parameter ALLOW_TO_ALLOCATE is true, @n
  * In case of no avialable free node that carries a value, new node is allocated from heap internally. @n
- * In this case, this queue may be locked. And push() may trigger this behavior.
- *
+ * In this case, this queue may be locked. And push() may trigger this behavior. @n
  * On the other hand, used free node will be recycled without a memory allocation. In this case, push() is lock free.
  *
  * To reduce lock behavior, pre-allocated nodes are effective. @n
  * get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
  *
- * In case that template parameter ALLOW_TO_ALLOCATE is true, @n
- * In case of no avialable free node, push() member function will return false. In this case, it fail to push a value @n
- * User side should recover this condition by User side itself.
+ * In case that template parameter ALLOW_TO_ALLOCATE is false, @n
+ * In case of no avialable free node, push() member function will return false. In this case, it fails to push a value @n
+ * User side has a role to recover this condition by User side itself, e.g. backoff approach.
  *
  * @note
  * To resolve ABA issue, this FIFO queue uses hazard pointer approach.
@@ -298,7 +297,8 @@ public:
 	 * @retval	false	fail to push cont_arg value to FIFO
 	 *
 	 * @note
-	 * In case that template parameter ALLOW_TO_ALLOCATE is false, this I/F is valid.
+	 * @li	In case that template parameter ALLOW_TO_ALLOCATE is false, this I/F is valid.
+	 * @li	In case that return value is false, User side has a role to recover this condition by User side itself, e.g. backoff approach.
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push(

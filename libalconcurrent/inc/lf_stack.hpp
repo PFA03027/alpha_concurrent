@@ -189,9 +189,9 @@ private:
  * To reduce lock behavior, pre-allocated nodes are effective. @n
  * get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
  *
- * In case that template parameter ALLOW_TO_ALLOCATE is true, @n
- * In case of no avialable free node, push() member function will return false. In this case, it fail to push a value @n
- * User side should recover this condition by User side itself.
+ * In case that template parameter ALLOW_TO_ALLOCATE is false, @n
+ * In case of no avialable free node, push() member function will return false. In this case, it fails to push a value @n
+ * User side has a role to recover this condition by User side itself, e.g. backoff approach.
  *
  * @note
  * To resolve ABA issue, this Stack queue uses hazard pointer approach.
@@ -225,6 +225,9 @@ public:
 	 * @breif	Push a value to this LIFO stack
 	 *
 	 * cont_arg will copy to LIFO stack.
+	 *
+	 * @note
+	 * In case that template parameter ALLOW_TO_ALLOCATE is true, this I/F is valid.
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push(
@@ -252,6 +255,10 @@ public:
 	 * @return	success or fail to push
 	 * @retval	true	success to push copy value of cont_arg to LIFO
 	 * @retval	false	fail to push cont_arg value to LIFO
+	 *
+	 * @note
+	 * @li	In case that template parameter ALLOW_TO_ALLOCATE is false, this I/F is valid.
+	 * @li	In case that return value is false, User side has a role to recover this condition by User side itself, e.g. backoff approach.
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push(

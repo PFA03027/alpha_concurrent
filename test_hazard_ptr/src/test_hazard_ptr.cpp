@@ -128,10 +128,12 @@ int test_case1( void )
 		//		std::cout << "Thread " << i << " is created." << std::endl;
 		pthread_create( &threads[i], NULL, func_refarencing, reinterpret_cast<void*>( &atm_p_test_obj ) );
 	}
+	std::cout << "!!!Ready!!!" << std::endl;
 
-	std::cout << "!!!Ready!!!" << std::endl;   // prints !!!Hello World!!!
+	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
+	std::cout << "!!!GO!!!" << std::endl;
+	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	pthread_barrier_wait( &barrier );
-	std::cout << "!!!GO!!!" << std::endl;   // prints !!!Hello World!!!
 
 	int sum = 0;
 	for ( int i = 0; i <= num_thread; i++ ) {
@@ -141,7 +143,10 @@ int test_case1( void )
 		sum += e;
 	}
 
-	//	std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
+
+	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
+	std::cout << "thread is " << num_thread << "  Exec time: " << diff.count() << " msec" << std::endl;
 
 	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
 	// に等しくなるはず。

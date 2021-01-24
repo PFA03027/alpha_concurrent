@@ -252,8 +252,8 @@ int test_case3( void )
 {
 	//	test_lifo_type* p_test_obj = new test_lifo_type( num_thread );
 	test_lifo_type* p_test_obj[2];
-	p_test_obj[0] = new test_lifo_type();
-	p_test_obj[1] = new test_lifo_type();
+	p_test_obj[0] = new test_lifo_type(num_thread);
+	p_test_obj[1] = new test_lifo_type(num_thread);
 
 	pthread_barrier_init( &barrier, NULL, num_thread + 1 );
 	pthread_t* threads = new pthread_t[num_thread];
@@ -261,10 +261,12 @@ int test_case3( void )
 	for ( int i = 0; i < num_thread; i++ ) {
 		pthread_create( &threads[i], NULL, func_test_fifo, reinterpret_cast<void*>( p_test_obj[i % 2] ) );
 	}
+	std::cout << "!!!Ready!!!" << std::endl;
 
-	std::cout << "!!!Ready!!!" << std::endl;   // prints !!!Hello World!!!
+	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
+	std::cout << "!!!GO!!!" << std::endl;
+	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	pthread_barrier_wait( &barrier );
-	std::cout << "!!!GO!!!" << std::endl;   // prints !!!Hello World!!!
 
 	auto [a1, a2] = func_test_fifo2( p_test_obj );
 	std::cout << "Thread X: last dequeued = " << a1 << ", " << a2 << std::endl;
@@ -277,7 +279,10 @@ int test_case3( void )
 		sum += e;
 	}
 
-	//	std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
+
+	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
+	std::cout << "thread is " << num_thread << "  Exec time: " << diff.count() << " msec" << std::endl;
 
 	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
 	// に等しくなるはず。
@@ -399,10 +404,12 @@ int test_case4( void )
 	for ( int i = 0; i < num_thread; i++ ) {
 		pthread_create( &threads[i], NULL, func_test4_fifo, reinterpret_cast<void*>( p_test_obj[i % 2] ) );
 	}
+	std::cout << "!!!Ready!!!" << std::endl;
 
-	std::cout << "!!!Ready!!!" << std::endl;   // prints !!!Hello World!!!
+	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
+	std::cout << "!!!GO!!!" << std::endl;
+	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	pthread_barrier_wait( &barrier );
-	std::cout << "!!!GO!!!" << std::endl;   // prints !!!Hello World!!!
 
 	auto [a1, a2] = func_test4_fifo2( p_test_obj );
 	std::cout << "Thread X: last dequeued = " << a1 << ", " << a2 << std::endl;
@@ -415,7 +422,10 @@ int test_case4( void )
 		sum += e;
 	}
 
-	//	std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
+
+	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
+	std::cout << "thread is " << num_thread << "  Exec time: " << diff.count() << " msec" << std::endl;
 
 	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
 	// に等しくなるはず。
