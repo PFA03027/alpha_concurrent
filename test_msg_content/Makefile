@@ -1,15 +1,21 @@
-CXXFLAGS =	 -std=c++17 -O2 -g -Wall -fmessage-length=0 -I../libalconcurrent/inc
+CXXFLAGS =	-c -MMD -MP -std=c++17 -O2 -g -Wall -fmessage-length=0 -I../libalconcurrent/inc
 
-OBJS =		test_msg_content.o test_crc32.o
+SRCS := $(wildcard *.cpp)
+OBJS := $(SRCS:%.cpp=%.o)
+DEPS := $(SRCS:%.cpp=%.d)
+LIB_FILES :=  ../libalconcurrent/Debug/libalconcurrent.a
 
 LIBS = -L../libalconcurrent/Debug -lalconcurrent
 
 TARGET =	test_msg_content.exe
 
-$(TARGET):	$(OBJS)
+-include $(DEPS)
+
+$(TARGET):	$(OBJS) $(LIB_FILES)
 	$(CXX) -o $(TARGET) $(OBJS) $(LIBS)
 
 all:	$(TARGET)
 
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJS) $(TARGET) $(DEPS)
+

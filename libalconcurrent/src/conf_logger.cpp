@@ -22,7 +22,7 @@ class default_logger : public logger_if_abst {
 		) override
 	{
 		printf( "%s\n", p_log_str );
-//		fflush( NULL );
+		//		fflush( NULL );
 		return;
 	}
 };
