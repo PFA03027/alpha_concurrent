@@ -7,7 +7,7 @@ LIB_FILES :=  ../libalconcurrent/libalconcurrent.a
 
 LIBS = -L../libalconcurrent -lalconcurrent
 
-TARGET =	test_msg_content.exe
+TARGET =	test_lf_stack.exe
 
 -include $(DEPS)
 
