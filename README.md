@@ -25,6 +25,7 @@ Non lock free behavior cases are below;
 * Construct a instance itself.
 * Any initial API call by each thread.
 * push() call in case of no free internal node.
+** In case that template parameter ALLOW_TO_ALLOCATE is false, push() is lock free.
 
 
 # stack_list class in lf_stack.hpp
@@ -47,6 +48,7 @@ Non lock free behavior cases are below;
 * Construct a instance itself.
 * Any initial API call by each thread.
 * push() call in case of no free internal node.
+** In case that template parameter ALLOW_TO_ALLOCATE is false, push() is lock free.
 
 
 # dynamic_tls class in dynamic_tls.hpp
