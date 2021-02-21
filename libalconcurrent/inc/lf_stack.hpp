@@ -78,7 +78,7 @@ public:
 
 		while ( true ) {
 			node_pointer p_cur_top = head_.load( std::memory_order_acquire );
-			hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_top, (int)hazard_ptr_idx::PUSH_FUNC_FIRST );
+			scoped_ref_cur.regist_ptr_as_hazard_ptr( p_cur_top );
 			if ( p_cur_top != head_.load( std::memory_order_acquire ) ) continue;
 
 			p_push_node->set_next( p_cur_top );
@@ -112,7 +112,7 @@ public:
 
 		while ( true ) {
 			node_pointer p_cur_first = head_.load( std::memory_order_acquire );
-			hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_first, (int)hazard_ptr_idx::POP_FUNC_FIRST );
+			scoped_ref_first.regist_ptr_as_hazard_ptr( p_cur_first );
 			if ( p_cur_first != head_.load( std::memory_order_acquire ) ) continue;
 
 			if ( p_cur_first == nullptr ) {
@@ -121,7 +121,7 @@ public:
 			}
 
 			node_pointer p_cur_next = p_cur_first->get_next();
-			hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_next, (int)hazard_ptr_idx::POP_FUNC_NEXT );
+			scoped_ref_next.regist_ptr_as_hazard_ptr( p_cur_next );
 			if ( p_cur_next != p_cur_first->get_next() ) continue;
 
 			T ans_2nd = p_cur_first->get_value();   // この処理が必要になるため、T型は、trivially copyableでなければならい。

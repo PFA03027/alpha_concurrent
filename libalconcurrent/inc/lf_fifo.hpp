@@ -84,16 +84,16 @@ public:
 	{
 		p_push_node->set_next( nullptr );
 
-		scoped_hazard_ref scoped_ref_cur( hzrd_ptr_, (int)hazard_ptr_idx::PUSH_FUNC_LAST );
+		scoped_hazard_ref scoped_ref_lst( hzrd_ptr_, (int)hazard_ptr_idx::PUSH_FUNC_LAST );
 		scoped_hazard_ref scoped_ref_nxt( hzrd_ptr_, (int)hazard_ptr_idx::PUSH_FUNC_NEXT );
 
 		while ( true ) {
 			node_pointer p_cur_last = tail_.load( std::memory_order_acquire );
-			hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_last, (int)hazard_ptr_idx::PUSH_FUNC_LAST );
+			scoped_ref_lst.regist_ptr_as_hazard_ptr( p_cur_last );
 			if ( p_cur_last != tail_.load( std::memory_order_acquire ) ) continue;
 
 			node_pointer p_cur_next = p_cur_last->get_next();
-			hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_next, (int)hazard_ptr_idx::PUSH_FUNC_NEXT );
+			scoped_ref_nxt.regist_ptr_as_hazard_ptr( p_cur_next );
 			if ( p_cur_next != p_cur_last->get_next() ) continue;
 
 			if ( p_cur_next == nullptr ) {
@@ -133,14 +133,14 @@ public:
 			node_pointer p_cur_first = head_.load( std::memory_order_acquire );
 			node_pointer p_cur_last  = tail_.load( std::memory_order_acquire );
 
-			hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_first, (int)hazard_ptr_idx::POP_FUNC_FIRST );
+			scoped_ref_first.regist_ptr_as_hazard_ptr( p_cur_first );
 			if ( p_cur_first != head_.load( std::memory_order_acquire ) ) continue;
 
-			hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_last, (int)hazard_ptr_idx::POP_FUNC_LAST );
+			scoped_ref_last.regist_ptr_as_hazard_ptr( p_cur_last );
 			if ( p_cur_last != tail_.load( std::memory_order_acquire ) ) continue;
 
 			node_pointer p_cur_next = p_cur_first->get_next();
-			hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_next, (int)hazard_ptr_idx::POP_FUNC_NEXT );
+			scoped_ref_next.regist_ptr_as_hazard_ptr( p_cur_next );
 			if ( p_cur_next != p_cur_first->get_next() ) continue;
 
 			if ( p_cur_first == p_cur_last ) {
@@ -251,7 +251,7 @@ public:
 	)
 	{
 		if ( !ALLOW_TO_ALLOCATE && ( pre_alloc_nodes < 1 ) ) {
-			LogOutput( log_type::WARN, "Warning: in case that ALLOW_TO_ALLOCATE is false, argument pre_alloc_nodes must be equal or than 1, now %d. Therefore it will be modified to 1. This value should be at least the number of CPUs. Also, it is recommended to double the number of threads to access.", pre_alloc_nodes );
+			LogOutput( log_type::WARN, "Warning: in case that ALLOW_TO_ALLOCATE is false, argument pre_alloc_nodes must be equal or greater than 1, now %d. Therefore it will be modified to 1. This value should be at least the number of CPUs. Also, it is recommended to double the number of threads to access.", pre_alloc_nodes );
 			pre_alloc_nodes = 1;
 		}
 

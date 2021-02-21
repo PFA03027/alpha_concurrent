@@ -379,6 +379,11 @@ public:
 		monitor_ref_.clear_hazard_ptr( idx_ );
 	}
 
+	void regist_ptr_as_hazard_ptr(T* p_target)
+	{
+		monitor_ref_.regist_ptr_as_hazard_ptr(p_target, idx_);
+	}
+
 private:
 	int               idx_;
 	hazard_ptr<T, N>& monitor_ref_;
