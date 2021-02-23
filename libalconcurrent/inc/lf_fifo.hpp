@@ -35,7 +35,7 @@ namespace internal {
  *
  * キューに登録された値そのものは、head_.nextが指すノードに存在する。
  */
-template <typename T>
+template <typename T, typename DELETER = default_deleter<T>>
 class fifo_nd_list {
 public:
 	static constexpr int hzrd_max_slot_ = 5;
@@ -64,8 +64,12 @@ public:
 
 		if ( p_cur != nullptr ) {
 			// 先頭ノードは番兵のため、nullptrであることはありえないが、チェックする。
+			// ノード自体は、フリーノードストレージに戻さず削除するが、ここは戻さない仕様で割り切る。
+			// TODO T型がpointerの場合、ポインタの先のオブジェクトを削除していないため、メモリリークとなる。
+			DELETER dt;
 			do {
 				node_pointer const p_nxt = p_cur->get_next();
+				dt( p_cur->ref_value() );
 				delete p_cur;
 				p_cur = p_nxt;
 			} while ( p_cur != nullptr );
@@ -234,7 +238,7 @@ private:
  * @note
  * To resolve ABA issue, this FIFO queue uses hazard pointer approach.
  */
-template <typename T, bool ALLOW_TO_ALLOCATE = true>
+template <typename T, bool ALLOW_TO_ALLOCATE = true, typename DELETER = internal::default_deleter<T>>
 class fifo_list {
 public:
 	using value_type = T;
@@ -374,7 +378,7 @@ private:
 	using free_nd_storage_type = internal::free_nd_storage;
 	using free_node_type       = typename free_nd_storage_type::node_type;
 	using free_node_pointer    = typename free_nd_storage_type::node_pointer;
-	using fifo_type            = internal::fifo_nd_list<T>;
+	using fifo_type            = internal::fifo_nd_list<T, DELETER>;
 	using fifo_node_type       = typename fifo_type::node_type;
 	using fifo_node_pointer    = typename fifo_type::node_pointer;
 
