@@ -56,9 +56,22 @@ public:
 
 	~lockfree_list_base()
 	{
-		node_pointer p_expect_sentinel = head_.load( std::memory_order_acquire );
+		auto [p_cur, cur_mark] = head_.get_next();
 
-		assert( p_expect_sentinel == p_sentinel_node );   // need to move all nodes to free node list before destruction
+		if ( p_cur != nullptr ) {
+			// 先頭ノードは番兵のため、nullptrであることはありえないが、チェックする。
+			// ノード自体は、フリーノードストレージに戻すことが基本だが、デストラクタの場合は、戻さない仕様で割り切る。
+			// T型がpointerの場合、ポインタの先のオブジェクトを削除してから、ノードを削除する。
+			DELETER dt;
+			do {
+				auto [p_nxt, nxt_mark] = p_cur->get_next();
+				dt( p_cur->ref_value() );
+				delete p_cur;
+				p_cur = p_nxt;
+			} while ( p_cur != nullptr );
+		}
+
+		return;
 
 		delete p_sentinel_node;
 
@@ -404,7 +417,7 @@ public:
 	 * @breif	remove all of nodes that pred return true from this list
 	 */
 	template <typename Predicate>
-	void remove_if(
+	void remove_all_if(
 		Predicate pred   //!< [in]	引数には、const list_node_pointerが渡される
 	)
 	{
@@ -425,7 +438,7 @@ public:
 	 * @breif	remove a first node that pred return true from this list
 	 */
 	template <typename Predicate>
-	void erase_if(
+	void remove_1st_if(
 		Predicate pred   //!< [in]	引数には、const list_node_pointerが渡される
 	)
 	{
