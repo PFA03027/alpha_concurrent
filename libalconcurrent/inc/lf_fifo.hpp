@@ -27,7 +27,7 @@ namespace internal {
 /*!
  * @breif	リスト型のFIFOキューの基本要素となるFIFOキュークラス
  *
- * Tは、trivially copyableでなければならい。
+ * Tは、copy assignableでなければならい。
  *
  * @note
  * https://www.slideshare.net/kumagi/lock-free-safe?next_slideshow=1 @n
@@ -163,7 +163,7 @@ public:
 					// headが他のスレッドでpopされた。
 					continue;
 				}
-				T ans_2nd = p_cur_next->get_value();   // この処理が必要になるため、T型は、trivially copyableでなければならい。
+				T ans_2nd = p_cur_next->get_value();   // この処理が必要になるため、T型は、copy assignableでなければならい。
 				// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
 				// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
 				if ( head_.compare_exchange_weak( p_cur_first, p_cur_next ) ) {
@@ -221,7 +221,7 @@ private:
 /*!
  * @breif	semi-lock free FIFO type queue
  *
- * Type T should be trivially copyable.
+ * Type T should be copy assignable.
  *
  * In case that template parameter ALLOW_TO_ALLOCATE is true, @n
  * In case of no avialable free node that carries a value, new node is allocated from heap internally. @n
@@ -372,8 +372,8 @@ public:
 private:
 	fifo_list( const fifo_list& ) = delete;
 	fifo_list( fifo_list&& )      = delete;
-	fifo_list operator=( const fifo_list& ) = delete;
-	fifo_list operator=( fifo_list&& ) = delete;
+	fifo_list& operator=( const fifo_list& ) = delete;
+	fifo_list& operator=( fifo_list&& ) = delete;
 
 	using free_nd_storage_type = internal::free_nd_storage;
 	using free_node_type       = typename free_nd_storage_type::node_type;

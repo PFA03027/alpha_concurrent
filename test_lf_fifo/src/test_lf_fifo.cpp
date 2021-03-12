@@ -193,7 +193,7 @@ int test_case2( void )
 
 /**
  * 各スレッドのメインルーチン。
- * ウントアップを繰り返す。
+ * カウントアップを繰り返す。
  */
 template <typename TEST_FIFO_TYPE>
 void* func_test_fifo( void* data )

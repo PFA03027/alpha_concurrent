@@ -8,7 +8,7 @@
 # fifo_list class in lf_fifo.hpp
 Semi-lock free FIFO type queue
 
-Template 1st parameter T should be trivially copyable.
+Template 1st parameter T should be copy assignable.
 
 In case of no avialable free node that carries a value, new node is allocated from heap internally.
 In this case, this queue may be locked. And push() may trigger this behavior.
@@ -17,21 +17,11 @@ On the other hand, used free node will be recycled without a memory allocation. 
 
 To reduce lock behavior, pre-allocated nodes are effective.
 get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
-
-## Supplement
-To resolve ABA issue, this FIFO queue uses hazard pointer approach.
-
-Non lock free behavior cases are below;
-* Construct a instance itself.
-* Any initial API call by each thread.
-* push() call in case of no free internal node.
-** In case that template parameter ALLOW_TO_ALLOCATE is false, push() is lock free.
-
 
 # stack_list class in lf_stack.hpp
 Semi-lock free Stack type queue
 
-Template 1st parameter T should be trivially copyable.
+Template 1st parameter T should be copy assignable.
 
 In case of no avialable free node that carries a value, new node is allocated from heap internally.
 In this case, this queue may be locked. And push() may trigger this behavior.
@@ -41,14 +31,27 @@ On the other hand, used free node will be recycled without a memory allocation. 
 To reduce lock behavior, pre-allocated nodes are effective.
 get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
 
-## Supplement
-To resolve ABA issue, this Stack queue uses hazard pointer approach.
+# stack_list class in lf_list.hpp
+Semi-lock free list
+
+Template 1st parameter T should be copy assignable.
+
+In case of no avialable free node that carries a value, new node is allocated from heap internally.
+In this case, this queue may be locked. And push_front()/push_back()/insert() may trigger this behavior.
+
+On the other hand, used free node will be recycled without a memory allocation. In this case, push_front()/push_back()/insert() is lock free.
+
+To reduce lock behavior, pre-allocated nodes are effective.
+get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
+
+# Supplement
+To resolve ABA issue, this FIFO / Stack / list uses hazard pointer approach.
 
 Non lock free behavior cases are below;
 * Construct a instance itself.
 * Any initial API call by each thread.
-* push() call in case of no free internal node.
-** In case that template parameter ALLOW_TO_ALLOCATE is false, push() is lock free.
+* push()/push_front()/push_back()/insert() call in case of no free internal node.
+** In case that template parameter ALLOW_TO_ALLOCATE is false, these API does not allocate internal node. therefore push()/push_front()/push_back()/insert() is lock free.
 
 
 # dynamic_tls class in dynamic_tls.hpp

@@ -27,7 +27,7 @@ namespace internal {
 /*!
  * @breif	リスト型のFIFOキューの基本要素となるFIFOキュークラス
  *
- * Tは、trivially copyableでなければならい。
+ * Tは、copy assignableでなければならい。
  *
  * @note
  * https://www.slideshare.net/kumagi/lock-free-safe?next_slideshow=1 @n
@@ -57,10 +57,10 @@ public:
 			// 先頭ノードは番兵のため、nullptrであることはありえないが、チェックする。
 			// ノード自体は、フリーノードストレージに戻さず削除するが、ここは戻さない仕様で割り切る。
 			// TODO T型がpointerの場合、ポインタの先のオブジェクトを削除していないため、メモリリークとなる。
-			DELETER	dt;
+			DELETER dt;
 			do {
 				node_pointer const p_nxt = p_cur->get_next();
-				dt(p_cur->ref_value());
+				dt( p_cur->ref_value() );
 				delete p_cur;
 				p_cur = p_nxt;
 			} while ( p_cur != nullptr );
@@ -183,7 +183,7 @@ private:
 /*!
  * @breif	semi-lock free Stack type queue
  *
- * Type T should be trivially copyable.
+ * Type T should be copy assignable.
  *
  * In case that template parameter ALLOW_TO_ALLOCATE is true, @n
  * In case of no avialable free node that carries a value, new node is allocated from heap internally. @n
@@ -329,8 +329,8 @@ public:
 private:
 	stack_list( const stack_list& ) = delete;
 	stack_list( stack_list&& )      = delete;
-	stack_list operator=( const stack_list& ) = delete;
-	stack_list operator=( stack_list&& ) = delete;
+	stack_list& operator=( const stack_list& ) = delete;
+	stack_list& operator=( stack_list&& ) = delete;
 
 	using free_nd_storage_type = internal::free_nd_storage;
 	using free_node_type       = typename free_nd_storage_type::node_type;

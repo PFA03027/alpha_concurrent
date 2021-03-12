@@ -33,6 +33,7 @@ struct one_way_list_node : public node_of_list {
 	  : target_()
 	  , next_( nullptr )
 	{
+		static_assert( std::is_copy_assignable<T>::value, "T need to be copy assignable." );
 	}
 
 	one_way_list_node( const T& cont_arg )
@@ -99,7 +100,9 @@ struct one_way_list_node_markable : public node_of_list {
 	  : target_()
 	  , next_( 0 )
 	{
-		assert( next_.is_lock_free() );   // std::atomic_uintptr_t is not lock-free.
+		static_assert( std::is_copy_assignable<T>::value, "T need to be copy assignable." );
+
+		//		assert( next_.is_lock_free() );   // std::atomic_uintptr_t is not lock-free.
 	}
 
 	one_way_list_node_markable( const T& cont_arg )
@@ -206,6 +209,56 @@ using default_deleter = typename std::conditional<
 		std::is_array<T>::value,
 		deleter_delete_array<T>,
 		deleter_no_delete<T>>::type>::type;
+
+template <typename T>
+class mover_copy {
+public:
+	void operator()( T* from, T* to )
+	{
+		*to = *from;
+	}
+};
+
+template <typename T>
+class mover_move {
+public:
+	void operator()( T* from, T* to )
+	{
+		*to = std::move( *from );
+	}
+};
+
+template <typename T>
+class mover_pointer {
+public:
+	void operator()( T* from, T* to )
+	{
+		*to   = *from;
+		*from = nullptr;
+	}
+};
+
+template <typename T>
+class mover_pointer_array {
+public:
+	void operator()( T* from, T* to )
+	{
+		*to   = *from;
+		*from = nullptr;
+	}
+};
+
+template <typename T>
+using default_mover = typename std::conditional<
+	std::is_pointer<T>::value,
+	mover_pointer<T>,
+	typename std::conditional<
+		std::is_array<T>::value,
+		mover_pointer_array<T>,
+		typename std::conditional<
+			std::is_move_assignable<T>::value,
+			mover_move<T>,
+			mover_copy<T>>::type>::type>::type;
 
 }   // namespace internal
 
