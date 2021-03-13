@@ -5,7 +5,7 @@ OBJS := $(SRCS:%.cpp=%.o)
 DEPS := $(SRCS:%.cpp=%.d)
 LIB_FILES :=  ../libalconcurrent/libalconcurrent.a
 
-LIBS = -L../libalconcurrent -lalconcurrent
+LIBS = -L../libalconcurrent -lalconcurrent -lpthread
 
 TARGET =	test_lf_stack.exe
 

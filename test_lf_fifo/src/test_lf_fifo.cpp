@@ -193,7 +193,7 @@ int test_case2( void )
 
 /**
  * 各スレッドのメインルーチン。
- * ウントアップを繰り返す。
+ * カウントアップを繰り返す。
  */
 template <typename TEST_FIFO_TYPE>
 void* func_test_fifo( void* data )
@@ -271,7 +271,8 @@ int test_case3( void )
 	pthread_barrier_wait( &barrier );
 
 	auto [a1, a2] = func_test_fifo2<TEST_FIFO_TYPE>( p_test_obj );
-	std::cout << "Thread X: last dequeued = " << a1 << ", " << a2 << std::endl;
+	std::cout << "Thread X: last dequeued = " << a1 << ", " << a2;
+	std::cout << std::endl;
 
 	int sum = a1 + a2;
 	for ( int i = 0; i < num_thread; i++ ) {
@@ -426,7 +427,8 @@ int test_case4( void )
 	pthread_barrier_wait( &barrier );
 
 	auto [a1, a2] = func_test4_fifo2<TEST_FIFO_TYPE>( p_test_obj );
-	std::cout << "Thread X: last dequeued = " << a1 << ", " << a2 << std::endl;
+	std::cout << "Thread X: last dequeued = " << a1 << ", " << a2;
+	std::cout << std::endl;
 
 	int sum = a1 + a2;
 	for ( int i = 0; i < num_thread; i++ ) {

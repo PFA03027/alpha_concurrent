@@ -7,7 +7,7 @@ LIB_FILES :=  ../libalconcurrent/libalconcurrent.a
 
 LIBS = -L../libalconcurrent -lalconcurrent -lpthread
 
-TARGET =	test_stm.exe
+TARGET =	test_lf_list.exe
 
 -include $(DEPS)
 

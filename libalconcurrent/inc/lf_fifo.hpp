@@ -27,7 +27,7 @@ namespace internal {
 /*!
  * @breif	リスト型のFIFOキューの基本要素となるFIFOキュークラス
  *
- * Tは、trivially copyableでなければならい。
+ * Tは、copy assignableでなければならい。
  *
  * @note
  * https://www.slideshare.net/kumagi/lock-free-safe?next_slideshow=1 @n
@@ -35,7 +35,7 @@ namespace internal {
  *
  * キューに登録された値そのものは、head_.nextが指すノードに存在する。
  */
-template <typename T>
+template <typename T, typename DELETER = default_deleter<T>>
 class fifo_nd_list {
 public:
 	static constexpr int hzrd_max_slot_ = 5;
@@ -64,8 +64,12 @@ public:
 
 		if ( p_cur != nullptr ) {
 			// 先頭ノードは番兵のため、nullptrであることはありえないが、チェックする。
+			// ノード自体は、フリーノードストレージに戻すことが基本だが、デストラクタの場合は、戻さない仕様で割り切る。
+			// T型がpointerの場合、ポインタの先のオブジェクトを削除してから、ノードを削除する。
+			DELETER dt;
 			do {
 				node_pointer const p_nxt = p_cur->get_next();
+				dt( p_cur->ref_value() );
 				delete p_cur;
 				p_cur = p_nxt;
 			} while ( p_cur != nullptr );
@@ -159,7 +163,7 @@ public:
 					// headが他のスレッドでpopされた。
 					continue;
 				}
-				T ans_2nd = p_cur_next->get_value();   // この処理が必要になるため、T型は、trivially copyableでなければならい。
+				T ans_2nd = p_cur_next->get_value();   // この処理が必要になるため、T型は、copy assignableでなければならい。
 				// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
 				// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
 				if ( head_.compare_exchange_weak( p_cur_first, p_cur_next ) ) {
@@ -217,7 +221,7 @@ private:
 /*!
  * @breif	semi-lock free FIFO type queue
  *
- * Type T should be trivially copyable.
+ * Type T should be copy assignable.
  *
  * In case that template parameter ALLOW_TO_ALLOCATE is true, @n
  * In case of no avialable free node that carries a value, new node is allocated from heap internally. @n
@@ -234,7 +238,7 @@ private:
  * @note
  * To resolve ABA issue, this FIFO queue uses hazard pointer approach.
  */
-template <typename T, bool ALLOW_TO_ALLOCATE = true>
+template <typename T, bool ALLOW_TO_ALLOCATE = true, typename DELETER = internal::default_deleter<T>>
 class fifo_list {
 public:
 	using value_type = T;
@@ -368,13 +372,13 @@ public:
 private:
 	fifo_list( const fifo_list& ) = delete;
 	fifo_list( fifo_list&& )      = delete;
-	fifo_list operator=( const fifo_list& ) = delete;
-	fifo_list operator=( fifo_list&& ) = delete;
+	fifo_list& operator=( const fifo_list& ) = delete;
+	fifo_list& operator=( fifo_list&& ) = delete;
 
 	using free_nd_storage_type = internal::free_nd_storage;
 	using free_node_type       = typename free_nd_storage_type::node_type;
 	using free_node_pointer    = typename free_nd_storage_type::node_pointer;
-	using fifo_type            = internal::fifo_nd_list<T>;
+	using fifo_type            = internal::fifo_nd_list<T, DELETER>;
 	using fifo_node_type       = typename fifo_type::node_type;
 	using fifo_node_pointer    = typename fifo_type::node_pointer;
 
