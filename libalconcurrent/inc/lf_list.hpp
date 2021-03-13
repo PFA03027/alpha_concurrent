@@ -436,10 +436,11 @@ public:
 	 * @breif	remove all of nodes that pred return true from this list
 	 */
 	template <typename Predicate>
-	void remove_all_if(
+	int remove_all_if(
 		Predicate pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
 	)
 	{
+		int  ans         = 0;
 		auto pred_common = [&pred]( const list_node_pointer a ) { return pred( a->ref_value() ); };
 
 		scoped_hazard_ref hzrd_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_PREV );
@@ -449,20 +450,24 @@ public:
 
 			if ( base_list_.is_end_node( p_curr ) ) break;
 
-			base_list_.remove( free_nd_, p_prev, p_curr );
+			if ( base_list_.remove( free_nd_, p_prev, p_curr ) ) {
+				ans++;
+			}
 		}
 
-		return;
+		return ans;
 	}
 
 	/*!
 	 * @breif	remove a first node that pred return true from this list
 	 */
 	template <typename Predicate>
-	void remove_one_if(
+	bool remove_one_if(
 		Predicate pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
 	)
 	{
+		bool ans = false;
+
 		auto pred_common = [&pred]( const list_node_pointer a ) { return pred( a->ref_value() ); };
 
 		scoped_hazard_ref hzrd_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_PREV );
@@ -470,12 +475,17 @@ public:
 		while ( true ) {
 			auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
 
-			if ( base_list_.is_end_node( p_curr ) ) break;
+			if ( base_list_.is_end_node( p_curr ) ) {
+				break;
+			}
 
-			if ( base_list_.remove( free_nd_, p_prev, p_curr ) ) break;
+			if ( base_list_.remove( free_nd_, p_prev, p_curr ) ) {
+				ans = true;
+				break;
+			}
 		}
 
-		return;
+		return ans;
 	}
 
 	/*!
