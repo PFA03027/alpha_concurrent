@@ -35,7 +35,7 @@ namespace internal {
 template <typename T, typename DELETER = default_deleter<T>>
 class lockfree_list_base {
 public:
-	static constexpr int hzrd_max_slot_ = 4;
+	static constexpr int hzrd_max_slot_ = 6;
 	using value_type                    = T;
 	using node_type                     = one_way_list_node_markable<T>;
 	using node_pointer                  = node_type*;
@@ -248,6 +248,55 @@ public:
 	}
 
 	/*!
+	 * @breif	Applies the specified function to all elements.
+	 *
+	 * @pre
+	 * The Function must meet the MoveConstructible requirement, but not the CopyConstructible requirement.
+	 *
+	 * @warning
+	 * Due to the lock-free nature, it is possible that the element being processed may be deleted
+	 * (just marked for deletion, the actual deletion may even be delayed until all threads are no
+	 * longer referencing it) or modified.
+	 * Also, access contention may occur during function execution. Therefore, when changing an element,
+	 * it is necessary to perform access control such as exclusive control in Function f.
+	 * Therefore, when a non-lock-free function such as exclusive control by mutex is used, the lock-free
+	 * property of this class is limited.
+	 */
+	template <typename Function>
+	Function for_each(
+		Function f   //!< [in]	A function f is passed value_type& as an argument
+	)
+	{
+		Function internal_func = std::move( f );
+
+		scoped_hazard_ref scoped_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FOR_EACH_PREV );
+		scoped_hazard_ref scoped_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FOR_EACH_CURR );
+
+		node_pointer p_prev = &head_;
+
+		while ( true ) {
+			auto         next_addr_and_mark = p_prev->get_next();
+			node_pointer p_curr             = std::get<0>( next_addr_and_mark );
+			scoped_ref_curr.regist_ptr_as_hazard_ptr( p_curr );
+			next_addr_and_mark = p_prev->get_next();   // p_currがまだ有効かどうかを再確認
+
+			if ( p_curr == nullptr ) break;           // nullptrの場合、何らかのエラー、あるいはp_prevが番兵ノードなので、終了する。
+			if ( p_curr == &sentinel_node_ ) break;   // p_currが番兵ノードなので、終了する。
+
+			if ( p_curr != std::get<0>( next_addr_and_mark ) ) continue;   // p_currポインタが書き換わっていたら読み出しからやり直し。
+			if ( !std::get<1>( next_addr_and_mark ) ) {
+				// ノードに削除マークがなければ、関数適用開始
+				internal_func( p_curr->ref_value() );
+			}
+
+			scoped_ref_prev.regist_ptr_as_hazard_ptr( p_curr );
+			p_prev = p_curr;
+		}
+
+		return std::move( internal_func );
+	}
+
+	/*!
 	 * @breif	Check whether a pointer is in this hazard list
 	 *
 	 * @retval	true	p_chk_ptr is in this hazard list.
@@ -304,7 +353,9 @@ private:
 		FIND_FUNC_PREV   = 0,
 		FIND_FUNC_CURR   = 1,
 		FIND_FUNC_NEXT   = 2,
-		REMOVE_FUNC_NEXT = 3
+		REMOVE_FUNC_NEXT = 3,
+		FOR_EACH_PREV    = 4,
+		FOR_EACH_CURR    = 5
 	};
 
 	node_type        head_;
@@ -613,6 +664,29 @@ public:
 		}
 
 		return std::tuple<bool, value_type>( true, ans_value );
+	}
+
+	/*!
+	 * @breif	Applies the specified function to all elements.
+	 *
+	 * @pre
+	 * The Function must meet the MoveConstructible requirement, but not the CopyConstructible requirement.
+	 *
+	 * @warning
+	 * Due to the lock-free nature, it is possible that the element being processed may be deleted
+	 * (just marked for deletion, the actual deletion may even be delayed until all threads are no
+	 * longer referencing it) or modified.
+	 * Also, access contention may occur during function execution. Therefore, when changing an element,
+	 * it is necessary to perform access control such as exclusive control in Function f.
+	 * Therefore, when a non-lock-free function such as exclusive control by mutex is used, the lock-free
+	 * property of this class is limited.
+	 */
+	template <typename Function>
+	Function for_each(
+		Function f   //!< [in]	A function f is passed value_type& as an argument
+	)
+	{
+		return base_list_.for_each( std::move( f ) );
 	}
 
 	/*!
