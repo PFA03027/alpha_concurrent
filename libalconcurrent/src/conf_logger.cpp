@@ -29,7 +29,21 @@ class default_logger : public logger_if_abst {
 
 default_logger default_logger_inst;
 
-logger_if_abst* p_concrete_logger_if = &default_logger_inst;
+logger_if_abst* p_concrete_logger_if = &default_logger_inst;   //!< TODO should we use std::atomic<T*> ?
+
+void SetLoggerIf( std::unique_ptr<logger_if_abst> up_logger_if_inst )
+{
+	static std::unique_ptr<logger_if_abst> up_keep_inst_of_logger_if( nullptr );
+
+	p_concrete_logger_if = nullptr;
+
+	up_keep_inst_of_logger_if = std::move( up_logger_if_inst );
+
+	p_concrete_logger_if = up_keep_inst_of_logger_if.get();
+
+	return;
+}
+
 }   // namespace internal
 
 }   // namespace concurrent
