@@ -85,6 +85,10 @@ constexpr bool is_allowed_to_output(
 /*!
  * @breif	Set new logger I/F
  *
+ * @warning
+ * This I/F is not lock-free and not thread-safe. @n
+ * Therefore, This I/F should be called before alpha::concurrent APIs calling.
+ *
  * @note
  * even if no call this API, this library uses the default logger. @n
  * Default logger outputs a log by printf.

@@ -83,7 +83,7 @@ int test1( void )
 {
 	test_list count_list;
 
-	pthread_barrier_init( &barrier, NULL, num_thread * 2 +1 );
+	pthread_barrier_init( &barrier, NULL, num_thread * 2 + 1 );
 	pthread_t* threads = new pthread_t[num_thread * 2];
 
 	for ( int i = 0; i < num_thread; i++ ) {
@@ -296,7 +296,7 @@ int test3( void )
 {
 	test_list count_list;
 
-	pthread_barrier_init( &barrier, NULL, num_thread * 2 + 1);
+	pthread_barrier_init( &barrier, NULL, num_thread * 2 + 1 );
 	pthread_t* threads       = new pthread_t[num_thread * 2];
 	data_tc*   test_data_set = new data_tc[num_thread];
 
@@ -349,6 +349,43 @@ int test3( void )
 	return EXIT_SUCCESS;
 }
 
+int test4( void )
+{
+	test_list count_list;
+
+	for ( std::uintptr_t i = 0; i <= loop_num; i++ ) {
+		if ( !count_list.push_front( i ) ) {
+			printf( "Bugggggggyyyy  func_test_list_push()!!!  %llu\n", i );
+			printf( "list size count: %d\n", count_list.get_size() );
+			return EXIT_FAILURE;
+		}
+	}
+
+	std::uintptr_t sum = 0;
+	count_list.for_each( [&sum]( auto& ref_value ) {
+		sum += ref_value;
+	} );
+
+	std::uintptr_t expect = 0;
+	if ( ( loop_num % 2 ) == 0 ) {
+		// 偶数の場合
+		expect = loop_num * ( loop_num / 2 ) + loop_num / 2;
+	} else {
+		// 奇数の場合
+		expect = loop_num * ( ( loop_num + 1 ) / 2 );
+	}
+	std::cout << "Expect: " << expect << std::endl;
+	std::cout << "Sum:    " << sum << std::endl;
+	if ( sum == expect ) {
+		std::cout << "OK!" << std::endl;
+	} else {
+		std::cout << "NGGGGGGgggggg!" << std::endl;
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
+}
+
 int main( void )
 {
 	std::cout << "!!!Start World!!!" << std::endl;   // prints !!!Hello World!!!
@@ -356,6 +393,7 @@ int main( void )
 	test1();
 	test2();
 	test3();
+	test4();
 
 	std::cout << "!!!End World!!!" << std::endl;   // prints !!!Hello World!!!
 	return EXIT_SUCCESS;
