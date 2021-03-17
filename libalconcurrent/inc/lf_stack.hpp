@@ -104,13 +104,12 @@ public:
 	 *
 	 * 返り値の管理ノードに保管されている。
 	 *
-	 * @return	1st: 取り出された管理ノードへのポインタ。nullptrの場合、FIFOキューが空だったことを示す。管理対象ポインタは、
-	 * @return	2nd: 取り出された管理ノードへのポインタが有効の場合、FIFOから取り出された値
+	 * @return	取り出された管理ノードへのポインタ。nullptrの場合、LIFOキューが空だったことを示す。
 	 *
 	 * @warning
 	 * 管理ノードは、使用中の可能性がある。ハザードポインタに登録されていないことの確認が完了するまで、管理ノードの破棄や、APIを呼び出しで、値を変更してはならない。
 	 */
-	std::tuple<node_pointer, value_type> pop( void )
+	node_pointer pop( void )
 	{
 		scoped_hazard_ref scoped_ref_first( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_FIRST );
 		scoped_hazard_ref scoped_ref_next( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_NEXT );
@@ -122,24 +121,23 @@ public:
 
 			if ( p_cur_first == nullptr ) {
 				// FIFOキューは空。
-				return std::tuple<node_pointer, value_type>( nullptr, value_type() );
+				return nullptr;
 			}
 
 			node_pointer p_cur_next = p_cur_first->get_next();
 			scoped_ref_next.regist_ptr_as_hazard_ptr( p_cur_next );
 			if ( p_cur_next != p_cur_first->get_next() ) continue;
 
-			T ans_2nd = p_cur_first->get_value();   // この処理が必要になるため、T型は、trivially copyableでなければならい。
 			// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
 			// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
 			if ( head_.compare_exchange_weak( p_cur_first, p_cur_next ) ) {
 				size_count_--;
 				// ここで、firstの取り出しと所有権確保が完了
 				// ただし、ハザードポインタをチェックしていないため、まだ参照している人がいるかもしれない。
-				return std::tuple<node_pointer, value_type>( p_cur_first, ans_2nd );
+				return p_cur_first;
 			}
 		}
-		return std::tuple<node_pointer, value_type>( nullptr, value_type() );
+		return nullptr;
 	}
 
 	/*!
@@ -295,9 +293,11 @@ public:
 	 */
 	std::tuple<bool, value_type> pop( void )
 	{
-		auto [p_poped_node, ans_value] = lifo_.pop();
+		lifo_node_pointer p_poped_node = lifo_.pop();
 
-		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type>( false, ans_value );
+		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type>( false, value_type {} );
+
+		value_type ans_value = p_poped_node->get_value();
 
 		free_nd_.recycle( (free_node_pointer)p_poped_node );
 

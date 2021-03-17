@@ -50,7 +50,7 @@ void* func_pop( void* data )
 
 	uintptr_t v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
-		auto [p_node, val] = p_test_obj->pop();
+		auto p_node = p_test_obj->pop();
 		if ( p_node == nullptr ) {
 			printf( "Gyaaaa!!!\n" );
 			return reinterpret_cast<void*>( v );
@@ -101,7 +101,7 @@ int test_case1( void )
 	}
 
 	std::cout << "!!!Check!!!" << std::endl;   // prints !!!Hello World!!!
-	auto [p_node, val] = p_test_obj->pop();
+	auto p_node = p_test_obj->pop();
 	if ( p_node != nullptr ) {
 		// 全部読み出し完了いることが必要だが、残っていた。
 		printf( "Gyaaaa!!!\n" );
@@ -138,12 +138,13 @@ void* func_test_fifo2( void* data )
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		auto p_node = new test_lifo_type_part::node_type( v );
 		p_test_obj->push( p_node );
-		auto [pop_flag, vv] = p_test_obj->pop();
-		if ( !pop_flag ) {
+		auto p_pop_node = p_test_obj->pop();
+		if ( p_pop_node == nullptr ) {
 			printf( "Buggggggg!!!  %llu\n", v );
 			exit( 1 );
 		}
-		v = vv + 1;
+		auto vv = p_pop_node->get_value();
+		v       = vv + 1;
 	}
 
 	return reinterpret_cast<void*>( v );
@@ -252,8 +253,8 @@ int test_case3( void )
 {
 	//	test_lifo_type* p_test_obj = new test_lifo_type( num_thread );
 	test_lifo_type* p_test_obj[2];
-	p_test_obj[0] = new test_lifo_type(num_thread);
-	p_test_obj[1] = new test_lifo_type(num_thread);
+	p_test_obj[0] = new test_lifo_type( num_thread );
+	p_test_obj[1] = new test_lifo_type( num_thread );
 
 	pthread_barrier_init( &barrier, NULL, num_thread + 1 );
 	pthread_t* threads = new pthread_t[num_thread];
