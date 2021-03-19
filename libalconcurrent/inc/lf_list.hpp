@@ -12,6 +12,7 @@
 #define INC_LF_LIST_HPP_
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <tuple>
 
@@ -27,18 +28,23 @@ namespace internal {
 /*!
  * @breif	ロックフリー方式用の単方向型リスト
  *
- * Tは、trivially copyableでなければならい。
+ * Tは、copyable、あるいはmovableでなければならい。
  *
  * @note
- * https://www.slideshare.net/kumagi/lock-free-safe?next_slideshow=1 @n
+ * std::function型を多用している理由は以下。 @n
+ * テンプレートメンバ関数の場合、生成される関数インスタンスが予測できないため、ハザードポインタを管理するスロット数を事前確定できなくな。 @n
+ * そのため、メンバ関数のテンプレート化を避ける必要がある。
  */
 template <typename T, typename DELETER = default_deleter<T>>
 class lockfree_list_base {
 public:
-	static constexpr int hzrd_max_slot_ = 6;
-	using value_type                    = T;
-	using node_type                     = one_way_list_node_markable<T>;
-	using node_pointer                  = node_type*;
+	using value_type                 = T;                                           //!< 保持対象の型
+	using node_type                  = one_way_list_node_markable<T>;               //!< 実際の値を保持するノードクラス。
+	using node_pointer               = node_type*;                                  //!< 実際の値を保持するノードクラスのインスタンスへのポインタ型
+	using find_predicate_t           = std::function<bool( const node_pointer )>;   //!< find関数で使用する述語関数を保持するfunction型
+	using for_each_func_t            = std::function<void( value_type& )>;          //!< for_each関数で各要素の処理を実行するための関数を保持するfunction型
+	using remove_operator_t          = std::function<void( value_type& )>;          //!< remove処理が行われたノードが保持する保持対象のインスタンスに対して何らかの処理を行う関数を保持するfunction型
+	using hazard_ptr_scoped_ref_if_t = hazard_ptr_scoped_ref_if<node_type>;         //!< ハザードポインタの参照制御をサポートするI/Fクラスの型
 
 	lockfree_list_base( void )
 	  : head_()
@@ -72,12 +78,11 @@ public:
 	 * @retval	1st-value	番兵ノードより１つ前のノードへのポインタ
 	 * @retval	2nd-value	番兵ノードへのポインタ
 	 */
-	template <typename Hazard_ref, typename Predicate>
 	std::tuple<node_pointer, node_pointer> find_if(
-		free_nd_storage& fn_strg,        //!< [in]	削除ノードを差し戻すためのFree node storageへの参照
-		Hazard_ref&      ans_prev_ref,   //!< [in]	戻り値のprevに対応するnodeポインタを登録するハザードポインタへの参照
-		Hazard_ref&      ans_curr_ref,   //!< [in]	戻り値のcurrに対応するnodeポインタを登録するハザードポインタへの参照
-		Predicate        pred            //!< [in]	引数には、const node_pointerが渡される
+		free_nd_storage&            fn_strg,        //!< [in]	削除ノードを差し戻すためのFree node storageへの参照
+		hazard_ptr_scoped_ref_if_t& ans_prev_ref,   //!< [in]	戻り値のprevに対応するnodeポインタを登録するハザードポインタへの参照
+		hazard_ptr_scoped_ref_if_t& ans_curr_ref,   //!< [in]	戻り値のcurrに対応するnodeポインタを登録するハザードポインタへの参照
+		find_predicate_t&           pred            //!< [in]	引数には、const node_pointerが渡される
 	)
 	{
 		scoped_hazard_ref scoped_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_FUNC_PREV );
@@ -190,12 +195,11 @@ public:
 	 * @warning
 	 * 引数の管理ノードは、事前にcheck_hazard_list()を使用してハザードポインタに登録されていないことを確認していること。
 	 */
-	template <typename REMOVE_OP>
 	bool remove(
-		free_nd_storage& fn_strg,   //!< [in]	削除ノードを差し戻すためのFree node storageへの参照
-		node_pointer     prev,      //!< [in]	find_ifの戻り値の第１パラメータ
-		node_pointer     curr,      //!< [in]	find_ifの戻り値の第２パラメータ。削除するノード
-		REMOVE_OP        rm_op      //!< [in/out]	currの削除に成功した場合、currが保持している値への参照を引数に呼び出される。
+		free_nd_storage&   fn_strg,   //!< [in]	削除ノードを差し戻すためのFree node storageへの参照
+		node_pointer       prev,      //!< [in]	find_ifの戻り値の第１パラメータ
+		node_pointer       curr,      //!< [in]	find_ifの戻り値の第２パラメータ。削除するノード
+		remove_operator_t& rm_op      //!< [in/out]	currの削除に成功した場合、currが保持している値への参照を引数に呼び出される。
 	)
 	{
 		bool ans = curr->set_mark_on();
@@ -243,8 +247,8 @@ public:
 		node_pointer     curr       //!< [in]	find_ifの戻り値の第２パラメータ。削除するノード
 	)
 	{
-		DELETER dt;
-		return remove( fn_strg, prev, curr, dt );
+		remove_operator_t rm_op = DELETER();
+		return remove( fn_strg, prev, curr, rm_op );
 	}
 
 	/*!
@@ -262,12 +266,11 @@ public:
 	 * Therefore, when a non-lock-free function such as exclusive control by mutex is used, the lock-free
 	 * property of this class is limited.
 	 */
-	template <typename Function>
-	Function for_each(
-		Function f   //!< [in]	A function f is passed value_type& as an argument
+	for_each_func_t for_each(
+		for_each_func_t&& f   //!< [in]	A function f is passed value_type& as an argument
 	)
 	{
-		Function internal_func = std::move( f );
+		for_each_func_t internal_func = std::move( f );
 
 		scoped_hazard_ref scoped_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FOR_EACH_PREV );
 		scoped_hazard_ref scoped_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FOR_EACH_CURR );
@@ -341,8 +344,9 @@ public:
 	}
 
 private:
-	using hazard_ptr_storage = hazard_ptr<node_type, hzrd_max_slot_>;
-	using scoped_hazard_ref  = hazard_ptr_scoped_ref<node_type, hzrd_max_slot_>;
+	static constexpr int hzrd_max_slot_ = 6;
+	using hazard_ptr_storage            = hazard_ptr<node_type, hzrd_max_slot_>;
+	using scoped_hazard_ref             = hazard_ptr_scoped_ref<node_type, hzrd_max_slot_>;
 
 	lockfree_list_base( const lockfree_list_base& ) = delete;
 	lockfree_list_base( lockfree_list_base&& )      = delete;
@@ -391,7 +395,9 @@ private:
 template <typename T, bool ALLOW_TO_ALLOCATE = true, typename DELETER = internal::default_deleter<T>>
 class lockfree_list {
 public:
-	using value_type = T;
+	using value_type      = T;
+	using predicate_t     = std::function<bool( const value_type& )>;
+	using for_each_func_t = std::function<void( value_type& )>;
 
 	/*!
 	 * @breif	Constructor
@@ -422,7 +428,7 @@ public:
 	 */
 	~lockfree_list()
 	{
-		auto pred_common = []( const value_type& a ) { return true; };
+		predicate_t pred_common = []( const value_type& a ) { return true; };
 		remove_all_if( pred_common );
 	}
 
@@ -445,13 +451,12 @@ public:
 	 * In case that template parameter ALLOW_TO_ALLOCATE is false, 2nd paramter has a possibility that returns false. @n
 	 * In case that 2nd return value is false, User side has a role to recover this condition(fail to allocate the free node) by User side itself, e.g. backoff approach is one of recovery approach.
 	 */
-	template <typename Predicate>
 	std::tuple<bool, bool> insert(
-		const T&  cont_arg,   //!< [in]	a value to insert this list
-		Predicate pred        //!< [in]	A predicate function to specify the insertion position. const value_type& is passed as an argument
+		const T&     cont_arg,   //!< [in]	a value to insert this list
+		predicate_t& pred        //!< [in]	A predicate function to specify the insertion position. const value_type& is passed as an argument
 	)
 	{
-		auto pred_common = [&pred]( const list_node_pointer a ) { return pred( a->ref_value() ); };
+		typename list_type::find_predicate_t pred_common = [&pred]( const list_node_pointer a ) { return pred( a->ref_value() ); };
 
 		list_node_pointer p_new_node = free_nd_.allocate<list_node_type>(
 			ALLOW_TO_ALLOCATE,
@@ -486,13 +491,12 @@ public:
 	/*!
 	 * @breif	remove all of nodes that pred return true from this list
 	 */
-	template <typename Predicate>
 	int remove_all_if(
-		Predicate pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
+		predicate_t& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
 	)
 	{
-		int  ans         = 0;
-		auto pred_common = [&pred]( const list_node_pointer a ) { return pred( a->ref_value() ); };
+		int                                  ans         = 0;
+		typename list_type::find_predicate_t pred_common = [&pred]( const list_node_pointer a ) { return pred( a->ref_value() ); };
 
 		scoped_hazard_ref hzrd_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_PREV );
 		scoped_hazard_ref hzrd_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_CURR );
@@ -512,14 +516,13 @@ public:
 	/*!
 	 * @breif	remove a first node that pred return true from this list
 	 */
-	template <typename Predicate>
 	bool remove_one_if(
-		Predicate pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
+		predicate_t& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
 	)
 	{
 		bool ans = false;
 
-		auto pred_common = [&pred]( const list_node_pointer a ) { return pred( a->ref_value() ); };
+		typename list_type::find_predicate_t pred_common = [&pred]( const list_node_pointer a ) { return pred( a->ref_value() ); };
 
 		scoped_hazard_ref hzrd_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_PREV );
 		scoped_hazard_ref hzrd_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_CURR );
@@ -556,7 +559,7 @@ public:
 		const T& cont_arg   //!< [in]	a value to insert this list
 	)
 	{
-		auto pred_common = []( const list_node_pointer a ) { return true; };
+		typename list_type::find_predicate_t pred_common = []( const list_node_pointer a ) { return true; };
 
 		return push_internal_common( cont_arg, pred_common );
 	}
@@ -576,11 +579,11 @@ public:
 		scoped_hazard_ref hzrd_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_PREV );
 		scoped_hazard_ref hzrd_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_CURR );
 
-		auto pred_common = []( const list_node_pointer a ) { return true; };
+		typename list_type::find_predicate_t pred_common = []( const list_node_pointer a ) { return true; };
 
-		value_type                 ans_value {};
-		internal::default_mover<T> dm;
-		auto                       remove_op = [&ans_value, &dm]( value_type& a ) { dm(&a, &ans_value); return; };
+		value_type                            ans_value {};
+		internal::default_mover<T>            dm;
+		typename list_type::remove_operator_t remove_op = [&ans_value, &dm]( value_type& a ) { dm(&a, &ans_value); return; };
 
 		while ( true ) {
 			auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
@@ -614,7 +617,7 @@ public:
 		const T& cont_arg   //!< [in]	a value to copy this list
 	)
 	{
-		auto pred_common = []( const list_node_pointer a ) { return false; };
+		typename list_type::find_predicate_t pred_common = []( const list_node_pointer a ) { return false; };
 
 		return push_internal_common( cont_arg, pred_common );
 	}
@@ -635,11 +638,11 @@ public:
 		scoped_hazard_ref hzrd_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_CURR );
 		scoped_hazard_ref hzrd_ref_last( hzrd_ptr_, (int)hazard_ptr_idx::POP_BACK_LAST );
 
-		auto pred_common = []( const list_node_pointer a ) { return false; };
+		typename list_type::find_predicate_t pred_common = []( const list_node_pointer a ) { return false; };
 
-		value_type                          ans_value {};
-		internal::default_mover<value_type> dm;
-		auto                                remove_op = [&ans_value, &dm]( value_type& a ) { dm(&a, &ans_value); return; };
+		value_type                            ans_value {};
+		internal::default_mover<value_type>   dm;
+		typename list_type::remove_operator_t remove_op = [&ans_value, &dm]( value_type& a ) { dm(&a, &ans_value); return; };
 
 		while ( true ) {
 			list_node_pointer p_last;
@@ -654,8 +657,8 @@ public:
 				hzrd_ref_last.regist_ptr_as_hazard_ptr( p_last );
 			}
 
-			auto pred_common2     = [p_last]( const list_node_pointer a ) { return ( a == p_last ); };
-			auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common2 );
+			typename list_type::find_predicate_t pred_common2 = [p_last]( const list_node_pointer a ) { return ( a == p_last ); };
+			auto [p_prev, p_curr]                             = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common2 );
 			if ( base_list_.is_end_node( p_curr ) ) continue;
 
 			if ( base_list_.remove( free_nd_, p_prev, p_curr, remove_op ) ) {
@@ -681,9 +684,8 @@ public:
 	 * Therefore, when a non-lock-free function such as exclusive control by mutex is used, the lock-free
 	 * property of this class is limited.
 	 */
-	template <typename Function>
-	Function for_each(
-		Function f   //!< [in]	A function f is passed value_type& as an argument
+	for_each_func_t for_each(
+		for_each_func_t&& f   //!< [in]	A function f is passed value_type& as an argument
 	)
 	{
 		return base_list_.for_each( std::move( f ) );
@@ -747,10 +749,9 @@ private:
 	 * @li	In case that template parameter ALLOW_TO_ALLOCATE is false, this I/F will have a possibility to return false.
 	 * @li	In case that return value is false, User side has a role to recover this condition(fail to allocate the free node) by User side itself, e.g. backoff approach is one of recovery approach.
 	 */
-	template <typename Predicate>
 	bool push_internal_common(
-		const T&  cont_arg,     //!< [in]	a value to copy this list
-		Predicate pred_common   //!< [in]	const list_node_pointer& is provided.
+		const T&                              cont_arg,     //!< [in]	a value to copy this list
+		typename list_type::find_predicate_t& pred_common   //!< [in]	const list_node_pointer& is provided.
 	)
 	{
 		list_node_pointer p_new_node = free_nd_.allocate<list_node_type>(

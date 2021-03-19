@@ -140,11 +140,11 @@ void* func_test_list_insert_remove( void* data )
 {
 	test_list* p_test_obj = reinterpret_cast<test_list*>( data );
 
-	auto search_insert_pos = []( const test_list::value_type& a ) -> bool {
+	test_list::predicate_t search_insert_pos = []( const test_list::value_type& a ) -> bool {
 		return ( a > target_value );
 	};
 
-	auto search_remove_data = []( const test_list::value_type& a ) -> bool {
+	test_list::predicate_t search_remove_data = []( const test_list::value_type& a ) -> bool {
 		return ( a == target_value );
 	};
 
@@ -272,7 +272,7 @@ void* func_test_list_remove_all( void* data )
 	data_tc*   p_tc       = reinterpret_cast<data_tc*>( data );
 	test_list* p_test_obj = p_tc->p_test_obj;
 
-	auto search_remove_data = [p_tc]( const test_list::value_type& a ) -> bool {
+	test_list::predicate_t search_remove_data = [p_tc]( const test_list::value_type& a ) -> bool {
 		return ( p_tc->tc_data == a );
 	};
 

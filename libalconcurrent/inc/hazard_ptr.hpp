@@ -36,10 +36,6 @@ namespace concurrent {
  * 参照権に対しては、制限なし。ただし、参照が終了した場合は、ハザードポインタをクリアしなければならない。
  * 参照権のクリアには、clear_hazard_ptr()を使用する。
  *
- * ハザードポインタとして登録したポインタが指し示すオブジェクトは、delete演算子によって削除される。
- * ただし、delete演算子による削除は非同期で行われるため、try_delete_instance()を呼び出したとしても、その時点でdelete演算子による削除が行われるわけではない。
- * そのため、デストラクタによるリソース開放を行うクラスがテンプレートパラメータとして指定される場合、リソース開放が遅延されても、新たなリソース確保側と衝突を起こさない構成である必要がある。
- *
  * （ハザードポインタ自身はlock-freeであるが）lock-freeとして動作するには、テンプレートパラメータで指定されたクラスのデストラクタがlock-freeでなければならない。
  *
  * インスタンスが削除される前に、アクセスするスレッドは、参照権の破棄としてrelease_owner()を呼び出すこと。
@@ -362,11 +358,30 @@ private:
 /*!
  * @breif	scoped reference control support class for hazard_ptr
  *
- * スコープベースでの、参照権の解放制御をサポートするクラス。
- * 削除権を確保する場合は、スコープアウトする前に、try_delete_instance()を呼び出すこと。
+ * スコープベースでの、参照権の解放制御をサポートするクラスのI/Fクラス
+ */
+template <typename T>
+class hazard_ptr_scoped_ref_if {
+public:
+	virtual void regist_ptr_as_hazard_ptr( T* p_target ) = 0;
+
+	hazard_ptr_scoped_ref_if( void )    = default;
+	virtual ~hazard_ptr_scoped_ref_if() = default;
+
+private:
+	hazard_ptr_scoped_ref_if( const hazard_ptr_scoped_ref_if& ) = delete;
+	hazard_ptr_scoped_ref_if( hazard_ptr_scoped_ref_if&& )      = delete;
+	hazard_ptr_scoped_ref_if& operator=( const hazard_ptr_scoped_ref_if& ) = delete;
+	hazard_ptr_scoped_ref_if& operator=( hazard_ptr_scoped_ref_if&& ) = delete;
+};
+
+/*!
+ * @breif	scoped reference control support class for hazard_ptr
+ *
+ * スコープベースでの、参照権の解放制御をサポートするクラスの実体定義クラス
  */
 template <typename T, int N>
-class hazard_ptr_scoped_ref {
+class hazard_ptr_scoped_ref : public hazard_ptr_scoped_ref_if<T> {
 public:
 	hazard_ptr_scoped_ref( hazard_ptr<T, N>& ref, int idx_arg )
 	  : idx_( idx_arg )
@@ -379,9 +394,9 @@ public:
 		monitor_ref_.clear_hazard_ptr( idx_ );
 	}
 
-	void regist_ptr_as_hazard_ptr(T* p_target)
+	void regist_ptr_as_hazard_ptr( T* p_target ) override
 	{
-		monitor_ref_.regist_ptr_as_hazard_ptr(p_target, idx_);
+		monitor_ref_.regist_ptr_as_hazard_ptr( p_target, idx_ );
 	}
 
 private:
