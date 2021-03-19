@@ -31,7 +31,7 @@ On the other hand, used free node will be recycled without a memory allocation. 
 To reduce lock behavior, pre-allocated nodes are effective.
 get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
 
-# stack_list class in lf_list.hpp
+# lockfree_list class in lf_list.hpp
 Semi-lock free list
 
 Template 1st parameter T should be copy assignable.
@@ -40,6 +40,19 @@ In case of no avialable free node that carries a value, new node is allocated fr
 In this case, this queue may be locked. And push_front()/push_back()/insert() may trigger this behavior.
 
 On the other hand, used free node will be recycled without a memory allocation. In this case, push_front()/push_back()/insert() is lock free.
+
+To reduce lock behavior, pre-allocated nodes are effective.
+get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
+
+# one_side_deque class in lf_one_side_deque.hpp
+Semi-lock free one side deque
+
+Template 1st parameter T should be copy assignable.
+
+In case of no avialable free node that carries a value, new node is allocated from heap internally.
+In this case, this queue may be locked. And push_front()/push_back() may trigger this behavior.
+
+On the other hand, used free node will be recycled without a memory allocation. In this case, push_front()/push_back() is lock free.
 
 To reduce lock behavior, pre-allocated nodes are effective.
 get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
