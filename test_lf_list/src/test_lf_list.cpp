@@ -17,7 +17,7 @@
 #include "lf_list.hpp"
 
 constexpr int            num_thread = 64;   // Tested until 128.
-constexpr std::uintptr_t loop_num   = 100000;
+constexpr std::uintptr_t loop_num   = 1000;
 
 using test_list = alpha::concurrent::lockfree_list<std::uintptr_t>;
 
