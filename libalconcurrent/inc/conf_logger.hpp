@@ -26,7 +26,8 @@ enum class log_type {
 	ERR,
 	WARN,
 	INFO,
-	DEBUG
+	DEBUG,
+	TEST
 };
 
 /*!
@@ -66,12 +67,16 @@ constexpr bool is_allowed_to_output(
 		case log_type::INFO:
 #ifdef CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO
 			ans = true;
-			break;
 #endif
+			break;
 		case log_type::DEBUG:
 #ifdef CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DEBUG
 			ans = true;
+#endif
 			break;
+		case log_type::TEST:
+#ifdef CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST
+			ans = true;
 #endif
 		default:
 			break;
