@@ -8,7 +8,7 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#include "conf_logger.hpp"
+#include "alconcurrent/conf_logger.hpp"
 
 namespace alpha {
 namespace concurrent {

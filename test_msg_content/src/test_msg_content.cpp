@@ -15,7 +15,7 @@
 #include <iostream>
 #include <random>
 
-#include "lf_fifo.hpp"
+#include "alconcurrent/lf_fifo.hpp"
 
 #include "test_crc32.hpp"
 

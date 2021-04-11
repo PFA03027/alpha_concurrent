@@ -9,7 +9,7 @@
 #include <iostream>
 #include <pthread.h>
 
-#include "hazard_ptr.hpp"
+#include "alconcurrent/hazard_ptr.hpp"
 
 class delete_test {
 public:

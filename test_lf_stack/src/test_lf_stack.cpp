@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <iostream>
 
-#include "lf_stack.hpp"
+#include "alconcurrent/lf_stack.hpp"
 
 constexpr int            num_thread = 128;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 100000;

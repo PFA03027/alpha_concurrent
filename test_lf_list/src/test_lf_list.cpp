@@ -14,7 +14,7 @@
 #include <random>
 #include <thread>
 
-#include "lf_list.hpp"
+#include "alconcurrent/lf_list.hpp"
 
 constexpr int            num_thread = 64;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 1000;

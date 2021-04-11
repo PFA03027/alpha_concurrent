@@ -12,7 +12,7 @@
 #include <iostream>
 #include <random>
 
-#include "lf_fifo.hpp"
+#include "alconcurrent/lf_fifo.hpp"
 
 constexpr int            num_thread = 128;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 100000;
