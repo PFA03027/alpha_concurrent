@@ -206,7 +206,13 @@ void* func_test_fifo( void* data )
 	typename test_lifo_type::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		p_test_obj->push( v );
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 		auto [pop_flag, vv] = p_test_obj->pop();
+#else
+		auto local_ret = p_test_obj->pop();
+		auto pop_flag  = std::get<0>( local_ret );
+		auto vv        = std::get<1>( local_ret );
+#endif
 		if ( !pop_flag ) {
 			printf( "Bugggggggyyyy  func_test_fifo()!!!  %llu\n", v );
 			printf( "fifo size count: %d\n", p_test_obj->get_size() );
@@ -227,7 +233,13 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( test_lifo_type* p_test_obj[] )
 		p_test_obj[0]->push( v1 );
 		p_test_obj[1]->push( v2 );
 		{
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [pop_flag, vv] = p_test_obj[0]->pop();
+#else
+			auto local_ret = p_test_obj[0]->pop();
+			auto pop_flag  = std::get<0>( local_ret );
+			auto vv        = std::get<1>( local_ret );
+#endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %llu\n", v1 );
 				printf( "fifo size count idx 0: %d\n", p_test_obj[0]->get_size() );
@@ -236,7 +248,13 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( test_lifo_type* p_test_obj[] )
 			v1 = vv + 1;
 		}
 		{
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [pop_flag, vv] = p_test_obj[1]->pop();
+#else
+			auto local_ret = p_test_obj[1]->pop();
+			auto pop_flag  = std::get<0>( local_ret );
+			auto vv        = std::get<1>( local_ret );
+#endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %llu\n", v2 );
 				printf( "fifo size count idx 1: %d\n", p_test_obj[1]->get_size() );
@@ -269,7 +287,13 @@ int test_case3( void )
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	pthread_barrier_wait( &barrier );
 
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 	auto [a1, a2] = func_test_fifo2( p_test_obj );
+#else
+	auto local_ret = func_test_fifo2( p_test_obj );
+	auto a1 = std::get<0>( local_ret );
+	auto a2 = std::get<1>( local_ret );
+#endif
 	std::cout << "Thread X: last dequeued = " << a1 << ", " << a2 << std::endl;
 
 	int sum = a1 + a2;
@@ -331,7 +355,13 @@ void* func_test4_fifo( void* data )
 			}
 			//			printf( "Get!!! func_test4_fifo2()\n" );
 		}
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 		auto [pop_flag, vv] = p_test_obj->pop();
+#else
+		auto local_ret = p_test_obj->pop();
+		auto pop_flag = std::get<0>( local_ret );
+		auto vv = std::get<1>( local_ret );
+#endif
 		if ( !pop_flag ) {
 			printf( "Bugggggggyyyy  func_test_fifo()!!!  %llu\n", v );
 			printf( "fifo size count: %d\n", p_test_obj->get_size() );
@@ -370,7 +400,13 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( test_lifo_type2* p_test_obj[]
 		}
 
 		{
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [pop_flag, vv] = p_test_obj[0]->pop();
+#else
+			auto local_ret = p_test_obj[0]->pop();
+			auto pop_flag = std::get<0>( local_ret );
+			auto vv = std::get<1>( local_ret );
+#endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %llu\n", v1 );
 				printf( "fifo size count idx 0: %d\n", p_test_obj[0]->get_size() );
@@ -379,7 +415,13 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( test_lifo_type2* p_test_obj[]
 			v1 = vv + 1;
 		}
 		{
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [pop_flag, vv] = p_test_obj[1]->pop();
+#else
+			auto local_ret = p_test_obj[1]->pop();
+			auto pop_flag = std::get<0>( local_ret );
+			auto vv = std::get<1>( local_ret );
+#endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %llu\n", v2 );
 				printf( "fifo size count idx 1: %d\n", p_test_obj[1]->get_size() );
@@ -412,7 +454,13 @@ int test_case4( void )
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	pthread_barrier_wait( &barrier );
 
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 	auto [a1, a2] = func_test4_fifo2( p_test_obj );
+#else
+	auto local_ret = func_test4_fifo2( p_test_obj );
+	auto a1 = std::get<0>( local_ret );
+	auto a2 = std::get<1>( local_ret );
+#endif
 	std::cout << "Thread X: last dequeued = " << a1 << ", " << a2 << std::endl;
 
 	int sum = a1 + a2;

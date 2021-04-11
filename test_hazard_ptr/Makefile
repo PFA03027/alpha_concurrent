@@ -1,4 +1,7 @@
-CXXFLAGS =	-c -MMD -MP -std=c++17 -O2 -g -Wall -I../libalconcurrent/inc
+
+include ../common.mk
+
+CXXFLAGS =	-c -MMD -MP $(CXX_STD) -O2 -g -Wall -I../libalconcurrent/inc
 
 SRCS := $(wildcard src/*.cpp)
 OBJS := $(SRCS:%.cpp=%.o)

@@ -95,7 +95,13 @@ void* func_test_fifo_consumer( void* data )
 	pthread_barrier_wait( &barrier );
 
 	while ( true ) {
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 		auto [pop_flag, p_one_msg] = p_test_obj->pop();
+#else
+		auto local_ret = p_test_obj->pop();
+		auto pop_flag  = std::get<0>( local_ret );
+		auto p_one_msg = std::get<1>( local_ret );
+#endif
 		if ( !pop_flag ) {
 			std::this_thread::sleep_for( std::chrono::milliseconds( 1 + dist( engine ) ) );   // backoff handling
 			continue;

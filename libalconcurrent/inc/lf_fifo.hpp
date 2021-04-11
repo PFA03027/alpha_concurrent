@@ -336,7 +336,13 @@ public:
 	 */
 	std::tuple<bool, value_type> pop( void )
 	{
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 		auto [p_poped_node, ans_value] = fifo_.pop();
+#else
+		auto local_ret    = fifo_.pop();
+		auto p_poped_node = std::get<0>( local_ret );
+		auto ans_value    = std::get<1>( local_ret );
+#endif
 
 		std::atomic_thread_fence( std::memory_order_acquire );
 

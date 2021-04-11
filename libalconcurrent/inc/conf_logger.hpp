@@ -54,9 +54,15 @@ public:
 namespace internal {
 extern logger_if_abst* p_concrete_logger_if;
 
-constexpr bool is_allowed_to_output(
-	const log_type lt   //!< [in]	log type to check
-)
+#if ( __cplusplus >= 201402L /* check C++14 */) && defined(__cpp_constexpr)
+constexpr
+#else
+inline
+#endif
+	bool
+	is_allowed_to_output(
+		const log_type lt   //!< [in]	log type to check
+	)
 {
 	bool ans = false;
 	switch ( lt ) {

@@ -58,7 +58,13 @@ public:
 
 	~lockfree_list_base()
 	{
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 		auto [p_cur, cur_mark] = head_.get_next();
+#else
+		auto local_ret = head_.get_next();
+		auto p_cur     = std::get<0>( local_ret );
+//			auto cur_mark = std::get<1>( local_ret );
+#endif
 
 		if ( !is_end_node( p_cur ) ) {
 			LogOutput( log_type::ERR, "ERR: lockfree_list_base is deleted before all data deletion." );
@@ -473,7 +479,13 @@ public:
 		scoped_hazard_ref hzrd_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_PREV );
 		scoped_hazard_ref hzrd_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_CURR );
 		while ( true ) {
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+#else
+			auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+			auto p_prev    = std::get<0>( local_ret );
+			auto p_curr    = std::get<1>( local_ret );
+#endif
 
 			if ( base_list_.is_end_node( p_curr ) ) {
 				free_nd_.recycle( p_new_node );
@@ -501,7 +513,13 @@ public:
 		scoped_hazard_ref hzrd_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_PREV );
 		scoped_hazard_ref hzrd_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_CURR );
 		while ( true ) {
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+#else
+			auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+			auto p_prev    = std::get<0>( local_ret );
+			auto p_curr    = std::get<1>( local_ret );
+#endif
 
 			if ( base_list_.is_end_node( p_curr ) ) break;
 
@@ -527,7 +545,13 @@ public:
 		scoped_hazard_ref hzrd_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_PREV );
 		scoped_hazard_ref hzrd_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_CURR );
 		while ( true ) {
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+#else
+			auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+			auto p_prev    = std::get<0>( local_ret );
+			auto p_curr    = std::get<1>( local_ret );
+#endif
 
 			if ( base_list_.is_end_node( p_curr ) ) {
 				break;
@@ -586,7 +610,13 @@ public:
 		typename list_type::remove_operator_t remove_op = [&ans_value, &dm]( value_type& a ) { dm(&a, &ans_value); return; };
 
 		while ( true ) {
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+#else
+			auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+			auto p_prev    = std::get<0>( local_ret );
+			auto p_curr    = std::get<1>( local_ret );
+#endif
 
 			if ( base_list_.is_end_node( p_curr ) ) {
 				return std::tuple<bool, value_type>( false, ans_value );
@@ -648,7 +678,13 @@ public:
 			list_node_pointer p_last;
 
 			{
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 				auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+#else
+				auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+				auto p_prev    = std::get<0>( local_ret );
+				auto p_curr    = std::get<1>( local_ret );
+#endif
 				if ( !base_list_.is_end_node( p_curr ) ) continue;
 				if ( base_list_.is_head_node( p_prev ) ) {
 					return std::tuple<bool, value_type>( false, ans_value );
@@ -658,7 +694,13 @@ public:
 			}
 
 			typename list_type::find_predicate_t pred_common2 = [p_last]( const list_node_pointer a ) { return ( a == p_last ); };
-			auto [p_prev, p_curr]                             = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common2 );
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
+			auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common2 );
+#else
+			auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common2 );
+			auto p_prev    = std::get<0>( local_ret );
+			auto p_curr    = std::get<1>( local_ret );
+#endif
 			if ( base_list_.is_end_node( p_curr ) ) continue;
 
 			if ( base_list_.remove( free_nd_, p_prev, p_curr, remove_op ) ) {
@@ -769,7 +811,13 @@ private:
 		scoped_hazard_ref hzrd_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_PREV );
 		scoped_hazard_ref hzrd_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_CURR );
 		while ( true ) {
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+#else
+			auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+			auto p_prev    = std::get<0>( local_ret );
+			auto p_curr    = std::get<1>( local_ret );
+#endif
 
 			if ( base_list_.insert( p_new_node, p_prev, p_curr ) ) {
 				// success to insert into front of list.

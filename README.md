@@ -2,8 +2,11 @@
  Semi lock-free concurrent software asset
 
 # Pre-requirement
-* C++17 standard and library are required.
+* C++11 standard and standard C++ library are required.
 * POSIX pthread thread local storage API is required.
+
+## Supplement
+C++14 or newer C++ standard is better to compile.
 
 # fifo_list class in lf_fifo.hpp
 Semi-lock free FIFO type queue
@@ -61,9 +64,11 @@ get_allocated_num() provides the number of the allocated nodes. This value is hi
 To resolve ABA issue, this FIFO / Stack / list uses hazard pointer approach.
 
 Non lock free behavior cases are below;
+
 * Construct a instance itself.
 * Any initial API call by each thread.
-* push()/push_front()/push_back()/insert() call in case of no free internal node.
+* pop_front()/push_front()/push_back() call in case of no free internal node.
+
 ** In case that template parameter ALLOW_TO_ALLOCATE is false, these API does not allocate internal node. therefore push()/push_front()/push_back()/insert() is lock free.
 
 

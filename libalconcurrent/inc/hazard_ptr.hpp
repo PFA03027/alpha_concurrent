@@ -404,12 +404,13 @@ private:
 	hazard_ptr<T, N>& monitor_ref_;
 };
 
+#if 0
 /*!
  * @breif	推論補助
  */
 template <class HZD_PTR>
 hazard_ptr_scoped_ref( HZD_PTR&, int ) -> hazard_ptr_scoped_ref<typename HZD_PTR::hzrd_type, HZD_PTR::hzrd_max_slot>;
-
+#endif
 }   // namespace concurrent
 }   // namespace alpha
 

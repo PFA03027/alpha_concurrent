@@ -48,7 +48,10 @@ void* func_refarencing( void* data )
 {
 	std::atomic<delete_test*>* p_target = reinterpret_cast<std::atomic<delete_test*>*>( data );
 
-	alpha::concurrent::hazard_ptr_scoped_ref hzrd_ref( hazard_ptr_to, 0 );
+	alpha::concurrent::hazard_ptr_scoped_ref<
+		alpha::concurrent::hazard_ptr<delete_test, 1>::hzrd_type,
+		alpha::concurrent::hazard_ptr<delete_test, 1>::hzrd_max_slot>
+		hzrd_ref( hazard_ptr_to, 0 );
 	//	printf( "p_target: %p\n", p_target );
 
 	delete_test* p_test_obj = p_target->load();
@@ -86,7 +89,10 @@ void* func_delete_owner( void* data )
 	delete_test* p_test_obj = p_target->load();
 
 	{
-		alpha::concurrent::hazard_ptr_scoped_ref hzrd_ref( hazard_ptr_to, 0 );
+		alpha::concurrent::hazard_ptr_scoped_ref<
+			alpha::concurrent::hazard_ptr<delete_test, 1>::hzrd_type,
+			alpha::concurrent::hazard_ptr<delete_test, 1>::hzrd_max_slot>
+			hzrd_ref( hazard_ptr_to, 0 );
 
 		printf( "p_target: %p\n", p_test_obj );
 

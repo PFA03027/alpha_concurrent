@@ -39,7 +39,13 @@ void* func_test_list_front2back( void* data )
 			printf( "list size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 		auto [pop_flag, vv] = p_test_obj->pop_back();
+#else
+		auto local_ret = p_test_obj->pop_back();
+		auto pop_flag  = std::get<0>( local_ret );
+		auto vv        = std::get<1>( local_ret );
+#endif
 		if ( !pop_flag ) {
 			printf( "Bugggggggyyyy  func_test_list_front2back()!!!  %llu\n", v );
 			printf( "list size count: %d\n", p_test_obj->get_size() );
@@ -67,7 +73,13 @@ void* func_test_list_back2front( void* data )
 			printf( "list size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 		auto [pop_flag, vv] = p_test_obj->pop_front();
+#else
+		auto local_ret = p_test_obj->pop_front();
+		auto pop_flag  = std::get<0>( local_ret );
+		auto vv        = std::get<1>( local_ret );
+#endif
 		if ( !pop_flag ) {
 			printf( "Bugggggggyyyy  func_test_list_back2front()!!!  %llu\n", v );
 			printf( "list size count: %d\n", p_test_obj->get_size() );
@@ -159,7 +171,13 @@ void* func_test_list_insert_remove( void* data )
 	typename test_list::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		while ( true ) {
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [ins_chk_ret, ins_allc_ret] = p_test_obj->insert( target_value, search_insert_pos );
+#else
+			auto local_ret    = p_test_obj->insert( target_value, search_insert_pos );
+			auto ins_chk_ret  = std::get<0>( local_ret );
+			auto ins_allc_ret = std::get<1>( local_ret );
+#endif
 			if ( ins_chk_ret ) break;
 			if ( ins_allc_ret ) {
 				// フリーノードストレージからの管理ノードアロケーションに成功しながらも、挿入位置を見つけられなかったことを示す。
@@ -362,7 +380,7 @@ int test4( void )
 	}
 
 	std::uintptr_t sum = 0;
-	count_list.for_each( [&sum]( auto& ref_value ) {
+	count_list.for_each( [&sum]( test_list::value_type& ref_value ) {
 		sum += ref_value;
 	} );
 
