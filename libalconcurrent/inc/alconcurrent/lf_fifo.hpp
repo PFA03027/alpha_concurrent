@@ -188,7 +188,7 @@ public:
 		return hzrd_ptr_.check_ptr_in_hazard_list( p_chk_node );
 	}
 
-	int get_size( void )
+	int get_size( void ) const
 	{
 		return size_count_.load( std::memory_order_acquire );
 	}
@@ -359,7 +359,7 @@ public:
 	 * @warning
 	 * This FIFO will be access by several thread concurrently. So, true number of this FIFO queue may be changed when caller uses the returned value.
 	 */
-	int get_size( void )
+	int get_size( void ) const
 	{
 		return fifo_.get_size();
 	}

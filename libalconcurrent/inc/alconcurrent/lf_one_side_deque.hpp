@@ -161,7 +161,7 @@ public:
 	 * @warning
 	 * This one side deque will be access by several thread concurrently. So, true number of this one side deque may be changed when caller uses the returned value.
 	 */
-	int get_size( void )
+	int get_size( void ) const
 	{
 		return head_side_.get_size() + tail_size_.get_size();
 	}

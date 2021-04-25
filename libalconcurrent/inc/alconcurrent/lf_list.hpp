@@ -322,7 +322,7 @@ public:
 	 * @warning
 	 * 必ずしも取得した瞬間の状態を正確に反映するわけではないので、参考程度の使用にとどめること。
 	 */
-	int get_size( void )
+	int get_size( void ) const
 	{
 		return size_count_.load( std::memory_order_acquire );
 	}
@@ -739,7 +739,7 @@ public:
 	 * @warning
 	 * This FIFO will be access by several thread concurrently. So, true number of this FIFO queue may be changed when caller uses the returned value.
 	 */
-	int get_size( void )
+	int get_size( void ) const
 	{
 		return base_list_.get_size();
 	}
