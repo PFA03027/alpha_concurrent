@@ -133,9 +133,59 @@ int test1( void )
 	return EXIT_SUCCESS;
 }
 
+void test_pointer( void )
+{
+	using test_fifo_type3 = alpha::concurrent::one_side_deque<int*>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "Pointer test#1" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push_back( new int() );
+
+	delete p_test_obj;
+
+	std::cout << "Pointer test#2" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push_front( new int() );
+
+	delete p_test_obj;
+
+	std::cout << "Pointer test#3" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push_back( new int() );
+	auto ret = p_test_obj->pop_front();
+	if ( std::get<0>( ret ) ) {
+		delete std::get<1>( ret );
+	} else {
+		std::cout << "NGGGGGGgggggg!" << std::endl;
+		exit( 1 );
+	}
+	delete p_test_obj;
+
+	std::cout << "Pointer test#4" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push_front( new int() );
+	ret = p_test_obj->pop_front();
+	if ( std::get<0>( ret ) ) {
+		delete std::get<1>( ret );
+	} else {
+		std::cout << "NGGGGGGgggggg!" << std::endl;
+		exit( 1 );
+	}
+	delete p_test_obj;
+
+	std::cout << "End Pointer test" << std::endl;
+}
+
 int main( void )
 {
 	std::cout << "!!!Start Test World!!!" << std::endl;   // prints !!!Hello World!!!
+
+	test_pointer();
 
 	test1();
 

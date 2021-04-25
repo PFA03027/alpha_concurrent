@@ -69,9 +69,12 @@ public:
 			DELETER dt;
 			do {
 				node_pointer const p_nxt = p_cur->get_next();
-				dt( p_cur->ref_value() );
 				delete p_cur;
 				p_cur = p_nxt;
+				if ( p_cur != nullptr ) {
+					// 先頭ノードに残っているポインタは、既に取り出し済みである。よって、２番目のノード以降のポインタの破棄を行う。
+					dt( p_cur->ref_value() );
+				}
 			} while ( p_cur != nullptr );
 		}
 

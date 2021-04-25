@@ -498,9 +498,39 @@ int test_case4( void )
 	return 0;
 }
 
+void test_pointer( void )
+{
+	using test_fifo_type3 = alpha::concurrent::stack_list<int*>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "Pointer test#1" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push( new int() );
+
+	delete p_test_obj;
+
+	std::cout << "Pointer test#2" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push( new int() );
+	auto ret = p_test_obj->pop();
+	if ( std::get<0>( ret ) ) {
+		delete std::get<1>( ret );
+	} else {
+		std::cout << "NGGGGGGgggggg!" << std::endl;
+		exit( 1 );
+	}
+	delete p_test_obj;
+
+	std::cout << "End Pointer test" << std::endl;
+}
+
 int main( void )
 {
 	std::cout << "!!!Start World!!!" << std::endl;   // prints !!!Hello World!!!
+
+	test_pointer();
 
 	for ( int i = 0; i < 4; i++ ) {
 		std::cout << "!!! " << i << " World!!!" << std::endl;   // prints !!!Hello World!!!
