@@ -197,6 +197,8 @@ public:
 	template <typename ALLOC_NODE_T, typename TFUNC>
 	ALLOC_NODE_T* allocate( bool does_allow_allocate, TFUNC pred )
 	{
+		static_assert( std::is_base_of<node_of_list, ALLOC_NODE_T>::value, "incorrect node type is required. it needs the derived class from node_of_list" );
+
 		for ( int i = 0; i < num_recycle_exec; i++ ) {
 			node_pointer p_ans = node_list_.pop();
 			if ( p_ans == nullptr ) {

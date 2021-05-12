@@ -48,12 +48,12 @@ public:
 	  , status_( ocupied_status::USING )
 	  , next_( nullptr )
 	{
-		LogOutput( log_type::DEBUG, "tls_data_container::constructor is allocated - %p", this );
+		LogOutput( log_type::DEBUG, "tls_data_container::constructor is called - %p", this );
 	}
 
 	~tls_data_container()
 	{
-		LogOutput( log_type::DEBUG, "tls_data_container::destructor is called     - %p", this );
+		LogOutput( log_type::DEBUG, "tls_data_container::destructor is called  - %p", this );
 		delete p_value;
 	}
 
