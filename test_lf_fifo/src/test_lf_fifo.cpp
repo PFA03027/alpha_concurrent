@@ -559,6 +559,93 @@ void test_pointer( void )
 	std::cout << "End Pointer test" << std::endl;
 }
 
+class array_test {
+public:
+	array_test( void )
+	{
+		x = 1;
+		return;
+	}
+
+	~array_test()
+	{
+		printf( "called destructor of array_test\n" );
+		return;
+	}
+
+	int x;
+
+private:
+};
+
+void test_array( void )
+{
+	using test_fifo_type3 = alpha::concurrent::fifo_list<array_test[]>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "Array array_test[] test#1" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push( new array_test[2] );
+
+	delete p_test_obj;
+
+	std::cout << "Array array_test[] test#2" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push( new array_test[2] );
+	auto ret = p_test_obj->pop();
+	if ( std::get<0>( ret ) ) {
+		delete[] std::get<1>( ret );
+	} else {
+		std::cout << "NGGGGGGgggggg!" << std::endl;
+		exit( 1 );
+	}
+	delete p_test_obj;
+
+	std::cout << "End Array array_test[] test" << std::endl;
+}
+
+#if 0
+void test_fixed_array( void )
+{
+	using test_fifo_type3 = alpha::concurrent::fifo_list<array_test[2]>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "Array array_test[2] test#1" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	array_test tmp_data[2];
+	tmp_data[0].x = 2;
+	tmp_data[1].x = 3;
+	p_test_obj->push( tmp_data );
+
+	delete p_test_obj;
+
+	std::cout << "Array array_test[2] test#2" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push( tmp_data );
+	auto ret = p_test_obj->pop();
+	if ( std::get<0>( ret ) ) {
+		if ( std::get<1>( ret )[0] != 2 ) {
+			std::cout << "NGGGGGGgggggg!" << std::endl;
+			exit( 1 );
+		}
+		if ( std::get<1>( ret )[1] != 3 ) {
+			std::cout << "NGGGGGGgggggg!" << std::endl;
+			exit( 1 );
+		}
+	} else {
+		std::cout << "NGGGGGGgggggg!" << std::endl;
+		exit( 1 );
+	}
+	delete p_test_obj;
+
+	std::cout << "End Array array_test[2] test" << std::endl;
+}
+#endif
+
 using test_fifo_type  = alpha::concurrent::fifo_list<std::uintptr_t>;
 using test_fifo_type2 = alpha::concurrent::fifo_list<std::uintptr_t, false>;
 
@@ -567,6 +654,8 @@ int main( void )
 	std::cout << "!!!Start World!!!" << std::endl;   // prints !!!Hello World!!!
 
 	test_pointer();
+	test_array();
+	//	test_fixed_array();
 
 	for ( int i = 0; i < 4; i++ ) {
 		std::cout << "!!! " << i << " World!!!" << std::endl;   // prints !!!Hello World!!!

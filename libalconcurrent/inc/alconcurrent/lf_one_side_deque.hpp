@@ -44,7 +44,7 @@ namespace concurrent {
 template <typename T, bool ALLOW_TO_ALLOCATE = true, typename DELETER = internal::default_deleter<T>>
 class one_side_deque {
 public:
-	using value_type = T;
+	using value_type = typename std::decay<T>::type;
 
 	/*!
 	 * @breif	Constructor
@@ -71,7 +71,7 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push_back(
-		const T& cont_arg   //!< [in]	a value to push this one side deque
+		const value_type& cont_arg   //!< [in]	a value to push this one side deque
 		) -> typename std::enable_if<BOOL_VALUE, void>::type
 	{
 		tail_size_.push( cont_arg );
@@ -93,7 +93,7 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push_back(
-		const T& cont_arg   //!< [in]	a value to push this one side deque
+		const value_type& cont_arg   //!< [in]	a value to push this one side deque
 		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
 	{
 		return tail_size_.push( cont_arg );
@@ -109,7 +109,7 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push_front(
-		const T& cont_arg   //!< [in]	a value to push this one side deque
+		const value_type& cont_arg   //!< [in]	a value to push this one side deque
 		) -> typename std::enable_if<BOOL_VALUE, void>::type
 	{
 		head_side_.push( cont_arg );
@@ -131,7 +131,7 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push_front(
-		const T& cont_arg   //!< [in]	a value to push this one side deque
+		const value_type& cont_arg   //!< [in]	a value to push this one side deque
 		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
 	{
 		return head_side_.push( cont_arg );
@@ -183,8 +183,8 @@ private:
 	one_side_deque& operator=( const one_side_deque& ) = delete;
 	one_side_deque& operator=( one_side_deque&& ) = delete;
 
-	using head_stack_t = stack_list<value_type, ALLOW_TO_ALLOCATE, DELETER>;
-	using tail_fifo_t  = fifo_list<value_type, ALLOW_TO_ALLOCATE, DELETER>;
+	using head_stack_t = stack_list<T, ALLOW_TO_ALLOCATE, DELETER>;
+	using tail_fifo_t  = fifo_list<T, ALLOW_TO_ALLOCATE, DELETER>;
 
 	head_stack_t head_side_;
 	tail_fifo_t  tail_size_;

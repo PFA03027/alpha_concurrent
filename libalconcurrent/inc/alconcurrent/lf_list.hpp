@@ -38,7 +38,7 @@ namespace internal {
 template <typename T, typename DELETER = default_deleter<T>>
 class lockfree_list_base {
 public:
-	using value_type                 = T;                                           //!< 保持対象の型
+	using value_type                 = typename std::decay<T>::type;                //!< 保持対象の型
 	using node_type                  = one_way_list_node_markable<T>;               //!< 実際の値を保持するノードクラス。
 	using node_pointer               = node_type*;                                  //!< 実際の値を保持するノードクラスのインスタンスへのポインタ型
 	using find_predicate_t           = std::function<bool( const node_pointer )>;   //!< find関数で使用する述語関数を保持するfunction型
@@ -401,7 +401,7 @@ private:
 template <typename T, bool ALLOW_TO_ALLOCATE = true, typename DELETER = internal::default_deleter<T>>
 class lockfree_list {
 public:
-	using value_type      = T;
+	using value_type      = typename std::decay<T>::type;
 	using predicate_t     = std::function<bool( const value_type& )>;
 	using for_each_func_t = std::function<void( value_type& )>;
 
@@ -458,8 +458,8 @@ public:
 	 * In case that 2nd return value is false, User side has a role to recover this condition(fail to allocate the free node) by User side itself, e.g. backoff approach is one of recovery approach.
 	 */
 	std::tuple<bool, bool> insert(
-		const T&     cont_arg,   //!< [in]	a value to insert this list
-		predicate_t& pred        //!< [in]	A predicate function to specify the insertion position. const value_type& is passed as an argument
+		const value_type& cont_arg,   //!< [in]	a value to insert this list
+		predicate_t&      pred        //!< [in]	A predicate function to specify the insertion position. const value_type& is passed as an argument
 	)
 	{
 		typename list_type::find_predicate_t pred_common = [&pred]( const list_node_pointer a ) { return pred( a->ref_value() ); };
@@ -580,7 +580,7 @@ public:
 	 * @li	In case that return value is false, User side has a role to recover this condition(fail to allocate the free node) by User side itself, e.g. backoff approach is one of recovery approach.
 	 */
 	bool push_front(
-		const T& cont_arg   //!< [in]	a value to insert this list
+		const value_type& cont_arg   //!< [in]	a value to insert this list
 	)
 	{
 		typename list_type::find_predicate_t pred_common = []( const list_node_pointer a ) { return true; };
@@ -607,7 +607,7 @@ public:
 
 		value_type                            ans_value {};
 		internal::default_mover<T>            dm;
-		typename list_type::remove_operator_t remove_op = [&ans_value, &dm]( value_type& a ) { dm(&a, &ans_value); return; };
+		typename list_type::remove_operator_t remove_op = [&ans_value, &dm]( value_type& a ) { dm(a, ans_value); return; };
 
 		while ( true ) {
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
@@ -644,7 +644,7 @@ public:
 	 * @li	In case that return value is false, User side has a role to recover this condition(fail to allocate the free node) by User side itself, e.g. backoff approach is one of recovery approach.
 	 */
 	bool push_back(
-		const T& cont_arg   //!< [in]	a value to copy this list
+		const value_type& cont_arg   //!< [in]	a value to copy this list
 	)
 	{
 		typename list_type::find_predicate_t pred_common = []( const list_node_pointer a ) { return false; };
@@ -672,7 +672,7 @@ public:
 
 		value_type                            ans_value {};
 		internal::default_mover<value_type>   dm;
-		typename list_type::remove_operator_t remove_op = [&ans_value, &dm]( value_type& a ) { dm(&a, &ans_value); return; };
+		typename list_type::remove_operator_t remove_op = [&ans_value, &dm]( value_type& a ) { dm(a, ans_value); return; };
 
 		while ( true ) {
 			list_node_pointer p_last;
@@ -792,7 +792,7 @@ private:
 	 * @li	In case that return value is false, User side has a role to recover this condition(fail to allocate the free node) by User side itself, e.g. backoff approach is one of recovery approach.
 	 */
 	bool push_internal_common(
-		const T&                              cont_arg,     //!< [in]	a value to copy this list
+		const value_type&                     cont_arg,     //!< [in]	a value to copy this list
 		typename list_type::find_predicate_t& pred_common   //!< [in]	const list_node_pointer& is provided.
 	)
 	{

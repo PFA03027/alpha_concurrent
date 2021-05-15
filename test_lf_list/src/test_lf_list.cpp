@@ -432,11 +432,58 @@ void test_pointer( void )
 	std::cout << "End Pointer test" << std::endl;
 }
 
+class array_test {
+public:
+	array_test( void )
+	{
+		x = 1;
+		return;
+	}
+
+	~array_test()
+	{
+		printf( "called destructor of array_test\n" );
+		return;
+	}
+
+private:
+	int x;
+};
+
+void test_array( void )
+{
+	using test_fifo_type3 = alpha::concurrent::lockfree_list<array_test[]>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "Array array_test[] test#1" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push_front( new array_test[2] );
+
+	delete p_test_obj;
+
+	std::cout << "Array array_test[] test#2" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push_front( new array_test[2] );
+	auto ret = p_test_obj->pop_front();
+	if ( std::get<0>( ret ) ) {
+		delete[] std::get<1>( ret );
+	} else {
+		std::cout << "NGGGGGGgggggg!" << std::endl;
+		exit( 1 );
+	}
+	delete p_test_obj;
+
+	std::cout << "End Array array_test[] test" << std::endl;
+}
+
 int main( void )
 {
 	std::cout << "!!!Start World!!!" << std::endl;   // prints !!!Hello World!!!
 
 	test_pointer();
+	test_array();
 
 	test1();
 	test2();

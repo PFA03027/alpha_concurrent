@@ -27,16 +27,16 @@ namespace internal {
 
 template <typename T>
 struct one_way_list_node : public node_of_list {
-	using value_type = T;
+	using value_type = typename std::decay<T>::type;
 
 	one_way_list_node( void )
 	  : target_()
 	  , next_( nullptr )
 	{
-		static_assert( std::is_copy_assignable<T>::value, "T need to be copy assignable." );
+		static_assert( std::is_copy_assignable<value_type>::value, "T need to be copy assignable." );
 	}
 
-	one_way_list_node( const T& cont_arg )
+	one_way_list_node( const value_type& cont_arg )
 	  : target_( cont_arg )
 	  , next_( nullptr )
 	{
@@ -47,25 +47,25 @@ struct one_way_list_node : public node_of_list {
 		return;
 	}
 
-	T get_value( void ) const
+	value_type get_value( void ) const
 	{
 		std::atomic_thread_fence( std::memory_order_acquire );
 		return target_;
 	}
 
-	T& ref_value( void )
+	value_type& ref_value( void )
 	{
 		std::atomic_thread_fence( std::memory_order_acquire );
 		return target_;
 	}
 
-	const T& ref_value( void ) const
+	const value_type& ref_value( void ) const
 	{
 		std::atomic_thread_fence( std::memory_order_acquire );
 		return target_;
 	}
 
-	void set_value( const T& value_arg )
+	void set_value( const value_type& value_arg )
 	{
 		target_ = value_arg;
 		std::atomic_thread_fence( std::memory_order_release );
@@ -94,18 +94,18 @@ private:
 
 template <typename T>
 struct one_way_list_node_markable : public node_of_list {
-	using value_type = T;
+	using value_type = typename std::decay<T>::type;
 
 	one_way_list_node_markable( void )
 	  : target_()
 	  , next_( 0 )
 	{
-		static_assert( std::is_copy_assignable<T>::value, "T need to be copy assignable." );
+		static_assert( std::is_copy_assignable<value_type>::value, "T need to be copy assignable." );
 
 		//		assert( next_.is_lock_free() );   // std::atomic_uintptr_t is not lock-free.
 	}
 
-	one_way_list_node_markable( const T& cont_arg )
+	one_way_list_node_markable( const value_type& cont_arg )
 	  : target_( cont_arg )
 	  , next_( 0 )
 	{
@@ -116,25 +116,25 @@ struct one_way_list_node_markable : public node_of_list {
 		return;
 	}
 
-	T get_value( void ) const
+	value_type get_value( void ) const
 	{
 		std::atomic_thread_fence( std::memory_order_acquire );
 		return target_;
 	}
 
-	T& ref_value( void )
+	value_type& ref_value( void )
 	{
 		std::atomic_thread_fence( std::memory_order_acquire );
 		return target_;
 	}
 
-	const T& ref_value( void ) const
+	const value_type& ref_value( void ) const
 	{
 		std::atomic_thread_fence( std::memory_order_acquire );
 		return target_;
 	}
 
-	void set_value( const T& value_arg )
+	void set_value( const value_type& value_arg )
 	{
 		target_ = value_arg;
 		std::atomic_thread_fence( std::memory_order_release );
@@ -175,43 +175,51 @@ private:
 	std::atomic_uintptr_t next_;
 };
 
+//////////////////////////////////////////////////////////////////////
+// Primary template for default deleter
 template <typename T>
-class deleter_no_delete {
+class default_deleter {
 public:
 	void operator()( T& x ) {}
 };
 
+// Specialized for pointer allocated by new
 template <typename T>
-class deleter_delete {
+class default_deleter<T*> {
 public:
-	void operator()( T& x )
+	using pointer = T*;
+	void operator()( pointer& x )
 	{
 		delete x;
 		x = nullptr;
 	}
 };
 
+// Specialized for array allocated by new []
 template <typename T>
-class deleter_delete_array {
+class default_deleter<T[]> {
 public:
-	void operator()( T& x )
+	using pointer = typename std::decay<T[]>::type;
+	void operator()( pointer& x )
 	{
 		delete[] x;
 		x = nullptr;
 	}
 };
 
-template <typename T>
-using default_deleter = typename std::conditional<
-	std::is_pointer<T>::value,
-	deleter_delete<T>,
-	typename std::conditional<
-		std::is_array<T>::value,
-		deleter_delete_array<T>,
-		deleter_no_delete<T>>::type>::type;
+// Specialized for array[N]
+template <typename T, int N>
+class default_deleter<T[N]> {
+public:
+	using pointer = typename std::decay<T[N]>::type;
+	void operator()( pointer& x )
+	{
+	}
+};
 
+//////////////////////////////////////////////////////////////////////
 template <typename T>
-class mover_copy {
+class mover_by_copy {
 public:
 	void operator()( T* from, T* to )
 	{
@@ -219,46 +227,45 @@ public:
 	}
 };
 
+// Primary template
 template <typename T>
-class mover_move {
+class mover_by_move {
 public:
-	void operator()( T* from, T* to )
+	void operator()( T& from, T& to )
 	{
-		*to = std::move( *from );
+		to = std::move( from );
+	}
+};
+
+// Specialized template for pointer
+template <typename T>
+class mover_by_move<T*> {
+public:
+	using pointer = T*;
+	void operator()( pointer& from, pointer& to )
+	{
+		to   = from;
+		from = nullptr;
 	}
 };
 
 template <typename T>
-class mover_pointer {
+class mover_by_move<T[]> {
 public:
-	void operator()( T* from, T* to )
-	{
-		*to   = *from;
-		*from = nullptr;
-	}
-};
+	using pointer = typename std::decay<T[]>::type;
 
-template <typename T>
-class mover_pointer_array {
-public:
-	void operator()( T* from, T* to )
+	void operator()( pointer& from, pointer& to )
 	{
-		*to   = *from;
-		*from = nullptr;
+		to   = from;
+		from = nullptr;
 	}
 };
 
 template <typename T>
 using default_mover = typename std::conditional<
-	std::is_pointer<T>::value,
-	mover_pointer<T>,
-	typename std::conditional<
-		std::is_array<T>::value,
-		mover_pointer_array<T>,
-		typename std::conditional<
-			std::is_move_assignable<T>::value,
-			mover_move<T>,
-			mover_copy<T>>::type>::type>::type;
+	std::is_move_assignable<typename std::decay<T>::type>::value,
+	mover_by_move<T>,
+	mover_by_copy<T>>::type;
 
 }   // namespace internal
 

@@ -39,7 +39,7 @@ template <typename T, typename DELETER = default_deleter<T>>
 class fifo_nd_list {
 public:
 	static constexpr int hzrd_max_slot_ = 5;
-	using value_type                    = T;
+	using value_type                    = typename std::decay<T>::type;
 	using node_type                     = one_way_list_node<T>;
 	using node_pointer                  = node_type*;
 	using hazard_ptr_storage            = hazard_ptr<node_type, hzrd_max_slot_>;
@@ -166,7 +166,7 @@ public:
 					// headが他のスレッドでpopされた。
 					continue;
 				}
-				T ans_2nd = p_cur_next->get_value();   // この処理が必要になるため、T型は、copy assignableでなければならい。
+				value_type ans_2nd = p_cur_next->get_value();   // この処理が必要になるため、T型は、copy assignableでなければならい。
 				// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
 				// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
 				if ( head_.compare_exchange_weak( p_cur_first, p_cur_next ) ) {
@@ -244,7 +244,7 @@ private:
 template <typename T, bool ALLOW_TO_ALLOCATE = true, typename DELETER = internal::default_deleter<T>>
 class fifo_list {
 public:
-	using value_type = T;
+	using value_type = typename std::decay<T>::type;
 
 	/*!
 	 * @breif	Constructor
@@ -276,7 +276,7 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push(
-		const T& cont_arg   //!< [in]	a value to push this FIFO queue
+		const value_type& cont_arg   //!< [in]	a value to push this FIFO queue
 		) -> typename std::enable_if<BOOL_VALUE, void>::type
 	{
 		std::atomic_thread_fence( std::memory_order_release );
@@ -309,7 +309,7 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push(
-		const T& cont_arg   //!< [in]	a value to push this FIFO queue
+		const value_type& cont_arg   //!< [in]	a value to push this FIFO queue
 		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
 	{
 		std::atomic_thread_fence( std::memory_order_release );

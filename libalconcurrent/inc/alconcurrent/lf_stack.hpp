@@ -36,7 +36,7 @@ template <typename T, typename DELETER = default_deleter<T>>
 class lifo_nd_list {
 public:
 	static constexpr int hzrd_max_slot_ = 3;
-	using value_type                    = T;
+	using value_type                    = typename std::decay<T>::type;
 	using node_type                     = one_way_list_node<T>;
 	using node_pointer                  = node_type*;
 	using hazard_ptr_storage            = hazard_ptr<node_type, hzrd_max_slot_>;
@@ -202,7 +202,14 @@ private:
 template <typename T, bool ALLOW_TO_ALLOCATE = true, typename DELETER = internal::default_deleter<T>>
 class stack_list {
 public:
+#if 0
 	using value_type = T;
+	using value_type = typename std::conditional<
+		std::is_array<T>::value,
+		std::decay<T>::type,
+		T>::type;
+#endif
+	using value_type = typename std::decay<T>::type;
 
 	/*!
 	 * @breif	Constructor
@@ -234,7 +241,7 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push(
-		const T& cont_arg   //!< [in]	a value to push this LIFO queue
+		const value_type& cont_arg   //!< [in]	a value to push this LIFO queue
 		) -> typename std::enable_if<BOOL_VALUE, void>::type
 	{
 		lifo_node_pointer p_new_node = free_nd_.allocate<lifo_node_type>(
@@ -265,7 +272,7 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push(
-		const T& cont_arg   //!< [in]	a value to push this LIFO queue
+		const value_type& cont_arg   //!< [in]	a value to push this LIFO queue
 		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
 	{
 		lifo_node_pointer p_new_node = free_nd_.allocate<lifo_node_type>(
