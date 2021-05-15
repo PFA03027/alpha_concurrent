@@ -12,7 +12,7 @@
 #include <cstdint>
 #include <iostream>
 
-#include "lf_mem_alloc.hpp"
+#include "alconcurrent/lf_mem_alloc.hpp"
 
 alpha::concurrent::param_chunk_allocation param = { 27, 2 };
 
@@ -106,6 +106,41 @@ void test_chunk_list( void )
 	}
 
 	delete p_ch_lst;
+}
+
+void test_general_mem_allocator( void )
+{
+	alpha::concurrent::param_chunk_allocation param[] = {
+		{ 27, 2 },
+		{ 100, 2 },
+	};
+
+	alpha::concurrent::general_mem_allocator* p_mem_allocator = new alpha::concurrent::general_mem_allocator( param, 2 );
+
+	void* test_ptr1 = p_mem_allocator->allocate( 10 );
+	void* test_ptr2 = p_mem_allocator->allocate( 100 );
+	void* test_ptr3 = p_mem_allocator->allocate( 1000 );
+
+	if ( test_ptr1 == nullptr ) {
+		std::cout << "NGGGGGGgggggg #1 !" << std::endl;
+		exit( 1 );
+	}
+
+	if ( test_ptr2 == nullptr ) {
+		std::cout << "NGGGGGGgggggg #2 !" << std::endl;
+		exit( 1 );
+	}
+
+	if ( test_ptr3 == nullptr ) {
+		std::cout << "NGGGGGGgggggg #3 !" << std::endl;
+		exit( 1 );
+	}
+
+	p_mem_allocator->deallocate( test_ptr3 );
+	p_mem_allocator->deallocate( test_ptr1 );
+	p_mem_allocator->deallocate( test_ptr2 );
+
+	delete p_mem_allocator;
 }
 
 int main( void )

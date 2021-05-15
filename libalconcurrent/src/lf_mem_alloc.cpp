@@ -8,9 +8,11 @@
  * Copyright (C) 2021 by alpha Teruaki Ata <PFA03027@nifty.com>
  */
 
+#include <algorithm>
 #include <cstddef>
+#include <vector>
 
-#include "lf_mem_alloc.hpp"
+#include "alconcurrent/lf_mem_alloc.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -305,6 +307,64 @@ bool chunk_list::recycle_mem_slot(
 const param_chunk_allocation& chunk_list::get_param( void ) const
 {
 	return alloc_conf_;
+}
+
+general_mem_allocator::general_mem_allocator(
+	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
+	int                           num              //!< [in] array size
+	)
+  : pr_ch_size_( num )
+{
+	std::vector<int> idx_vec( pr_ch_size_ );
+
+	for ( int i = 0; i < pr_ch_size_; i++ ) {
+		idx_vec[i] = i;
+	}
+
+	std::sort( idx_vec.begin(), idx_vec.end(),
+	           [p_param_array]( int a, int b ) {
+				   return p_param_array[a].size_of_one_piece_ < p_param_array[b].size_of_one_piece_;
+			   } );
+
+	up_param_ch_array_ = std::unique_ptr<param_chunk_comb[]>( new param_chunk_comb[pr_ch_size_] );
+	for ( int i = 0; i < pr_ch_size_; i++ ) {
+		up_param_ch_array_[i].param_        = p_param_array[idx_vec[i]];
+		up_param_ch_array_[i].up_chunk_lst_ = std::unique_ptr<chunk_list>( new chunk_list( up_param_ch_array_[i].param_ ) );
+	}
+
+	return;
+}
+
+void* general_mem_allocator::allocate(
+	std::size_t n   //!< [in] required memory size
+)
+{
+	void* p_ans = nullptr;
+	for ( int i = 0; i < pr_ch_size_; i++ ) {
+		if ( up_param_ch_array_[i].param_.size_of_one_piece_ >= n ) {
+			p_ans = up_param_ch_array_[i].up_chunk_lst_->allocate_mem_slot();
+			if ( p_ans != nullptr ) {
+				return p_ans;
+			}
+		}
+	}
+
+	p_ans = std::malloc( n );
+	return p_ans;
+}
+
+void general_mem_allocator::deallocate(
+	void* p_mem   //!< [in] pointer to allocated memory by allocate()
+)
+{
+	for ( int i = 0; i < pr_ch_size_; i++ ) {
+		bool ret = up_param_ch_array_[i].up_chunk_lst_->recycle_mem_slot( p_mem );
+		if ( ret ) return;
+	}
+
+	std::free( p_mem );
+
+	return;
 }
 
 }   // namespace concurrent
