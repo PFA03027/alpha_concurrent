@@ -78,10 +78,8 @@ Support dynamic allocatable thread local storage.
 When allocating dynamic allocatable thread local storage for a thread, it is not lock free. This will be happened by 1st access of a value instance.
 After allocation, this class may be lock free. This depends whether pthread_getspecific() is lock free or not.
 
-# stm.hpp
-This is experimental code of STM.
-Not resolved the memory leak issue yet.
-
+# general memory allocator class that is semi lock-free in lf_mem_alloc.hpp
+This is general memory allocator.
 
 # Important points
 Whether the provided class is lock-free depends on whether the POSIX API for thread-local storage is lock-free.
