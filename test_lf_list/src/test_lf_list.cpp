@@ -490,6 +490,23 @@ int main( void )
 	test3();
 	test4();
 
+
+#ifdef USE_LOCK_FREE_MEM_ALLOC
+	std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::internal::node_of_list::get_statistics();
+
+	for ( auto& e : statistics ) {
+		printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d\n",
+		        (int)e.alloc_conf_.size_of_one_piece_,
+		        (int)e.alloc_conf_.num_of_pieces_,
+		        (int)e.chunk_num_,
+		        (int)e.total_slot_cnt_,
+		        (int)e.free_slot_cnt_,
+		        (int)e.alloc_req_cnt_,
+		        (int)e.error_alloc_req_cnt_,
+		        (int)e.dealloc_req_cnt_,
+		        (int)e.error_dealloc_req_cnt_ );
+	}
+#endif
 	std::cout << "!!!End World!!!" << std::endl;   // prints !!!Hello World!!!
 	return EXIT_SUCCESS;
 }

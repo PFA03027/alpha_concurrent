@@ -15,6 +15,9 @@
 #include <memory>
 
 #include "hazard_ptr.hpp"
+#ifdef USE_LOCK_FREE_MEM_ALLOC
+#include "lf_mem_alloc.hpp"
+#endif
 
 namespace alpha {
 namespace concurrent {
@@ -59,6 +62,19 @@ struct node_of_list {
 	{
 		return next_[(int)cur_slot_idx].compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
 	}
+
+#ifdef USE_LOCK_FREE_MEM_ALLOC
+	void* operator new( std::size_t n );             // usual new...(1)
+	void  operator delete( void* p_mem ) noexcept;   // usual new...(2)
+
+	void* operator new[]( std::size_t n );             // usual new...(1)
+	void  operator delete[]( void* p_mem ) noexcept;   // usual new...(2)
+
+	void* operator new( std::size_t n, void* p );          // placement new
+	void  operator delete( void* p, void* p2 ) noexcept;   // placement delete...(3)
+
+	static std::list<chunk_statistics> get_statistics(void);
+#endif
 
 private:
 	node_of_list( const node_of_list& ) = delete;

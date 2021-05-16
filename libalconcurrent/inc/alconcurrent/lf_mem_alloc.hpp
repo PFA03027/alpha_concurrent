@@ -13,10 +13,10 @@
 
 #include <atomic>
 #include <cstdlib>
+#include <list>
 #include <memory>
 
-#include "alconcurrent/free_node_storage.hpp"
-#include "alconcurrent/lf_stack.hpp"
+#include "conf_logger.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -40,13 +40,25 @@ enum class chunk_control_status {
 	DELETION,              //!< does not allow to access any more except GC. After shift to this state, chunk memory will be free after confirmed accesser is zero.
 };
 
-class slot_release_handler {
-public:
-	using pointer = void*;
-	void operator()( pointer& x )
-	{
-		x = nullptr;
-	}
+/*!
+ * @breif	slot status
+ */
+enum class slot_status {
+	INVALID,         //!< invalid queue slot
+	SLOT_RESERVED,   //!< this queue slot will use soon
+	VALID_IDX,       //!< free idx is valid in this slot
+	SOLD_OUT,        //!< index in this queue slot is sold out
+};
+
+struct chunk_statistics {
+	param_chunk_allocation alloc_conf_;
+	std::size_t            chunk_num_;
+	std::size_t            total_slot_cnt_;
+	std::size_t            free_slot_cnt_;
+	std::size_t            alloc_req_cnt_;
+	std::size_t            error_alloc_req_cnt_;
+	std::size_t            dealloc_req_cnt_;
+	std::size_t            error_dealloc_req_cnt_;
 };
 
 /*!
@@ -104,19 +116,36 @@ public:
 	 */
 	bool alloc_new_chunk( void );
 
+	/*!
+	 * @breif	get statistics
+	 */
+	chunk_statistics get_statistics( void ) const;
+
 private:
-	param_chunk_allocation                        alloc_conf_;          //!< allocation configuration paramter
-	std::size_t                                   size_of_chunk_ = 0;   //!< size of a chunk
-	stack_list<void*, true, slot_release_handler> free_slot_stack_;     //!< free slot stack
+	struct free_slot_idx_stack_node {
+		int                                    idx_;
+		std::atomic<free_slot_idx_stack_node*> p_non_free_next_node_;
+		std::atomic<free_slot_idx_stack_node*> p_free_next_node_;
+	};
+
+	param_chunk_allocation alloc_conf_;          //!< allocation configuration paramter. value is corrected internally.
+	std::size_t            size_of_chunk_ = 0;   //!< size of a chunk
+
+	std::atomic_bool* p_free_slot_mark_ = nullptr;   //!< if slot is free, this is marked as true. This is prior information than free slot idx stack.
+
+	free_slot_idx_stack_node*              p_free_idx_array_;           //!< free slot index node
+	std::atomic<free_slot_idx_stack_node*> non_free_node_stack_head_;   //!< non free slot index node stack
+	std::atomic<free_slot_idx_stack_node*> free_node_stack_head_;       //!< free slot index stack
+
+	std::atomic<int>	hint_idx_;
 
 	void* p_chunk_ = nullptr;   //!< pointer to an allocated memory as a chunk
 
-	/*!
-	 * @breif	allocate new chunk
-	 */
-	bool alloc_new_chunk(
-		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
-	);
+	// statistics
+	std::atomic<unsigned int> statistics_alloc_req_cnt_;
+	std::atomic<unsigned int> statistics_alloc_req_err_cnt_;
+	std::atomic<unsigned int> statistics_dealloc_req_cnt_;
+	std::atomic<unsigned int> statistics_dealloc_req_err_cnt_;
 
 	std::size_t get_size_of_one_slot( void ) const;
 };
@@ -162,6 +191,11 @@ public:
 	 */
 	const param_chunk_allocation& get_param( void ) const;
 
+	/*!
+	 * @breif	get statistics
+	 */
+	chunk_statistics get_statistics( void ) const;
+
 private:
 	param_chunk_allocation                alloc_conf_;    //!< allocation configuration paramter
 	std::atomic<chunk_header_multi_slot*> p_top_chunk_;   //!< pointer to chunk_header that is top of list.
@@ -202,6 +236,11 @@ public:
 	 * @breif	deallocate memory
 	 */
 	void deallocate( void* p_mem );
+
+	/*!
+	 * @breif	get statistics
+	 */
+	std::list<chunk_statistics> get_statistics( void ) const;
 
 private:
 	struct param_chunk_comb {

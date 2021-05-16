@@ -55,4 +55,5 @@
 			<resource resourceType="PROJECT" workspacePath="/test_lf_list"/>
 		</configuration>
 	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
 </cproject>

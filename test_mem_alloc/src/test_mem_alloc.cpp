@@ -143,12 +143,16 @@ void test_general_mem_allocator( void )
 	delete p_mem_allocator;
 }
 
+extern void load_test( void );
+
 int main( void )
 {
 	puts( "!!!Hello Test World!!!" );
 
 	test_chunk_header_multi_slot();
 	test_chunk_list();
+
+	load_test();
 
 	puts( "!!!End Test World!!!" );
 	return EXIT_SUCCESS;

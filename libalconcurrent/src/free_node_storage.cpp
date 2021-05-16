@@ -9,6 +9,7 @@
  */
 
 #include "alconcurrent/free_node_storage.hpp"
+#include "alconcurrent/lf_mem_alloc.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -95,10 +96,9 @@ fifo_free_nd_list::~fifo_free_nd_list()
 	return;
 }
 
-
 void fifo_free_nd_list::initial_push( fifo_free_nd_list::node_pointer const p_push_node )
 {
-	if(	(head_.load() != nullptr) || (tail_.load() != nullptr) ) {
+	if ( ( head_.load() != nullptr ) || ( tail_.load() != nullptr ) ) {
 		LogOutput( log_type::ERR, "Because already this fifo_free_nd_list instance has sentinel node, fail to initial_push()." );
 		return;
 	}
@@ -108,7 +108,6 @@ void fifo_free_nd_list::initial_push( fifo_free_nd_list::node_pointer const p_pu
 
 	return;
 }
-
 
 void fifo_free_nd_list::push( fifo_free_nd_list::node_pointer const p_push_node )
 {
@@ -222,7 +221,7 @@ bool free_nd_storage::recycle( free_nd_storage::node_pointer p_retire_node )
 		p_tls_fifo_->push( p_retire_node );
 	}
 
-	if(p_tls_fifo_->is_empty()) {
+	if ( p_tls_fifo_->is_empty() ) {
 		return false;
 	}
 
@@ -256,6 +255,66 @@ void free_nd_storage::destr_fn( void* parm )
 	LogOutput( log_type::DEBUG, "thread local destructor is done." );
 	return;
 }
+
+#ifdef USE_LOCK_FREE_MEM_ALLOC
+
+static param_chunk_allocation param[] = {
+	{ 32, 100 },
+	{ 64, 100 },
+	{ 128, 100 },
+};
+
+static general_mem_allocator& get_gma( void )
+{
+	static general_mem_allocator siglton( param, 3 );
+	return siglton;
+}
+
+void* node_of_list::operator new( std::size_t n )   // usual new...(1)
+{
+	void* p_ans;
+	p_ans = get_gma().allocate( n );
+
+	if ( p_ans == nullptr ) throw std::bad_alloc();
+
+	return p_ans;
+}
+void node_of_list::operator delete( void* p_mem ) noexcept   // usual new...(2)
+{
+	get_gma().deallocate( p_mem );
+	return;
+}
+
+void* node_of_list::operator new[]( std::size_t n )   // usual new...(1)
+{
+	void* p_ans;
+	p_ans = get_gma().allocate( n );
+
+	if ( p_ans == nullptr ) throw std::bad_alloc();
+
+	return p_ans;
+}
+void node_of_list::operator delete[]( void* p_mem ) noexcept   // usual new...(2)
+{
+	get_gma().deallocate( p_mem );
+	return;
+}
+
+void* node_of_list::operator new( std::size_t n, void* p )   // placement new
+{
+	return p;
+}
+void node_of_list::operator delete( void* p, void* p2 ) noexcept   // placement delete...(3)
+{
+	return;
+}
+
+std::list<chunk_statistics> node_of_list::get_statistics( void )
+{
+	return get_gma().get_statistics();
+}
+
+#endif
 
 }   // namespace internal
 }   // namespace concurrent

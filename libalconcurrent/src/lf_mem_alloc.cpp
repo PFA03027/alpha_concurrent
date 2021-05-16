@@ -14,8 +14,13 @@
 
 #include "alconcurrent/lf_mem_alloc.hpp"
 
+//#define ALLOC_ALG1
+#define ALLOC_ALG2
+
 namespace alpha {
 namespace concurrent {
+
+constexpr int	num_of_free_chk_try = 10;
 
 template <typename T>
 class scoped_inout_counter {
@@ -42,15 +47,32 @@ chunk_header_multi_slot::chunk_header_multi_slot(
   , status_( chunk_control_status::EMPTY )
   , num_of_accesser_( 0 )
   , alloc_conf_( ch_param_arg )
-  , free_slot_stack_( ch_param_arg.num_of_pieces_ )
+  , p_free_slot_mark_( nullptr )
+  , p_free_idx_array_( nullptr )
+  , non_free_node_stack_head_( nullptr )
+  , free_node_stack_head_( nullptr )
+  , hint_idx_( 0 )
+  , p_chunk_( nullptr )
+  , statistics_alloc_req_cnt_( 0 )
+  , statistics_alloc_req_err_cnt_( 0 )
+  , statistics_dealloc_req_cnt_( 0 )
+  , statistics_dealloc_req_err_cnt_( 0 )
 {
-	alloc_new_chunk( ch_param_arg );
+	alloc_conf_.size_of_one_piece_ = get_size_of_one_slot();
+	alloc_conf_.num_of_pieces_     = ( ch_param_arg.num_of_pieces_ >= 2 ) ? ch_param_arg.num_of_pieces_ : 2;
+
+	alloc_new_chunk();
+
 	return;
 }
 
 chunk_header_multi_slot::~chunk_header_multi_slot()
 {
+	delete[] p_free_slot_mark_;
+	delete[] p_free_idx_array_;
 	std::free( p_chunk_ );
+
+	return;
 }
 
 std::size_t chunk_header_multi_slot::get_size_of_one_slot( void ) const
@@ -64,19 +86,15 @@ std::size_t chunk_header_multi_slot::get_size_of_one_slot( void ) const
 	return ans;
 }
 
-bool chunk_header_multi_slot::alloc_new_chunk(
-	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
-)
+bool chunk_header_multi_slot::alloc_new_chunk( void )
 {
 	// get ownership to allocate a chunk
 	chunk_control_status expect = chunk_control_status::EMPTY;
 	bool                 result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::RESERVED_ALLOCATION );
 	if ( !result ) return false;
 
-	alloc_conf_ = ch_param_arg;
-
 	std::size_t tmp_size;
-	tmp_size = get_size_of_one_slot() * alloc_conf_.num_of_pieces_;
+	tmp_size = alloc_conf_.size_of_one_piece_ * alloc_conf_.num_of_pieces_;
 
 	if ( tmp_size == 0 ) {
 		status_.store( chunk_control_status::EMPTY );
@@ -89,13 +107,21 @@ bool chunk_header_multi_slot::alloc_new_chunk(
 		return false;
 	}
 
+	if ( p_free_slot_mark_ == nullptr ) {
+		p_free_slot_mark_ = new std::atomic_bool[alloc_conf_.num_of_pieces_];
+	}
+	if ( p_free_idx_array_ == nullptr ) {
+		p_free_idx_array_ = new free_slot_idx_stack_node[alloc_conf_.num_of_pieces_];
+	}
+
 	size_of_chunk_ = tmp_size;
 
 	for ( std::size_t i = 0; i < alloc_conf_.num_of_pieces_; i++ ) {
-		std::uintptr_t p_slot_addr = reinterpret_cast<std::uintptr_t>( p_chunk_ );
-
-		p_slot_addr += i * get_size_of_one_slot();
-		free_slot_stack_.push( reinterpret_cast<void*>( p_slot_addr ) );
+		p_free_slot_mark_[i].store( true );
+		p_free_idx_array_[i].idx_ = i;
+		p_free_idx_array_[i].p_non_free_next_node_.store( nullptr );
+		p_free_idx_array_[i].p_free_next_node_.store( free_node_stack_head_.load() );
+		free_node_stack_head_.store( &( p_free_idx_array_[i] ) );
 	}
 
 	status_.store( chunk_control_status::NORMAL );
@@ -109,13 +135,65 @@ void* chunk_header_multi_slot::allocate_mem_slot( void )
 
 	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
 
-	auto  ret   = free_slot_stack_.pop();
-	void* p_ans = nullptr;
-	if ( std::get<0>( ret ) ) {
-		p_ans = std::get<1>( ret );
+#ifdef ALLOC_ALG1
+	free_slot_idx_stack_node* p_node;
+
+	{
+		// pop free slot stack
+		free_slot_idx_stack_node* p_cur_head;
+		free_slot_idx_stack_node* p_nxt;
+		p_cur_head = free_node_stack_head_.load();
+		do {
+			if ( p_cur_head == nullptr ) return nullptr;
+
+			p_nxt = p_cur_head->p_free_next_node_.load();
+
+		} while ( !std::atomic_compare_exchange_strong( &free_node_stack_head_, &p_cur_head, p_nxt ) );
+
+		p_node = p_cur_head;
 	}
 
-	return p_ans;
+	int read_idx = p_node->idx_;
+	p_free_slot_mark_[read_idx].store( false );
+	p_node->idx_ = -1;
+	statistics_alloc_req_cnt_++;
+
+	{
+		// push non free slot stack
+		free_slot_idx_stack_node* p_cur_head;
+		p_cur_head = non_free_node_stack_head_.load();
+		do {
+			p_node->p_non_free_next_node_.store( p_cur_head );
+		} while ( !std::atomic_compare_exchange_strong( &non_free_node_stack_head_, &p_cur_head, p_node ) );
+	}
+#elif defined( ALLOC_ALG2 )
+	statistics_alloc_req_cnt_++;
+	int read_idx = -1;
+	for ( int i = 0; i < num_of_free_chk_try; i++ ) {
+		int  tmp_idx  = hint_idx_.load();
+		int  tmp_idx2 = tmp_idx;
+		bool expect   = true;
+		bool ret      = std::atomic_compare_exchange_strong( &( p_free_slot_mark_[tmp_idx] ), &expect, false );
+		int  expect2  = tmp_idx2 + 1;
+		if ( expect2 >= static_cast<int>( alloc_conf_.num_of_pieces_ ) ) {
+			expect2 = 0;
+		}
+		std::atomic_compare_exchange_strong( &( hint_idx_ ), &tmp_idx2, expect2 );
+		if ( ret ) {
+			read_idx = tmp_idx;
+			break;
+		}
+	}
+	if ( read_idx == -1 ) {
+		statistics_alloc_req_err_cnt_++;
+		return nullptr;
+	}
+#endif
+
+	std::uintptr_t p_ans_addr = reinterpret_cast<std::uintptr_t>( p_chunk_ );
+	p_ans_addr += read_idx * alloc_conf_.size_of_one_piece_;
+
+	return reinterpret_cast<void*>( p_ans_addr );
 }
 
 bool chunk_header_multi_slot::recycle_mem_slot(
@@ -143,14 +221,59 @@ bool chunk_header_multi_slot::recycle_mem_slot(
 	std::uintptr_t p_chking_addr = reinterpret_cast<std::uintptr_t>( p_recycle_slot );
 	p_chking_addr -= reinterpret_cast<std::uintptr_t>( p_chunk_ );
 
-	std::uintptr_t idx = p_chking_addr / get_size_of_one_slot();
-	std::uintptr_t adt = p_chking_addr % get_size_of_one_slot();
+	std::uintptr_t idx = p_chking_addr / alloc_conf_.size_of_one_piece_;
+	std::uintptr_t adt = p_chking_addr % alloc_conf_.size_of_one_piece_;
 
 	if ( idx >= alloc_conf_.num_of_pieces_ ) return false;
 	if ( adt != 0 ) return false;
 
+	bool expect_not_free = false;
+	bool result          = std::atomic_compare_exchange_strong( &p_free_slot_mark_[idx], &expect_not_free, true );
+
+	if ( !result ) {
+		// double free has occured.
+		LogOutput( log_type::ERR, "double free has occured." );
+		statistics_dealloc_req_err_cnt_++;
+		return true;
+	}
+
 	// OK. correct address
-	free_slot_stack_.push( p_recycle_slot );
+#ifdef ALLOC_ALG1
+	free_slot_idx_stack_node* p_node;
+
+	{
+		// pop non free slot stack
+		free_slot_idx_stack_node* p_cur_head;
+		free_slot_idx_stack_node* p_nxt;
+		p_cur_head = non_free_node_stack_head_.load();
+		do {
+			if ( p_cur_head == nullptr ) {
+				LogOutput( log_type::ERR, "internal error... over free ..." );
+				statistics_dealloc_req_err_cnt_++;
+				return true;
+			}
+
+			p_nxt = p_cur_head->p_non_free_next_node_.load();
+
+		} while ( !std::atomic_compare_exchange_strong( &non_free_node_stack_head_, &p_cur_head, p_nxt ) );
+
+		p_node = p_cur_head;
+	}
+
+	p_node->idx_ = idx;
+	statistics_dealloc_req_cnt_++;
+
+	{
+		// push free slot stack
+		free_slot_idx_stack_node* p_cur_head;
+		p_cur_head = free_node_stack_head_.load();
+		do {
+			p_node->p_free_next_node_.store( p_cur_head );
+		} while ( !std::atomic_compare_exchange_strong( &free_node_stack_head_, &p_cur_head, p_node ) );
+	}
+#elif defined( ALLOC_ALG2 )
+	statistics_dealloc_req_cnt_++;
+#endif
 
 	return true;
 }
@@ -191,9 +314,23 @@ bool chunk_header_multi_slot::exec_deletion( void )
 	return true;
 }
 
-bool chunk_header_multi_slot::alloc_new_chunk( void )
+chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
 {
-	return alloc_new_chunk( alloc_conf_ );
+	chunk_statistics ans;
+
+	ans.alloc_conf_     = alloc_conf_;
+	ans.chunk_num_      = 1;
+	ans.total_slot_cnt_ = alloc_conf_.num_of_pieces_;
+	ans.free_slot_cnt_  = 0;
+	for ( std::size_t i = 0; i < alloc_conf_.num_of_pieces_; i++ ) {
+		if ( p_free_slot_mark_[i].load() ) ans.free_slot_cnt_++;
+	}
+	ans.alloc_req_cnt_         = statistics_alloc_req_cnt_.load();
+	ans.error_alloc_req_cnt_   = statistics_alloc_req_err_cnt_.load();
+	ans.dealloc_req_cnt_       = statistics_dealloc_req_cnt_.load();
+	ans.error_dealloc_req_cnt_ = statistics_dealloc_req_err_cnt_.load();
+
+	return ans;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -309,6 +446,42 @@ const param_chunk_allocation& chunk_list::get_param( void ) const
 	return alloc_conf_;
 }
 
+/*!
+ * @breif	get statistics
+ */
+chunk_statistics chunk_list::get_statistics( void ) const
+{
+	chunk_statistics ans;
+
+	ans.alloc_conf_            = alloc_conf_;
+	ans.chunk_num_             = 0;
+	ans.total_slot_cnt_        = 0;
+	ans.free_slot_cnt_         = 0;
+	ans.alloc_req_cnt_         = 0;
+	ans.error_alloc_req_cnt_   = 0;
+	ans.dealloc_req_cnt_       = 0;
+	ans.error_dealloc_req_cnt_ = 0;
+
+	chunk_header_multi_slot* p_cur_chms = p_top_chunk_.load();
+	while ( p_cur_chms != nullptr ) {
+		chunk_statistics one_chms_statistics = p_cur_chms->get_statistics();
+		ans.alloc_conf_                      = alloc_conf_;
+		ans.chunk_num_ += one_chms_statistics.chunk_num_;
+		ans.total_slot_cnt_ += one_chms_statistics.total_slot_cnt_;
+		ans.free_slot_cnt_ += one_chms_statistics.free_slot_cnt_;
+		ans.alloc_req_cnt_ += one_chms_statistics.alloc_req_cnt_;
+		ans.error_alloc_req_cnt_ += one_chms_statistics.error_alloc_req_cnt_;
+		ans.dealloc_req_cnt_ += one_chms_statistics.dealloc_req_cnt_;
+		ans.error_dealloc_req_cnt_ += one_chms_statistics.error_dealloc_req_cnt_;
+
+		chunk_header_multi_slot* p_nxt_chms = p_cur_chms->p_next_chunk_.load();
+		p_cur_chms                          = p_nxt_chms;
+	}
+
+	return ans;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 general_mem_allocator::general_mem_allocator(
 	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
 	int                           num              //!< [in] array size
@@ -365,6 +538,21 @@ void general_mem_allocator::deallocate(
 	std::free( p_mem );
 
 	return;
+}
+
+/*!
+ * @breif	get statistics
+ */
+std::list<chunk_statistics> general_mem_allocator::get_statistics( void ) const
+{
+	std::list<chunk_statistics> ans;
+
+	for ( int i = 0; i < pr_ch_size_; i++ ) {
+		chunk_statistics tmp_st = up_param_ch_array_[i].up_chunk_lst_->get_statistics();
+		ans.push_back( tmp_st );
+	}
+
+	return ans;
 }
 
 }   // namespace concurrent
