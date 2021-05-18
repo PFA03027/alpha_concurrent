@@ -123,9 +123,9 @@ public:
 
 private:
 	struct free_slot_idx_stack_node {
-		int                                    idx_;
-		std::atomic<free_slot_idx_stack_node*> p_non_free_next_node_;
-		std::atomic<free_slot_idx_stack_node*> p_free_next_node_;
+		int                                    idx_;                    //!< スロット番号
+		std::atomic<free_slot_idx_stack_node*> p_non_free_next_node_;   //!< 使用中スロットスタックの次のノードへのポインタ
+		std::atomic<free_slot_idx_stack_node*> p_free_next_node_;       //!< フリースロットスタックの次のノードへのポインタ
 	};
 
 	param_chunk_allocation alloc_conf_;          //!< allocation configuration paramter. value is corrected internally.
@@ -137,7 +137,7 @@ private:
 	std::atomic<free_slot_idx_stack_node*> non_free_node_stack_head_;   //!< non free slot index node stack
 	std::atomic<free_slot_idx_stack_node*> free_node_stack_head_;       //!< free slot index stack
 
-	std::atomic<int>	hint_idx_;
+	std::atomic<int> hint_idx_;
 
 	void* p_chunk_ = nullptr;   //!< pointer to an allocated memory as a chunk
 
