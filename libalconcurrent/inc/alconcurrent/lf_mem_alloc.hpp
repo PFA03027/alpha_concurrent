@@ -1,11 +1,11 @@
 /*!
  * @file	lf_mem_alloc.hpp
  * @brief	semi lock-free memory allocator
- * @author	alpha
+ * @author	Teruaki Ata
  * @date	Created on 2021/05/12
  * @details
  *
- * Copyright (C) 2021 by alpha <e-mail address>
+ * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
 #ifndef INC_ALCONCURRENT_LF_MEM_ALLOC_HPP_
@@ -17,9 +17,12 @@
 #include <memory>
 
 #include "conf_logger.hpp"
+#include "dynamic_tls.hpp"
+#include "lf_mem_alloc_idx_mgr.hpp"
 
 namespace alpha {
 namespace concurrent {
+
 
 /*!
  * @breif	configuration paramters when allocate chunk
@@ -122,22 +125,12 @@ public:
 	chunk_statistics get_statistics( void ) const;
 
 private:
-	struct free_slot_idx_stack_node {
-		int                                    idx_;                    //!< スロット番号
-		std::atomic<free_slot_idx_stack_node*> p_non_free_next_node_;   //!< 使用中スロットスタックの次のノードへのポインタ
-		std::atomic<free_slot_idx_stack_node*> p_free_next_node_;       //!< フリースロットスタックの次のノードへのポインタ
-	};
-
 	param_chunk_allocation alloc_conf_;          //!< allocation configuration paramter. value is corrected internally.
 	std::size_t            size_of_chunk_ = 0;   //!< size of a chunk
 
 	std::atomic_bool* p_free_slot_mark_ = nullptr;   //!< if slot is free, this is marked as true. This is prior information than free slot idx stack.
 
-	free_slot_idx_stack_node*              p_free_idx_array_;           //!< free slot index node
-	std::atomic<free_slot_idx_stack_node*> non_free_node_stack_head_;   //!< non free slot index node stack
-	std::atomic<free_slot_idx_stack_node*> free_node_stack_head_;       //!< free slot index stack
-
-	std::atomic<int> hint_idx_;
+	internal::idx_mgr free_slot_idx_mgr_;
 
 	void* p_chunk_ = nullptr;   //!< pointer to an allocated memory as a chunk
 

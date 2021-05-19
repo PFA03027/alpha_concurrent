@@ -32,7 +32,7 @@ pthread_barrier_t barrier;
 constexpr int max_slot_size  = 1000;
 constexpr int max_alloc_size = 1200;
 constexpr int num_loop       = 1200;
-constexpr int num_thread     = 2;
+constexpr int num_thread     = 10;
 
 void* one_load( void* )
 {

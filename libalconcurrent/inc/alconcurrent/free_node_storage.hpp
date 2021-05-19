@@ -1,6 +1,6 @@
 /*!
  * @file	free_node_storage.hpp
- * @brief
+ * @brief	free node strage class for lock-free data structure
  * @author	Teruaki Ata
  * @date	Created on 2020/12/31
  * @details

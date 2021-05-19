@@ -1,11 +1,11 @@
 /*!
  * @file	lf_list.hpp
- * @brief
- * @author	alpha
+ * @brief	semi lock-free list
+ * @author	Teruaki Ata
  * @date	Created on 2021/02/23
  * @details
  *
- * Copyright (C) 2021 by alpha <e-mail address>
+ * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
 #ifndef INC_LF_LIST_HPP_

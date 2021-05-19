@@ -1,6 +1,6 @@
 /*!
  * @file	hazard_ptr.hpp
- * @brief
+ * @brief	hazard pointer
  * @author	Teruaki Ata
  * @date	Created on 2020/12/24
  * @details
@@ -105,6 +105,12 @@ public:
 		p_hzd_ptr_node_->clear_hazard_ptr_all();
 	}
 
+	/*!
+	 * @breif	Check whether a pointer is in this hazard list
+	 *
+	 * @retval	true	p_chk_ptr is in this hazard list.
+	 * @retval	false	p_chk_ptr is not in this hazard list.
+	 */
 	bool check_ptr_in_hazard_list( T* p_chk_ptr )
 	{
 		return get_head_instance().check_ptr_in_hazard_list( p_chk_ptr );
