@@ -34,6 +34,11 @@ constexpr int max_alloc_size = 1200;
 constexpr int num_loop       = 1200;
 constexpr int num_thread     = 10;
 
+void write_task( char* p_write )
+{
+	*p_write = 10;
+}
+
 void* one_load( void* )
 {
 	fflush( NULL );
@@ -53,6 +58,11 @@ void* one_load( void* )
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
 			alloc_addr[j] = test_gma.allocate( size_dist( engine ) );
 		}
+
+		for ( int j = 0; j < cur_alloc_num; j++ ) {
+			write_task( reinterpret_cast<char*>( alloc_addr[j] ) );
+		}
+
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
 			test_gma.deallocate( alloc_addr[j] );
 		}
@@ -80,6 +90,11 @@ void* one_load_malloc_free( void* )
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
 			alloc_addr[j] = malloc( size_dist( engine ) );
 		}
+
+		for ( int j = 0; j < cur_alloc_num; j++ ) {
+			write_task( reinterpret_cast<char*>( alloc_addr[j] ) );
+		}
+
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
 			free( alloc_addr[j] );
 		}
@@ -88,102 +103,82 @@ void* one_load_malloc_free( void* )
 	return nullptr;
 }
 
+void load_test_lockfree( int num_of_thd )
+{
+	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_t* threads = new pthread_t[num_of_thd];
+
+	void* dummy = nullptr;
+
+	for ( int i = 0; i < num_of_thd; i++ ) {
+		pthread_create( &threads[i], NULL, one_load, &dummy );
+	}
+	std::cout << "!!!Ready!!!" << std::endl;
+
+	pthread_barrier_wait( &barrier );
+	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
+	std::cout << "!!!GO!!!" << std::endl;
+	fflush( NULL );
+
+	for ( int i = 0; i < num_of_thd; i++ ) {
+		pthread_join( threads[i], nullptr );
+	}
+
+	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
+
+	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
+	std::cout << "thread is " << num_of_thd
+			  << " one_load() Exec time: " << diff.count() << " msec" << std::endl;
+
+	std::list<alpha::concurrent::chunk_statistics> statistics = test_gma.get_statistics();
+
+	for ( auto& e : statistics ) {
+		printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d\n",
+		        (int)e.alloc_conf_.size_of_one_piece_,
+		        (int)e.alloc_conf_.num_of_pieces_,
+		        (int)e.chunk_num_,
+		        (int)e.total_slot_cnt_,
+		        (int)e.free_slot_cnt_,
+		        (int)e.alloc_req_cnt_,
+		        (int)e.error_alloc_req_cnt_,
+		        (int)e.dealloc_req_cnt_,
+		        (int)e.error_dealloc_req_cnt_ );
+	}
+}
+
+void load_test_malloc( int num_of_thd )
+{
+	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_t* threads = new pthread_t[num_of_thd];
+
+	void* dummy = nullptr;
+
+	for ( int i = 0; i < num_of_thd; i++ ) {
+		pthread_create( &threads[i], NULL, one_load_malloc_free, &dummy );
+	}
+	std::cout << "!!!Ready!!!" << std::endl;
+
+	pthread_barrier_wait( &barrier );
+	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
+	std::cout << "!!!GO!!!" << std::endl;
+	fflush( NULL );
+
+	for ( int i = 0; i < num_of_thd; i++ ) {
+		pthread_join( threads[i], nullptr );
+	}
+
+	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
+
+	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
+	std::cout << "thread is " << num_of_thd
+			  << " one_load_malloc_free() Exec time: " << diff.count() << " msec" << std::endl;
+}
+
 void load_test( void )
 {
-
-	{
-		pthread_barrier_init( &barrier, NULL, 1 );
-		std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-
-		one_load( nullptr );
-
-		std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
-
-		std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
-		std::cout << "thread is num_thread"
-				  << " one_load() Exec time: " << diff.count() << " msec" << std::endl;
-	}
-
-	{
-		pthread_barrier_init( &barrier, NULL, 1 );
-		std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-		//	pthread_barrier_wait( &barrier );
-
-		one_load_malloc_free( nullptr );
-
-		std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
-
-		std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
-		std::cout << "thread is num_thread"
-				  << " one_load_malloc_free() Exec time: " << diff.count() << " msec" << std::endl;
-	}
-
-	{
-		pthread_barrier_init( &barrier, NULL, num_thread + 1 );
-		pthread_t* threads = new pthread_t[num_thread];
-
-		void* dummy = nullptr;
-
-		for ( int i = 0; i < num_thread; i++ ) {
-			pthread_create( &threads[i], NULL, one_load, &dummy );
-		}
-		std::cout << "!!!Ready!!!" << std::endl;
-
-		pthread_barrier_wait( &barrier );
-		std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-		std::cout << "!!!GO!!!" << std::endl;
-		fflush( NULL );
-
-		for ( int i = 0; i < num_thread; i++ ) {
-			pthread_join( threads[i], nullptr );
-		}
-
-		std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
-
-		std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
-		std::cout << "thread is " << num_thread
-				  << " one_load() Exec time: " << diff.count() << " msec" << std::endl;
-
-		std::list<alpha::concurrent::chunk_statistics> statistics = test_gma.get_statistics();
-
-		for ( auto& e : statistics ) {
-			printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d\n",
-			        (int)e.alloc_conf_.size_of_one_piece_,
-			        (int)e.alloc_conf_.num_of_pieces_,
-			        (int)e.chunk_num_,
-			        (int)e.total_slot_cnt_,
-			        (int)e.free_slot_cnt_,
-			        (int)e.alloc_req_cnt_,
-			        (int)e.error_alloc_req_cnt_,
-			        (int)e.dealloc_req_cnt_,
-			        (int)e.error_dealloc_req_cnt_ );
-		}
-	}
-	{
-		pthread_barrier_init( &barrier, NULL, num_thread + 1 );
-		pthread_t* threads = new pthread_t[num_thread];
-
-		void* dummy = nullptr;
-
-		for ( int i = 0; i < num_thread; i++ ) {
-			pthread_create( &threads[i], NULL, one_load_malloc_free, &dummy );
-		}
-		std::cout << "!!!Ready!!!" << std::endl;
-
-		pthread_barrier_wait( &barrier );
-		std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-		std::cout << "!!!GO!!!" << std::endl;
-		fflush( NULL );
-
-		for ( int i = 0; i < num_thread; i++ ) {
-			pthread_join( threads[i], nullptr );
-		}
-
-		std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
-
-		std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
-		std::cout << "thread is " << num_thread
-				  << " one_load_malloc_free() Exec time: " << diff.count() << " msec" << std::endl;
-	}
+	load_test_lockfree( 1 );
+	load_test_malloc( 1 );
+	load_test_lockfree( num_thread );
+	load_test_malloc( num_thread );
 	return;
 }

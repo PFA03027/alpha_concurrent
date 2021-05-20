@@ -17,9 +17,6 @@
 #include "alconcurrent/lf_mem_alloc.hpp"
 #include "alconcurrent/lf_mem_alloc_idx_mgr.hpp"
 
-#define ALLOC_ALG1
-//#define ALLOC_ALG2
-
 namespace alpha {
 namespace concurrent {
 
@@ -434,7 +431,8 @@ void* chunk_header_multi_slot::allocate_mem_slot( void )
 
 	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
 
-#ifdef ALLOC_ALG1
+	statistics_alloc_req_cnt_++;
+
 	int read_idx = free_slot_idx_mgr_.pop();
 	if ( read_idx == -1 ) {
 		statistics_alloc_req_err_cnt_++;
@@ -442,30 +440,6 @@ void* chunk_header_multi_slot::allocate_mem_slot( void )
 	}
 
 	p_free_slot_mark_[read_idx].store( false );
-
-#elif defined( ALLOC_ALG2 )
-	statistics_alloc_req_cnt_++;
-	int read_idx = -1;
-	for ( int i = 0; i < num_of_free_chk_try; i++ ) {
-		int  tmp_idx  = hint_idx_.load();
-		int  tmp_idx2 = tmp_idx;
-		bool expect   = true;
-		bool ret      = std::atomic_compare_exchange_strong( &( p_free_slot_mark_[tmp_idx] ), &expect, false );
-		int  expect2  = tmp_idx2 + 1;
-		if ( expect2 >= static_cast<int>( alloc_conf_.num_of_pieces_ ) ) {
-			expect2 = 0;
-		}
-		std::atomic_compare_exchange_strong( &( hint_idx_ ), &tmp_idx2, expect2 );
-		if ( ret ) {
-			read_idx = tmp_idx;
-			break;
-		}
-	}
-	if ( read_idx == -1 ) {
-		statistics_alloc_req_err_cnt_++;
-		return nullptr;
-	}
-#endif
 
 	std::uintptr_t p_ans_addr = reinterpret_cast<std::uintptr_t>( p_chunk_ );
 	p_ans_addr += read_idx * alloc_conf_.size_of_one_piece_;
@@ -516,11 +490,8 @@ bool chunk_header_multi_slot::recycle_mem_slot(
 	}
 
 	// OK. correct address
-#ifdef ALLOC_ALG1
 	free_slot_idx_mgr_.push( idx );
-#elif defined( ALLOC_ALG2 )
 	statistics_dealloc_req_cnt_++;
-#endif
 
 	return true;
 }
