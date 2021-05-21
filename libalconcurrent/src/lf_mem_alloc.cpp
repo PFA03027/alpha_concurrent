@@ -264,6 +264,7 @@ int idx_mgr::pop( void )
 	ans                       = p_valid_pop_element->idx_;
 	p_valid_pop_element->idx_ = -1;
 
+#if 0
 	if ( hzrd_element_.check_ptr_in_hazard_list( p_valid_pop_element ) ) {
 		wait_list.push( p_valid_pop_element );
 	} else {
@@ -273,6 +274,9 @@ int idx_mgr::pop( void )
 			&idx_mgr_element::p_invalid_idx_next_element_,
 			hazard_ptr_idx::PUSH_INV_CUR );
 	}
+#else
+	wait_list.push( p_valid_pop_element );
+#endif
 
 	return ans;
 }
@@ -285,11 +289,16 @@ void idx_mgr::push(
 
 	idx_mgr_element* p_invalid_element       = wait_list.pop();
 	idx_mgr_element* p_invalid_element_first = nullptr;
+	int              ch_cnt                  = 2;
 
 	do {
 		if ( p_invalid_element == nullptr ) {
 			break;
 		}
+		if ( ch_cnt <= 0 ) {
+			break;
+		}
+		ch_cnt--;
 		if ( !hzrd_element_.check_ptr_in_hazard_list( p_invalid_element ) ) {
 			stack_push_element(
 				p_invalid_element,
@@ -577,7 +586,7 @@ void* chunk_list::allocate_mem_slot( void )
 {
 	void* p_ans = nullptr;
 
-	chunk_header_multi_slot* p_cur_chms         = p_top_chunk_.load();
+	chunk_header_multi_slot* p_cur_chms         = p_top_chunk_.load(std::memory_order_acquire);
 	chunk_header_multi_slot* p_1st_rsv_del_chms = nullptr;
 	chunk_header_multi_slot* p_1st_empty_chms   = nullptr;
 	while ( p_cur_chms != nullptr ) {
@@ -585,17 +594,17 @@ void* chunk_list::allocate_mem_slot( void )
 		if ( p_ans != nullptr ) {
 			return p_ans;
 		}
-		if ( p_cur_chms->status_.load() == chunk_control_status::RESERVED_DELETION ) {
+		if ( p_cur_chms->status_.load(std::memory_order_acquire) == chunk_control_status::RESERVED_DELETION ) {
 			if ( p_1st_rsv_del_chms == nullptr ) {
 				p_1st_rsv_del_chms = p_cur_chms;
 			}
 		}
-		if ( p_cur_chms->status_.load() == chunk_control_status::EMPTY ) {
+		if ( p_cur_chms->status_.load(std::memory_order_acquire) == chunk_control_status::EMPTY ) {
 			if ( p_1st_empty_chms == nullptr ) {
 				p_1st_empty_chms = p_cur_chms;
 			}
 		}
-		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load();
+		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load(std::memory_order_acquire);
 		p_cur_chms                           = p_next_chms;
 	}
 
@@ -606,7 +615,7 @@ void* chunk_list::allocate_mem_slot( void )
 				return p_ans;
 			}
 		} else {
-			if ( p_1st_rsv_del_chms->status_.load() == chunk_control_status::NORMAL ) {
+			if ( p_1st_rsv_del_chms->status_.load(std::memory_order_acquire) == chunk_control_status::NORMAL ) {
 				p_ans = p_1st_rsv_del_chms->allocate_mem_slot();
 				if ( p_ans != nullptr ) {
 					return p_ans;
@@ -622,7 +631,7 @@ void* chunk_list::allocate_mem_slot( void )
 				return p_ans;
 			}
 		} else {
-			if ( p_1st_empty_chms->status_.load() == chunk_control_status::NORMAL ) {
+			if ( p_1st_empty_chms->status_.load(std::memory_order_acquire) == chunk_control_status::NORMAL ) {
 				p_ans = p_1st_empty_chms->allocate_mem_slot();
 				if ( p_ans != nullptr ) {
 					return p_ans;
@@ -637,7 +646,7 @@ void* chunk_list::allocate_mem_slot( void )
 
 	chunk_header_multi_slot* p_cur_top = nullptr;
 	do {
-		p_cur_top = p_top_chunk_.load();
+		p_cur_top = p_top_chunk_.load(std::memory_order_acquire);
 		p_new_chms->p_next_chunk_.store( p_cur_top );
 	} while ( !std::atomic_compare_exchange_strong( &p_top_chunk_, &p_cur_top, p_new_chms ) );
 
@@ -648,11 +657,11 @@ bool chunk_list::recycle_mem_slot(
 	void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
 )
 {
-	chunk_header_multi_slot* p_cur_chms = p_top_chunk_.load();
+	chunk_header_multi_slot* p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
 	while ( p_cur_chms != nullptr ) {
 		bool ret = p_cur_chms->recycle_mem_slot( p_recycle_slot );
 		if ( ret ) return true;
-		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load();
+		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
 		p_cur_chms                           = p_next_chms;
 	}
 

@@ -71,6 +71,38 @@ void* one_load( void* )
 	return nullptr;
 }
 
+void* one_load_malloc_free2( void* )
+{
+	fflush( NULL );
+	std::random_device seed_gen;
+	std::mt19937       engine( seed_gen() );
+
+	// 0以上9以下の値を等確率で発生させる
+	std::uniform_int_distribution<> num_dist( 0, max_slot_size - 1 );
+	std::uniform_int_distribution<> size_dist( 1024 + 1, 1024 + max_alloc_size );
+
+	void* alloc_addr[max_slot_size];
+
+	pthread_barrier_wait( &barrier );
+
+	for ( int i = 0; i < num_loop; i++ ) {
+		int cur_alloc_num = num_dist( engine );
+		for ( int j = 0; j < cur_alloc_num; j++ ) {
+			alloc_addr[j] = test_gma.allocate( size_dist( engine ) );
+		}
+
+		for ( int j = 0; j < cur_alloc_num; j++ ) {
+			write_task( reinterpret_cast<char*>( alloc_addr[j] ) );
+		}
+
+		for ( int j = 0; j < cur_alloc_num; j++ ) {
+			test_gma.deallocate( alloc_addr[j] );
+		}
+	}
+
+	return nullptr;
+}
+
 void* one_load_malloc_free( void* )
 {
 	fflush( NULL );
@@ -97,6 +129,36 @@ void* one_load_malloc_free( void* )
 
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
 			free( alloc_addr[j] );
+		}
+	}
+
+	return nullptr;
+}
+
+void* one_load_empty( void* )
+{
+	fflush( NULL );
+	std::random_device seed_gen;
+	std::mt19937       engine( seed_gen() );
+
+	// 0以上9以下の値を等確率で発生させる
+	std::uniform_int_distribution<> num_dist( 0, max_slot_size - 1 );
+	std::uniform_int_distribution<> size_dist( 1, max_alloc_size );
+	char                            y;
+
+	pthread_barrier_wait( &barrier );
+
+	for ( int i = 0; i < num_loop; i++ ) {
+		int cur_alloc_num = num_dist( engine );
+		for ( int j = 0; j < cur_alloc_num; j++ ) {
+			write_task( &y );
+		}
+
+		for ( int j = 0; j < cur_alloc_num; j++ ) {
+		}
+
+		for ( int j = 0; j < cur_alloc_num; j++ ) {
+			write_task( &y );
 		}
 	}
 
@@ -154,7 +216,7 @@ void load_test_malloc( int num_of_thd )
 	void* dummy = nullptr;
 
 	for ( int i = 0; i < num_of_thd; i++ ) {
-		pthread_create( &threads[i], NULL, one_load_malloc_free, &dummy );
+		pthread_create( &threads[i], NULL, one_load_malloc_free2, &dummy );
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
 
@@ -171,14 +233,44 @@ void load_test_malloc( int num_of_thd )
 
 	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
 	std::cout << "thread is " << num_of_thd
-			  << " one_load_malloc_free() Exec time: " << diff.count() << " msec" << std::endl;
+			  << " one_load_malloc_free2() Exec time: " << diff.count() << " msec" << std::endl;
+}
+
+void load_test_empty( int num_of_thd )
+{
+	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_t* threads = new pthread_t[num_of_thd];
+
+	void* dummy = nullptr;
+
+	for ( int i = 0; i < num_of_thd; i++ ) {
+		pthread_create( &threads[i], NULL, one_load_empty, &dummy );
+	}
+	std::cout << "!!!Ready!!!" << std::endl;
+
+	pthread_barrier_wait( &barrier );
+	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
+	std::cout << "!!!GO!!!" << std::endl;
+	fflush( NULL );
+
+	for ( int i = 0; i < num_of_thd; i++ ) {
+		pthread_join( threads[i], nullptr );
+	}
+
+	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
+
+	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
+	std::cout << "thread is " << num_of_thd
+			  << " load_test_empty() Exec time: " << diff.count() << " msec" << std::endl;
 }
 
 void load_test( void )
 {
-	load_test_lockfree( 1 );
+	load_test_empty( 1 );
 	load_test_malloc( 1 );
-	load_test_lockfree( num_thread );
+	load_test_lockfree( 1 );
+	load_test_empty( num_thread );
 	load_test_malloc( num_thread );
+	load_test_lockfree( num_thread );
 	return;
 }
