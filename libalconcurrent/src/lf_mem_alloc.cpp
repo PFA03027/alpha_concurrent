@@ -31,6 +31,38 @@ idx_mgr_element::idx_mgr_element( void )
 	return;
 }
 
+/*!
+ * @breif	dump for debug
+ */
+void idx_mgr_element::dump( void ) const
+{
+	char buf[2048];
+	snprintf( buf, 2047,
+	          "object idx_mgr_element_%p as %p {\n"
+	          "\t idx_ = %d\n"
+	          "\t p_invalid_idx_next_element_ = %p\n"
+	          "\t p_valid_idx_next_element_ = %p\n"
+	          "\t p_waiting_next_element_ = %p\n"
+	          "}\n",
+	          this, this,
+	          idx_,
+	          p_invalid_idx_next_element_.load(),
+	          p_valid_idx_next_element_.load(),
+	          p_waiting_next_element_ );
+	LogOutput( log_type::DUMP, buf );
+
+	snprintf( buf, 2047,
+	          "%p --> %p : invalid\n"
+	          "%p --> %p : valid\n"
+	          "%p --> %p : waiting\n",
+	          this, p_invalid_idx_next_element_.load(),
+	          this, p_valid_idx_next_element_.load(),
+	          this, p_waiting_next_element_ );
+	LogOutput( log_type::DUMP, buf );
+
+	return;
+}
+
 waiting_element_list::waiting_element_list( const int idx_buff_size_arg )
   : head_( nullptr )
   , tail_( nullptr )
@@ -112,6 +144,59 @@ void waiting_element_list::push_to_tls( const int valid_idx )
 
 	p_idx_buff_[idx_top_idx_] = valid_idx;
 	idx_top_idx_++;
+
+	return;
+}
+
+void waiting_element_list::dump( void ) const
+{
+	char buf[2048];
+
+	snprintf( buf, 2047,
+	          "object waiting_element_list_%p as %p {\n"
+	          "\t head_ = %p\n"
+	          "\t tail_ = %p\n"
+	          "\t idx_buff_size_ = %d\n"
+	          "\t idx_top_idx_ = %d\n"
+	          "\t p_idx_buff_ = %p\n"
+	          "}\n",
+	          this, this,
+	          head_,
+	          tail_,
+	          idx_buff_size_,
+	          idx_top_idx_,
+	          p_idx_buff_ );
+	LogOutput( log_type::DUMP, buf );
+
+	if ( p_idx_buff_ != nullptr ) {
+		snprintf( buf, 2047,
+		          "object p_idx_buff_%p as %p {\n",
+		          this, this );
+		LogOutput( log_type::DUMP, buf );
+
+		for ( int i = 0; i < idx_buff_size_; i++ ) {
+			snprintf( buf, 2047,
+			          "\t %d => %d\n",
+			          i, p_idx_buff_[i] );
+			LogOutput( log_type::DUMP, buf );
+		}
+
+		LogOutput( log_type::DUMP, "}\n" );
+	}
+
+	if ( head_ != nullptr ) {
+		snprintf( buf, 2047,
+		          "%p --> %p\n",
+		          this, head_ );
+		LogOutput( log_type::DUMP, buf );
+	}
+
+	if ( tail_ != nullptr ) {
+		snprintf( buf, 2047,
+		          "%p --> %p\n",
+		          this, tail_ );
+		LogOutput( log_type::DUMP, buf );
+	}
 
 	return;
 }
@@ -336,6 +421,49 @@ void idx_mgr::push(
 	return;
 }
 
+void idx_mgr::dump( void )
+{
+	char buf[2048];
+
+	const waiting_element_list& tmp_wel = tls_waiting_list_.get_tls_instance( idx_size_ );
+
+	snprintf( buf, 2047,
+	          "object idx_mgr_%p as %p {\n"
+	          "\t idx_size_ = %d\n"
+	          "\t invalid_element_stack_head_ = %p\n"
+	          "\t valid_element_stack_head_ = %p\n"
+	          "\t waiting_element_list = %p\n"
+	          "\t hzrd_element_ = (not implemented)\n"
+	          "}\n",
+	          this, this,
+	          idx_size_,
+	          invalid_element_stack_head_.load(),
+	          valid_element_stack_head_.load(),
+	          &tmp_wel );
+	LogOutput( log_type::DUMP, buf );
+
+	snprintf( buf, 2047,
+	          "%p --> %p \n"
+	          "%p --> %p \n"
+	          "%p --> %p \n"
+	          "%p --> %p \n",
+	          this, p_idx_mgr_element_array_,
+	          this, invalid_element_stack_head_.load(),
+	          this, valid_element_stack_head_.load(),
+	          this, &tmp_wel );
+	LogOutput( log_type::DUMP, buf );
+
+	if ( p_idx_mgr_element_array_ != nullptr ) {
+		for ( int i = 0; i < idx_size_; i++ ) {
+			p_idx_mgr_element_array_[i].dump();
+		}
+	}
+
+	tmp_wel.dump();
+
+	return;
+}
+
 }   // namespace internal
 
 constexpr int num_of_free_chk_try = 10;
@@ -460,7 +588,7 @@ bool chunk_header_multi_slot::recycle_mem_slot(
 	void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
 )
 {
-	switch ( status_.load() ) {
+	switch ( status_.load( std::memory_order_acquire ) ) {
 		default:
 		case chunk_control_status::EMPTY:
 		case chunk_control_status::RESERVED_ALLOCATION:
@@ -560,6 +688,48 @@ chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
 	return ans;
 }
 
+/*!
+ * @breif	dump for debug
+ */
+void chunk_header_multi_slot::dump( void )
+{
+	char buf[2048];
+
+	if ( p_chunk_ != nullptr ) {
+		snprintf( buf, 2047,
+		          "object chunk_%p as %p \n",
+		          p_chunk_, p_chunk_ );
+	}
+
+	if ( p_free_slot_mark_ != nullptr ) {
+		snprintf( buf, 2047,
+		          "object p_free_slot_mark_%p as %p \n",
+		          p_free_slot_mark_, p_free_slot_mark_ );
+	}
+
+	snprintf( buf, 2047,
+	          "object chunk_header_multi_slot_%p as %p {\n"
+	          "\t alloc_conf_.size_of_one_piece_ = %zu \n"
+	          "\t alloc_conf_.num_of_pieces_ = %zu \n"
+	          "\t size_of_chunk_ = %zu \n"
+	          "\t p_free_slot_mark_ = %p \n"
+	          "\t p_chunk_ = %p \n"
+	          "\t free_slot_idx_mgr_ = %p \n"
+	          "}\n",
+	          this, this,
+	          alloc_conf_.size_of_one_piece_,
+	          alloc_conf_.num_of_pieces_,
+	          size_of_chunk_,
+	          p_free_slot_mark_,
+	          p_chunk_,
+	          &free_slot_idx_mgr_ );
+	LogOutput( log_type::DUMP, buf );
+
+	free_slot_idx_mgr_.dump();
+
+	return;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 chunk_list::chunk_list(
 	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
@@ -586,7 +756,7 @@ void* chunk_list::allocate_mem_slot( void )
 {
 	void* p_ans = nullptr;
 
-	chunk_header_multi_slot* p_cur_chms         = p_top_chunk_.load(std::memory_order_acquire);
+	chunk_header_multi_slot* p_cur_chms         = p_top_chunk_.load( std::memory_order_acquire );
 	chunk_header_multi_slot* p_1st_rsv_del_chms = nullptr;
 	chunk_header_multi_slot* p_1st_empty_chms   = nullptr;
 	while ( p_cur_chms != nullptr ) {
@@ -594,17 +764,17 @@ void* chunk_list::allocate_mem_slot( void )
 		if ( p_ans != nullptr ) {
 			return p_ans;
 		}
-		if ( p_cur_chms->status_.load(std::memory_order_acquire) == chunk_control_status::RESERVED_DELETION ) {
+		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::RESERVED_DELETION ) {
 			if ( p_1st_rsv_del_chms == nullptr ) {
 				p_1st_rsv_del_chms = p_cur_chms;
 			}
 		}
-		if ( p_cur_chms->status_.load(std::memory_order_acquire) == chunk_control_status::EMPTY ) {
+		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::EMPTY ) {
 			if ( p_1st_empty_chms == nullptr ) {
 				p_1st_empty_chms = p_cur_chms;
 			}
 		}
-		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load(std::memory_order_acquire);
+		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
 		p_cur_chms                           = p_next_chms;
 	}
 
@@ -615,7 +785,7 @@ void* chunk_list::allocate_mem_slot( void )
 				return p_ans;
 			}
 		} else {
-			if ( p_1st_rsv_del_chms->status_.load(std::memory_order_acquire) == chunk_control_status::NORMAL ) {
+			if ( p_1st_rsv_del_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
 				p_ans = p_1st_rsv_del_chms->allocate_mem_slot();
 				if ( p_ans != nullptr ) {
 					return p_ans;
@@ -631,7 +801,7 @@ void* chunk_list::allocate_mem_slot( void )
 				return p_ans;
 			}
 		} else {
-			if ( p_1st_empty_chms->status_.load(std::memory_order_acquire) == chunk_control_status::NORMAL ) {
+			if ( p_1st_empty_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
 				p_ans = p_1st_empty_chms->allocate_mem_slot();
 				if ( p_ans != nullptr ) {
 					return p_ans;
@@ -646,7 +816,7 @@ void* chunk_list::allocate_mem_slot( void )
 
 	chunk_header_multi_slot* p_cur_top = nullptr;
 	do {
-		p_cur_top = p_top_chunk_.load(std::memory_order_acquire);
+		p_cur_top = p_top_chunk_.load( std::memory_order_acquire );
 		p_new_chms->p_next_chunk_.store( p_cur_top );
 	} while ( !std::atomic_compare_exchange_strong( &p_top_chunk_, &p_cur_top, p_new_chms ) );
 

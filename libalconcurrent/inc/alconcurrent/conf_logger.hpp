@@ -23,11 +23,12 @@ namespace concurrent {
  * @breif	log type that is used by this library
  */
 enum class log_type {
-	ERR,
-	WARN,
-	INFO,
-	DEBUG,
-	TEST
+	ERR,     //!< Log type is Error
+	WARN,    //!< Log type is Warning
+	INFO,    //!< Log type is Information
+	DEBUG,   //!< Log type is debug level
+	TEST,    //!< Log type is for test purpose
+	DUMP     //!< Log type is dump data for debug purpose by dump() api.
 };
 
 /*!
@@ -54,7 +55,7 @@ public:
 namespace internal {
 extern logger_if_abst* p_concrete_logger_if;
 
-#if ( __cplusplus >= 201402L /* check C++14 */) && defined(__cpp_constexpr)
+#if ( __cplusplus >= 201402L /* check C++14 */ ) && defined( __cpp_constexpr )
 constexpr
 #else
 inline
@@ -84,6 +85,12 @@ inline
 #ifdef CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST
 			ans = true;
 #endif
+			break;
+		case log_type::DUMP:
+#ifdef CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP
+			ans = true;
+#endif
+			break;
 		default:
 			break;
 	}

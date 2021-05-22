@@ -40,6 +40,7 @@ struct idx_mgr_element {
 	idx_mgr_element*              p_waiting_next_element_;       //!< ハザードポインタに登録されている間保持しておくスレッドローカルリストで使用する次のノードへのポインタ
 
 	idx_mgr_element( void );
+	void dump( void ) const;
 };
 
 /*!
@@ -58,6 +59,8 @@ public:
 
 	int  pop_from_tls( void );
 	void push_to_tls( const int valid_idx );
+
+	void dump( void ) const;
 
 private:
 	idx_mgr_element* head_;
@@ -113,6 +116,11 @@ struct idx_mgr {
 	void push(
 		const int idx_arg   //!< [in] 返却するインデックス番号
 	);
+
+	/*!
+	 * @breif	dump for debug
+	 */
+	void dump( void );
 
 private:
 	static constexpr int hzrd_max_slot_ = 6;

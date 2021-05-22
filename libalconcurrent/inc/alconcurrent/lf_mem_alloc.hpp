@@ -23,7 +23,6 @@
 namespace alpha {
 namespace concurrent {
 
-
 /*!
  * @breif	configuration paramters when allocate chunk
  */
@@ -123,6 +122,11 @@ public:
 	 * @breif	get statistics
 	 */
 	chunk_statistics get_statistics( void ) const;
+
+	/*!
+	 * @breif	dump for debug
+	 */
+	void dump( void );
 
 private:
 	param_chunk_allocation alloc_conf_;          //!< allocation configuration paramter. value is corrected internally.
