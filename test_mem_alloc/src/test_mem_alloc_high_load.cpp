@@ -77,7 +77,7 @@ void one_chunk_load( void )
 
 	void* alloc_addr[max_slot_size];
 
-	static alpha::concurrent::param_chunk_allocation param = { 256, 2000 };
+	static alpha::concurrent::param_chunk_allocation param = { 256, 20 };
 
 	alpha::concurrent::chunk_header_multi_slot chms( param );
 
@@ -85,7 +85,7 @@ void one_chunk_load( void )
 
 	//	for ( int i = 0; i < num_loop; i++ ) {
 	for ( int i = 0; i < 1; i++ ) {
-		int cur_alloc_num = 1000;
+		int cur_alloc_num = 15;
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
 			alloc_addr[j] = chms.allocate_mem_slot();
 		}
@@ -116,7 +116,7 @@ void one_chunk_load( void )
 	        (int)e.dealloc_req_cnt_,
 	        (int)e.error_dealloc_req_cnt_ );
 
-	chms.dump();
+	//	chms.dump();
 
 	return;
 }
@@ -349,7 +349,7 @@ void load_test_empty( int num_of_thd )
 void load_test( void )
 {
 	one_chunk_load();
-#if 0
+#if 1
 	load_test_empty( 1 );
 	load_test_malloc( 1 );
 	load_test_lockfree( 1 );

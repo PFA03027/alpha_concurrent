@@ -51,14 +51,26 @@ void idx_mgr_element::dump( void ) const
 	          p_waiting_next_element_ );
 	LogOutput( log_type::DUMP, buf );
 
-	snprintf( buf, 2047,
-	          "%p --> %p : invalid\n"
-	          "%p --> %p : valid\n"
-	          "%p --> %p : waiting\n",
-	          this, p_invalid_idx_next_element_.load(),
-	          this, p_valid_idx_next_element_.load(),
-	          this, p_waiting_next_element_ );
-	LogOutput( log_type::DUMP, buf );
+	if ( p_invalid_idx_next_element_.load() != nullptr ) {
+		snprintf( buf, 2047,
+		          "%p --> %p : invalid\n",
+		          this, p_invalid_idx_next_element_.load() );
+		LogOutput( log_type::DUMP, buf );
+	}
+
+	if ( p_valid_idx_next_element_.load() != nullptr ) {
+		snprintf( buf, 2047,
+		          "%p --> %p : valid\n",
+		          this, p_valid_idx_next_element_.load() );
+		LogOutput( log_type::DUMP, buf );
+	}
+
+	if ( p_waiting_next_element_ != nullptr ) {
+		snprintf( buf, 2047,
+		          "%p --> %p : waiting\n",
+		          this, p_waiting_next_element_ );
+		LogOutput( log_type::DUMP, buf );
+	}
 
 	return;
 }
@@ -230,7 +242,10 @@ void idx_mgr::set_idx_size( const int idx_size_arg )
 	if ( idx_size_arg <= 0 ) {
 		idx_size_ = -1;
 		delete[] p_idx_mgr_element_array_;
+		p_idx_mgr_element_array_ = nullptr;
+		return;
 	}
+
 	if ( p_idx_mgr_element_array_ == nullptr ) {
 		p_idx_mgr_element_array_ = new idx_mgr_element[idx_size_arg];
 	} else {
@@ -376,14 +391,7 @@ void idx_mgr::push(
 	idx_mgr_element* p_invalid_element_first = nullptr;
 	int              ch_cnt                  = 2;
 
-	do {
-		if ( p_invalid_element == nullptr ) {
-			break;
-		}
-		if ( ch_cnt <= 0 ) {
-			break;
-		}
-		ch_cnt--;
+	while ( p_invalid_element != nullptr ) {
 		if ( !hzrd_element_.check_ptr_in_hazard_list( p_invalid_element ) ) {
 			stack_push_element(
 				p_invalid_element,
@@ -396,8 +404,12 @@ void idx_mgr::push(
 			}
 			wait_list.push( p_invalid_element );
 		}
+		if ( ch_cnt <= 0 ) {
+			break;
+		}
+		ch_cnt--;
 		p_invalid_element = wait_list.pop();
-	} while ( p_invalid_element != p_invalid_element_first );
+	}
 
 	p_invalid_element = stack_pop_element(
 		invalid_element_stack_head_,
@@ -442,14 +454,29 @@ void idx_mgr::dump( void )
 	          &tmp_wel );
 	LogOutput( log_type::DUMP, buf );
 
+	if ( p_idx_mgr_element_array_ != nullptr ) {
+		snprintf( buf, 2047,
+		          "%p --> %p \n",
+		          this, p_idx_mgr_element_array_ );
+		LogOutput( log_type::DUMP, buf );
+	}
+
+	if ( invalid_element_stack_head_.load() != nullptr ) {
+		snprintf( buf, 2047,
+		          "%p --> %p \n",
+		          this, invalid_element_stack_head_.load() );
+		LogOutput( log_type::DUMP, buf );
+	}
+
+	if ( valid_element_stack_head_.load() != nullptr ) {
+		snprintf( buf, 2047,
+		          "%p --> %p \n",
+		          this, valid_element_stack_head_.load() );
+		LogOutput( log_type::DUMP, buf );
+	}
+
 	snprintf( buf, 2047,
-	          "%p --> %p \n"
-	          "%p --> %p \n"
-	          "%p --> %p \n"
 	          "%p --> %p \n",
-	          this, p_idx_mgr_element_array_,
-	          this, invalid_element_stack_head_.load(),
-	          this, valid_element_stack_head_.load(),
 	          this, &tmp_wel );
 	LogOutput( log_type::DUMP, buf );
 
@@ -551,6 +578,9 @@ bool chunk_header_multi_slot::alloc_new_chunk( void )
 
 	if ( p_free_slot_mark_ == nullptr ) {
 		p_free_slot_mark_ = new std::atomic_bool[alloc_conf_.num_of_pieces_];
+		for ( std::size_t i = 0; i < alloc_conf_.num_of_pieces_; i++ ) {
+			p_free_slot_mark_[i].store( true );
+		}
 	}
 
 	size_of_chunk_ = tmp_size;
@@ -664,6 +694,9 @@ bool chunk_header_multi_slot::exec_deletion( void )
 	std::free( p_chunk_ );
 	p_chunk_ = nullptr;
 
+	delete[] p_free_slot_mark_;
+	p_free_slot_mark_ = nullptr;
+
 	status_.store( chunk_control_status::EMPTY );
 
 	return true;
@@ -699,12 +732,22 @@ void chunk_header_multi_slot::dump( void )
 		snprintf( buf, 2047,
 		          "object chunk_%p as %p \n",
 		          p_chunk_, p_chunk_ );
+		LogOutput( log_type::DUMP, buf );
 	}
 
 	if ( p_free_slot_mark_ != nullptr ) {
 		snprintf( buf, 2047,
-		          "object p_free_slot_mark_%p as %p \n",
+		          "object p_free_slot_mark_%p as %p {\n",
 		          p_free_slot_mark_, p_free_slot_mark_ );
+		LogOutput( log_type::DUMP, buf );
+
+		for ( std::size_t i = 0; i < alloc_conf_.num_of_pieces_; i++ ) {
+			snprintf( buf, 2047,
+			          "%zu = %s \n",
+			          i, p_free_slot_mark_[i].load() ? "true" : "false" );
+			LogOutput( log_type::DUMP, buf );
+		}
+		LogOutput( log_type::DUMP, "}\n" );
 	}
 
 	snprintf( buf, 2047,
