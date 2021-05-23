@@ -80,6 +80,8 @@ After allocation, this class may be lock free. This depends whether pthread_gets
 
 # general memory allocator class that is semi lock-free in lf_mem_alloc.hpp
 This is general memory allocator.
+The current implementation does not perform well. The only advantage is that it is semi-lock free.
+In addition, the function to actively release the memory area to the OS has not been implemented.
 
 # Important points
 Whether the provided class is lock-free depends on whether the POSIX API for thread-local storage is lock-free.

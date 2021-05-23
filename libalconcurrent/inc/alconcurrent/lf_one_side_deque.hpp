@@ -1,11 +1,11 @@
 /*!
  * @file	lf_one_side_deque.hpp
  * @brief	semi Lock free one side deque
- * @author	alpha
+ * @author	Teruaki Ata
  * @date	Created on 2021/03/19
  * @details
  *
- * Copyright (C) 2021 by alpha <e-mail address>
+ * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
 #ifndef INC_LF_ONE_SIDE_DEQUE_HPP_

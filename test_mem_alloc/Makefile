@@ -1,7 +1,7 @@
 
 include ../common.mk
 
-CXXFLAGS +=	-c -MMD -MP $(CXX_STD) -O2 -g -Wall -I../libalconcurrent/inc -I../libalconcurrent/src
+CXXFLAGS +=	-c -MMD -MP $(CXX_STD) -g -O2 -Wall -I../libalconcurrent/inc -I../libalconcurrent/src
 
 SRCS := $(wildcard src/*.cpp)
 OBJS := $(SRCS:%.cpp=%.o)

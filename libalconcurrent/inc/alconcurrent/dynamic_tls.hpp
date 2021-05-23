@@ -13,7 +13,7 @@
  *
  * また、クラスメンバ変数や、動的に確保することはできないため、POSIX thread local storage APIを使用して、動的に確保できるスレッドローカルストレージクラスを用意する。
  *
- * Copyright (C) 2021 by alpha <e-mail address>
+ * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
 #ifndef SRC_DYNAMIC_TLS_HPP_

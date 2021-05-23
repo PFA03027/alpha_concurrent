@@ -59,6 +59,19 @@ void test_chunk_header_multi_slot( void )
 		exit( 1 );
 	}
 
+	alpha::concurrent::chunk_statistics e = p_chms->get_statistics();
+
+	printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d\n",
+	        (int)e.alloc_conf_.size_of_one_piece_,
+	        (int)e.alloc_conf_.num_of_pieces_,
+	        (int)e.chunk_num_,
+	        (int)e.total_slot_cnt_,
+	        (int)e.free_slot_cnt_,
+	        (int)e.alloc_req_cnt_,
+	        (int)e.error_alloc_req_cnt_,
+	        (int)e.dealloc_req_cnt_,
+	        (int)e.error_dealloc_req_cnt_ );
+
 	delete p_chms;
 }
 
@@ -104,6 +117,19 @@ void test_chunk_list( void )
 		std::cout << "NGGGGGGgggggg #7 !" << std::endl;
 		exit( 1 );
 	}
+
+	alpha::concurrent::chunk_statistics e = p_ch_lst->get_statistics();
+
+	printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d\n",
+	        (int)e.alloc_conf_.size_of_one_piece_,
+	        (int)e.alloc_conf_.num_of_pieces_,
+	        (int)e.chunk_num_,
+	        (int)e.total_slot_cnt_,
+	        (int)e.free_slot_cnt_,
+	        (int)e.alloc_req_cnt_,
+	        (int)e.error_alloc_req_cnt_,
+	        (int)e.dealloc_req_cnt_,
+	        (int)e.error_dealloc_req_cnt_ );
 
 	delete p_ch_lst;
 }
@@ -151,6 +177,7 @@ int main( void )
 
 	test_chunk_header_multi_slot();
 	test_chunk_list();
+	test_general_mem_allocator();
 
 	load_test();
 
