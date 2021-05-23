@@ -364,19 +364,7 @@ int idx_mgr::pop( void )
 	ans                       = p_valid_pop_element->idx_;
 	p_valid_pop_element->idx_ = -1;
 
-#if 0
-	if ( hzrd_element_.check_ptr_in_hazard_list( p_valid_pop_element ) ) {
-		wait_list.push( p_valid_pop_element );
-	} else {
-		stack_push_element(
-			p_valid_pop_element,
-			invalid_element_stack_head_,
-			&idx_mgr_element::p_invalid_idx_next_element_,
-			hazard_ptr_idx::PUSH_INV_CUR );
-	}
-#else
 	wait_list.push( p_valid_pop_element );
-#endif
 
 	return ans;
 }
