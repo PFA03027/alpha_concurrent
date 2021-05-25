@@ -639,7 +639,7 @@ bool chunk_header_multi_slot::recycle_mem_slot(
 	if ( !result ) {
 		// double free has occured.
 		LogOutput( log_type::ERR, "double free has occured." );
-		fflush( NULL );
+		//		fflush( NULL );
 		statistics_dealloc_req_err_cnt_++;
 		return true;
 	}
