@@ -75,7 +75,7 @@ void one_chunk_load( void )
 
 	alpha::concurrent::chunk_statistics e = chms.get_statistics();
 
-	printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d\n",
+	printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d\n",
 	        (int)e.alloc_conf_.size_of_one_piece_,
 	        (int)e.alloc_conf_.num_of_pieces_,
 	        (int)e.chunk_num_,
@@ -84,7 +84,10 @@ void one_chunk_load( void )
 	        (int)e.alloc_req_cnt_,
 	        (int)e.error_alloc_req_cnt_,
 	        (int)e.dealloc_req_cnt_,
-	        (int)e.error_dealloc_req_cnt_ );
+	        (int)e.error_dealloc_req_cnt_,
+	        (int)e.alloc_collision_cnt_,
+	        (int)e.dealloc_collision_cnt_
+			);
 
 	//	chms.dump();
 
@@ -386,7 +389,7 @@ void load_test_lockfree( int num_of_thd )
 	std::list<alpha::concurrent::chunk_statistics> statistics = test_gma.get_statistics();
 
 	for ( auto& e : statistics ) {
-		printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d\n",
+		printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d\n",
 		        (int)e.alloc_conf_.size_of_one_piece_,
 		        (int)e.alloc_conf_.num_of_pieces_,
 		        (int)e.chunk_num_,
@@ -395,7 +398,10 @@ void load_test_lockfree( int num_of_thd )
 		        (int)e.alloc_req_cnt_,
 		        (int)e.error_alloc_req_cnt_,
 		        (int)e.dealloc_req_cnt_,
-		        (int)e.error_dealloc_req_cnt_ );
+		        (int)e.error_dealloc_req_cnt_,
+		        (int)e.alloc_collision_cnt_,
+		        (int)e.dealloc_collision_cnt_
+				);
 	}
 }
 
@@ -457,7 +463,7 @@ void load_test_lockfree_min2( int num_of_thd )
 	std::list<alpha::concurrent::chunk_statistics> statistics = test_free_gma.get_statistics();
 
 	for ( auto& e : statistics ) {
-		printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d\n",
+		printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d\n",
 		        (int)e.alloc_conf_.size_of_one_piece_,
 		        (int)e.alloc_conf_.num_of_pieces_,
 		        (int)e.chunk_num_,
@@ -466,7 +472,10 @@ void load_test_lockfree_min2( int num_of_thd )
 		        (int)e.alloc_req_cnt_,
 		        (int)e.error_alloc_req_cnt_,
 		        (int)e.dealloc_req_cnt_,
-		        (int)e.error_dealloc_req_cnt_ );
+		        (int)e.error_dealloc_req_cnt_,
+		        (int)e.alloc_collision_cnt_,
+		        (int)e.dealloc_collision_cnt_
+				);
 	}
 }
 

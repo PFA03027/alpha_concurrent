@@ -224,6 +224,9 @@ idx_mgr::idx_mgr(
   , invalid_element_stack_head_( nullptr )
   , valid_element_stack_head_( nullptr )
 {
+	collision_cnt_invalid_stack_.store( 0 );
+	collision_cnt_valid_stack_.store( 0 );
+
 	if ( idx_size_ < 0 ) return;
 
 	tls_waiting_list_.get_tls_instance( idx_size_ );
@@ -271,21 +274,12 @@ void idx_mgr::set_idx_size( const int idx_size_arg )
 	return;
 }
 
-/*!
- * @breif	利用可能なインデックス番号を取り出す。
- *
- * @return	利用可能なインデックス番号
- * @retval	-1	利用可能なインデックス番号がない
- *
- * @note
- * このI/Fはスレッドセーフで、ロックフリーです。
- */
 idx_mgr_element* idx_mgr::stack_pop_element(
-	std::atomic<idx_mgr_element*>& head_,                               //!< [in] reference of atomic pointer to stack head
-	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next,             //!< [in] member pointer that points to next element
-	const hazard_ptr_idx                            hzd_pop_cur_slot,   //!< [in] hazard pointer slot to store pop current pointer
-	const hazard_ptr_idx                            hzd_pop_next_slot   //!< [in] hazard pointer slot to store pop next pointer
-)
+	std::atomic<idx_mgr_element*>& head_,                                //!< [in] reference of atomic pointer to stack head
+	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next,              //!< [in] member pointer that points to next element
+	const hazard_ptr_idx                            hzd_pop_cur_slot,    //!< [in] hazard pointer slot to store pop current pointer
+	const hazard_ptr_idx                            hzd_pop_next_slot,   //!< [in] hazard pointer slot to store pop next pointer
+	std::atomic<int>&                               cl_cnt )
 {
 	scoped_hazard_ref scoped_ref_first( hzrd_element_, (int)hzd_pop_cur_slot );
 	scoped_hazard_ref scoped_ref_next( hzrd_element_, (int)hzd_pop_next_slot );
@@ -293,7 +287,10 @@ idx_mgr_element* idx_mgr::stack_pop_element(
 	while ( true ) {
 		idx_mgr_element* p_cur_first = head_.load( std::memory_order_acquire );
 		scoped_ref_first.regist_ptr_as_hazard_ptr( p_cur_first );
-		if ( p_cur_first != head_.load( std::memory_order_acquire ) ) continue;
+		if ( p_cur_first != head_.load( std::memory_order_acquire ) ) {
+			cl_cnt++;
+			continue;
+		}
 
 		if ( p_cur_first == nullptr ) {
 			// stackは空。
@@ -302,7 +299,10 @@ idx_mgr_element* idx_mgr::stack_pop_element(
 
 		idx_mgr_element* p_cur_next = ( p_cur_first->*p_next ).load();
 		scoped_ref_next.regist_ptr_as_hazard_ptr( p_cur_next );
-		if ( p_cur_next != ( p_cur_first->*p_next ).load() ) continue;
+		if ( p_cur_next != ( p_cur_first->*p_next ).load() ) {
+			cl_cnt++;
+			continue;
+		}
 
 		// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
 		// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
@@ -311,16 +311,17 @@ idx_mgr_element* idx_mgr::stack_pop_element(
 			// ただし、ハザードポインタをチェックしていないため、まだ参照している人がいるかもしれない。
 			return p_cur_first;
 		}
+		cl_cnt++;
 	}
 	return nullptr;
 }
 
 void idx_mgr::stack_push_element(
-	idx_mgr_element*               p_push_element,                      //!< [in] pointer of element to push
-	std::atomic<idx_mgr_element*>& head_,                               //!< [in] reference of atomic pointer to stack head
-	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next,             //!< [in] member pointer that points to next element
-	const hazard_ptr_idx                            hzd_push_cur_slot   //!< [in] hazard pointer slot to store pop current pointer
-)
+	idx_mgr_element*               p_push_element,                       //!< [in] pointer of element to push
+	std::atomic<idx_mgr_element*>& head_,                                //!< [in] reference of atomic pointer to stack head
+	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next,              //!< [in] member pointer that points to next element
+	const hazard_ptr_idx                            hzd_push_cur_slot,   //!< [in] hazard pointer slot to store pop current pointer
+	std::atomic<int>&                               cl_cnt )
 {
 	( p_push_element->*p_next ).store( nullptr );
 
@@ -329,7 +330,10 @@ void idx_mgr::stack_push_element(
 	while ( true ) {
 		idx_mgr_element* p_cur_top = head_.load( std::memory_order_acquire );
 		scoped_ref_cur.regist_ptr_as_hazard_ptr( p_cur_top );
-		if ( p_cur_top != head_.load( std::memory_order_acquire ) ) continue;
+		if ( p_cur_top != head_.load( std::memory_order_acquire ) ) {
+			cl_cnt++;
+			continue;
+		}
 
 		( p_push_element->*p_next ).store( p_cur_top );
 
@@ -339,6 +343,7 @@ void idx_mgr::stack_push_element(
 		if ( head_.compare_exchange_weak( p_cur_top, p_push_element ) ) {
 			return;   // 追加完了
 		}
+		cl_cnt++;
 	}
 	return;
 }
@@ -357,7 +362,8 @@ int idx_mgr::pop( void )
 		valid_element_stack_head_,
 		&idx_mgr_element::p_valid_idx_next_element_,
 		hazard_ptr_idx::POP_VAL_CUR,
-		hazard_ptr_idx::POP_VAL_NEXT );
+		hazard_ptr_idx::POP_VAL_NEXT,
+		collision_cnt_valid_stack_ );
 
 	if ( p_valid_pop_element == nullptr ) return -1;
 
@@ -385,7 +391,8 @@ void idx_mgr::push(
 				p_invalid_element,
 				invalid_element_stack_head_,
 				&idx_mgr_element::p_invalid_idx_next_element_,
-				hazard_ptr_idx::PUSH_INV_CUR );
+				hazard_ptr_idx::PUSH_INV_CUR,
+				collision_cnt_invalid_stack_ );
 		} else {
 			if ( p_invalid_element_first == nullptr ) {
 				p_invalid_element_first = p_invalid_element;
@@ -403,7 +410,8 @@ void idx_mgr::push(
 		invalid_element_stack_head_,
 		&idx_mgr_element::p_invalid_idx_next_element_,
 		hazard_ptr_idx::POP_INV_CUR,
-		hazard_ptr_idx::POP_INV_NEXT );
+		hazard_ptr_idx::POP_INV_NEXT,
+		collision_cnt_invalid_stack_ );
 
 	if ( p_invalid_element == nullptr ) {
 		wait_list.push_to_tls( idx_arg );
@@ -415,7 +423,8 @@ void idx_mgr::push(
 			p_invalid_element,
 			valid_element_stack_head_,
 			&idx_mgr_element::p_valid_idx_next_element_,
-			hazard_ptr_idx::PUSH_VAL_CUR );
+			hazard_ptr_idx::PUSH_VAL_CUR,
+			collision_cnt_invalid_stack_ );
 	}
 
 	return;
@@ -434,12 +443,16 @@ void idx_mgr::dump( void )
 	          "\t valid_element_stack_head_ = %p\n"
 	          "\t waiting_element_list = %p\n"
 	          "\t hzrd_element_ = (not implemented)\n"
+	          "\t invalid_collision_cnt = %d\n"
+	          "\t valid_collision_cnt = %d\n"
 	          "}\n",
 	          this, this,
 	          idx_size_,
 	          invalid_element_stack_head_.load(),
 	          valid_element_stack_head_.load(),
-	          &tmp_wel );
+	          &tmp_wel,
+	          collision_cnt_invalid_stack_.load(),
+	          collision_cnt_valid_stack_.load() );
 	LogOutput( log_type::DUMP, buf );
 
 	if ( p_idx_mgr_element_array_ != nullptr ) {
@@ -706,6 +719,9 @@ chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
 	ans.dealloc_req_cnt_       = statistics_dealloc_req_cnt_.load();
 	ans.error_dealloc_req_cnt_ = statistics_dealloc_req_err_cnt_.load();
 
+	ans.alloc_collision_cnt_   = free_slot_idx_mgr_.collision_cnt_valid_stack_.load();
+	ans.dealloc_collision_cnt_ = free_slot_idx_mgr_.collision_cnt_invalid_stack_.load();
+
 	return ans;
 }
 
@@ -889,6 +905,8 @@ chunk_statistics chunk_list::get_statistics( void ) const
 	ans.error_alloc_req_cnt_   = 0;
 	ans.dealloc_req_cnt_       = 0;
 	ans.error_dealloc_req_cnt_ = 0;
+	ans.alloc_collision_cnt_   = 0;
+	ans.dealloc_collision_cnt_ = 0;
 
 	chunk_header_multi_slot* p_cur_chms = p_top_chunk_.load();
 	while ( p_cur_chms != nullptr ) {
@@ -901,6 +919,8 @@ chunk_statistics chunk_list::get_statistics( void ) const
 		ans.error_alloc_req_cnt_ += one_chms_statistics.error_alloc_req_cnt_;
 		ans.dealloc_req_cnt_ += one_chms_statistics.dealloc_req_cnt_;
 		ans.error_dealloc_req_cnt_ += one_chms_statistics.error_dealloc_req_cnt_;
+		ans.alloc_collision_cnt_ += one_chms_statistics.alloc_collision_cnt_;
+		ans.dealloc_collision_cnt_ += one_chms_statistics.dealloc_collision_cnt_;
 
 		chunk_header_multi_slot* p_nxt_chms = p_cur_chms->p_next_chunk_.load();
 		p_cur_chms                          = p_nxt_chms;

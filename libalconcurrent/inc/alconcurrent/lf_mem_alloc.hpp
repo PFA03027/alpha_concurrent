@@ -61,6 +61,8 @@ struct chunk_statistics {
 	std::size_t            error_alloc_req_cnt_;
 	std::size_t            dealloc_req_cnt_;
 	std::size_t            error_dealloc_req_cnt_;
+	int                    alloc_collision_cnt_;
+	int                    dealloc_collision_cnt_;
 };
 
 /*!

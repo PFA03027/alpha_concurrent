@@ -122,6 +122,9 @@ struct idx_mgr {
 	 */
 	void dump( void );
 
+	std::atomic<int> collision_cnt_invalid_stack_;
+	std::atomic<int> collision_cnt_valid_stack_;
+
 private:
 	static constexpr int hzrd_max_slot_ = 6;
 	enum class hazard_ptr_idx : int {
@@ -142,17 +145,17 @@ private:
 	hazard_ptr<idx_mgr_element, hzrd_max_slot_> hzrd_element_;                 //!< ハザードポインタを管理する構造体。
 
 	idx_mgr_element* stack_pop_element(
-		std::atomic<idx_mgr_element*>& head_,                               //!< [in] reference of atomic pointer to stack head
-		std::atomic<idx_mgr_element*> idx_mgr_element::*p_next,             //!< [in] member pointer that points to next element
-		const hazard_ptr_idx                            hzd_pop_cur_slot,   //!< [in] hazard pointer slot to store pop current pointer
-		const hazard_ptr_idx                            hzd_pop_next_slot   //!< [in] hazard pointer slot to store pop next pointer
-	);
+		std::atomic<idx_mgr_element*>& head_,                                //!< [in] reference of atomic pointer to stack head
+		std::atomic<idx_mgr_element*> idx_mgr_element::*p_next,              //!< [in] member pointer that points to next element
+		const hazard_ptr_idx                            hzd_pop_cur_slot,    //!< [in] hazard pointer slot to store pop current pointer
+		const hazard_ptr_idx                            hzd_pop_next_slot,   //!< [in] hazard pointer slot to store pop next pointer
+		std::atomic<int>&                               cl_cnt );
 	void stack_push_element(
-		idx_mgr_element*               p_push_element,                      //!< [in] pointer of element to push
-		std::atomic<idx_mgr_element*>& head_,                               //!< [in] reference of atomic pointer to stack head
-		std::atomic<idx_mgr_element*> idx_mgr_element::*p_next,             //!< [in] member pointer that points to next element
-		const hazard_ptr_idx                            hzd_push_cur_slot   //!< [in] hazard pointer slot to store pop current pointer
-	);
+		idx_mgr_element*               p_push_element,                       //!< [in] pointer of element to push
+		std::atomic<idx_mgr_element*>& head_,                                //!< [in] reference of atomic pointer to stack head
+		std::atomic<idx_mgr_element*> idx_mgr_element::*p_next,              //!< [in] member pointer that points to next element
+		const hazard_ptr_idx                            hzd_push_cur_slot,   //!< [in] hazard pointer slot to store pop current pointer
+		std::atomic<int>&                               cl_cnt );
 };
 
 }   // namespace internal
