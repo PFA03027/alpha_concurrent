@@ -15,7 +15,7 @@
 #include <vector>
 
 #include "alconcurrent/lf_mem_alloc.hpp"
-#include "alconcurrent/lf_mem_alloc_idx_mgr.hpp"
+#include "alconcurrent/lf_mem_alloc_internal.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -543,8 +543,6 @@ void idx_mgr::dump( void )
 	return;
 }
 
-}   // namespace internal
-
 constexpr int num_of_free_chk_try = 10;
 
 template <typename T>
@@ -980,6 +978,8 @@ chunk_statistics chunk_list::get_statistics( void ) const
 	return ans;
 }
 
+}   // namespace internal
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 general_mem_allocator::general_mem_allocator(
 	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
@@ -1001,7 +1001,7 @@ general_mem_allocator::general_mem_allocator(
 	up_param_ch_array_ = std::unique_ptr<param_chunk_comb[]>( new param_chunk_comb[pr_ch_size_] );
 	for ( int i = 0; i < pr_ch_size_; i++ ) {
 		up_param_ch_array_[i].param_        = p_param_array[idx_vec[i]];
-		up_param_ch_array_[i].up_chunk_lst_ = std::unique_ptr<chunk_list>( new chunk_list( up_param_ch_array_[i].param_ ) );
+		up_param_ch_array_[i].up_chunk_lst_ = std::unique_ptr<internal::chunk_list>( new internal::chunk_list( up_param_ch_array_[i].param_ ) );
 	}
 
 	return;

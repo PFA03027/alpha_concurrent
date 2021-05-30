@@ -48,7 +48,7 @@ void one_chunk_load( void )
 
 	static alpha::concurrent::param_chunk_allocation param = { 256, 20 };
 
-	alpha::concurrent::chunk_header_multi_slot chms( param );
+	alpha::concurrent::internal::chunk_header_multi_slot chms( param );
 
 	//	pthread_barrier_wait( &barrier );
 
@@ -722,7 +722,6 @@ void load_test_malloc_free_actual_behavior( int num_of_thd )
 	std::cout << "thread is " << num_of_thd
 			  << " load_test_malloc_free_actual_behavior() Exec time: " << diff.count() << " msec" << std::endl;
 }
-
 
 void load_test( void )
 {

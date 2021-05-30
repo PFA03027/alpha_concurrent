@@ -18,7 +18,7 @@ alpha::concurrent::param_chunk_allocation param = { 27, 2 };
 
 void test_chunk_header_multi_slot( void )
 {
-	alpha::concurrent::chunk_header_multi_slot* p_chms = new alpha::concurrent::chunk_header_multi_slot( param );
+	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new alpha::concurrent::internal::chunk_header_multi_slot( param );
 
 	void* test_ptr1 = p_chms->allocate_mem_slot();
 	void* test_ptr2 = p_chms->allocate_mem_slot();
@@ -77,7 +77,7 @@ void test_chunk_header_multi_slot( void )
 
 void test_chunk_list( void )
 {
-	alpha::concurrent::chunk_list* p_ch_lst = new alpha::concurrent::chunk_list( param );
+	alpha::concurrent::internal::chunk_list* p_ch_lst = new alpha::concurrent::internal::chunk_list( param );
 
 	void* test_ptr1 = p_ch_lst->allocate_mem_slot();
 	void* test_ptr2 = p_ch_lst->allocate_mem_slot();
@@ -170,7 +170,7 @@ void test_general_mem_allocator( void )
 }
 
 extern void load_test( void );
-extern void load_test_alloc_free_bw_mult_thread(void);
+extern void load_test_alloc_free_bw_mult_thread( void );
 
 int main( void )
 {
