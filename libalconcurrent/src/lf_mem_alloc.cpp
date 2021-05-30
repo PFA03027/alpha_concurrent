@@ -289,8 +289,6 @@ idx_mgr_element* idx_element_storage_mgr::pop_element( void )
 	}
 
 	return p_ans;
-
-	return p_ans;
 }
 
 /*!
@@ -544,7 +542,6 @@ void idx_mgr::dump( void )
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-constexpr int num_of_free_chk_try = 10;
 
 template <typename T>
 class scoped_inout_counter {
