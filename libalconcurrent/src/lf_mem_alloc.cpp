@@ -15,7 +15,7 @@
 #include <vector>
 
 #include "alconcurrent/lf_mem_alloc.hpp"
-#include "alconcurrent/lf_mem_alloc_idx_mgr.hpp"
+#include "alconcurrent/lf_mem_alloc_internal.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -75,30 +75,15 @@ void idx_mgr_element::dump( void ) const
 	return;
 }
 
-waiting_element_list::waiting_element_list( const int idx_buff_size_arg )
+waiting_element_list::waiting_element_list( void )
   : head_( nullptr )
   , tail_( nullptr )
-  , idx_buff_size_( idx_buff_size_arg )
-  , idx_top_idx_( 0 )
 {
-	p_idx_buff_ = new int[idx_buff_size_];
 	return;
 }
 
 waiting_element_list::~waiting_element_list()
 {
-	delete[] p_idx_buff_;
-}
-
-void waiting_element_list::reset_and_set_size( const int idx_buff_size_arg )
-{
-	delete[] p_idx_buff_;
-	idx_buff_size_ = idx_buff_size_arg;
-	p_idx_buff_    = new int[idx_buff_size_];
-	head_          = nullptr;
-	tail_          = nullptr;
-	idx_top_idx_   = 0;
-	return;
 }
 
 idx_mgr_element* waiting_element_list::pop( void )
@@ -133,8 +118,71 @@ void waiting_element_list::push(
 	return;
 }
 
-int waiting_element_list::pop_from_tls( void )
+void waiting_element_list::dump( void ) const
 {
+	char buf[2048];
+
+	snprintf( buf, 2047,
+	          "object waiting_element_list_%p as %p {\n"
+	          "\t head_ = %p\n"
+	          "\t tail_ = %p\n"
+	          "}\n",
+	          this, this,
+	          head_,
+	          tail_ );
+	LogOutput( log_type::DUMP, buf );
+
+	if ( head_ != nullptr ) {
+		snprintf( buf, 2047,
+		          "%p --> %p\n",
+		          this, head_ );
+		LogOutput( log_type::DUMP, buf );
+	}
+
+	if ( tail_ != nullptr ) {
+		snprintf( buf, 2047,
+		          "%p --> %p\n",
+		          this, tail_ );
+		LogOutput( log_type::DUMP, buf );
+	}
+
+	return;
+}
+
+waiting_idx_list::waiting_idx_list( const int idx_buff_size_arg, const int ver_arg )
+  : ver_( ver_arg )
+  , idx_buff_size_( idx_buff_size_arg )
+  , idx_top_idx_( 0 )
+  , p_idx_buff_( nullptr )
+{
+
+	if ( idx_buff_size_arg >= 0 ) {
+		p_idx_buff_ = new int[idx_buff_size_];
+	}
+	return;
+}
+
+waiting_idx_list::~waiting_idx_list()
+{
+	delete[] p_idx_buff_;
+}
+
+void waiting_idx_list::chk_reset_and_set_size( const int idx_buff_size_arg, const int ver_arg )
+{
+	if ( ver_ == ver_arg ) return;
+
+	delete[] p_idx_buff_;
+	idx_buff_size_ = idx_buff_size_arg;
+	p_idx_buff_    = new int[idx_buff_size_];
+	idx_top_idx_   = 0;
+	ver_           = ver_arg;
+	return;
+}
+
+int waiting_idx_list::pop_from_tls( const int idx_buff_size_arg, const int ver_arg )
+{
+	chk_reset_and_set_size( idx_buff_size_arg, ver_arg );
+
 	int ans = -1;
 
 	if ( idx_top_idx_ <= 0 ) return ans;
@@ -147,8 +195,10 @@ int waiting_element_list::pop_from_tls( void )
 	return ans;
 }
 
-void waiting_element_list::push_to_tls( const int valid_idx )
+void waiting_idx_list::push_to_tls( const int valid_idx, const int idx_buff_size_arg, const int ver_arg )
 {
+	chk_reset_and_set_size( idx_buff_size_arg, ver_arg );
+
 	if ( idx_top_idx_ >= idx_buff_size_ ) {
 		throw std::exception();
 		return;
@@ -160,21 +210,17 @@ void waiting_element_list::push_to_tls( const int valid_idx )
 	return;
 }
 
-void waiting_element_list::dump( void ) const
+void waiting_idx_list::dump( void ) const
 {
 	char buf[2048];
 
 	snprintf( buf, 2047,
-	          "object waiting_element_list_%p as %p {\n"
-	          "\t head_ = %p\n"
-	          "\t tail_ = %p\n"
+	          "object waiting_idx_list_%p as %p {\n"
 	          "\t idx_buff_size_ = %d\n"
 	          "\t idx_top_idx_ = %d\n"
 	          "\t p_idx_buff_ = %p\n"
 	          "}\n",
 	          this, this,
-	          head_,
-	          tail_,
 	          idx_buff_size_,
 	          idx_top_idx_,
 	          p_idx_buff_ );
@@ -196,20 +242,152 @@ void waiting_element_list::dump( void ) const
 		LogOutput( log_type::DUMP, "}\n" );
 	}
 
-	if ( head_ != nullptr ) {
-		snprintf( buf, 2047,
-		          "%p --> %p\n",
-		          this, head_ );
-		LogOutput( log_type::DUMP, buf );
+	return;
+}
+
+/*!
+ * @breif	インデックス管理スロットのロックフリーストレージクラス
+ */
+idx_element_storage_mgr::idx_element_storage_mgr(
+	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_arg   //!< [in] nextポインタを保持しているメンバ変数へのメンバ変数ポインタ
+	)
+  : head_( nullptr )
+  , tail_( nullptr )
+  , p_next_ptr_offset_( p_next_ptr_offset_arg )
+  , collision_cnt_( 0 )
+{
+	return;
+}
+
+/*!
+ * @breif	ストレージから１つの要素を取り出す
+ *
+ * @return	pointer to the poped element
+ * @retval	nullptr	no available element
+ */
+idx_mgr_element* idx_element_storage_mgr::pop_element( void )
+{
+	idx_mgr_element*      p_ans     = nullptr;
+	waiting_element_list& wait_list = tls_waiting_list_.get_tls_instance();
+
+	p_ans = wait_list.pop();
+	if ( p_ans != nullptr ) {
+		// スレッドローカルストレージからノードが取り出せたので、さらに1回リサイクルを試みる
+		idx_mgr_element* p_tmp_recycle = wait_list.pop();
+		if ( p_tmp_recycle != nullptr ) {
+			if ( hzrd_element_.check_ptr_in_hazard_list( p_tmp_recycle ) ) {
+				// まだハザードポインタに登録されていたので、スレッドローカルストレージに差し戻す
+				wait_list.push( p_tmp_recycle );
+			} else {
+				// ハザードポインタに登録されていなかったので、共有リストへpush
+				push_element_to_list( p_tmp_recycle );
+			}
+		}
+	} else {
+		// スレッドローカルストレージは空だったので、共有リストから取り出す。
+		p_ans = pop_element_from_list();
 	}
 
-	if ( tail_ != nullptr ) {
-		snprintf( buf, 2047,
-		          "%p --> %p\n",
-		          this, tail_ );
-		LogOutput( log_type::DUMP, buf );
+	return p_ans;
+}
+
+/*!
+ * @breif	ストレージへ１つの要素を戻す
+ */
+void idx_element_storage_mgr::push_element(
+	idx_mgr_element* p_push_element   //!< [in] pointer of element to push
+)
+{
+	waiting_element_list& wait_list     = tls_waiting_list_.get_tls_instance();
+	idx_mgr_element*      p_tmp_recycle = wait_list.pop();   // 新たに登録されるポインタとのチェックが重複しないように、先に読みだしておく
+
+	if ( hzrd_element_.check_ptr_in_hazard_list( p_push_element ) ) {
+		// まだハザードポインタに登録されていたので、スレッドローカルストレージに戻す
+		wait_list.push( p_push_element );
+	} else {
+		// ハザードポインタに登録されていなかったので、共有リストへpush
+		push_element_to_list( p_push_element );
 	}
 
+	if ( p_tmp_recycle != nullptr ) {
+		if ( hzrd_element_.check_ptr_in_hazard_list( p_tmp_recycle ) ) {
+			// まだハザードポインタに登録されていたので、スレッドローカルストレージに差し戻す
+			wait_list.push( p_tmp_recycle );
+		} else {
+			// ハザードポインタに登録されていなかったので、共有リストへpush
+			push_element_to_list( p_tmp_recycle );
+		}
+	}
+
+	return;
+}
+
+idx_mgr_element* idx_element_storage_mgr::pop_element_from_list( void )
+{
+	scoped_hazard_ref scoped_ref_first( hzrd_element_, (int)hazard_ptr_idx::POP_CUR );
+	scoped_hazard_ref scoped_ref_next( hzrd_element_, (int)hazard_ptr_idx::POP_NEXT );
+
+	while ( true ) {
+		idx_mgr_element* p_cur_first = head_.load( std::memory_order_acquire );
+		scoped_ref_first.regist_ptr_as_hazard_ptr( p_cur_first );
+		if ( p_cur_first != head_.load( std::memory_order_acquire ) ) {
+			collision_cnt_++;
+			continue;
+		}
+
+		if ( p_cur_first == nullptr ) {
+			// stackは空。
+			return nullptr;
+		}
+
+		idx_mgr_element* p_cur_next = ( p_cur_first->*p_next_ptr_offset_ ).load();
+		scoped_ref_next.regist_ptr_as_hazard_ptr( p_cur_next );
+		if ( p_cur_next != ( p_cur_first->*p_next_ptr_offset_ ).load() ) {
+			collision_cnt_++;
+			continue;
+		}
+
+		// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
+		// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
+		if ( head_.compare_exchange_weak( p_cur_first, p_cur_next ) ) {
+			// ここで、firstの取り出しと所有権確保が完了
+			// ただし、ハザードポインタをチェックしていないため、まだ参照している人がいるかもしれない。
+			return p_cur_first;
+		}
+		collision_cnt_++;
+	}
+	return nullptr;
+}
+
+/*!
+ * @breif	ストレージへ１つの要素を戻す
+ */
+void idx_element_storage_mgr::push_element_to_list(
+	idx_mgr_element* p_push_element   //!< [in] pointer of element to push
+)
+{
+	( p_push_element->*p_next_ptr_offset_ ).store( nullptr );
+
+	scoped_hazard_ref scoped_ref_cur( hzrd_element_, (int)hazard_ptr_idx::PUSH_CUR );
+
+	while ( true ) {
+		idx_mgr_element* p_cur_top = head_.load( std::memory_order_acquire );
+		scoped_ref_cur.regist_ptr_as_hazard_ptr( p_cur_top );
+		if ( p_cur_top != head_.load( std::memory_order_acquire ) ) {
+			collision_cnt_++;
+			continue;
+		}
+
+		( p_push_element->*p_next_ptr_offset_ ).store( p_cur_top );
+
+		// head_を更新する。
+		// ここで、プリエンプションして、tail_がA->B->A'となった時、p_cur_lastが期待値とは異なるが、
+		// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
+		if ( head_.compare_exchange_weak( p_cur_top, p_push_element ) ) {
+			return;   // 追加完了
+		}
+		collision_cnt_++;
+	}
 	return;
 }
 
@@ -220,13 +398,15 @@ idx_mgr::idx_mgr(
 	const int idx_size_arg   //!< [in] 用意するインデックス番号の数。-1の場合、割り当てを保留する。
 	)
   : idx_size_( idx_size_arg )
+  , idx_size_ver_( 0 )
   , p_idx_mgr_element_array_( nullptr )
-  , invalid_element_stack_head_( nullptr )
-  , valid_element_stack_head_( nullptr )
+  , invalid_element_storage_( &idx_mgr_element::p_invalid_idx_next_element_ )
+  , valid_element_storage_( &idx_mgr_element::p_valid_idx_next_element_ )
 {
+
 	if ( idx_size_ < 0 ) return;
 
-	tls_waiting_list_.get_tls_instance( idx_size_ );
+	tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
 
 	set_idx_size( idx_size_ );
 	return;
@@ -239,132 +419,46 @@ idx_mgr::~idx_mgr()
 
 void idx_mgr::set_idx_size( const int idx_size_arg )
 {
+	delete[] p_idx_mgr_element_array_;
+	p_idx_mgr_element_array_ = nullptr;
+
+	idx_size_ver_++;
+
 	if ( idx_size_arg <= 0 ) {
 		idx_size_ = -1;
-		delete[] p_idx_mgr_element_array_;
-		p_idx_mgr_element_array_ = nullptr;
 		return;
 	}
 
-	if ( p_idx_mgr_element_array_ == nullptr ) {
-		p_idx_mgr_element_array_ = new idx_mgr_element[idx_size_arg];
-	} else {
-		if ( idx_size_arg > idx_size_ ) {
-			delete[] p_idx_mgr_element_array_;
-			p_idx_mgr_element_array_ = new idx_mgr_element[idx_size_arg];
-		}
-	}
-	idx_size_ = idx_size_arg;
+	// idx_mgr_elementのコンストラクタによる初期化を機能させるため、配列の再利用はしない。
+	p_idx_mgr_element_array_ = new idx_mgr_element[idx_size_arg];
+	idx_size_                = idx_size_arg;
 
-	idx_mgr_element* tmp_head = nullptr;
 	for ( int i = 0; i < idx_size_; i++ ) {
 		p_idx_mgr_element_array_[i].idx_ = i;
-		p_idx_mgr_element_array_[i].p_valid_idx_next_element_.store( tmp_head );
-		tmp_head = &( p_idx_mgr_element_array_[i] );
-		p_idx_mgr_element_array_[i].p_invalid_idx_next_element_.store( nullptr );
-		p_idx_mgr_element_array_[i].p_waiting_next_element_ = nullptr;
+		valid_element_storage_.push_element( &( p_idx_mgr_element_array_[i] ) );
 	}
-	valid_element_stack_head_.store( tmp_head );
 
-	invalid_element_stack_head_.store( nullptr );
-
-	return;
-}
-
-/*!
- * @breif	利用可能なインデックス番号を取り出す。
- *
- * @return	利用可能なインデックス番号
- * @retval	-1	利用可能なインデックス番号がない
- *
- * @note
- * このI/Fはスレッドセーフで、ロックフリーです。
- */
-idx_mgr_element* idx_mgr::stack_pop_element(
-	std::atomic<idx_mgr_element*>& head_,                               //!< [in] reference of atomic pointer to stack head
-	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next,             //!< [in] member pointer that points to next element
-	const hazard_ptr_idx                            hzd_pop_cur_slot,   //!< [in] hazard pointer slot to store pop current pointer
-	const hazard_ptr_idx                            hzd_pop_next_slot   //!< [in] hazard pointer slot to store pop next pointer
-)
-{
-	scoped_hazard_ref scoped_ref_first( hzrd_element_, (int)hzd_pop_cur_slot );
-	scoped_hazard_ref scoped_ref_next( hzrd_element_, (int)hzd_pop_next_slot );
-
-	while ( true ) {
-		idx_mgr_element* p_cur_first = head_.load( std::memory_order_acquire );
-		scoped_ref_first.regist_ptr_as_hazard_ptr( p_cur_first );
-		if ( p_cur_first != head_.load( std::memory_order_acquire ) ) continue;
-
-		if ( p_cur_first == nullptr ) {
-			// stackは空。
-			return nullptr;
-		}
-
-		idx_mgr_element* p_cur_next = ( p_cur_first->*p_next ).load();
-		scoped_ref_next.regist_ptr_as_hazard_ptr( p_cur_next );
-		if ( p_cur_next != ( p_cur_first->*p_next ).load() ) continue;
-
-		// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
-		// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
-		if ( head_.compare_exchange_weak( p_cur_first, p_cur_next ) ) {
-			// ここで、firstの取り出しと所有権確保が完了
-			// ただし、ハザードポインタをチェックしていないため、まだ参照している人がいるかもしれない。
-			return p_cur_first;
-		}
-	}
-	return nullptr;
-}
-
-void idx_mgr::stack_push_element(
-	idx_mgr_element*               p_push_element,                      //!< [in] pointer of element to push
-	std::atomic<idx_mgr_element*>& head_,                               //!< [in] reference of atomic pointer to stack head
-	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next,             //!< [in] member pointer that points to next element
-	const hazard_ptr_idx                            hzd_push_cur_slot   //!< [in] hazard pointer slot to store pop current pointer
-)
-{
-	( p_push_element->*p_next ).store( nullptr );
-
-	scoped_hazard_ref scoped_ref_cur( hzrd_element_, (int)hzd_push_cur_slot );
-
-	while ( true ) {
-		idx_mgr_element* p_cur_top = head_.load( std::memory_order_acquire );
-		scoped_ref_cur.regist_ptr_as_hazard_ptr( p_cur_top );
-		if ( p_cur_top != head_.load( std::memory_order_acquire ) ) continue;
-
-		( p_push_element->*p_next ).store( p_cur_top );
-
-		// head_を更新する。
-		// ここで、プリエンプションして、tail_がA->B->A'となった時、p_cur_lastが期待値とは異なるが、
-		// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
-		if ( head_.compare_exchange_weak( p_cur_top, p_push_element ) ) {
-			return;   // 追加完了
-		}
-	}
 	return;
 }
 
 int idx_mgr::pop( void )
 {
-	int                   ans       = -1;
-	waiting_element_list& wait_list = tls_waiting_list_.get_tls_instance( idx_size_ );
+	int               ans       = -1;
+	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
 
-	ans = wait_list.pop_from_tls();
+	ans = wait_list.pop_from_tls( idx_size_, idx_size_ver_ );
 	if ( ans != -1 ) {
 		return ans;
 	}
 
-	idx_mgr_element* p_valid_pop_element = stack_pop_element(
-		valid_element_stack_head_,
-		&idx_mgr_element::p_valid_idx_next_element_,
-		hazard_ptr_idx::POP_VAL_CUR,
-		hazard_ptr_idx::POP_VAL_NEXT );
+	idx_mgr_element* p_valid_pop_element = valid_element_storage_.pop_element();
 
 	if ( p_valid_pop_element == nullptr ) return -1;
 
 	ans                       = p_valid_pop_element->idx_;
 	p_valid_pop_element->idx_ = -1;
 
-	wait_list.push( p_valid_pop_element );
+	invalid_element_storage_.push_element( p_valid_pop_element );
 
 	return ans;
 }
@@ -373,49 +467,18 @@ void idx_mgr::push(
 	const int idx_arg   //!< [in] 返却するインデックス番号
 )
 {
-	waiting_element_list& wait_list = tls_waiting_list_.get_tls_instance( idx_size_ );
+	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
 
-	idx_mgr_element* p_invalid_element       = wait_list.pop();
-	idx_mgr_element* p_invalid_element_first = nullptr;
-	int              ch_cnt                  = 2;
-
-	while ( p_invalid_element != nullptr ) {
-		if ( !hzrd_element_.check_ptr_in_hazard_list( p_invalid_element ) ) {
-			stack_push_element(
-				p_invalid_element,
-				invalid_element_stack_head_,
-				&idx_mgr_element::p_invalid_idx_next_element_,
-				hazard_ptr_idx::PUSH_INV_CUR );
-		} else {
-			if ( p_invalid_element_first == nullptr ) {
-				p_invalid_element_first = p_invalid_element;
-			}
-			wait_list.push( p_invalid_element );
-		}
-		if ( ch_cnt <= 0 ) {
-			break;
-		}
-		ch_cnt--;
-		p_invalid_element = wait_list.pop();
-	}
-
-	p_invalid_element = stack_pop_element(
-		invalid_element_stack_head_,
-		&idx_mgr_element::p_invalid_idx_next_element_,
-		hazard_ptr_idx::POP_INV_CUR,
-		hazard_ptr_idx::POP_INV_NEXT );
+	idx_mgr_element* p_invalid_element = invalid_element_storage_.pop_element();
 
 	if ( p_invalid_element == nullptr ) {
-		wait_list.push_to_tls( idx_arg );
+		// スロットに空きがないので、ローカルストレージで保持する。
+		wait_list.push_to_tls( idx_arg, idx_size_, idx_size_ver_ );
 	} else {
 
 		p_invalid_element->idx_ = idx_arg;
 
-		stack_push_element(
-			p_invalid_element,
-			valid_element_stack_head_,
-			&idx_mgr_element::p_valid_idx_next_element_,
-			hazard_ptr_idx::PUSH_VAL_CUR );
+		valid_element_storage_.push_element( p_invalid_element );
 	}
 
 	return;
@@ -425,20 +488,23 @@ void idx_mgr::dump( void )
 {
 	char buf[2048];
 
-	const waiting_element_list& tmp_wel = tls_waiting_list_.get_tls_instance( idx_size_ );
+	const waiting_idx_list& tmp_wel = tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
 
 	snprintf( buf, 2047,
 	          "object idx_mgr_%p as %p {\n"
 	          "\t idx_size_ = %d\n"
+	          "\t idx_size_ver_ = %d\n"
+	          "\t p_idx_mgr_element_array_ = %p\n"
 	          "\t invalid_element_stack_head_ = %p\n"
 	          "\t valid_element_stack_head_ = %p\n"
 	          "\t waiting_element_list = %p\n"
-	          "\t hzrd_element_ = (not implemented)\n"
 	          "}\n",
 	          this, this,
 	          idx_size_,
-	          invalid_element_stack_head_.load(),
-	          valid_element_stack_head_.load(),
+	          idx_size_ver_,
+	          p_idx_mgr_element_array_,
+	          &invalid_element_storage_,
+	          &valid_element_storage_,
 	          &tmp_wel );
 	LogOutput( log_type::DUMP, buf );
 
@@ -449,19 +515,15 @@ void idx_mgr::dump( void )
 		LogOutput( log_type::DUMP, buf );
 	}
 
-	if ( invalid_element_stack_head_.load() != nullptr ) {
-		snprintf( buf, 2047,
-		          "%p --> %p \n",
-		          this, invalid_element_stack_head_.load() );
-		LogOutput( log_type::DUMP, buf );
-	}
+	snprintf( buf, 2047,
+	          "%p --> %p \n",
+	          this, &invalid_element_storage_ );
+	LogOutput( log_type::DUMP, buf );
 
-	if ( valid_element_stack_head_.load() != nullptr ) {
-		snprintf( buf, 2047,
-		          "%p --> %p \n",
-		          this, valid_element_stack_head_.load() );
-		LogOutput( log_type::DUMP, buf );
-	}
+	snprintf( buf, 2047,
+	          "%p --> %p \n",
+	          this, &valid_element_storage_ );
+	LogOutput( log_type::DUMP, buf );
 
 	snprintf( buf, 2047,
 	          "%p --> %p \n",
@@ -479,9 +541,7 @@ void idx_mgr::dump( void )
 	return;
 }
 
-}   // namespace internal
-
-constexpr int num_of_free_chk_try = 10;
+////////////////////////////////////////////////////////////////////////////////
 
 template <typename T>
 class scoped_inout_counter {
@@ -501,6 +561,31 @@ private:
 	T& atomic_couter_ref;
 };
 
+////////////////////////////////////////////////////////////////////////////////
+
+void slot_header::set_addr_of_chunk_header_multi_slot(
+	chunk_header_multi_slot* p_chms_arg )
+{
+	// 今は簡単な仕組みで実装する
+	p_chms = p_chms_arg;
+	mark   = 0 - reinterpret_cast<std::uintptr_t>( p_chms );
+
+	return;
+}
+
+slot_chk_result slot_header::chk_header_data( void ) const
+{
+	// 今は簡単な仕組みで実装する
+	std::uintptr_t tmp = reinterpret_cast<std::uintptr_t>( p_chms );
+	tmp += mark;
+
+	slot_chk_result ans;
+	ans.correct = ( tmp == 0 );
+	ans.p_chms  = p_chms;
+	return ans;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 chunk_header_multi_slot::chunk_header_multi_slot(
 	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
 	)
@@ -532,13 +617,23 @@ chunk_header_multi_slot::~chunk_header_multi_slot()
 	return;
 }
 
+constexpr std::size_t get_slot_header_size( void )
+{
+	std::size_t tmp = sizeof( slot_header ) / sizeof( std::max_align_t );
+	std::size_t adt = sizeof( slot_header ) % sizeof( std::max_align_t );
+
+	std::size_t ans = ( tmp + ( ( adt > 0 ) ? 1 : 0 ) ) * sizeof( std::max_align_t );
+
+	return ans;
+}
+
 std::size_t chunk_header_multi_slot::get_size_of_one_slot( void ) const
 {
-	std::size_t ans;
 	std::size_t tmp = alloc_conf_.size_of_one_piece_ / sizeof( std::max_align_t );
 	std::size_t adt = alloc_conf_.size_of_one_piece_ % sizeof( std::max_align_t );
 
-	ans = ( tmp + ( ( adt > 0 ) ? 1 : 0 ) ) * sizeof( std::max_align_t );
+	std::size_t ans = ( tmp + ( ( adt > 0 ) ? 1 : 0 ) ) * sizeof( std::max_align_t );
+	ans += get_slot_header_size();
 
 	return ans;
 }
@@ -546,8 +641,8 @@ std::size_t chunk_header_multi_slot::get_size_of_one_slot( void ) const
 bool chunk_header_multi_slot::alloc_new_chunk( void )
 {
 	// get ownership to allocate a chunk
-	chunk_control_status expect = chunk_control_status::EMPTY;
-	bool                 result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::RESERVED_ALLOCATION );
+	internal::chunk_control_status expect = chunk_control_status::EMPTY;
+	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::RESERVED_ALLOCATION );
 	if ( !result ) return false;
 
 	std::size_t tmp_size;
@@ -599,11 +694,14 @@ void* chunk_header_multi_slot::allocate_mem_slot( void )
 	std::uintptr_t p_ans_addr = reinterpret_cast<std::uintptr_t>( p_chunk_ );
 	p_ans_addr += read_idx * alloc_conf_.size_of_one_piece_;
 
-	return reinterpret_cast<void*>( p_ans_addr );
+	slot_header* p_sh = reinterpret_cast<slot_header*>( p_ans_addr );
+	p_sh->set_addr_of_chunk_header_multi_slot( this );
+
+	return reinterpret_cast<void*>( p_ans_addr + get_slot_header_size() );
 }
 
 bool chunk_header_multi_slot::recycle_mem_slot(
-	void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
+	void* p_recycle_addr   //!< [in] pointer to the memory slot to recycle.
 )
 {
 	switch ( status_.load( std::memory_order_acquire ) ) {
@@ -621,10 +719,14 @@ bool chunk_header_multi_slot::recycle_mem_slot(
 
 	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
 
-	// check correct address or not.
-	if ( p_recycle_slot < p_chunk_ ) return false;
+	std::uintptr_t slot_header_addr_tmp = reinterpret_cast<std::uintptr_t>( p_recycle_addr );
+	slot_header_addr_tmp -= get_slot_header_size();
+	void* p_slot_addr = reinterpret_cast<void*>( slot_header_addr_tmp );
 
-	std::uintptr_t p_chking_addr = reinterpret_cast<std::uintptr_t>( p_recycle_slot );
+	// check correct address or not.
+	if ( p_slot_addr < p_chunk_ ) return false;
+
+	std::uintptr_t p_chking_addr = reinterpret_cast<std::uintptr_t>( p_slot_addr );
 	p_chking_addr -= reinterpret_cast<std::uintptr_t>( p_chunk_ );
 
 	std::uintptr_t idx = p_chking_addr / alloc_conf_.size_of_one_piece_;
@@ -639,7 +741,7 @@ bool chunk_header_multi_slot::recycle_mem_slot(
 	if ( !result ) {
 		// double free has occured.
 		LogOutput( log_type::ERR, "double free has occured." );
-		fflush( NULL );
+		//		fflush( NULL );
 		statistics_dealloc_req_err_cnt_++;
 		return true;
 	}
@@ -658,15 +760,15 @@ const param_chunk_allocation& chunk_header_multi_slot::get_param( void ) const
 
 bool chunk_header_multi_slot::set_delete_reservation( void )
 {
-	chunk_control_status expect = chunk_control_status::NORMAL;
-	bool                 result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::RESERVED_DELETION );
+	internal::chunk_control_status expect = chunk_control_status::NORMAL;
+	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::RESERVED_DELETION );
 	return result;
 }
 
 bool chunk_header_multi_slot::unset_delete_reservation( void )
 {
-	chunk_control_status expect = chunk_control_status::RESERVED_DELETION;
-	bool                 result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::NORMAL );
+	internal::chunk_control_status expect = chunk_control_status::RESERVED_DELETION;
+	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::NORMAL );
 	return result;
 }
 
@@ -674,8 +776,8 @@ bool chunk_header_multi_slot::exec_deletion( void )
 {
 	if ( num_of_accesser_.load() != 0 ) return false;
 
-	chunk_control_status expect = chunk_control_status::RESERVED_DELETION;
-	bool                 result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::DELETION );
+	internal::chunk_control_status expect = chunk_control_status::RESERVED_DELETION;
+	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::DELETION );
 
 	if ( !result ) return false;
 
@@ -688,6 +790,27 @@ bool chunk_header_multi_slot::exec_deletion( void )
 	status_.store( chunk_control_status::EMPTY );
 
 	return true;
+}
+
+slot_chk_result chunk_header_multi_slot::get_chunk(
+	void* p_addr   //!< [in] void* address that allocate_mem_slot() returns
+)
+{
+	std::uintptr_t slot_header_addr_tmp = reinterpret_cast<std::uintptr_t>( p_addr );
+	slot_header_addr_tmp -= get_slot_header_size();
+	slot_header* p_slot_addr = reinterpret_cast<slot_header*>( slot_header_addr_tmp );
+
+	slot_chk_result ret = p_slot_addr->chk_header_data();
+	if ( !( ret.correct ) ) {
+		char buf[2048];
+
+		snprintf( buf, 2047,
+		          "a header of slot_header is corrupted %p\n",
+		          p_addr );
+		LogOutput( log_type::WARN, buf );
+	}
+
+	return ret;
 }
 
 chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
@@ -705,6 +828,9 @@ chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
 	ans.error_alloc_req_cnt_   = statistics_alloc_req_err_cnt_.load();
 	ans.dealloc_req_cnt_       = statistics_dealloc_req_cnt_.load();
 	ans.error_dealloc_req_cnt_ = statistics_dealloc_req_err_cnt_.load();
+
+	ans.alloc_collision_cnt_   = free_slot_idx_mgr_.get_collision_cnt_valid_storage();
+	ans.dealloc_collision_cnt_ = free_slot_idx_mgr_.get_collision_cnt_invalid_storage();
 
 	return ans;
 }
@@ -889,6 +1015,8 @@ chunk_statistics chunk_list::get_statistics( void ) const
 	ans.error_alloc_req_cnt_   = 0;
 	ans.dealloc_req_cnt_       = 0;
 	ans.error_dealloc_req_cnt_ = 0;
+	ans.alloc_collision_cnt_   = 0;
+	ans.dealloc_collision_cnt_ = 0;
 
 	chunk_header_multi_slot* p_cur_chms = p_top_chunk_.load();
 	while ( p_cur_chms != nullptr ) {
@@ -901,6 +1029,8 @@ chunk_statistics chunk_list::get_statistics( void ) const
 		ans.error_alloc_req_cnt_ += one_chms_statistics.error_alloc_req_cnt_;
 		ans.dealloc_req_cnt_ += one_chms_statistics.dealloc_req_cnt_;
 		ans.error_dealloc_req_cnt_ += one_chms_statistics.error_dealloc_req_cnt_;
+		ans.alloc_collision_cnt_ += one_chms_statistics.alloc_collision_cnt_;
+		ans.dealloc_collision_cnt_ += one_chms_statistics.dealloc_collision_cnt_;
 
 		chunk_header_multi_slot* p_nxt_chms = p_cur_chms->p_next_chunk_.load();
 		p_cur_chms                          = p_nxt_chms;
@@ -908,6 +1038,8 @@ chunk_statistics chunk_list::get_statistics( void ) const
 
 	return ans;
 }
+
+}   // namespace internal
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 general_mem_allocator::general_mem_allocator(
@@ -930,7 +1062,7 @@ general_mem_allocator::general_mem_allocator(
 	up_param_ch_array_ = std::unique_ptr<param_chunk_comb[]>( new param_chunk_comb[pr_ch_size_] );
 	for ( int i = 0; i < pr_ch_size_; i++ ) {
 		up_param_ch_array_[i].param_        = p_param_array[idx_vec[i]];
-		up_param_ch_array_[i].up_chunk_lst_ = std::unique_ptr<chunk_list>( new chunk_list( up_param_ch_array_[i].param_ ) );
+		up_param_ch_array_[i].up_chunk_lst_ = std::unique_ptr<internal::chunk_list>( new internal::chunk_list( up_param_ch_array_[i].param_ ) );
 	}
 
 	return;
@@ -950,7 +1082,14 @@ void* general_mem_allocator::allocate(
 		}
 	}
 
-	p_ans = std::malloc( n );
+	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( std::malloc( n + internal::get_slot_header_size() ) );
+
+	p_sh->set_addr_of_chunk_header_multi_slot( nullptr );
+
+	std::uintptr_t tmp_ans = reinterpret_cast<std::uintptr_t>( p_sh );
+	tmp_ans += internal::get_slot_header_size();
+	p_ans = reinterpret_cast<void*>( tmp_ans );
+
 	return p_ans;
 }
 
@@ -958,12 +1097,25 @@ void general_mem_allocator::deallocate(
 	void* p_mem   //!< [in] pointer to allocated memory by allocate()
 )
 {
-	for ( int i = 0; i < pr_ch_size_; i++ ) {
-		bool ret = up_param_ch_array_[i].up_chunk_lst_->recycle_mem_slot( p_mem );
-		if ( ret ) return;
-	}
+	internal::slot_chk_result chk_ret = internal::chunk_header_multi_slot::get_chunk( p_mem );
 
-	std::free( p_mem );
+	if ( chk_ret.correct ) {
+		if ( chk_ret.p_chms != nullptr ) {
+			chk_ret.p_chms->recycle_mem_slot( p_mem );
+		} else {
+			std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
+			tmp_addr -= internal::get_slot_header_size();
+			std::free( reinterpret_cast<void*>( tmp_addr ) );
+		}
+	} else {
+
+		for ( int i = 0; i < pr_ch_size_; i++ ) {
+			bool ret = up_param_ch_array_[i].up_chunk_lst_->recycle_mem_slot( p_mem );
+			if ( ret ) return;
+		}
+
+		std::free( p_mem );   // TODO should not do this ?
+	}
 
 	return;
 }
