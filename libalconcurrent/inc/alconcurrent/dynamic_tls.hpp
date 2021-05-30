@@ -22,7 +22,10 @@
 #include <pthread.h>
 
 #include <atomic>
+#include <cstdlib>
 #include <memory>
+#include <type_traits>
+#include <utility>
 
 #include "conf_logger.hpp"
 
@@ -31,6 +34,27 @@ namespace concurrent {
 
 namespace internal {
 
+struct is_callable_threadlocal_destructor_impl {
+	template <typename T>
+	static auto check( T* ) -> decltype(
+		std::declval<T*>()->threadlocal_destructor(),
+		std::true_type() );
+
+	template <typename T>
+	static auto check( ... ) -> std::false_type;
+};
+
+template <typename T>
+struct is_callable_threadlocal_destructor : decltype( is_callable_threadlocal_destructor_impl::check<T>( nullptr ) ) {
+};
+
+/*!
+ * @breif	動的スレッドローカルストレージで使用する内部処理用クラス
+ *
+ * @note
+ * lf_mem_allocクラスで使用するため、
+ * コンポーネントの上下関係から、メモリの確保にはnewを使用せず、malloc/freeと配置newのみを使用する。
+ */
 template <typename T>
 class tls_data_container {
 public:
@@ -54,18 +78,49 @@ public:
 	~tls_data_container()
 	{
 		LogOutput( log_type::DEBUG, "tls_data_container::destructor is called  - %p", this );
-		delete p_value;
+
+		p_value->~T();
+		std::free( p_value );
+
+		p_value = nullptr;
 	}
 
+	/*!
+	 * @breif	スレッド終了時に管理しているスレッドローカルストレージを解放する。
+	 *
+	 * Tがthreadlocal_destructor(void)というメンバ関数を持つ場合、これを呼び出してからデストラクタを呼び出す。
+	 */
+	template <typename U = T, typename std::enable_if<is_callable_threadlocal_destructor<U>::value>::type* = nullptr>
 	void release_owner( void )
 	{
-		delete p_value;
+		p_value->threadlocal_destructor();
+
+		p_value->~T();
+		std::free( p_value );
+
 		p_value = nullptr;
 		status_.store( ocupied_status::UNUSED, std::memory_order_release );
 		return;
 	}
 
-	bool try_to_get_owner( void )
+	/*!
+	 * @breif	スレッド終了時に管理しているスレッドローカルストレージを解放する。
+	 *
+	 * Tがthreadlocal_destructor(void)というメンバ関数を持たない場合、すぐにデストラクタを呼び出す。
+	 */
+	template <typename U = T, typename std::enable_if<!is_callable_threadlocal_destructor<U>::value>::type* = nullptr>
+	void release_owner( void )
+	{
+		p_value->~T();
+		std::free( p_value );
+
+		p_value = nullptr;
+		status_.store( ocupied_status::UNUSED, std::memory_order_release );
+		return;
+	}
+
+	bool
+	try_to_get_owner( void )
 	{
 		ocupied_status cur;
 		cur = get_status();
@@ -104,6 +159,16 @@ private:
 
 }   // namespace internal
 
+/*!
+ * @breif	動的スレッドローカルストレージを実現するクラス
+ *
+ * T型が、threadlocal_destructor()というメンバ関数を持つ場合、スレッド終了時にスレッドローカルストレージをdestructする前に、threadlocal_destructor()を呼び出す。
+ * このクラスのインスタンス変数自体がdestructされる場合は、threadlocal_destructor()は呼び出されない。
+ *
+ * @note
+ * lf_mem_allocクラスで使用するため、
+ * コンポーネントの上下関係から、メモリの確保にはnewを使用せず、malloc/freeと配置newのみを使用する。
+ */
 template <typename T>
 class dynamic_tls {
 public:
@@ -135,7 +200,8 @@ public:
 		internal::tls_data_container<T>* p_cur = head_.load( std::memory_order_acquire );
 		while ( p_cur != nullptr ) {
 			internal::tls_data_container<T>* p_nxt = p_cur->get_next();
-			delete p_cur;
+			p_cur->~tls_data_container();
+			std::free( p_cur );
 			p_cur = p_nxt;
 		}
 	}
@@ -148,7 +214,8 @@ public:
 		if ( p_tls == nullptr ) {
 			p_tls = allocate_free_tls_container();
 			if ( p_tls == nullptr ) {
-				p_tls = new internal::tls_data_container<T>();
+				void* p_tmp = std::malloc( sizeof( internal::tls_data_container<T> ) );
+				p_tls       = new ( p_tmp ) internal::tls_data_container<T>();
 			}
 			p_tls->p_value = pred();
 
@@ -166,7 +233,10 @@ public:
 	template <typename... Args>
 	value_reference get_tls_instance( Args... args )
 	{
-		return get_tls_instance_pred( [&args...]() { return new T( args... ); } );
+		return get_tls_instance_pred( [&args...]() {
+			void* p_tmp = std::malloc( sizeof( T ) );
+			return new ( p_tmp ) T( args... );
+		} );
 	}
 
 private:

@@ -23,6 +23,7 @@ namespace alpha {
 namespace concurrent {
 
 namespace internal {
+
 /*!
  * @breif	lock freeで使用するノードの基本クラス
  *

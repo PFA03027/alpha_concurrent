@@ -27,6 +27,8 @@ namespace concurrent {
 
 namespace internal {
 
+class idx_mgr;
+
 /*!
  * @breif	chunk control status
  */
@@ -62,12 +64,14 @@ struct idx_mgr_element {
  * スレッドローカルデータとして管理されるため、排他制御は不要なクラス
  *
  * @note
- * スレッドローカルストレージは、情報の伝搬が難しいため、バッファの再構築の要否を判定するために、バッファ構築のバージョン情報を使用使用する方式を採る。
+ * スレッドローカルストレージは、情報の伝搬が難しいため、バッファの再構築の要否を判定するために、バッファ構築のバージョン情報を使用する方式を採る。
  */
 struct waiting_idx_list {
 public:
-	waiting_idx_list( const int idx_buff_size_arg, const int ver_arg );
+	waiting_idx_list( idx_mgr* p_owner_of_idx_arg, const int idx_buff_size_arg, const int ver_arg );
 	~waiting_idx_list();
+
+	void threadlocal_destructor( void );
 
 	int  pop_from_tls( const int idx_buff_size_arg, const int ver_arg );
 	void push_to_tls( const int valid_idx, const int idx_buff_size_arg, const int ver_arg );
@@ -75,10 +79,11 @@ public:
 	void dump( void ) const;
 
 private:
-	int  ver_;
-	int  idx_buff_size_;
-	int  idx_top_idx_;
-	int* p_idx_buff_;
+	idx_mgr* p_owner_of_idx_;
+	int      ver_;
+	int      idx_buff_size_;
+	int      idx_top_idx_;
+	int*     p_idx_buff_;
 
 	void chk_reset_and_set_size( const int idx_buff_size_arg, const int ver_arg );
 };
@@ -232,6 +237,8 @@ struct idx_mgr {
 		return valid_element_storage_.get_collision_cnt();
 	}
 
+	void rcv_wait_idx_by_thread_terminating( waiting_idx_list* p_idx_list );
+
 private:
 	int                           idx_size_;                  //!< 割り当てられたインデックス番号の数
 	int                           idx_size_ver_;              //!< 割り当てられたインデックス番号の数の情報のバージョン番号
@@ -239,6 +246,9 @@ private:
 	idx_element_storage_mgr       invalid_element_storage_;   //!< インデックス番号を所持しない要素を管理するストレージ
 	idx_element_storage_mgr       valid_element_storage_;     //!< インデックス番号を所持する要素を管理するストレージ
 	dynamic_tls<waiting_idx_list> tls_waiting_idx_list_;      //!< 滞留インデックスを管理するスレッドローカルリスト
+
+	std::mutex       mtx_rcv_waiting_idx_list_;   //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ(rcv_waiting_idx_list_)の排他制御を行う
+	waiting_idx_list rcv_waiting_idx_list_;
 };
 
 struct slot_chk_result;
@@ -323,7 +333,7 @@ private:
 
 	std::atomic_bool* p_free_slot_mark_ = nullptr;   //!< if slot is free, this is marked as true. This is prior information than free slot idx stack.
 
-	internal::idx_mgr free_slot_idx_mgr_;
+	idx_mgr free_slot_idx_mgr_;   //<! manager of free slot index
 
 	void* p_chunk_ = nullptr;   //!< pointer to an allocated memory as a chunk
 

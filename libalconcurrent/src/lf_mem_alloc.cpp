@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <exception>
+#include <mutex>
 #include <stdexcept>
 #include <vector>
 
@@ -149,8 +150,9 @@ void waiting_element_list::dump( void ) const
 	return;
 }
 
-waiting_idx_list::waiting_idx_list( const int idx_buff_size_arg, const int ver_arg )
-  : ver_( ver_arg )
+waiting_idx_list::waiting_idx_list( idx_mgr* p_owner_of_idx_arg, const int idx_buff_size_arg, const int ver_arg )
+  : p_owner_of_idx_( p_owner_of_idx_arg )
+  , ver_( ver_arg )
   , idx_buff_size_( idx_buff_size_arg )
   , idx_top_idx_( 0 )
   , p_idx_buff_( nullptr )
@@ -164,7 +166,27 @@ waiting_idx_list::waiting_idx_list( const int idx_buff_size_arg, const int ver_a
 
 waiting_idx_list::~waiting_idx_list()
 {
+	if ( idx_top_idx_ > 0 ) {
+		char buf[2048];
+
+		snprintf( buf, 2047, "waiting_idx_list_%p is destructed. but it has some index {", this );
+		LogOutput( log_type::WARN, buf );
+		for ( int i = 0; i < idx_top_idx_; i++ ) {
+			snprintf( buf, 2047, "\t%d,", p_idx_buff_[i] );
+			LogOutput( log_type::WARN, buf );
+		}
+		LogOutput( log_type::WARN, "}" );
+
+		// TODO このケースの場合、滞留しているindexが使用中のまま再利用されない状態となる。リカバーは、GCスレッド実装時に行う。
+	}
+
 	delete[] p_idx_buff_;
+}
+
+void waiting_idx_list::threadlocal_destructor( void )
+{
+	p_owner_of_idx_->rcv_wait_idx_by_thread_terminating( this );
+	return;
 }
 
 void waiting_idx_list::chk_reset_and_set_size( const int idx_buff_size_arg, const int ver_arg )
@@ -402,11 +424,11 @@ idx_mgr::idx_mgr(
   , p_idx_mgr_element_array_( nullptr )
   , invalid_element_storage_( &idx_mgr_element::p_invalid_idx_next_element_ )
   , valid_element_storage_( &idx_mgr_element::p_valid_idx_next_element_ )
+  , rcv_waiting_idx_list_( this, idx_size_, idx_size_ver_ )
 {
-
 	if ( idx_size_ < 0 ) return;
 
-	tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
+	tls_waiting_idx_list_.get_tls_instance( this, idx_size_, idx_size_ver_ );
 
 	set_idx_size( idx_size_ );
 	return;
@@ -444,7 +466,7 @@ void idx_mgr::set_idx_size( const int idx_size_arg )
 int idx_mgr::pop( void )
 {
 	int               ans       = -1;
-	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
+	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( this, idx_size_, idx_size_ver_ );
 
 	ans = wait_list.pop_from_tls( idx_size_, idx_size_ver_ );
 	if ( ans != -1 ) {
@@ -453,7 +475,16 @@ int idx_mgr::pop( void )
 
 	idx_mgr_element* p_valid_pop_element = valid_element_storage_.pop_element();
 
-	if ( p_valid_pop_element == nullptr ) return -1;
+	if ( p_valid_pop_element == nullptr ) {
+		std::unique_lock<std::mutex> lk( mtx_rcv_waiting_idx_list_, std::try_to_lock );
+		if ( lk.owns_lock() ) {
+			int tmp_ans = rcv_waiting_idx_list_.pop_from_tls( idx_size_, idx_size_ver_ );
+			if ( tmp_ans >= 0 ) {
+				return tmp_ans;
+			}
+		}
+		return -1;
+	}
 
 	ans                       = p_valid_pop_element->idx_;
 	p_valid_pop_element->idx_ = -1;
@@ -467,7 +498,7 @@ void idx_mgr::push(
 	const int idx_arg   //!< [in] 返却するインデックス番号
 )
 {
-	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
+	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( this, idx_size_, idx_size_ver_ );
 
 	idx_mgr_element* p_invalid_element = invalid_element_storage_.pop_element();
 
@@ -484,11 +515,25 @@ void idx_mgr::push(
 	return;
 }
 
+void idx_mgr::rcv_wait_idx_by_thread_terminating( waiting_idx_list* p_idx_list )
+{
+	std::lock_guard<std::mutex> lock( mtx_rcv_waiting_idx_list_ );
+
+	int tmp_idx = p_idx_list->pop_from_tls( idx_size_, idx_size_ver_ );
+
+	while ( tmp_idx >= 0 ) {
+		rcv_waiting_idx_list_.push_to_tls( tmp_idx, idx_size_, idx_size_ver_ );
+		tmp_idx = p_idx_list->pop_from_tls( idx_size_, idx_size_ver_ );
+	}
+
+	return;
+}
+
 void idx_mgr::dump( void )
 {
 	char buf[2048];
 
-	const waiting_idx_list& tmp_wel = tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
+	const waiting_idx_list& tmp_wel = tls_waiting_idx_list_.get_tls_instance( this, idx_size_, idx_size_ver_ );
 
 	snprintf( buf, 2047,
 	          "object idx_mgr_%p as %p {\n"
