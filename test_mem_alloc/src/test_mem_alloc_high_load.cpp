@@ -1,11 +1,11 @@
 /*!
  * @file	test_mem_alloc_high_load.cpp
  * @brief
- * @author	alpha
+ * @author	Teruaki Ata
  * @date	Created on 2021/05/16
  * @details
  *
- * Copyright (C) 2021 by alpha <e-mail address>
+ * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 #include <pthread.h>
 
@@ -722,6 +722,7 @@ void load_test_malloc_free_actual_behavior( int num_of_thd )
 	std::cout << "thread is " << num_of_thd
 			  << " load_test_malloc_free_actual_behavior() Exec time: " << diff.count() << " msec" << std::endl;
 }
+
 
 void load_test( void )
 {

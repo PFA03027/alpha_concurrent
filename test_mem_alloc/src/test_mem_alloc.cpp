@@ -170,6 +170,7 @@ void test_general_mem_allocator( void )
 }
 
 extern void load_test( void );
+extern void load_test_alloc_free_bw_mult_thread(void);
 
 int main( void )
 {
@@ -180,6 +181,7 @@ int main( void )
 	test_general_mem_allocator();
 
 	load_test();
+	load_test_alloc_free_bw_mult_thread();
 
 	puts( "!!!End Test World!!!" );
 	return EXIT_SUCCESS;
