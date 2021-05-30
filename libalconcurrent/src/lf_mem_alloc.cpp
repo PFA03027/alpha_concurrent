@@ -543,6 +543,7 @@ void idx_mgr::dump( void )
 	return;
 }
 
+////////////////////////////////////////////////////////////////////////////////
 constexpr int num_of_free_chk_try = 10;
 
 template <typename T>
@@ -563,11 +564,36 @@ private:
 	T& atomic_couter_ref;
 };
 
+////////////////////////////////////////////////////////////////////////////////
+
+void slot_header::set_addr_of_chunk_header_multi_slot(
+	chunk_header_multi_slot* p_chms_arg )
+{
+	// 今は簡単な仕組みで実装する
+	p_chms = p_chms_arg;
+	mark   = 0 - reinterpret_cast<std::uintptr_t>( p_chms );
+
+	return;
+}
+
+slot_chk_result slot_header::chk_header_data( void ) const
+{
+	// 今は簡単な仕組みで実装する
+	std::uintptr_t tmp = reinterpret_cast<std::uintptr_t>( p_chms );
+	tmp += mark;
+
+	slot_chk_result ans;
+	ans.correct = ( tmp == 0 );
+	ans.p_chms  = p_chms;
+	return ans;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 chunk_header_multi_slot::chunk_header_multi_slot(
 	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
 	)
   : p_next_chunk_( nullptr )
-  , status_( internal::chunk_control_status::EMPTY )
+  , status_( chunk_control_status::EMPTY )
   , num_of_accesser_( 0 )
   , alloc_conf_( ch_param_arg )
   , p_free_slot_mark_( nullptr )
@@ -594,13 +620,23 @@ chunk_header_multi_slot::~chunk_header_multi_slot()
 	return;
 }
 
+constexpr std::size_t get_slot_header_size( void )
+{
+	std::size_t tmp = sizeof( slot_header ) / sizeof( std::max_align_t );
+	std::size_t adt = sizeof( slot_header ) % sizeof( std::max_align_t );
+
+	std::size_t ans = ( tmp + ( ( adt > 0 ) ? 1 : 0 ) ) * sizeof( std::max_align_t );
+
+	return ans;
+}
+
 std::size_t chunk_header_multi_slot::get_size_of_one_slot( void ) const
 {
-	std::size_t ans;
 	std::size_t tmp = alloc_conf_.size_of_one_piece_ / sizeof( std::max_align_t );
 	std::size_t adt = alloc_conf_.size_of_one_piece_ % sizeof( std::max_align_t );
 
-	ans = ( tmp + ( ( adt > 0 ) ? 1 : 0 ) ) * sizeof( std::max_align_t );
+	std::size_t ans = ( tmp + ( ( adt > 0 ) ? 1 : 0 ) ) * sizeof( std::max_align_t );
+	ans += get_slot_header_size();
 
 	return ans;
 }
@@ -608,21 +644,21 @@ std::size_t chunk_header_multi_slot::get_size_of_one_slot( void ) const
 bool chunk_header_multi_slot::alloc_new_chunk( void )
 {
 	// get ownership to allocate a chunk
-	internal::chunk_control_status expect = internal::chunk_control_status::EMPTY;
-	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, internal::chunk_control_status::RESERVED_ALLOCATION );
+	internal::chunk_control_status expect = chunk_control_status::EMPTY;
+	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::RESERVED_ALLOCATION );
 	if ( !result ) return false;
 
 	std::size_t tmp_size;
 	tmp_size = alloc_conf_.size_of_one_piece_ * alloc_conf_.num_of_pieces_;
 
 	if ( tmp_size == 0 ) {
-		status_.store( internal::chunk_control_status::EMPTY );
+		status_.store( chunk_control_status::EMPTY );
 		return false;
 	}
 
 	p_chunk_ = std::malloc( tmp_size );
 	if ( p_chunk_ == nullptr ) {
-		status_.store( internal::chunk_control_status::EMPTY );
+		status_.store( chunk_control_status::EMPTY );
 		return false;
 	}
 
@@ -637,14 +673,14 @@ bool chunk_header_multi_slot::alloc_new_chunk( void )
 
 	free_slot_idx_mgr_.set_idx_size( alloc_conf_.num_of_pieces_ );
 
-	status_.store( internal::chunk_control_status::NORMAL );
+	status_.store( chunk_control_status::NORMAL );
 
 	return true;
 }
 
 void* chunk_header_multi_slot::allocate_mem_slot( void )
 {
-	if ( status_.load() != internal::chunk_control_status::NORMAL ) return nullptr;
+	if ( status_.load() != chunk_control_status::NORMAL ) return nullptr;
 
 	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
 
@@ -661,32 +697,39 @@ void* chunk_header_multi_slot::allocate_mem_slot( void )
 	std::uintptr_t p_ans_addr = reinterpret_cast<std::uintptr_t>( p_chunk_ );
 	p_ans_addr += read_idx * alloc_conf_.size_of_one_piece_;
 
-	return reinterpret_cast<void*>( p_ans_addr );
+	slot_header* p_sh = reinterpret_cast<slot_header*>( p_ans_addr );
+	p_sh->set_addr_of_chunk_header_multi_slot( this );
+
+	return reinterpret_cast<void*>( p_ans_addr + get_slot_header_size() );
 }
 
 bool chunk_header_multi_slot::recycle_mem_slot(
-	void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
+	void* p_recycle_addr   //!< [in] pointer to the memory slot to recycle.
 )
 {
 	switch ( status_.load( std::memory_order_acquire ) ) {
 		default:
-		case internal::chunk_control_status::EMPTY:
-		case internal::chunk_control_status::RESERVED_ALLOCATION:
-		case internal::chunk_control_status::DELETION:
+		case chunk_control_status::EMPTY:
+		case chunk_control_status::RESERVED_ALLOCATION:
+		case chunk_control_status::DELETION:
 			return false;
 			break;
 
-		case internal::chunk_control_status::NORMAL:
-		case internal::chunk_control_status::RESERVED_DELETION:
+		case chunk_control_status::NORMAL:
+		case chunk_control_status::RESERVED_DELETION:
 			break;
 	}
 
 	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
 
-	// check correct address or not.
-	if ( p_recycle_slot < p_chunk_ ) return false;
+	std::uintptr_t slot_header_addr_tmp = reinterpret_cast<std::uintptr_t>( p_recycle_addr );
+	slot_header_addr_tmp -= get_slot_header_size();
+	void* p_slot_addr = reinterpret_cast<void*>( slot_header_addr_tmp );
 
-	std::uintptr_t p_chking_addr = reinterpret_cast<std::uintptr_t>( p_recycle_slot );
+	// check correct address or not.
+	if ( p_slot_addr < p_chunk_ ) return false;
+
+	std::uintptr_t p_chking_addr = reinterpret_cast<std::uintptr_t>( p_slot_addr );
 	p_chking_addr -= reinterpret_cast<std::uintptr_t>( p_chunk_ );
 
 	std::uintptr_t idx = p_chking_addr / alloc_conf_.size_of_one_piece_;
@@ -720,15 +763,15 @@ const param_chunk_allocation& chunk_header_multi_slot::get_param( void ) const
 
 bool chunk_header_multi_slot::set_delete_reservation( void )
 {
-	internal::chunk_control_status expect = internal::chunk_control_status::NORMAL;
-	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, internal::chunk_control_status::RESERVED_DELETION );
+	internal::chunk_control_status expect = chunk_control_status::NORMAL;
+	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::RESERVED_DELETION );
 	return result;
 }
 
 bool chunk_header_multi_slot::unset_delete_reservation( void )
 {
-	internal::chunk_control_status expect = internal::chunk_control_status::RESERVED_DELETION;
-	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, internal::chunk_control_status::NORMAL );
+	internal::chunk_control_status expect = chunk_control_status::RESERVED_DELETION;
+	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::NORMAL );
 	return result;
 }
 
@@ -736,8 +779,8 @@ bool chunk_header_multi_slot::exec_deletion( void )
 {
 	if ( num_of_accesser_.load() != 0 ) return false;
 
-	internal::chunk_control_status expect = internal::chunk_control_status::RESERVED_DELETION;
-	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, internal::chunk_control_status::DELETION );
+	internal::chunk_control_status expect = chunk_control_status::RESERVED_DELETION;
+	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::DELETION );
 
 	if ( !result ) return false;
 
@@ -747,9 +790,30 @@ bool chunk_header_multi_slot::exec_deletion( void )
 	delete[] p_free_slot_mark_;
 	p_free_slot_mark_ = nullptr;
 
-	status_.store( internal::chunk_control_status::EMPTY );
+	status_.store( chunk_control_status::EMPTY );
 
 	return true;
+}
+
+slot_chk_result chunk_header_multi_slot::get_chunk(
+	void* p_addr   //!< [in] void* address that allocate_mem_slot() returns
+)
+{
+	std::uintptr_t slot_header_addr_tmp = reinterpret_cast<std::uintptr_t>( p_addr );
+	slot_header_addr_tmp -= get_slot_header_size();
+	slot_header* p_slot_addr = reinterpret_cast<slot_header*>( slot_header_addr_tmp );
+
+	slot_chk_result ret = p_slot_addr->chk_header_data();
+	if ( !( ret.correct ) ) {
+		char buf[2048];
+
+		snprintf( buf, 2047,
+		          "a header of slot_header is corrupted %p\n",
+		          p_addr );
+		LogOutput( log_type::WARN, buf );
+	}
+
+	return ret;
 }
 
 chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
@@ -860,12 +924,12 @@ void* chunk_list::allocate_mem_slot( void )
 		if ( p_ans != nullptr ) {
 			return p_ans;
 		}
-		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == internal::chunk_control_status::RESERVED_DELETION ) {
+		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::RESERVED_DELETION ) {
 			if ( p_1st_rsv_del_chms == nullptr ) {
 				p_1st_rsv_del_chms = p_cur_chms;
 			}
 		}
-		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == internal::chunk_control_status::EMPTY ) {
+		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::EMPTY ) {
 			if ( p_1st_empty_chms == nullptr ) {
 				p_1st_empty_chms = p_cur_chms;
 			}
@@ -881,7 +945,7 @@ void* chunk_list::allocate_mem_slot( void )
 				return p_ans;
 			}
 		} else {
-			if ( p_1st_rsv_del_chms->status_.load( std::memory_order_acquire ) == internal::chunk_control_status::NORMAL ) {
+			if ( p_1st_rsv_del_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
 				p_ans = p_1st_rsv_del_chms->allocate_mem_slot();
 				if ( p_ans != nullptr ) {
 					return p_ans;
@@ -897,7 +961,7 @@ void* chunk_list::allocate_mem_slot( void )
 				return p_ans;
 			}
 		} else {
-			if ( p_1st_empty_chms->status_.load( std::memory_order_acquire ) == internal::chunk_control_status::NORMAL ) {
+			if ( p_1st_empty_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
 				p_ans = p_1st_empty_chms->allocate_mem_slot();
 				if ( p_ans != nullptr ) {
 					return p_ans;
@@ -1021,7 +1085,14 @@ void* general_mem_allocator::allocate(
 		}
 	}
 
-	p_ans = std::malloc( n );
+	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( std::malloc( n + internal::get_slot_header_size() ) );
+
+	p_sh->set_addr_of_chunk_header_multi_slot( nullptr );
+
+	std::uintptr_t tmp_ans = reinterpret_cast<std::uintptr_t>( p_sh );
+	tmp_ans += internal::get_slot_header_size();
+	p_ans = reinterpret_cast<void*>( tmp_ans );
+
 	return p_ans;
 }
 
@@ -1029,12 +1100,25 @@ void general_mem_allocator::deallocate(
 	void* p_mem   //!< [in] pointer to allocated memory by allocate()
 )
 {
-	for ( int i = 0; i < pr_ch_size_; i++ ) {
-		bool ret = up_param_ch_array_[i].up_chunk_lst_->recycle_mem_slot( p_mem );
-		if ( ret ) return;
-	}
+	internal::slot_chk_result chk_ret = internal::chunk_header_multi_slot::get_chunk( p_mem );
 
-	std::free( p_mem );
+	if ( chk_ret.correct ) {
+		if ( chk_ret.p_chms != nullptr ) {
+			chk_ret.p_chms->recycle_mem_slot( p_mem );
+		} else {
+			std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
+			tmp_addr -= internal::get_slot_header_size();
+			std::free( reinterpret_cast<void*>( tmp_addr ) );
+		}
+	} else {
+
+		for ( int i = 0; i < pr_ch_size_; i++ ) {
+			bool ret = up_param_ch_array_[i].up_chunk_lst_->recycle_mem_slot( p_mem );
+			if ( ret ) return;
+		}
+
+		std::free( p_mem );   // TODO should not do this ?
+	}
 
 	return;
 }

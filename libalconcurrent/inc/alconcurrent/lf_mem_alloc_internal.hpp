@@ -39,19 +39,6 @@ enum class chunk_control_status {
 };
 
 /*!
- * @breif	slot status
- */
-enum class slot_status {
-	INVALID,         //!< invalid queue slot
-	SLOT_RESERVED,   //!< this queue slot will use soon
-	VALID_IDX,       //!< free idx is valid in this slot
-	SOLD_OUT,        //!< index in this queue slot is sold out
-};
-
-
-
-
-/*!
  * @breif	使用可能なインデックス番号を管理する配列で使用する各要素のデータ構造
  *
  * 下記のスタック構造、あるいはリスト構造で管理される。
@@ -254,6 +241,7 @@ private:
 	dynamic_tls<waiting_idx_list> tls_waiting_idx_list_;      //!< 滞留インデックスを管理するスレッドローカルリスト
 };
 
+struct slot_chk_result;
 
 /*!
  * @breif	management information of a chunk
@@ -311,6 +299,15 @@ public:
 	bool alloc_new_chunk( void );
 
 	/*!
+	 * @breif	get chunk_header_multi_slot address from void* address that allocate_mem_slot() returns.
+	 *
+	 * @return	check result and pointer to chunk
+	 */
+	static slot_chk_result get_chunk(
+		void* p_addr   //!< [in] void* address that allocate_mem_slot() returns
+	);
+
+	/*!
 	 * @breif	get statistics
 	 */
 	chunk_statistics get_statistics( void ) const;
@@ -337,6 +334,21 @@ private:
 	std::atomic<unsigned int> statistics_dealloc_req_err_cnt_;
 
 	std::size_t get_size_of_one_slot( void ) const;
+};
+
+struct slot_chk_result {
+	bool                     correct;   //!< slot header result
+	chunk_header_multi_slot* p_chms;    //!< pointer to chunk_header_multi_slot. if correct is true and this pointer value is nullptr, it is allocated by malloc with slot_header
+};
+
+struct slot_header {
+	chunk_header_multi_slot* p_chms;   //!< pointer to chunk_header_multi_slot that is an owner of this slot
+	std::uintptr_t           mark;     //!< checker mark
+
+	void set_addr_of_chunk_header_multi_slot(
+		chunk_header_multi_slot* p_chms_arg );
+
+	slot_chk_result chk_header_data( void ) const;
 };
 
 /*!
@@ -389,7 +401,6 @@ private:
 	param_chunk_allocation                alloc_conf_;    //!< allocation configuration paramter
 	std::atomic<chunk_header_multi_slot*> p_top_chunk_;   //!< pointer to chunk_header that is top of list.
 };
-
 
 }   // namespace internal
 }   // namespace concurrent
