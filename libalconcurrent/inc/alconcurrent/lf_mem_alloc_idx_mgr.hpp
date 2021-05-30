@@ -26,6 +26,30 @@ namespace concurrent {
 namespace internal {
 
 /*!
+ * @breif	chunk control status
+ */
+enum class chunk_control_status {
+	EMPTY,                 //!< chunk header has no allocated chunk memory.
+	RESERVED_ALLOCATION,   //!< chunk header has no allocated chunk memory. But some one start to allocation
+	NORMAL,                //!< allow to allocate the memory from this chunk
+	RESERVED_DELETION,     //!< does not allow to allocate the memory from this chunk. But if needed to reuse this chunk, allow to change NORMAL
+	DELETION,              //!< does not allow to access any more except GC. After shift to this state, chunk memory will be free after confirmed accesser is zero.
+};
+
+/*!
+ * @breif	slot status
+ */
+enum class slot_status {
+	INVALID,         //!< invalid queue slot
+	SLOT_RESERVED,   //!< this queue slot will use soon
+	VALID_IDX,       //!< free idx is valid in this slot
+	SOLD_OUT,        //!< index in this queue slot is sold out
+};
+
+
+
+
+/*!
  * @breif	使用可能なインデックス番号を管理する配列で使用する各要素のデータ構造
  *
  * 下記のスタック構造、あるいはリスト構造で管理される。

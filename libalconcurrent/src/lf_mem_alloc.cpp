@@ -569,7 +569,7 @@ chunk_header_multi_slot::chunk_header_multi_slot(
 	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
 	)
   : p_next_chunk_( nullptr )
-  , status_( chunk_control_status::EMPTY )
+  , status_( internal::chunk_control_status::EMPTY )
   , num_of_accesser_( 0 )
   , alloc_conf_( ch_param_arg )
   , p_free_slot_mark_( nullptr )
@@ -610,21 +610,21 @@ std::size_t chunk_header_multi_slot::get_size_of_one_slot( void ) const
 bool chunk_header_multi_slot::alloc_new_chunk( void )
 {
 	// get ownership to allocate a chunk
-	chunk_control_status expect = chunk_control_status::EMPTY;
-	bool                 result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::RESERVED_ALLOCATION );
+	internal::chunk_control_status expect = internal::chunk_control_status::EMPTY;
+	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, internal::chunk_control_status::RESERVED_ALLOCATION );
 	if ( !result ) return false;
 
 	std::size_t tmp_size;
 	tmp_size = alloc_conf_.size_of_one_piece_ * alloc_conf_.num_of_pieces_;
 
 	if ( tmp_size == 0 ) {
-		status_.store( chunk_control_status::EMPTY );
+		status_.store( internal::chunk_control_status::EMPTY );
 		return false;
 	}
 
 	p_chunk_ = std::malloc( tmp_size );
 	if ( p_chunk_ == nullptr ) {
-		status_.store( chunk_control_status::EMPTY );
+		status_.store( internal::chunk_control_status::EMPTY );
 		return false;
 	}
 
@@ -639,14 +639,14 @@ bool chunk_header_multi_slot::alloc_new_chunk( void )
 
 	free_slot_idx_mgr_.set_idx_size( alloc_conf_.num_of_pieces_ );
 
-	status_.store( chunk_control_status::NORMAL );
+	status_.store( internal::chunk_control_status::NORMAL );
 
 	return true;
 }
 
 void* chunk_header_multi_slot::allocate_mem_slot( void )
 {
-	if ( status_.load() != chunk_control_status::NORMAL ) return nullptr;
+	if ( status_.load() != internal::chunk_control_status::NORMAL ) return nullptr;
 
 	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
 
@@ -672,14 +672,14 @@ bool chunk_header_multi_slot::recycle_mem_slot(
 {
 	switch ( status_.load( std::memory_order_acquire ) ) {
 		default:
-		case chunk_control_status::EMPTY:
-		case chunk_control_status::RESERVED_ALLOCATION:
-		case chunk_control_status::DELETION:
+		case internal::chunk_control_status::EMPTY:
+		case internal::chunk_control_status::RESERVED_ALLOCATION:
+		case internal::chunk_control_status::DELETION:
 			return false;
 			break;
 
-		case chunk_control_status::NORMAL:
-		case chunk_control_status::RESERVED_DELETION:
+		case internal::chunk_control_status::NORMAL:
+		case internal::chunk_control_status::RESERVED_DELETION:
 			break;
 	}
 
@@ -722,15 +722,15 @@ const param_chunk_allocation& chunk_header_multi_slot::get_param( void ) const
 
 bool chunk_header_multi_slot::set_delete_reservation( void )
 {
-	chunk_control_status expect = chunk_control_status::NORMAL;
-	bool                 result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::RESERVED_DELETION );
+	internal::chunk_control_status expect = internal::chunk_control_status::NORMAL;
+	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, internal::chunk_control_status::RESERVED_DELETION );
 	return result;
 }
 
 bool chunk_header_multi_slot::unset_delete_reservation( void )
 {
-	chunk_control_status expect = chunk_control_status::RESERVED_DELETION;
-	bool                 result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::NORMAL );
+	internal::chunk_control_status expect = internal::chunk_control_status::RESERVED_DELETION;
+	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, internal::chunk_control_status::NORMAL );
 	return result;
 }
 
@@ -738,8 +738,8 @@ bool chunk_header_multi_slot::exec_deletion( void )
 {
 	if ( num_of_accesser_.load() != 0 ) return false;
 
-	chunk_control_status expect = chunk_control_status::RESERVED_DELETION;
-	bool                 result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::DELETION );
+	internal::chunk_control_status expect = internal::chunk_control_status::RESERVED_DELETION;
+	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, internal::chunk_control_status::DELETION );
 
 	if ( !result ) return false;
 
@@ -749,7 +749,7 @@ bool chunk_header_multi_slot::exec_deletion( void )
 	delete[] p_free_slot_mark_;
 	p_free_slot_mark_ = nullptr;
 
-	status_.store( chunk_control_status::EMPTY );
+	status_.store( internal::chunk_control_status::EMPTY );
 
 	return true;
 }
@@ -862,12 +862,12 @@ void* chunk_list::allocate_mem_slot( void )
 		if ( p_ans != nullptr ) {
 			return p_ans;
 		}
-		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::RESERVED_DELETION ) {
+		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == internal::chunk_control_status::RESERVED_DELETION ) {
 			if ( p_1st_rsv_del_chms == nullptr ) {
 				p_1st_rsv_del_chms = p_cur_chms;
 			}
 		}
-		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::EMPTY ) {
+		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == internal::chunk_control_status::EMPTY ) {
 			if ( p_1st_empty_chms == nullptr ) {
 				p_1st_empty_chms = p_cur_chms;
 			}
@@ -883,7 +883,7 @@ void* chunk_list::allocate_mem_slot( void )
 				return p_ans;
 			}
 		} else {
-			if ( p_1st_rsv_del_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
+			if ( p_1st_rsv_del_chms->status_.load( std::memory_order_acquire ) == internal::chunk_control_status::NORMAL ) {
 				p_ans = p_1st_rsv_del_chms->allocate_mem_slot();
 				if ( p_ans != nullptr ) {
 					return p_ans;
@@ -899,7 +899,7 @@ void* chunk_list::allocate_mem_slot( void )
 				return p_ans;
 			}
 		} else {
-			if ( p_1st_empty_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
+			if ( p_1st_empty_chms->status_.load( std::memory_order_acquire ) == internal::chunk_control_status::NORMAL ) {
 				p_ans = p_1st_empty_chms->allocate_mem_slot();
 				if ( p_ans != nullptr ) {
 					return p_ans;

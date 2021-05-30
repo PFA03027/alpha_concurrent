@@ -31,27 +31,6 @@ struct param_chunk_allocation {
 	std::size_t num_of_pieces_     = 0;   //!< number of pieces in a chunk
 };
 
-/*!
- * @breif	chunk control status
- */
-enum class chunk_control_status {
-	EMPTY,                 //!< chunk header has no allocated chunk memory.
-	RESERVED_ALLOCATION,   //!< chunk header has no allocated chunk memory. But some one start to allocation
-	NORMAL,                //!< allow to allocate the memory from this chunk
-	RESERVED_DELETION,     //!< does not allow to allocate the memory from this chunk. But if needed to reuse this chunk, allow to change NORMAL
-	DELETION,              //!< does not allow to access any more except GC. After shift to this state, chunk memory will be free after confirmed accesser is zero.
-};
-
-/*!
- * @breif	slot status
- */
-enum class slot_status {
-	INVALID,         //!< invalid queue slot
-	SLOT_RESERVED,   //!< this queue slot will use soon
-	VALID_IDX,       //!< free idx is valid in this slot
-	SOLD_OUT,        //!< index in this queue slot is sold out
-};
-
 struct chunk_statistics {
 	param_chunk_allocation alloc_conf_;
 	std::size_t            chunk_num_;
@@ -71,7 +50,7 @@ struct chunk_statistics {
 class chunk_header_multi_slot {
 public:
 	std::atomic<chunk_header_multi_slot*> p_next_chunk_;      //!< pointer to next chunk header. chunk header does not free. therefore we don't need to consider ABA.
-	std::atomic<chunk_control_status>     status_;            //!< chunk status for GC
+	std::atomic<internal::chunk_control_status>     status_;            //!< chunk status for GC
 	std::atomic<int>                      num_of_accesser_;   //!< number of accesser
 
 	/*!
