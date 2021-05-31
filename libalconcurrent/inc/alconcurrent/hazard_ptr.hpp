@@ -49,6 +49,7 @@ public:
 	static constexpr int hzrd_max_slot = N;
 
 	hazard_ptr( void )
+	  : p_hzd_ptr_node_( threadlocal_destructor_functor() )
 	{
 	}
 
@@ -203,20 +204,6 @@ private:
 			return next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
 		}
 
-		static void destr_fn( void* parm )
-		{
-			LogOutput( log_type::DEBUG, "thread local destructor now being called -- " );
-
-			if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
-
-			node_for_hazard_ptr* p_target_node = reinterpret_cast<node_for_hazard_ptr*>( parm );
-
-			p_target_node->release_owner();
-
-			LogOutput( log_type::DEBUG, "thread local destructor is done." );
-			return;
-		}
-
 		void release_owner( void )
 		{
 			clear_hazard_ptr_all();
@@ -350,15 +337,25 @@ private:
 
 	inline node_for_hazard_ptr* check_local_storage( void )
 	{
-		node_for_hazard_ptr* p_ans = p_hzd_ptr_node__.get_tls_instance( nullptr );
+		node_for_hazard_ptr* p_ans = p_hzd_ptr_node_.get_tls_instance( nullptr );
 		if ( p_ans == nullptr ) {
-			p_ans                               = get_head_instance().allocate_hazard_ptr_node();
-			p_hzd_ptr_node__.get_tls_instance() = p_ans;
+			p_ans                              = get_head_instance().allocate_hazard_ptr_node();
+			p_hzd_ptr_node_.get_tls_instance() = p_ans;
 		}
 		return p_ans;
 	}
 
-	dynamic_tls<node_for_hazard_ptr*> p_hzd_ptr_node__;
+	struct threadlocal_destructor_functor {
+		using value_type      = node_for_hazard_ptr*;
+		using value_reference = value_type&;
+		void operator()( value_reference data )
+		{
+			data->release_owner();
+			return;
+		}
+	};
+
+	dynamic_tls<node_for_hazard_ptr*, threadlocal_destructor_functor> p_hzd_ptr_node_;
 };
 
 /*!

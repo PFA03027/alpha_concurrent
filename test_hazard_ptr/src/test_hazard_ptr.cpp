@@ -179,6 +179,7 @@ int main( void )
 
 	for ( int i = 0; i < num_thread; i++ ) {
 		//	for ( int i = 0; i < 1; i++ ) {
+		std::cout << "\t!!!Start " << i << std::endl;   // prints !!!Hello World!!!
 		test_case1();
 	}
 

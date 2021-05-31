@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <list>
 #include <random>
 
 #include "alconcurrent/lf_fifo.hpp"
@@ -649,9 +650,20 @@ void test_fixed_array( void )
 using test_fifo_type  = alpha::concurrent::fifo_list<std::uintptr_t>;
 using test_fifo_type2 = alpha::concurrent::fifo_list<std::uintptr_t, false>;
 
+// example
+static alpha::concurrent::param_chunk_allocation param[] = {
+	{ 32, 100 },
+	{ 64, 100 },
+	{ 128, 100 },
+};
+
 int main( void )
 {
 	std::cout << "!!!Start World!!!" << std::endl;   // prints !!!Hello World!!!
+
+#ifdef USE_LOCK_FREE_MEM_ALLOC
+	set_param_to_free_nd_mem_alloc( param, 3 );
+#endif
 
 	test_pointer();
 	test_array();
@@ -669,16 +681,7 @@ int main( void )
 	std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::internal::node_of_list::get_statistics();
 
 	for ( auto& e : statistics ) {
-		printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d\n",
-		        (int)e.alloc_conf_.size_of_one_piece_,
-		        (int)e.alloc_conf_.num_of_pieces_,
-		        (int)e.chunk_num_,
-		        (int)e.total_slot_cnt_,
-		        (int)e.free_slot_cnt_,
-		        (int)e.alloc_req_cnt_,
-		        (int)e.error_alloc_req_cnt_,
-		        (int)e.dealloc_req_cnt_,
-		        (int)e.error_dealloc_req_cnt_ );
+		printf( "%s\n", e.print().c_str() );
 	}
 #endif
 

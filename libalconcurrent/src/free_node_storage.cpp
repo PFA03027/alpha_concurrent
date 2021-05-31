@@ -205,6 +205,8 @@ bool fifo_free_nd_list::check_hazard_list( fifo_free_nd_list::node_pointer const
 
 free_nd_storage::free_nd_storage( void )
   : allocated_node_count_( 0 )
+  , tls_fifo_( rcv_fifo_list_by_thread_terminating( this ) )
+  , rcv_thread_local_fifo_list_()
 {
 }
 
@@ -243,31 +245,35 @@ int free_nd_storage::get_allocated_num( void )
 	return allocated_node_count_.load( std::memory_order_acquire );
 }
 
-void free_nd_storage::destr_fn( void* parm )
+void free_nd_storage::rcv_thread_local_fifo_list( thread_local_fifo_list* p_rcv )
 {
-	LogOutput( log_type::DEBUG, "thread local destructor now being called -- %p -- ", parm );
+	std::lock_guard<std::mutex> lock( mtx_rcv_thread_local_fifo_list_ );
 
-	if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
+	auto p_np = p_rcv->pop();
 
-	thread_local_fifo_list* p_target_node = reinterpret_cast<thread_local_fifo_list*>( parm );
-	delete p_target_node;
+	while ( p_np != nullptr ) {
+		rcv_thread_local_fifo_list_.push( p_np );
+		p_np = p_rcv->pop();
+	}
 
-	LogOutput( log_type::DEBUG, "thread local destructor is done." );
 	return;
 }
 
 #ifdef USE_LOCK_FREE_MEM_ALLOC
 
+#if 0
+// example
 static param_chunk_allocation param[] = {
 	{ 32, 100 },
 	{ 64, 100 },
 	{ 128, 100 },
 };
+#endif
 
 static general_mem_allocator& get_gma( void )
 {
-	static general_mem_allocator siglton( param, 3 );
-	return siglton;
+	static general_mem_allocator singlton;
+	return singlton;
 }
 
 void* node_of_list::operator new( std::size_t n )   // usual new...(1)
@@ -317,5 +323,26 @@ std::list<chunk_statistics> node_of_list::get_statistics( void )
 #endif
 
 }   // namespace internal
+
+#ifdef USE_LOCK_FREE_MEM_ALLOC
+/*!
+ * @breif	Set parameters in the lock-free memory allocator to enable the function.
+ *
+ * ロックフリーメモリアロケータに、パラメータを設定し機能を有効化する。
+ *
+ * @note
+ * If this I / F parameter setting is not performed, memory allocation using malloc / free will be performed. @n
+ * このI/Fによるパラメータ設定が行われない場合、malloc/freeを使用したメモリアロケーションが行われる。
+ */
+void set_param_to_free_nd_mem_alloc(
+	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
+	unsigned int                  num              //!< [in] array size
+)
+{
+	internal::get_gma().set_param( p_param_array, num );
+}
+
+#endif
+
 }   // namespace concurrent
 }   // namespace alpha

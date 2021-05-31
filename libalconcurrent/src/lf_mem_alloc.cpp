@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <exception>
+#include <mutex>
 #include <stdexcept>
 #include <vector>
 
@@ -149,111 +150,18 @@ void waiting_element_list::dump( void ) const
 	return;
 }
 
-waiting_idx_list::waiting_idx_list( const int idx_buff_size_arg, const int ver_arg )
-  : ver_( ver_arg )
-  , idx_buff_size_( idx_buff_size_arg )
-  , idx_top_idx_( 0 )
-  , p_idx_buff_( nullptr )
-{
-
-	if ( idx_buff_size_arg >= 0 ) {
-		p_idx_buff_ = new int[idx_buff_size_];
-	}
-	return;
-}
-
-waiting_idx_list::~waiting_idx_list()
-{
-	delete[] p_idx_buff_;
-}
-
-void waiting_idx_list::chk_reset_and_set_size( const int idx_buff_size_arg, const int ver_arg )
-{
-	if ( ver_ == ver_arg ) return;
-
-	delete[] p_idx_buff_;
-	idx_buff_size_ = idx_buff_size_arg;
-	p_idx_buff_    = new int[idx_buff_size_];
-	idx_top_idx_   = 0;
-	ver_           = ver_arg;
-	return;
-}
-
-int waiting_idx_list::pop_from_tls( const int idx_buff_size_arg, const int ver_arg )
-{
-	chk_reset_and_set_size( idx_buff_size_arg, ver_arg );
-
-	int ans = -1;
-
-	if ( idx_top_idx_ <= 0 ) return ans;
-
-	idx_top_idx_--;
-
-	ans                       = p_idx_buff_[idx_top_idx_];
-	p_idx_buff_[idx_top_idx_] = -1;
-
-	return ans;
-}
-
-void waiting_idx_list::push_to_tls( const int valid_idx, const int idx_buff_size_arg, const int ver_arg )
-{
-	chk_reset_and_set_size( idx_buff_size_arg, ver_arg );
-
-	if ( idx_top_idx_ >= idx_buff_size_ ) {
-		throw std::exception();
-		return;
-	}
-
-	p_idx_buff_[idx_top_idx_] = valid_idx;
-	idx_top_idx_++;
-
-	return;
-}
-
-void waiting_idx_list::dump( void ) const
-{
-	char buf[2048];
-
-	snprintf( buf, 2047,
-	          "object waiting_idx_list_%p as %p {\n"
-	          "\t idx_buff_size_ = %d\n"
-	          "\t idx_top_idx_ = %d\n"
-	          "\t p_idx_buff_ = %p\n"
-	          "}\n",
-	          this, this,
-	          idx_buff_size_,
-	          idx_top_idx_,
-	          p_idx_buff_ );
-	LogOutput( log_type::DUMP, buf );
-
-	if ( p_idx_buff_ != nullptr ) {
-		snprintf( buf, 2047,
-		          "object p_idx_buff_%p as %p {\n",
-		          this, this );
-		LogOutput( log_type::DUMP, buf );
-
-		for ( int i = 0; i < idx_buff_size_; i++ ) {
-			snprintf( buf, 2047,
-			          "\t %d => %d\n",
-			          i, p_idx_buff_[i] );
-			LogOutput( log_type::DUMP, buf );
-		}
-
-		LogOutput( log_type::DUMP, "}\n" );
-	}
-
-	return;
-}
-
+////////////////////////////////////////////////////////////////////////////////
 /*!
  * @breif	インデックス管理スロットのロックフリーストレージクラス
  */
 idx_element_storage_mgr::idx_element_storage_mgr(
 	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_arg   //!< [in] nextポインタを保持しているメンバ変数へのメンバ変数ポインタ
 	)
-  : head_( nullptr )
+  : tls_waiting_list_( rcv_el_by_thread_terminating( this ) )
+  , head_( nullptr )
   , tail_( nullptr )
   , p_next_ptr_offset_( p_next_ptr_offset_arg )
+  , rcv_wait_element_list_()
   , collision_cnt_( 0 )
 {
 	return;
@@ -286,6 +194,14 @@ idx_mgr_element* idx_element_storage_mgr::pop_element( void )
 	} else {
 		// スレッドローカルストレージは空だったので、共有リストから取り出す。
 		p_ans = pop_element_from_list();
+
+		if ( p_ans == nullptr ) {
+			// 共有リストからの取得も出来なかったため、回収されたリストを確認する。
+			std::unique_lock<std::mutex> lk( mtx_rcv_wait_element_list_, std::try_to_lock );
+			if ( lk.owns_lock() ) {
+				p_ans = rcv_wait_element_list_.pop();
+			}
+		}
 	}
 
 	return p_ans;
@@ -391,6 +307,130 @@ void idx_element_storage_mgr::push_element_to_list(
 	return;
 }
 
+void idx_element_storage_mgr::rcv_wait_element_by_thread_terminating( waiting_element_list* p_el_list )
+{
+	std::lock_guard<std::mutex> lk( mtx_rcv_wait_element_list_ );
+
+	idx_mgr_element* p_poped_el = p_el_list->pop();
+	while ( p_poped_el != nullptr ) {
+		rcv_wait_element_list_.push( p_poped_el );
+		p_poped_el = p_el_list->pop();
+	}
+
+	return;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+waiting_idx_list::waiting_idx_list( const int idx_buff_size_arg, const int ver_arg )
+  : ver_( ver_arg )
+  , idx_buff_size_( idx_buff_size_arg )
+  , idx_top_idx_( 0 )
+  , p_idx_buff_( nullptr )
+{
+
+	if ( idx_buff_size_arg >= 0 ) {
+		p_idx_buff_ = new int[idx_buff_size_];
+	}
+	return;
+}
+
+waiting_idx_list::~waiting_idx_list()
+{
+	if ( idx_top_idx_ > 0 ) {
+		char buf[2048];
+
+		snprintf( buf, 2047, "waiting_idx_list_%p is destructed. but it has some index {", this );
+		LogOutput( log_type::WARN, buf );
+		for ( int i = 0; i < idx_top_idx_; i++ ) {
+			snprintf( buf, 2047, "\t%d,", p_idx_buff_[i] );
+			LogOutput( log_type::WARN, buf );
+		}
+		LogOutput( log_type::WARN, "}" );
+	}
+
+	delete[] p_idx_buff_;
+}
+
+void waiting_idx_list::chk_reset_and_set_size( const int idx_buff_size_arg, const int ver_arg )
+{
+	if ( ver_ == ver_arg ) return;
+
+	delete[] p_idx_buff_;
+	idx_buff_size_ = idx_buff_size_arg;
+	p_idx_buff_    = new int[idx_buff_size_];
+	idx_top_idx_   = 0;
+	ver_           = ver_arg;
+	return;
+}
+
+int waiting_idx_list::pop_from_tls( const int idx_buff_size_arg, const int ver_arg )
+{
+	chk_reset_and_set_size( idx_buff_size_arg, ver_arg );
+
+	int ans = -1;
+
+	if ( idx_top_idx_ <= 0 ) return ans;
+
+	idx_top_idx_--;
+
+	ans                       = p_idx_buff_[idx_top_idx_];
+	p_idx_buff_[idx_top_idx_] = -1;
+
+	return ans;
+}
+
+void waiting_idx_list::push_to_tls( const int valid_idx, const int idx_buff_size_arg, const int ver_arg )
+{
+	chk_reset_and_set_size( idx_buff_size_arg, ver_arg );
+
+	if ( idx_top_idx_ >= idx_buff_size_ ) {
+		throw std::exception();
+		return;
+	}
+
+	p_idx_buff_[idx_top_idx_] = valid_idx;
+	idx_top_idx_++;
+
+	return;
+}
+
+void waiting_idx_list::dump( void ) const
+{
+	char buf[2048];
+
+	snprintf( buf, 2047,
+	          "object waiting_idx_list_%p as %p {\n"
+	          "\t idx_buff_size_ = %d\n"
+	          "\t idx_top_idx_ = %d\n"
+	          "\t p_idx_buff_ = %p\n"
+	          "}\n",
+	          this, this,
+	          idx_buff_size_,
+	          idx_top_idx_,
+	          p_idx_buff_ );
+	LogOutput( log_type::DUMP, buf );
+
+	if ( p_idx_buff_ != nullptr ) {
+		snprintf( buf, 2047,
+		          "object p_idx_buff_%p as %p {\n",
+		          this, this );
+		LogOutput( log_type::DUMP, buf );
+
+		for ( int i = 0; i < idx_buff_size_; i++ ) {
+			snprintf( buf, 2047,
+			          "\t %d => %d\n",
+			          i, p_idx_buff_[i] );
+			LogOutput( log_type::DUMP, buf );
+		}
+
+		LogOutput( log_type::DUMP, "}\n" );
+	}
+
+	return;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /*!
  * @breif	コンストラクタ
  */
@@ -402,8 +442,9 @@ idx_mgr::idx_mgr(
   , p_idx_mgr_element_array_( nullptr )
   , invalid_element_storage_( &idx_mgr_element::p_invalid_idx_next_element_ )
   , valid_element_storage_( &idx_mgr_element::p_valid_idx_next_element_ )
+  , tls_waiting_idx_list_( rcv_idx_by_thread_terminating( this ) )
+  , rcv_waiting_idx_list_( idx_size_, idx_size_ver_ )
 {
-
 	if ( idx_size_ < 0 ) return;
 
 	tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
@@ -453,7 +494,16 @@ int idx_mgr::pop( void )
 
 	idx_mgr_element* p_valid_pop_element = valid_element_storage_.pop_element();
 
-	if ( p_valid_pop_element == nullptr ) return -1;
+	if ( p_valid_pop_element == nullptr ) {
+		std::unique_lock<std::mutex> lk( mtx_rcv_waiting_idx_list_, std::try_to_lock );
+		if ( lk.owns_lock() ) {
+			int tmp_ans = rcv_waiting_idx_list_.pop_from_tls( idx_size_, idx_size_ver_ );
+			if ( tmp_ans >= 0 ) {
+				return tmp_ans;
+			}
+		}
+		return -1;
+	}
 
 	ans                       = p_valid_pop_element->idx_;
 	p_valid_pop_element->idx_ = -1;
@@ -479,6 +529,20 @@ void idx_mgr::push(
 		p_invalid_element->idx_ = idx_arg;
 
 		valid_element_storage_.push_element( p_invalid_element );
+	}
+
+	return;
+}
+
+void idx_mgr::rcv_wait_idx_by_thread_terminating( waiting_idx_list* p_idx_list )
+{
+	std::lock_guard<std::mutex> lock( mtx_rcv_waiting_idx_list_ );
+
+	int tmp_idx = p_idx_list->pop_from_tls( idx_size_, idx_size_ver_ );
+
+	while ( tmp_idx >= 0 ) {
+		rcv_waiting_idx_list_.push_to_tls( tmp_idx, idx_size_, idx_size_ver_ );
+		tmp_idx = p_idx_list->pop_from_tls( idx_size_, idx_size_ver_ );
 	}
 
 	return;
@@ -1042,29 +1106,21 @@ chunk_statistics chunk_list::get_statistics( void ) const
 }   // namespace internal
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
+general_mem_allocator::general_mem_allocator( void )
+  : pr_ch_size_( 0 )
+  , up_param_ch_array_()
+{
+	return;
+}
+
 general_mem_allocator::general_mem_allocator(
 	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
-	int                           num              //!< [in] array size
+	unsigned int                  num              //!< [in] array size
 	)
-  : pr_ch_size_( num )
+  : pr_ch_size_( 0 )
+  , up_param_ch_array_()
 {
-	std::vector<int> idx_vec( pr_ch_size_ );
-
-	for ( int i = 0; i < pr_ch_size_; i++ ) {
-		idx_vec[i] = i;
-	}
-
-	std::sort( idx_vec.begin(), idx_vec.end(),
-	           [p_param_array]( int a, int b ) {
-				   return p_param_array[a].size_of_one_piece_ < p_param_array[b].size_of_one_piece_;
-			   } );
-
-	up_param_ch_array_ = std::unique_ptr<param_chunk_comb[]>( new param_chunk_comb[pr_ch_size_] );
-	for ( int i = 0; i < pr_ch_size_; i++ ) {
-		up_param_ch_array_[i].param_        = p_param_array[idx_vec[i]];
-		up_param_ch_array_[i].up_chunk_lst_ = std::unique_ptr<internal::chunk_list>( new internal::chunk_list( up_param_ch_array_[i].param_ ) );
-	}
-
+	set_param( p_param_array, num );
 	return;
 }
 
@@ -1073,7 +1129,7 @@ void* general_mem_allocator::allocate(
 )
 {
 	void* p_ans = nullptr;
-	for ( int i = 0; i < pr_ch_size_; i++ ) {
+	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
 		if ( up_param_ch_array_[i].param_.size_of_one_piece_ >= n ) {
 			p_ans = up_param_ch_array_[i].up_chunk_lst_->allocate_mem_slot();
 			if ( p_ans != nullptr ) {
@@ -1109,12 +1165,44 @@ void general_mem_allocator::deallocate(
 		}
 	} else {
 
-		for ( int i = 0; i < pr_ch_size_; i++ ) {
+		for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
 			bool ret = up_param_ch_array_[i].up_chunk_lst_->recycle_mem_slot( p_mem );
 			if ( ret ) return;
 		}
 
 		std::free( p_mem );   // TODO should not do this ?
+	}
+
+	return;
+}
+
+void general_mem_allocator::set_param(
+	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
+	unsigned int                  num              //!< [in] array size
+)
+{
+	if ( pr_ch_size_ > 0 ) {
+		LogOutput( log_type::WARN, "paramter has already set. ignore this request." );
+		return;
+	}
+
+	pr_ch_size_ = num;
+
+	std::vector<int> idx_vec( pr_ch_size_ );
+
+	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
+		idx_vec[i] = i;
+	}
+
+	std::sort( idx_vec.begin(), idx_vec.end(),
+	           [p_param_array]( int a, int b ) {
+				   return p_param_array[a].size_of_one_piece_ < p_param_array[b].size_of_one_piece_;
+			   } );
+
+	up_param_ch_array_ = std::unique_ptr<param_chunk_comb[]>( new param_chunk_comb[pr_ch_size_] );
+	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
+		up_param_ch_array_[i].param_        = p_param_array[idx_vec[i]];
+		up_param_ch_array_[i].up_chunk_lst_ = std::unique_ptr<internal::chunk_list>( new internal::chunk_list( up_param_ch_array_[i].param_ ) );
 	}
 
 	return;
@@ -1127,12 +1215,32 @@ std::list<chunk_statistics> general_mem_allocator::get_statistics( void ) const
 {
 	std::list<chunk_statistics> ans;
 
-	for ( int i = 0; i < pr_ch_size_; i++ ) {
+	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
 		chunk_statistics tmp_st = up_param_ch_array_[i].up_chunk_lst_->get_statistics();
 		ans.push_back( tmp_st );
 	}
 
 	return ans;
+}
+
+std::string chunk_statistics::print( void )
+{
+	char buf[2048];
+	snprintf( buf, 2047,
+	          "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d",
+	          (int)alloc_conf_.size_of_one_piece_,
+	          (int)alloc_conf_.num_of_pieces_,
+	          (int)chunk_num_,
+	          (int)total_slot_cnt_,
+	          (int)free_slot_cnt_,
+	          (int)alloc_req_cnt_,
+	          (int)error_alloc_req_cnt_,
+	          (int)dealloc_req_cnt_,
+	          (int)error_dealloc_req_cnt_,
+	          (int)alloc_collision_cnt_,
+	          (int)dealloc_collision_cnt_ );
+
+	return std::string( buf );
 }
 
 }   // namespace concurrent

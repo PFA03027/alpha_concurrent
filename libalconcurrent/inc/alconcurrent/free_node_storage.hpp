@@ -13,6 +13,7 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 
 #include "hazard_ptr.hpp"
 #ifdef USE_LOCK_FREE_MEM_ALLOC
@@ -23,6 +24,9 @@ namespace alpha {
 namespace concurrent {
 
 namespace internal {
+
+class free_nd_storage;
+
 /*!
  * @breif	lock freeで使用するノードの基本クラス
  *
@@ -73,7 +77,7 @@ struct node_of_list {
 	void* operator new( std::size_t n, void* p );          // placement new
 	void  operator delete( void* p, void* p2 ) noexcept;   // placement delete...(3)
 
-	static std::list<chunk_statistics> get_statistics(void);
+	static std::list<chunk_statistics> get_statistics( void );
 #endif
 
 private:
@@ -215,6 +219,22 @@ public:
 	{
 		static_assert( std::is_base_of<node_of_list, ALLOC_NODE_T>::value, "incorrect node type is required. it needs the derived class from node_of_list" );
 
+		auto chk_and_recycle = [this, &pred]( node_pointer p_chk ) -> ALLOC_NODE_T* {
+			ALLOC_NODE_T* p_down_casted_ans = dynamic_cast<ALLOC_NODE_T*>( p_chk );   // TODO: lock free ?
+			if ( p_down_casted_ans != nullptr ) {
+				if ( pred( p_down_casted_ans ) ) {
+					return p_down_casted_ans;
+				} else {
+					this->recycle( p_chk );
+				}
+			} else {
+				// もし、ダウンキャストに失敗したら、そもそも不具合であるし、不要なので、削除する。
+				LogOutput( log_type::ERR, "Info: fail to down cast. discard the node that have unexpected type." );
+				delete p_chk;
+			}
+			return nullptr;
+		};
+
 		for ( int i = 0; i < num_recycle_exec; i++ ) {
 			node_pointer p_ans = node_list_.pop();
 			if ( p_ans == nullptr ) {
@@ -225,17 +245,22 @@ public:
 				}
 			}
 
-			ALLOC_NODE_T* p_down_casted_ans = dynamic_cast<ALLOC_NODE_T*>( p_ans );   // TODO: lock free ?
+			ALLOC_NODE_T* p_down_casted_ans = chk_and_recycle( p_ans );
 			if ( p_down_casted_ans != nullptr ) {
-				if ( pred( p_down_casted_ans ) ) {
-					return p_down_casted_ans;
-				} else {
-					recycle( p_ans );
+				return p_down_casted_ans;
+			}
+		}
+
+		{
+			std::unique_lock<std::mutex> lk( mtx_rcv_thread_local_fifo_list_, std::try_to_lock );
+			if ( lk.owns_lock() ) {
+				node_pointer p_ans = rcv_thread_local_fifo_list_.pop();
+				if ( p_ans != nullptr ) {
+					ALLOC_NODE_T* p_down_casted_ans = chk_and_recycle( p_ans );
+					if ( p_down_casted_ans != nullptr ) {
+						return p_down_casted_ans;
+					}
 				}
-			} else {
-				// もし、ダウンキャストに失敗したら、そもそも不具合であるし、不要なので、削除する。
-				LogOutput( log_type::ERR, "Info: fail to down cast. discard the node that have unexpected type." );
-				delete p_ans;
 			}
 		}
 
@@ -265,6 +290,20 @@ private:
 	free_nd_storage operator=( const free_nd_storage& ) = delete;
 	free_nd_storage operator=( free_nd_storage&& ) = delete;
 
+	struct rcv_fifo_list_by_thread_terminating {
+		rcv_fifo_list_by_thread_terminating( free_nd_storage* p_fns_arg )
+		  : p_fns_( p_fns_arg )
+		{
+		}
+
+		void operator()( thread_local_fifo_list& destructing_tls )
+		{
+			p_fns_->rcv_thread_local_fifo_list( &destructing_tls );
+		}
+
+		free_nd_storage* p_fns_;
+	};
+
 	template <typename ALLOC_NODE_T>
 	inline ALLOC_NODE_T* allocate_new_node( void )
 	{
@@ -276,13 +315,13 @@ private:
 		return new ALLOC_NODE_T();
 	}
 
-	static void destr_fn( void* parm );
-
 	inline thread_local_fifo_list* check_local_storage( void )
 	{
 		thread_local_fifo_list* p_ans = &( tls_fifo_.get_tls_instance() );
 		return p_ans;
 	}
+
+	void rcv_thread_local_fifo_list( thread_local_fifo_list* p_rcv );
 
 	static constexpr int num_recycle_exec = 16;   //!< recycle処理を行うノード数。処理量を一定化するために、ループ回数を定数化する。２以上とする事。だいたいCPU数程度にすればよい。
 
@@ -290,12 +329,29 @@ private:
 
 	fifo_free_nd_list node_list_;
 
-	dynamic_tls<thread_local_fifo_list> tls_fifo_;
+	dynamic_tls<thread_local_fifo_list, rcv_fifo_list_by_thread_terminating> tls_fifo_;
 
-	//	friend pthread_key_create;
+	std::mutex             mtx_rcv_thread_local_fifo_list_;
+	thread_local_fifo_list rcv_thread_local_fifo_list_;
 };
 
 }   // namespace internal
+
+#ifdef USE_LOCK_FREE_MEM_ALLOC
+/*!
+ * @breif	Set parameters in the lock-free memory allocator to enable the function.
+ *
+ * ロックフリーメモリアロケータに、パラメータを設定し機能を有効化する。
+ *
+ * @note
+ * If this I / F parameter setting is not performed, memory allocation using malloc / free will be performed. @n
+ * このI/Fによるパラメータ設定が行われない場合、malloc/freeを使用したメモリアロケーションが行われる。
+ */
+void set_param_to_free_nd_mem_alloc(
+	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
+	unsigned int                  num              //!< [in] array size
+);
+#endif
 
 }   // namespace concurrent
 }   // namespace alpha
