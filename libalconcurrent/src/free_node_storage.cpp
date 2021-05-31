@@ -261,16 +261,19 @@ void free_nd_storage::rcv_thread_local_fifo_list( thread_local_fifo_list* p_rcv 
 
 #ifdef USE_LOCK_FREE_MEM_ALLOC
 
+#if 0
+// example
 static param_chunk_allocation param[] = {
 	{ 32, 100 },
 	{ 64, 100 },
 	{ 128, 100 },
 };
+#endif
 
 static general_mem_allocator& get_gma( void )
 {
-	static general_mem_allocator siglton( param, 3 );
-	return siglton;
+	static general_mem_allocator singlton;
+	return singlton;
 }
 
 void* node_of_list::operator new( std::size_t n )   // usual new...(1)
@@ -320,5 +323,26 @@ std::list<chunk_statistics> node_of_list::get_statistics( void )
 #endif
 
 }   // namespace internal
+
+#ifdef USE_LOCK_FREE_MEM_ALLOC
+/*!
+ * @breif	Set parameters in the lock-free memory allocator to enable the function.
+ *
+ * ロックフリーメモリアロケータに、パラメータを設定し機能を有効化する。
+ *
+ * @note
+ * If this I / F parameter setting is not performed, memory allocation using malloc / free will be performed. @n
+ * このI/Fによるパラメータ設定が行われない場合、malloc/freeを使用したメモリアロケーションが行われる。
+ */
+void set_param_to_free_nd_mem_alloc(
+	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
+	unsigned int                  num              //!< [in] array size
+)
+{
+	internal::get_gma().set_param( p_param_array, num );
+}
+
+#endif
+
 }   // namespace concurrent
 }   // namespace alpha

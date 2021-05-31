@@ -1106,29 +1106,21 @@ chunk_statistics chunk_list::get_statistics( void ) const
 }   // namespace internal
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
+general_mem_allocator::general_mem_allocator( void )
+  : pr_ch_size_( 0 )
+  , up_param_ch_array_()
+{
+	return;
+}
+
 general_mem_allocator::general_mem_allocator(
 	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
-	int                           num              //!< [in] array size
+	unsigned int                  num              //!< [in] array size
 	)
-  : pr_ch_size_( num )
+  : pr_ch_size_( 0 )
+  , up_param_ch_array_()
 {
-	std::vector<int> idx_vec( pr_ch_size_ );
-
-	for ( int i = 0; i < pr_ch_size_; i++ ) {
-		idx_vec[i] = i;
-	}
-
-	std::sort( idx_vec.begin(), idx_vec.end(),
-	           [p_param_array]( int a, int b ) {
-				   return p_param_array[a].size_of_one_piece_ < p_param_array[b].size_of_one_piece_;
-			   } );
-
-	up_param_ch_array_ = std::unique_ptr<param_chunk_comb[]>( new param_chunk_comb[pr_ch_size_] );
-	for ( int i = 0; i < pr_ch_size_; i++ ) {
-		up_param_ch_array_[i].param_        = p_param_array[idx_vec[i]];
-		up_param_ch_array_[i].up_chunk_lst_ = std::unique_ptr<internal::chunk_list>( new internal::chunk_list( up_param_ch_array_[i].param_ ) );
-	}
-
+	set_param( p_param_array, num );
 	return;
 }
 
@@ -1137,7 +1129,7 @@ void* general_mem_allocator::allocate(
 )
 {
 	void* p_ans = nullptr;
-	for ( int i = 0; i < pr_ch_size_; i++ ) {
+	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
 		if ( up_param_ch_array_[i].param_.size_of_one_piece_ >= n ) {
 			p_ans = up_param_ch_array_[i].up_chunk_lst_->allocate_mem_slot();
 			if ( p_ans != nullptr ) {
@@ -1173,12 +1165,44 @@ void general_mem_allocator::deallocate(
 		}
 	} else {
 
-		for ( int i = 0; i < pr_ch_size_; i++ ) {
+		for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
 			bool ret = up_param_ch_array_[i].up_chunk_lst_->recycle_mem_slot( p_mem );
 			if ( ret ) return;
 		}
 
 		std::free( p_mem );   // TODO should not do this ?
+	}
+
+	return;
+}
+
+void general_mem_allocator::set_param(
+	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
+	unsigned int                  num              //!< [in] array size
+)
+{
+	if ( pr_ch_size_ > 0 ) {
+		LogOutput( log_type::WARN, "paramter has already set. ignore this request." );
+		return;
+	}
+
+	pr_ch_size_ = num;
+
+	std::vector<int> idx_vec( pr_ch_size_ );
+
+	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
+		idx_vec[i] = i;
+	}
+
+	std::sort( idx_vec.begin(), idx_vec.end(),
+	           [p_param_array]( int a, int b ) {
+				   return p_param_array[a].size_of_one_piece_ < p_param_array[b].size_of_one_piece_;
+			   } );
+
+	up_param_ch_array_ = std::unique_ptr<param_chunk_comb[]>( new param_chunk_comb[pr_ch_size_] );
+	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
+		up_param_ch_array_[i].param_        = p_param_array[idx_vec[i]];
+		up_param_ch_array_[i].up_chunk_lst_ = std::unique_ptr<internal::chunk_list>( new internal::chunk_list( up_param_ch_array_[i].param_ ) );
 	}
 
 	return;
@@ -1191,7 +1215,7 @@ std::list<chunk_statistics> general_mem_allocator::get_statistics( void ) const
 {
 	std::list<chunk_statistics> ans;
 
-	for ( int i = 0; i < pr_ch_size_; i++ ) {
+	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
 		chunk_statistics tmp_st = up_param_ch_array_[i].up_chunk_lst_->get_statistics();
 		ans.push_back( tmp_st );
 	}

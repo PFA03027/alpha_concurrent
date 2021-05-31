@@ -603,9 +603,20 @@ void test_fixed_array( void )
 }
 #endif
 
+// example
+static alpha::concurrent::param_chunk_allocation param[] = {
+	{ 32, 100 },
+	{ 64, 100 },
+	{ 128, 100 },
+};
+
 int main( void )
 {
 	std::cout << "!!!Start World!!!" << std::endl;   // prints !!!Hello World!!!
+
+#ifdef USE_LOCK_FREE_MEM_ALLOC
+	set_param_to_free_nd_mem_alloc( param, 3 );
+#endif
 
 	test_pointer();
 	test_array();
@@ -619,7 +630,6 @@ int main( void )
 		test_case4();
 	}
 
-
 #ifdef USE_LOCK_FREE_MEM_ALLOC
 	std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::internal::node_of_list::get_statistics();
 
@@ -627,7 +637,6 @@ int main( void )
 		printf( "%s\n", e.print().c_str() );
 	}
 #endif
-
 
 	std::cout << "!!!End World!!!" << std::endl;   // prints !!!Hello World!!!
 	return 0;

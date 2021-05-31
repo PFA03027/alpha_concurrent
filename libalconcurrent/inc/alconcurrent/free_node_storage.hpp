@@ -337,6 +337,22 @@ private:
 
 }   // namespace internal
 
+#ifdef USE_LOCK_FREE_MEM_ALLOC
+/*!
+ * @breif	Set parameters in the lock-free memory allocator to enable the function.
+ *
+ * ロックフリーメモリアロケータに、パラメータを設定し機能を有効化する。
+ *
+ * @note
+ * If this I / F parameter setting is not performed, memory allocation using malloc / free will be performed. @n
+ * このI/Fによるパラメータ設定が行われない場合、malloc/freeを使用したメモリアロケーションが行われる。
+ */
+void set_param_to_free_nd_mem_alloc(
+	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
+	unsigned int                  num              //!< [in] array size
+);
+#endif
+
 }   // namespace concurrent
 }   // namespace alpha
 

@@ -34,21 +34,15 @@ public:
 	/*!
 	 * @breif	constructor
 	 */
-	general_mem_allocator(
-		const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
-		int                           num              //!< [in] array size
-	);
+	general_mem_allocator( void );
 
 	/*!
 	 * @breif	constructor
 	 */
-	template <int N>
 	general_mem_allocator(
-		const param_chunk_allocation param_array[N]   //!< [in] param array
-		)
-	  : general_mem_allocator( param_array, N )
-	{
-	}
+		const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
+		unsigned int                  num              //!< [in] array size
+	);
 
 	/*!
 	 * @breif	allocate memory
@@ -61,6 +55,20 @@ public:
 	void deallocate( void* p_mem );
 
 	/*!
+	 * @breif	set parameter
+	 *
+	 * If already set paramter by constructor or this I/F, this call is ignored.
+	 *
+	 * @warn
+	 * This I/F is NOT thread safe. @n
+	 * This should be called before launching any threads
+	 */
+	void set_param(
+		const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
+		unsigned int                  num              //!< [in] array size
+	);
+
+	/*!
 	 * @breif	get statistics
 	 */
 	std::list<chunk_statistics> get_statistics( void ) const;
@@ -71,7 +79,7 @@ private:
 		std::unique_ptr<internal::chunk_list> up_chunk_lst_;   //!< unique pointer to chunk list
 	};
 
-	int                                 pr_ch_size_;          // array size of chunk and param array
+	unsigned int                        pr_ch_size_;          // array size of chunk and param array
 	std::unique_ptr<param_chunk_comb[]> up_param_ch_array_;   //!< unique pointer to chunk and param array
 };
 

@@ -10,8 +10,8 @@
 
 #include <cstdint>
 #include <iostream>
-#include <random>
 #include <list>
+#include <random>
 
 #include "alconcurrent/lf_fifo.hpp"
 
@@ -650,9 +650,20 @@ void test_fixed_array( void )
 using test_fifo_type  = alpha::concurrent::fifo_list<std::uintptr_t>;
 using test_fifo_type2 = alpha::concurrent::fifo_list<std::uintptr_t, false>;
 
+// example
+static alpha::concurrent::param_chunk_allocation param[] = {
+	{ 32, 100 },
+	{ 64, 100 },
+	{ 128, 100 },
+};
+
 int main( void )
 {
 	std::cout << "!!!Start World!!!" << std::endl;   // prints !!!Hello World!!!
+
+#ifdef USE_LOCK_FREE_MEM_ALLOC
+	set_param_to_free_nd_mem_alloc( param, 3 );
+#endif
 
 	test_pointer();
 	test_array();
