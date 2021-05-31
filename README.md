@@ -21,6 +21,10 @@ On the other hand, used free node will be recycled without a memory allocation. 
 To reduce lock behavior, pre-allocated nodes are effective.
 get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
 
+If you compiles with USE_LOCK_FREE_MEM_ALLOC and configures the paramter of node allocation by alpha::concurrent::set_param_to_free_nd_mem_alloc(),
+semi lock-free memory allocater(lf_mem_alloc class) is used to allocate node.
+Therefore lock behavior will be reduced more.
+
 # stack_list class in lf_stack.hpp
 Semi-lock free Stack type queue
 
@@ -33,6 +37,10 @@ On the other hand, used free node will be recycled without a memory allocation. 
 
 To reduce lock behavior, pre-allocated nodes are effective.
 get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
+
+If you compiles with USE_LOCK_FREE_MEM_ALLOC and configures the paramter of node allocation by alpha::concurrent::set_param_to_free_nd_mem_alloc(),
+semi lock-free memory allocater(lf_mem_alloc class) is used to allocate node.
+Therefore lock behavior will be reduced more.
 
 # lockfree_list class in lf_list.hpp
 Semi-lock free list
@@ -47,6 +55,10 @@ On the other hand, used free node will be recycled without a memory allocation. 
 To reduce lock behavior, pre-allocated nodes are effective.
 get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
 
+If you compiles with USE_LOCK_FREE_MEM_ALLOC and configures the paramter of node allocation by alpha::concurrent::set_param_to_free_nd_mem_alloc(),
+semi lock-free memory allocater(lf_mem_alloc class) is used to allocate node.
+Therefore lock behavior will be reduced more.
+
 # one_side_deque class in lf_one_side_deque.hpp
 Semi-lock free one side deque
 
@@ -59,6 +71,10 @@ On the other hand, used free node will be recycled without a memory allocation. 
 
 To reduce lock behavior, pre-allocated nodes are effective.
 get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
+
+If you compiles with USE_LOCK_FREE_MEM_ALLOC and configures the paramter of node allocation by alpha::concurrent::set_param_to_free_nd_mem_alloc(),
+semi lock-free memory allocater(lf_mem_alloc class) is used to allocate node.
+Therefore lock behavior will be reduced more.
 
 # Supplement
 To resolve ABA issue, this FIFO / Stack / list uses hazard pointer approach.
@@ -80,8 +96,10 @@ After allocation, this class may be lock free. This depends whether pthread_gets
 
 # general memory allocator class that is semi lock-free in lf_mem_alloc.hpp
 This is general memory allocator.
-The current implementation does not perform well. The only advantage is that it is semi-lock free.
-In addition, the function to actively release the memory area to the OS has not been implemented.
+The current implementation needs the small overhead than malloc/free.
+Configured size of memory is kept to re-use.
+If the required size is over the max size of configuration paramter, it allocates from malloc directry and free it also.
+
 
 # Important points
 Whether the provided class is lock-free depends on whether the POSIX API for thread-local storage is lock-free.
