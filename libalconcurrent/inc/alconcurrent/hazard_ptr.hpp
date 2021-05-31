@@ -49,6 +49,7 @@ public:
 	static constexpr int hzrd_max_slot = N;
 
 	hazard_ptr( void )
+	  : p_hzd_ptr_node_( threadlocal_destructor_functor() )
 	{
 	}
 
@@ -336,15 +337,25 @@ private:
 
 	inline node_for_hazard_ptr* check_local_storage( void )
 	{
-		node_for_hazard_ptr* p_ans = p_hzd_ptr_node__.get_tls_instance( nullptr );
+		node_for_hazard_ptr* p_ans = p_hzd_ptr_node_.get_tls_instance( nullptr );
 		if ( p_ans == nullptr ) {
-			p_ans                               = get_head_instance().allocate_hazard_ptr_node();
-			p_hzd_ptr_node__.get_tls_instance() = p_ans;
+			p_ans                              = get_head_instance().allocate_hazard_ptr_node();
+			p_hzd_ptr_node_.get_tls_instance() = p_ans;
 		}
 		return p_ans;
 	}
 
-	dynamic_tls<node_for_hazard_ptr*> p_hzd_ptr_node__;
+	struct threadlocal_destructor_functor {
+		using value_type      = node_for_hazard_ptr*;
+		using value_reference = value_type&;
+		void operator()( value_reference data )
+		{
+			data->release_owner();
+			return;
+		}
+	};
+
+	dynamic_tls<node_for_hazard_ptr*, threadlocal_destructor_functor> p_hzd_ptr_node_;
 };
 
 /*!

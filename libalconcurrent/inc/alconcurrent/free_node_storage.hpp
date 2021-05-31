@@ -13,6 +13,7 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 
 #include "hazard_ptr.hpp"
 #ifdef USE_LOCK_FREE_MEM_ALLOC
@@ -23,6 +24,8 @@ namespace alpha {
 namespace concurrent {
 
 namespace internal {
+
+class free_nd_storage;
 
 /*!
  * @breif	lock freeで使用するノードの基本クラス
@@ -94,9 +97,11 @@ public:
 	using node_type    = node_of_list;
 	using node_pointer = node_type*;
 
-	thread_local_fifo_list( void );
+	thread_local_fifo_list( free_nd_storage* p_free_nd_storage_arg );
 
 	~thread_local_fifo_list();
+
+	void threadlocal_destructor( void );
 
 	void push( node_pointer const p_push_node );
 
@@ -115,8 +120,9 @@ private:
 
 	static constexpr node_of_list::next_slot_idx next_slot_idx_ = node_of_list::next_slot_idx::TL_LIST_SLOT;
 
-	node_pointer head_;
-	node_pointer tail_;
+	free_nd_storage* p_free_nd_storage_;
+	node_pointer     head_;
+	node_pointer     tail_;
 };
 
 /*!
@@ -216,6 +222,22 @@ public:
 	{
 		static_assert( std::is_base_of<node_of_list, ALLOC_NODE_T>::value, "incorrect node type is required. it needs the derived class from node_of_list" );
 
+		auto chk_and_recycle = [this, &pred]( node_pointer p_chk ) -> ALLOC_NODE_T* {
+			ALLOC_NODE_T* p_down_casted_ans = dynamic_cast<ALLOC_NODE_T*>( p_chk );   // TODO: lock free ?
+			if ( p_down_casted_ans != nullptr ) {
+				if ( pred( p_down_casted_ans ) ) {
+					return p_down_casted_ans;
+				} else {
+					this->recycle( p_chk );
+				}
+			} else {
+				// もし、ダウンキャストに失敗したら、そもそも不具合であるし、不要なので、削除する。
+				LogOutput( log_type::ERR, "Info: fail to down cast. discard the node that have unexpected type." );
+				delete p_chk;
+			}
+			return nullptr;
+		};
+
 		for ( int i = 0; i < num_recycle_exec; i++ ) {
 			node_pointer p_ans = node_list_.pop();
 			if ( p_ans == nullptr ) {
@@ -226,17 +248,22 @@ public:
 				}
 			}
 
-			ALLOC_NODE_T* p_down_casted_ans = dynamic_cast<ALLOC_NODE_T*>( p_ans );   // TODO: lock free ?
+			ALLOC_NODE_T* p_down_casted_ans = chk_and_recycle( p_ans );
 			if ( p_down_casted_ans != nullptr ) {
-				if ( pred( p_down_casted_ans ) ) {
-					return p_down_casted_ans;
-				} else {
-					recycle( p_ans );
+				return p_down_casted_ans;
+			}
+		}
+
+		{
+			std::unique_lock<std::mutex> lk( mtx_rcv_thread_local_fifo_list_, std::try_to_lock );
+			if ( lk.owns_lock() ) {
+				node_pointer p_ans = rcv_thread_local_fifo_list_.pop();
+				if ( p_ans != nullptr ) {
+					ALLOC_NODE_T* p_down_casted_ans = chk_and_recycle( p_ans );
+					if ( p_down_casted_ans != nullptr ) {
+						return p_down_casted_ans;
+					}
 				}
-			} else {
-				// もし、ダウンキャストに失敗したら、そもそも不具合であるし、不要なので、削除する。
-				LogOutput( log_type::ERR, "Info: fail to down cast. discard the node that have unexpected type." );
-				delete p_ans;
 			}
 		}
 
@@ -260,6 +287,8 @@ public:
 
 	int get_allocated_num( void );
 
+	void rcv_thread_local_fifo_list( thread_local_fifo_list* p_rcv );
+
 private:
 	free_nd_storage( const free_nd_storage& ) = delete;
 	free_nd_storage( free_nd_storage&& )      = delete;
@@ -279,7 +308,7 @@ private:
 
 	inline thread_local_fifo_list* check_local_storage( void )
 	{
-		thread_local_fifo_list* p_ans = &( tls_fifo_.get_tls_instance() );
+		thread_local_fifo_list* p_ans = &( tls_fifo_.get_tls_instance( this ) );
 		return p_ans;
 	}
 
@@ -290,6 +319,9 @@ private:
 	fifo_free_nd_list node_list_;
 
 	dynamic_tls<thread_local_fifo_list> tls_fifo_;
+
+	std::mutex             mtx_rcv_thread_local_fifo_list_;
+	thread_local_fifo_list rcv_thread_local_fifo_list_;
 
 	//	friend pthread_key_create;
 };

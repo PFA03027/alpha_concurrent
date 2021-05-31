@@ -16,8 +16,9 @@ namespace concurrent {
 
 namespace internal {
 
-thread_local_fifo_list::thread_local_fifo_list( void )
-  : head_( nullptr )
+thread_local_fifo_list::thread_local_fifo_list( free_nd_storage* p_free_nd_storage_arg )
+  : p_free_nd_storage_( p_free_nd_storage_arg )
+  , head_( nullptr )
   , tail_( nullptr )
 {
 	return;
@@ -34,6 +35,13 @@ thread_local_fifo_list::~thread_local_fifo_list()
 			p_cur = p_nxt;
 		} while ( p_cur != nullptr );
 	}
+
+	return;
+}
+
+void thread_local_fifo_list::threadlocal_destructor( void )
+{
+	p_free_nd_storage_->rcv_thread_local_fifo_list( this );
 
 	return;
 }
@@ -205,6 +213,7 @@ bool fifo_free_nd_list::check_hazard_list( fifo_free_nd_list::node_pointer const
 
 free_nd_storage::free_nd_storage( void )
   : allocated_node_count_( 0 )
+  , rcv_thread_local_fifo_list_( this )
 {
 }
 
@@ -241,6 +250,20 @@ bool free_nd_storage::recycle( free_nd_storage::node_pointer p_retire_node )
 int free_nd_storage::get_allocated_num( void )
 {
 	return allocated_node_count_.load( std::memory_order_acquire );
+}
+
+void free_nd_storage::rcv_thread_local_fifo_list( thread_local_fifo_list* p_rcv )
+{
+	std::lock_guard<std::mutex> lock( mtx_rcv_thread_local_fifo_list_ );
+
+	auto p_np = p_rcv->pop();
+
+	while ( p_np != nullptr ) {
+		rcv_thread_local_fifo_list_.push( p_np );
+		p_np = p_rcv->pop();
+	}
+
+	return;
 }
 
 #ifdef USE_LOCK_FREE_MEM_ALLOC

@@ -55,22 +55,24 @@ struct is_callable_threadlocal_destructor : decltype( is_callable_threadlocal_de
  * lf_mem_allocクラスで使用するため、
  * コンポーネントの上下関係から、メモリの確保にはnewを使用せず、malloc/freeと配置newのみを使用する。
  */
-template <typename T>
+template <typename T, typename TL_DESTRUCTOR>
 class tls_data_container {
 public:
-	using value_type = T;
+	using value_type         = T;
+	using value_pointer_type = value_type*;
 
 	enum class ocupied_status {
 		UNUSED,
 		USING
 	};
 
-	T* p_value;
+	value_pointer_type p_value;
 
-	tls_data_container( void )
+	tls_data_container( TL_DESTRUCTOR& df )
 	  : p_value( nullptr )
 	  , status_( ocupied_status::USING )
 	  , next_( nullptr )
+	  , pre_exec_( df )
 	{
 		LogOutput( log_type::DEBUG, "tls_data_container::constructor is called - %p", this );
 	}
@@ -111,6 +113,8 @@ public:
 	template <typename U = T, typename std::enable_if<!is_callable_threadlocal_destructor<U>::value>::type* = nullptr>
 	void release_owner( void )
 	{
+		pre_exec_( *p_value );
+
 		p_value->~T();
 		std::free( p_value );
 
@@ -155,9 +159,19 @@ public:
 private:
 	std::atomic<ocupied_status>      status_;
 	std::atomic<tls_data_container*> next_;
+	TL_DESTRUCTOR&                   pre_exec_;
 };
 
 }   // namespace internal
+
+template <typename T>
+struct threadlocal_destructor_functor {
+	using value_reference = T&;
+	void operator()( value_reference data )
+	{
+		return;
+	}
+};
 
 /*!
  * @breif	動的スレッドローカルストレージを実現するクラス
@@ -169,14 +183,37 @@ private:
  * lf_mem_allocクラスで使用するため、
  * コンポーネントの上下関係から、メモリの確保にはnewを使用せず、malloc/freeと配置newのみを使用する。
  */
-template <typename T>
+template <typename T, typename TL_DESTRUCTOR = threadlocal_destructor_functor<T>>
 class dynamic_tls {
 public:
 	using value_type      = T;
 	using value_reference = T&;
 
 	dynamic_tls( void )
-	  : head_( nullptr )
+	  : pre_exec_()
+	  , head_( nullptr )
+	{
+		int status = pthread_key_create( &tls_key, destr_fn );
+		if ( status < 0 ) {
+			LogOutput( log_type::ERR, "pthread_key_create failed, errno=%d", errno );
+			exit( 1 );
+		}
+	}
+
+	dynamic_tls( const TL_DESTRUCTOR& tl_dest_functor_arg )
+	  : pre_exec_( tl_dest_functor_arg )
+	  , head_( nullptr )
+	{
+		int status = pthread_key_create( &tls_key, destr_fn );
+		if ( status < 0 ) {
+			LogOutput( log_type::ERR, "pthread_key_create failed, errno=%d", errno );
+			exit( 1 );
+		}
+	}
+
+	dynamic_tls( TL_DESTRUCTOR&& tl_dest_functor_arg )
+	  : pre_exec_( std::move( tl_dest_functor_arg ) )
+	  , head_( nullptr )
 	{
 		int status = pthread_key_create( &tls_key, destr_fn );
 		if ( status < 0 ) {
@@ -197,25 +234,38 @@ public:
 
 		// メモリリークが無いように、スレッドローカルストレージを削除する
 		// この処理と、スレッド終了処理によるdestr_fn()の同時呼び出しは、不定動作とする。
-		internal::tls_data_container<T>* p_cur = head_.load( std::memory_order_acquire );
+		tls_cont_pointer p_cur = head_.load( std::memory_order_acquire );
 		while ( p_cur != nullptr ) {
-			internal::tls_data_container<T>* p_nxt = p_cur->get_next();
+			tls_cont_pointer p_nxt = p_cur->get_next();
 			p_cur->~tls_data_container();
 			std::free( p_cur );
 			p_cur = p_nxt;
 		}
 	}
 
+	template <typename... Args>
+	value_reference get_tls_instance( Args... args )
+	{
+		return get_tls_instance_pred( [&args...]() {
+			void* p_tmp = std::malloc( sizeof( T ) );
+			return new ( p_tmp ) T( args... );
+		} );
+	}
+
+private:
+	using tls_cont         = internal::tls_data_container<T, TL_DESTRUCTOR>;
+	using tls_cont_pointer = tls_cont*;
+
 	template <typename TFUNC>
 	value_reference get_tls_instance_pred( TFUNC pred )
 	{
 		// pthread_getspecific()が、ロックフリーであることを祈る。
-		internal::tls_data_container<T>* p_tls = reinterpret_cast<internal::tls_data_container<T>*>( pthread_getspecific( tls_key ) );
+		tls_cont_pointer p_tls = reinterpret_cast<tls_cont_pointer>( pthread_getspecific( tls_key ) );
 		if ( p_tls == nullptr ) {
 			p_tls = allocate_free_tls_container();
 			if ( p_tls == nullptr ) {
-				void* p_tmp = std::malloc( sizeof( internal::tls_data_container<T> ) );
-				p_tls       = new ( p_tmp ) internal::tls_data_container<T>();
+				void* p_tmp = std::malloc( sizeof( tls_cont ) );
+				p_tls       = new ( p_tmp ) tls_cont( pre_exec_ );
 			}
 			p_tls->p_value = pred();
 
@@ -230,34 +280,25 @@ public:
 		return *( p_tls->p_value );
 	}
 
-	template <typename... Args>
-	value_reference get_tls_instance( Args... args )
-	{
-		return get_tls_instance_pred( [&args...]() {
-			void* p_tmp = std::malloc( sizeof( T ) );
-			return new ( p_tmp ) T( args... );
-		} );
-	}
-
-private:
 	static void destr_fn( void* parm )
 	{
 		LogOutput( log_type::DEBUG, "dynamic_tls::destr_fn is called              - %p", parm );
 
-		if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
+		if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。どうしようもないので、諦める。
 
-		internal::tls_data_container<T>* p_target_node = reinterpret_cast<internal::tls_data_container<T>*>( parm );
+		tls_cont_pointer p_target_node = reinterpret_cast<tls_cont_pointer>( parm );
+
 		p_target_node->release_owner();
 
 		return;
 	}
 
-	internal::tls_data_container<T>* allocate_free_tls_container( void )
+	tls_cont_pointer allocate_free_tls_container( void )
 	{
 		// 空きノードを探す。
-		internal::tls_data_container<T>* p_ans = head_.load( std::memory_order_acquire );
+		tls_cont_pointer p_ans = head_.load( std::memory_order_acquire );
 		while ( p_ans != nullptr ) {
-			if ( p_ans->get_status() == internal::tls_data_container<T>::ocupied_status::UNUSED ) {
+			if ( p_ans->get_status() == tls_cont::ocupied_status::UNUSED ) {
 				if ( p_ans->try_to_get_owner() ) {
 					LogOutput( log_type::DEBUG, "node is allocated." );
 					return p_ans;
@@ -272,7 +313,8 @@ private:
 
 	pthread_key_t tls_key;   //!<	key for thread local storage of POSIX.
 
-	std::atomic<internal::tls_data_container<T>*> head_;
+	TL_DESTRUCTOR                 pre_exec_;   //!< functor to clean-up the resources when thread is terminated.
+	std::atomic<tls_cont_pointer> head_;       //!< head of thread local data container list
 };
 
 }   // namespace concurrent
