@@ -41,7 +41,7 @@ namespace internal {
  * lf_mem_allocクラスで使用するため、
  * コンポーネントの上下関係から、メモリの確保にはnewを使用せず、malloc/freeと配置newのみを使用する。
  */
-template <typename T, typename TL_DESTRUCTOR>
+template <typename T, typename TL_PRE_DESTRUCTOR>
 class tls_data_container {
 public:
 	using value_type         = T;
@@ -54,7 +54,7 @@ public:
 
 	value_pointer_type p_value;
 
-	tls_data_container( TL_DESTRUCTOR& df )
+	tls_data_container( TL_PRE_DESTRUCTOR& df )
 	  : p_value( nullptr )
 	  , status_( ocupied_status::USING )
 	  , next_( nullptr )
@@ -124,7 +124,7 @@ public:
 private:
 	std::atomic<ocupied_status>      status_;
 	std::atomic<tls_data_container*> next_;
-	TL_DESTRUCTOR&                   pre_exec_;
+	TL_PRE_DESTRUCTOR&               pre_exec_;
 };
 
 }   // namespace internal
@@ -157,11 +157,11 @@ struct threadlocal_destructor_functor {
 /*!
  * @breif	動的スレッドローカルストレージを実現するクラス
  *
- * スレッド終了時にスレッドローカルストレージをdestructする前に、コンストラクタで指定されたTL_DESTRUCTORのインスタンスが呼び出される。
+ * スレッド終了時にスレッドローカルストレージをdestructする前に、コンストラクタで指定されたTL_PRE_DESTRUCTORのインスタンスが呼び出される。
  * このクラスのインスタンス変数自体がdestructされる場合は、呼び出されない。
  *
  * @param [in]	T	スレッドローカルストレージとして確保する型
- * @param [in]	TL_DESTRUCTOR	スレッド終了時にスレッドローカルストレージを解放する前に呼び出されるファンクタ
+ * @param [in]	TL_PRE_DESTRUCTOR	スレッド終了時にスレッドローカルストレージを解放(delete)する前に呼び出されるファンクタ
  *
  * @note
  * lf_mem_allocクラスで使用するため、
@@ -170,17 +170,17 @@ struct threadlocal_destructor_functor {
  *
  * @breif Class that realizes dynamic thread local storage
  *
- * At the end of the thread, the instance of TL_DESTRUCTOR specified in the constructor is called before destructing the thread local storage.
+ * At the end of the thread, the instance of TL_PRE_DESTRUCTOR specified in the constructor is called before destructing the thread local storage.
  * If the instance variable of this class itself is destroyed, it will not be called.
  *
  * @param [in] T Type reserved as thread local storage
- * @param [in] TL_DESTRUCTOR A functor called before freeing thread-local storage at the end of a thread
+ * @param [in] TL_PRE_DESTRUCTOR A functor called before freeing(delete) thread-local storage at the end of a thread
  *
  * @note
  * Because it is used in the lf_mem_alloc class
  * Due to the hierarchical relationship of components, new is not used to allocate memory, only malloc/free and placement new are used.
  */
-template <typename T, typename TL_DESTRUCTOR = threadlocal_destructor_functor<T>>
+template <typename T, typename TL_PRE_DESTRUCTOR = threadlocal_destructor_functor<T>>
 class dynamic_tls {
 public:
 	using value_type      = T;
@@ -197,7 +197,7 @@ public:
 		}
 	}
 
-	dynamic_tls( const TL_DESTRUCTOR& tl_dest_functor_arg )
+	dynamic_tls( const TL_PRE_DESTRUCTOR& tl_dest_functor_arg )
 	  : pre_exec_( tl_dest_functor_arg )
 	  , head_( nullptr )
 	{
@@ -208,7 +208,7 @@ public:
 		}
 	}
 
-	dynamic_tls( TL_DESTRUCTOR&& tl_dest_functor_arg )
+	dynamic_tls( TL_PRE_DESTRUCTOR&& tl_dest_functor_arg )
 	  : pre_exec_( std::move( tl_dest_functor_arg ) )
 	  , head_( nullptr )
 	{
@@ -250,7 +250,7 @@ public:
 	}
 
 private:
-	using tls_cont         = internal::tls_data_container<T, TL_DESTRUCTOR>;
+	using tls_cont         = internal::tls_data_container<T, TL_PRE_DESTRUCTOR>;
 	using tls_cont_pointer = tls_cont*;
 
 	template <typename TFUNC>
@@ -310,7 +310,7 @@ private:
 
 	pthread_key_t tls_key;   //!<	key for thread local storage of POSIX.
 
-	TL_DESTRUCTOR                 pre_exec_;   //!< functor to clean-up the resources when thread is terminated.
+	TL_PRE_DESTRUCTOR             pre_exec_;   //!< functor to clean-up the resources when thread is terminated.
 	std::atomic<tls_cont_pointer> head_;       //!< head of thread local data container list
 };
 
