@@ -76,8 +76,9 @@ void idx_mgr_element::dump( void ) const
 	return;
 }
 
-waiting_element_list::waiting_element_list( void )
-  : head_( nullptr )
+waiting_element_list::waiting_element_list( idx_element_storage_mgr* p_idx_element_storage_mgr_arg )
+  : p_idx_element_storage_mgr_( p_idx_element_storage_mgr_arg )
+  , head_( nullptr )
   , tail_( nullptr )
 {
 	return;
@@ -85,6 +86,12 @@ waiting_element_list::waiting_element_list( void )
 
 waiting_element_list::~waiting_element_list()
 {
+}
+
+void waiting_element_list::threadlocal_destructor( void )
+{
+	p_idx_element_storage_mgr_->rcv_wait_element_by_thread_terminating( this );
+	return;
 }
 
 idx_mgr_element* waiting_element_list::pop( void )
@@ -150,123 +157,7 @@ void waiting_element_list::dump( void ) const
 	return;
 }
 
-waiting_idx_list::waiting_idx_list( idx_mgr* p_owner_of_idx_arg, const int idx_buff_size_arg, const int ver_arg )
-  : p_owner_of_idx_( p_owner_of_idx_arg )
-  , ver_( ver_arg )
-  , idx_buff_size_( idx_buff_size_arg )
-  , idx_top_idx_( 0 )
-  , p_idx_buff_( nullptr )
-{
-
-	if ( idx_buff_size_arg >= 0 ) {
-		p_idx_buff_ = new int[idx_buff_size_];
-	}
-	return;
-}
-
-waiting_idx_list::~waiting_idx_list()
-{
-	if ( idx_top_idx_ > 0 ) {
-		char buf[2048];
-
-		snprintf( buf, 2047, "waiting_idx_list_%p is destructed. but it has some index {", this );
-		LogOutput( log_type::WARN, buf );
-		for ( int i = 0; i < idx_top_idx_; i++ ) {
-			snprintf( buf, 2047, "\t%d,", p_idx_buff_[i] );
-			LogOutput( log_type::WARN, buf );
-		}
-		LogOutput( log_type::WARN, "}" );
-
-		// TODO このケースの場合、滞留しているindexが使用中のまま再利用されない状態となる。リカバーは、GCスレッド実装時に行う。
-	}
-
-	delete[] p_idx_buff_;
-}
-
-void waiting_idx_list::threadlocal_destructor( void )
-{
-	p_owner_of_idx_->rcv_wait_idx_by_thread_terminating( this );
-	return;
-}
-
-void waiting_idx_list::chk_reset_and_set_size( const int idx_buff_size_arg, const int ver_arg )
-{
-	if ( ver_ == ver_arg ) return;
-
-	delete[] p_idx_buff_;
-	idx_buff_size_ = idx_buff_size_arg;
-	p_idx_buff_    = new int[idx_buff_size_];
-	idx_top_idx_   = 0;
-	ver_           = ver_arg;
-	return;
-}
-
-int waiting_idx_list::pop_from_tls( const int idx_buff_size_arg, const int ver_arg )
-{
-	chk_reset_and_set_size( idx_buff_size_arg, ver_arg );
-
-	int ans = -1;
-
-	if ( idx_top_idx_ <= 0 ) return ans;
-
-	idx_top_idx_--;
-
-	ans                       = p_idx_buff_[idx_top_idx_];
-	p_idx_buff_[idx_top_idx_] = -1;
-
-	return ans;
-}
-
-void waiting_idx_list::push_to_tls( const int valid_idx, const int idx_buff_size_arg, const int ver_arg )
-{
-	chk_reset_and_set_size( idx_buff_size_arg, ver_arg );
-
-	if ( idx_top_idx_ >= idx_buff_size_ ) {
-		throw std::exception();
-		return;
-	}
-
-	p_idx_buff_[idx_top_idx_] = valid_idx;
-	idx_top_idx_++;
-
-	return;
-}
-
-void waiting_idx_list::dump( void ) const
-{
-	char buf[2048];
-
-	snprintf( buf, 2047,
-	          "object waiting_idx_list_%p as %p {\n"
-	          "\t idx_buff_size_ = %d\n"
-	          "\t idx_top_idx_ = %d\n"
-	          "\t p_idx_buff_ = %p\n"
-	          "}\n",
-	          this, this,
-	          idx_buff_size_,
-	          idx_top_idx_,
-	          p_idx_buff_ );
-	LogOutput( log_type::DUMP, buf );
-
-	if ( p_idx_buff_ != nullptr ) {
-		snprintf( buf, 2047,
-		          "object p_idx_buff_%p as %p {\n",
-		          this, this );
-		LogOutput( log_type::DUMP, buf );
-
-		for ( int i = 0; i < idx_buff_size_; i++ ) {
-			snprintf( buf, 2047,
-			          "\t %d => %d\n",
-			          i, p_idx_buff_[i] );
-			LogOutput( log_type::DUMP, buf );
-		}
-
-		LogOutput( log_type::DUMP, "}\n" );
-	}
-
-	return;
-}
-
+////////////////////////////////////////////////////////////////////////////////
 /*!
  * @breif	インデックス管理スロットのロックフリーストレージクラス
  */
@@ -276,6 +167,7 @@ idx_element_storage_mgr::idx_element_storage_mgr(
   : head_( nullptr )
   , tail_( nullptr )
   , p_next_ptr_offset_( p_next_ptr_offset_arg )
+  , rcv_wait_element_list_( this )
   , collision_cnt_( 0 )
 {
 	return;
@@ -290,7 +182,7 @@ idx_element_storage_mgr::idx_element_storage_mgr(
 idx_mgr_element* idx_element_storage_mgr::pop_element( void )
 {
 	idx_mgr_element*      p_ans     = nullptr;
-	waiting_element_list& wait_list = tls_waiting_list_.get_tls_instance();
+	waiting_element_list& wait_list = tls_waiting_list_.get_tls_instance( this );
 
 	p_ans = wait_list.pop();
 	if ( p_ans != nullptr ) {
@@ -308,6 +200,14 @@ idx_mgr_element* idx_element_storage_mgr::pop_element( void )
 	} else {
 		// スレッドローカルストレージは空だったので、共有リストから取り出す。
 		p_ans = pop_element_from_list();
+
+		if ( p_ans == nullptr ) {
+			// 共有リストからの取得も出来なかったため、回収されたリストを確認する。
+			std::unique_lock<std::mutex> lk( mtx_rcv_wait_element_list_, std::try_to_lock );
+			if ( lk.owns_lock() ) {
+				p_ans = rcv_wait_element_list_.pop();
+			}
+		}
 	}
 
 	return p_ans;
@@ -320,7 +220,7 @@ void idx_element_storage_mgr::push_element(
 	idx_mgr_element* p_push_element   //!< [in] pointer of element to push
 )
 {
-	waiting_element_list& wait_list     = tls_waiting_list_.get_tls_instance();
+	waiting_element_list& wait_list     = tls_waiting_list_.get_tls_instance( this );
 	idx_mgr_element*      p_tmp_recycle = wait_list.pop();   // 新たに登録されるポインタとのチェックが重複しないように、先に読みだしておく
 
 	if ( hzrd_element_.check_ptr_in_hazard_list( p_push_element ) ) {
@@ -413,6 +313,139 @@ void idx_element_storage_mgr::push_element_to_list(
 	return;
 }
 
+void idx_element_storage_mgr::rcv_wait_element_by_thread_terminating( waiting_element_list* p_el_list )
+{
+	std::lock_guard<std::mutex> lk( mtx_rcv_wait_element_list_ );
+
+	idx_mgr_element* p_poped_el = p_el_list->pop();
+	while ( p_poped_el != nullptr ) {
+		printf("GGGGGGGGGGGGGUUUUUUUUUUUUUuuuuuuuuuuuuaaaaaaaa!!!!!\n");
+		rcv_wait_element_list_.push( p_poped_el );
+		p_poped_el = p_el_list->pop();
+	}
+
+	return;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+waiting_idx_list::waiting_idx_list( idx_mgr* p_owner_of_idx_arg, const int idx_buff_size_arg, const int ver_arg )
+  : p_owner_of_idx_( p_owner_of_idx_arg )
+  , ver_( ver_arg )
+  , idx_buff_size_( idx_buff_size_arg )
+  , idx_top_idx_( 0 )
+  , p_idx_buff_( nullptr )
+{
+
+	if ( idx_buff_size_arg >= 0 ) {
+		p_idx_buff_ = new int[idx_buff_size_];
+	}
+	return;
+}
+
+waiting_idx_list::~waiting_idx_list()
+{
+	if ( idx_top_idx_ > 0 ) {
+		char buf[2048];
+
+		snprintf( buf, 2047, "waiting_idx_list_%p is destructed. but it has some index {", this );
+		LogOutput( log_type::WARN, buf );
+		for ( int i = 0; i < idx_top_idx_; i++ ) {
+			snprintf( buf, 2047, "\t%d,", p_idx_buff_[i] );
+			LogOutput( log_type::WARN, buf );
+		}
+		LogOutput( log_type::WARN, "}" );
+
+	}
+
+	delete[] p_idx_buff_;
+}
+
+void waiting_idx_list::threadlocal_destructor( void )
+{
+	p_owner_of_idx_->rcv_wait_idx_by_thread_terminating( this );
+	return;
+}
+
+void waiting_idx_list::chk_reset_and_set_size( const int idx_buff_size_arg, const int ver_arg )
+{
+	if ( ver_ == ver_arg ) return;
+
+	delete[] p_idx_buff_;
+	idx_buff_size_ = idx_buff_size_arg;
+	p_idx_buff_    = new int[idx_buff_size_];
+	idx_top_idx_   = 0;
+	ver_           = ver_arg;
+	return;
+}
+
+int waiting_idx_list::pop_from_tls( const int idx_buff_size_arg, const int ver_arg )
+{
+	chk_reset_and_set_size( idx_buff_size_arg, ver_arg );
+
+	int ans = -1;
+
+	if ( idx_top_idx_ <= 0 ) return ans;
+
+	idx_top_idx_--;
+
+	ans                       = p_idx_buff_[idx_top_idx_];
+	p_idx_buff_[idx_top_idx_] = -1;
+
+	return ans;
+}
+
+void waiting_idx_list::push_to_tls( const int valid_idx, const int idx_buff_size_arg, const int ver_arg )
+{
+	chk_reset_and_set_size( idx_buff_size_arg, ver_arg );
+
+	if ( idx_top_idx_ >= idx_buff_size_ ) {
+		throw std::exception();
+		return;
+	}
+
+	p_idx_buff_[idx_top_idx_] = valid_idx;
+	idx_top_idx_++;
+
+	return;
+}
+
+void waiting_idx_list::dump( void ) const
+{
+	char buf[2048];
+
+	snprintf( buf, 2047,
+	          "object waiting_idx_list_%p as %p {\n"
+	          "\t idx_buff_size_ = %d\n"
+	          "\t idx_top_idx_ = %d\n"
+	          "\t p_idx_buff_ = %p\n"
+	          "}\n",
+	          this, this,
+	          idx_buff_size_,
+	          idx_top_idx_,
+	          p_idx_buff_ );
+	LogOutput( log_type::DUMP, buf );
+
+	if ( p_idx_buff_ != nullptr ) {
+		snprintf( buf, 2047,
+		          "object p_idx_buff_%p as %p {\n",
+		          this, this );
+		LogOutput( log_type::DUMP, buf );
+
+		for ( int i = 0; i < idx_buff_size_; i++ ) {
+			snprintf( buf, 2047,
+			          "\t %d => %d\n",
+			          i, p_idx_buff_[i] );
+			LogOutput( log_type::DUMP, buf );
+		}
+
+		LogOutput( log_type::DUMP, "}\n" );
+	}
+
+	return;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /*!
  * @breif	コンストラクタ
  */
@@ -1178,6 +1211,26 @@ std::list<chunk_statistics> general_mem_allocator::get_statistics( void ) const
 	}
 
 	return ans;
+}
+
+std::string chunk_statistics::print( void )
+{
+	char buf[2048];
+	snprintf( buf, 2047,
+	          "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d",
+	          (int)alloc_conf_.size_of_one_piece_,
+	          (int)alloc_conf_.num_of_pieces_,
+	          (int)chunk_num_,
+	          (int)total_slot_cnt_,
+	          (int)free_slot_cnt_,
+	          (int)alloc_req_cnt_,
+	          (int)error_alloc_req_cnt_,
+	          (int)dealloc_req_cnt_,
+	          (int)error_dealloc_req_cnt_,
+	          (int)alloc_collision_cnt_,
+	          (int)dealloc_collision_cnt_ );
+
+	return std::string( buf );
 }
 
 }   // namespace concurrent

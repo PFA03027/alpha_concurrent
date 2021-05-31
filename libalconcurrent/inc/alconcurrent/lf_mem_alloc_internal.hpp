@@ -28,6 +28,7 @@ namespace concurrent {
 namespace internal {
 
 class idx_mgr;
+class idx_element_storage_mgr;
 
 /*!
  * @breif	chunk control status
@@ -62,41 +63,13 @@ struct idx_mgr_element {
  * @breif	ハーザードポインタ登録中で滞留している要素を管理するリスト
  *
  * スレッドローカルデータとして管理されるため、排他制御は不要なクラス
- *
- * @note
- * スレッドローカルストレージは、情報の伝搬が難しいため、バッファの再構築の要否を判定するために、バッファ構築のバージョン情報を使用する方式を採る。
- */
-struct waiting_idx_list {
-public:
-	waiting_idx_list( idx_mgr* p_owner_of_idx_arg, const int idx_buff_size_arg, const int ver_arg );
-	~waiting_idx_list();
-
-	void threadlocal_destructor( void );
-
-	int  pop_from_tls( const int idx_buff_size_arg, const int ver_arg );
-	void push_to_tls( const int valid_idx, const int idx_buff_size_arg, const int ver_arg );
-
-	void dump( void ) const;
-
-private:
-	idx_mgr* p_owner_of_idx_;
-	int      ver_;
-	int      idx_buff_size_;
-	int      idx_top_idx_;
-	int*     p_idx_buff_;
-
-	void chk_reset_and_set_size( const int idx_buff_size_arg, const int ver_arg );
-};
-
-/*!
- * @breif	ハーザードポインタ登録中で滞留している要素を管理するリスト
- *
- * スレッドローカルデータとして管理されるため、排他制御は不要なクラス
  */
 struct waiting_element_list {
 public:
-	waiting_element_list( void );
+	waiting_element_list( idx_element_storage_mgr* p_idx_element_storage_mgr_arg );
 	~waiting_element_list();
+
+	void threadlocal_destructor( void );
 
 	idx_mgr_element* pop( void );
 	void             push( idx_mgr_element* );
@@ -104,8 +77,9 @@ public:
 	void dump( void ) const;
 
 private:
-	idx_mgr_element* head_;
-	idx_mgr_element* tail_;
+	idx_element_storage_mgr* p_idx_element_storage_mgr_;
+	idx_mgr_element*         head_;
+	idx_mgr_element*         tail_;
 };
 
 /*!
@@ -135,6 +109,17 @@ public:
 		idx_mgr_element* p_push_element   //!< [in] pointer of element to push
 	);
 
+	/*!
+	 * @breif	tls_waiting_list_のスレッドローカルストレージが破棄される際(=スレッドが終了する場合)に滞留中の要素を受け取る
+	 *
+	 * @note
+	 * スレッドセーフではあるが、ロックによる排他制御が行われる。
+	 */
+	void rcv_wait_element_by_thread_terminating( waiting_element_list* p_el_list );
+
+	/*!
+	 * @breif	リスト操作時の衝突回数を取得する。
+	 */
 	int get_collision_cnt( void ) const
 	{
 		return collision_cnt_.load();
@@ -149,13 +134,15 @@ private:
 	};
 	using scoped_hazard_ref = hazard_ptr_scoped_ref<idx_mgr_element, hzrd_max_slot_>;
 
-	int                                         idx_size_;
 	dynamic_tls<waiting_element_list>           tls_waiting_list_;   //!< 滞留要素を管理するスレッドローカルリスト
 	hazard_ptr<idx_mgr_element, hzrd_max_slot_> hzrd_element_;       //!< ハザードポインタを管理する構造体。
 
 	std::atomic<idx_mgr_element*> head_;                                  //!< リスト構造のヘッドへのポインタ
 	std::atomic<idx_mgr_element*> tail_;                                  //!< リスト構造の終端要素へのポインタ
 	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_;   //!< リスト構造の次のノードへのポインタを格納したメンバ変数へのメンバ変数ポインタ
+
+	std::mutex           mtx_rcv_wait_element_list_;   //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取るメンバ変数rcv_wait_element_list_の排他制御用Mutex
+	waiting_element_list rcv_wait_element_list_;       //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取る
 
 	// statistics
 	std::atomic<int> collision_cnt_;   //!< ロックフリーアルゴリズム内で発生した衝突回数
@@ -175,6 +162,37 @@ private:
 		idx_mgr_element* p_push_element   //!< [in] pointer of element to push
 	);
 };
+
+/*!
+ * @breif	ハーザードポインタ登録中でindexを登録するフリーの要素がない場合に、滞留している要素を管理するリスト
+ *
+ * スレッドローカルデータとして管理されるため、排他制御は不要なクラス
+ *
+ * @note
+ * スレッドローカルストレージは、情報の伝搬が難しいため、バッファの再構築の要否を判定するために、バッファ構築のバージョン情報を使用する方式を採る。
+ */
+struct waiting_idx_list {
+public:
+	waiting_idx_list( idx_mgr* p_owner_of_idx_arg, const int idx_buff_size_arg, const int ver_arg );
+	~waiting_idx_list();
+
+	void threadlocal_destructor( void );
+
+	int  pop_from_tls( const int idx_buff_size_arg, const int ver_arg );
+	void push_to_tls( const int valid_idx, const int idx_buff_size_arg, const int ver_arg );
+
+	void dump( void ) const;
+
+private:
+	idx_mgr* p_owner_of_idx_;
+	int      ver_;
+	int      idx_buff_size_;
+	int      idx_top_idx_;
+	int*     p_idx_buff_;
+
+	void chk_reset_and_set_size( const int idx_buff_size_arg, const int ver_arg );
+};
+
 
 /*!
  * @breif	使用可能なインデックス番号を管理する準ロックフリークラス
@@ -237,6 +255,12 @@ struct idx_mgr {
 		return valid_element_storage_.get_collision_cnt();
 	}
 
+	/*!
+	 * @breif	tls_waiting_idx_list_のスレッドローカルストレージが破棄される際(=スレッドが終了する場合)に滞留中の要素を受け取る
+	 *
+	 * @note
+	 * スレッドセーフではあるが、ロックによる排他制御が行われる。
+	 */
 	void rcv_wait_idx_by_thread_terminating( waiting_idx_list* p_idx_list );
 
 private:

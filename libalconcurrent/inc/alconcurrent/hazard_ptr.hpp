@@ -203,20 +203,6 @@ private:
 			return next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
 		}
 
-		static void destr_fn( void* parm )
-		{
-			LogOutput( log_type::DEBUG, "thread local destructor now being called -- " );
-
-			if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
-
-			node_for_hazard_ptr* p_target_node = reinterpret_cast<node_for_hazard_ptr*>( parm );
-
-			p_target_node->release_owner();
-
-			LogOutput( log_type::DEBUG, "thread local destructor is done." );
-			return;
-		}
-
 		void release_owner( void )
 		{
 			clear_hazard_ptr_all();

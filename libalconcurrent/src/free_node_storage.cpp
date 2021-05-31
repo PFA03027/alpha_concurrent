@@ -243,19 +243,6 @@ int free_nd_storage::get_allocated_num( void )
 	return allocated_node_count_.load( std::memory_order_acquire );
 }
 
-void free_nd_storage::destr_fn( void* parm )
-{
-	LogOutput( log_type::DEBUG, "thread local destructor now being called -- %p -- ", parm );
-
-	if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。
-
-	thread_local_fifo_list* p_target_node = reinterpret_cast<thread_local_fifo_list*>( parm );
-	delete p_target_node;
-
-	LogOutput( log_type::DEBUG, "thread local destructor is done." );
-	return;
-}
-
 #ifdef USE_LOCK_FREE_MEM_ALLOC
 
 static param_chunk_allocation param[] = {

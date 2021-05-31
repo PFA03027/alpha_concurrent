@@ -17,7 +17,6 @@
 #include <memory>
 
 #include "conf_logger.hpp"
-#include "dynamic_tls.hpp"
 
 #include "lf_mem_alloc_internal.hpp"
 #include "lf_mem_alloc_type.hpp"

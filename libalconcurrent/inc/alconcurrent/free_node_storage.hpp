@@ -74,7 +74,7 @@ struct node_of_list {
 	void* operator new( std::size_t n, void* p );          // placement new
 	void  operator delete( void* p, void* p2 ) noexcept;   // placement delete...(3)
 
-	static std::list<chunk_statistics> get_statistics(void);
+	static std::list<chunk_statistics> get_statistics( void );
 #endif
 
 private:
@@ -276,8 +276,6 @@ private:
 		allocated_node_count_++;
 		return new ALLOC_NODE_T();
 	}
-
-	static void destr_fn( void* parm );
 
 	inline thread_local_fifo_list* check_local_storage( void )
 	{
