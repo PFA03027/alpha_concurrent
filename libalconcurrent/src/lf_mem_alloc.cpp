@@ -957,6 +957,7 @@ chunk_list::chunk_list(
 	)
   : alloc_conf_( ch_param_arg )
   , p_top_chunk_( nullptr )
+  , p_hint_chunk_( nullptr )
 {
 	return;
 }
@@ -977,12 +978,14 @@ void* chunk_list::allocate_mem_slot( void )
 {
 	void* p_ans = nullptr;
 
-	chunk_header_multi_slot* p_cur_chms         = p_top_chunk_.load( std::memory_order_acquire );
+	chunk_header_multi_slot* p_start_chms       = p_hint_chunk_.load( std::memory_order_acquire );
+	chunk_header_multi_slot* p_cur_chms         = p_start_chms;
 	chunk_header_multi_slot* p_1st_rsv_del_chms = nullptr;
 	chunk_header_multi_slot* p_1st_empty_chms   = nullptr;
 	while ( p_cur_chms != nullptr ) {
 		p_ans = p_cur_chms->allocate_mem_slot();
 		if ( p_ans != nullptr ) {
+			p_hint_chunk_.store( p_cur_chms, std::memory_order_release );
 			return p_ans;
 		}
 		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::RESERVED_DELETION ) {
@@ -995,20 +998,30 @@ void* chunk_list::allocate_mem_slot( void )
 				p_1st_empty_chms = p_cur_chms;
 			}
 		}
+
 		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
-		p_cur_chms                           = p_next_chms;
+		if ( p_next_chms == nullptr ) {
+			p_next_chms = p_top_chunk_.load( std::memory_order_acquire );
+		}
+		if ( p_next_chms == p_start_chms ) {
+			p_cur_chms = nullptr;
+			break;
+		}
+		p_cur_chms = p_next_chms;
 	}
 
 	if ( p_1st_rsv_del_chms != nullptr ) {
 		if ( p_1st_rsv_del_chms->unset_delete_reservation() ) {
 			p_ans = p_1st_rsv_del_chms->allocate_mem_slot();
 			if ( p_ans != nullptr ) {
+				p_hint_chunk_.store( p_1st_rsv_del_chms, std::memory_order_release );
 				return p_ans;
 			}
 		} else {
 			if ( p_1st_rsv_del_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
 				p_ans = p_1st_rsv_del_chms->allocate_mem_slot();
 				if ( p_ans != nullptr ) {
+					p_hint_chunk_.store( p_1st_rsv_del_chms, std::memory_order_release );
 					return p_ans;
 				}
 			}
@@ -1019,12 +1032,14 @@ void* chunk_list::allocate_mem_slot( void )
 		if ( p_1st_empty_chms->alloc_new_chunk() ) {
 			p_ans = p_1st_empty_chms->allocate_mem_slot();
 			if ( p_ans != nullptr ) {
+				p_hint_chunk_.store( p_1st_empty_chms, std::memory_order_release );
 				return p_ans;
 			}
 		} else {
 			if ( p_1st_empty_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
 				p_ans = p_1st_empty_chms->allocate_mem_slot();
 				if ( p_ans != nullptr ) {
+					p_hint_chunk_.store( p_1st_empty_chms, std::memory_order_release );
 					return p_ans;
 				}
 			}
@@ -1033,7 +1048,10 @@ void* chunk_list::allocate_mem_slot( void )
 
 	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( alloc_conf_ );
 	p_ans                               = p_new_chms->allocate_mem_slot();
-	if ( p_ans == nullptr ) return nullptr;   // TODO: should throw exception ?
+	if ( p_ans == nullptr ) {
+		delete p_new_chms;
+		return nullptr;   // TODO: should throw exception ?
+	}
 
 	chunk_header_multi_slot* p_cur_top = nullptr;
 	do {
@@ -1041,6 +1059,7 @@ void* chunk_list::allocate_mem_slot( void )
 		p_new_chms->p_next_chunk_.store( p_cur_top );
 	} while ( !std::atomic_compare_exchange_strong( &p_top_chunk_, &p_cur_top, p_new_chms ) );
 
+	p_hint_chunk_.store( p_new_chms, std::memory_order_release );
 	return p_ans;
 }
 
