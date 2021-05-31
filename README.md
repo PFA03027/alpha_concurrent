@@ -21,7 +21,7 @@ On the other hand, used free node will be recycled without a memory allocation. 
 To reduce lock behavior, pre-allocated nodes are effective.
 get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
 
-If you compiles with USE_LOCK_FREE_MEM_ALLOC and configures the paramter of node allocation by alpha::concurrent::set_param_to_free_nd_mem_alloc(),
+If you configure the paramter of node allocation by alpha::concurrent::set_param_to_free_nd_mem_alloc(),
 semi lock-free memory allocater(lf_mem_alloc class) is used to allocate node.
 Therefore lock behavior will be reduced more.
 
@@ -38,7 +38,7 @@ On the other hand, used free node will be recycled without a memory allocation. 
 To reduce lock behavior, pre-allocated nodes are effective.
 get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
 
-If you compiles with USE_LOCK_FREE_MEM_ALLOC and configures the paramter of node allocation by alpha::concurrent::set_param_to_free_nd_mem_alloc(),
+If you configure the paramter of node allocation by alpha::concurrent::set_param_to_free_nd_mem_alloc(),
 semi lock-free memory allocater(lf_mem_alloc class) is used to allocate node.
 Therefore lock behavior will be reduced more.
 
@@ -55,7 +55,7 @@ On the other hand, used free node will be recycled without a memory allocation. 
 To reduce lock behavior, pre-allocated nodes are effective.
 get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
 
-If you compiles with USE_LOCK_FREE_MEM_ALLOC and configures the paramter of node allocation by alpha::concurrent::set_param_to_free_nd_mem_alloc(),
+If you configure the paramter of node allocation by alpha::concurrent::set_param_to_free_nd_mem_alloc(),
 semi lock-free memory allocater(lf_mem_alloc class) is used to allocate node.
 Therefore lock behavior will be reduced more.
 
@@ -72,7 +72,7 @@ On the other hand, used free node will be recycled without a memory allocation. 
 To reduce lock behavior, pre-allocated nodes are effective.
 get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
 
-If you compiles with USE_LOCK_FREE_MEM_ALLOC and configures the paramter of node allocation by alpha::concurrent::set_param_to_free_nd_mem_alloc(),
+If you configure the paramter of node allocation by alpha::concurrent::set_param_to_free_nd_mem_alloc(),
 semi lock-free memory allocater(lf_mem_alloc class) is used to allocate node.
 Therefore lock behavior will be reduced more.
 

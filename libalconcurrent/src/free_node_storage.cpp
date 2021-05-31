@@ -259,7 +259,7 @@ void free_nd_storage::rcv_thread_local_fifo_list( thread_local_fifo_list* p_rcv 
 	return;
 }
 
-#ifdef USE_LOCK_FREE_MEM_ALLOC
+#ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
 
 #if 0
 // example
@@ -324,7 +324,7 @@ std::list<chunk_statistics> node_of_list::get_statistics( void )
 
 }   // namespace internal
 
-#ifdef USE_LOCK_FREE_MEM_ALLOC
+#ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
 /*!
  * @breif	Set parameters in the lock-free memory allocator to enable the function.
  *

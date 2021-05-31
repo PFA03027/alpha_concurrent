@@ -15,6 +15,7 @@
 #include <thread>
 
 #include "alconcurrent/lf_list.hpp"
+#include "alconcurrent/lf_mem_alloc_type.hpp"
 
 constexpr int            num_thread = 64;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 1000;
@@ -489,7 +490,7 @@ int main( void )
 {
 	std::cout << "!!!Start World!!!" << std::endl;   // prints !!!Hello World!!!
 
-#ifdef USE_LOCK_FREE_MEM_ALLOC
+#ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
 	set_param_to_free_nd_mem_alloc( param, 3 );
 #endif
 
@@ -501,7 +502,7 @@ int main( void )
 	test3();
 	test4();
 
-#ifdef USE_LOCK_FREE_MEM_ALLOC
+#ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
 	std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::internal::node_of_list::get_statistics();
 
 	for ( auto& e : statistics ) {
