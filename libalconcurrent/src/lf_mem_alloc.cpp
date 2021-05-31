@@ -76,9 +76,8 @@ void idx_mgr_element::dump( void ) const
 	return;
 }
 
-waiting_element_list::waiting_element_list( idx_element_storage_mgr* p_idx_element_storage_mgr_arg )
-  : p_idx_element_storage_mgr_( p_idx_element_storage_mgr_arg )
-  , head_( nullptr )
+waiting_element_list::waiting_element_list( void )
+  : head_( nullptr )
   , tail_( nullptr )
 {
 	return;
@@ -86,12 +85,6 @@ waiting_element_list::waiting_element_list( idx_element_storage_mgr* p_idx_eleme
 
 waiting_element_list::~waiting_element_list()
 {
-}
-
-void waiting_element_list::threadlocal_destructor( void )
-{
-	p_idx_element_storage_mgr_->rcv_wait_element_by_thread_terminating( this );
-	return;
 }
 
 idx_mgr_element* waiting_element_list::pop( void )
@@ -164,10 +157,11 @@ void waiting_element_list::dump( void ) const
 idx_element_storage_mgr::idx_element_storage_mgr(
 	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_arg   //!< [in] nextポインタを保持しているメンバ変数へのメンバ変数ポインタ
 	)
-  : head_( nullptr )
+  : tls_waiting_list_( rcv_el_by_thread_terminating( this ) )
+  , head_( nullptr )
   , tail_( nullptr )
   , p_next_ptr_offset_( p_next_ptr_offset_arg )
-  , rcv_wait_element_list_( this )
+  , rcv_wait_element_list_()
   , collision_cnt_( 0 )
 {
 	return;
@@ -182,7 +176,7 @@ idx_element_storage_mgr::idx_element_storage_mgr(
 idx_mgr_element* idx_element_storage_mgr::pop_element( void )
 {
 	idx_mgr_element*      p_ans     = nullptr;
-	waiting_element_list& wait_list = tls_waiting_list_.get_tls_instance( this );
+	waiting_element_list& wait_list = tls_waiting_list_.get_tls_instance();
 
 	p_ans = wait_list.pop();
 	if ( p_ans != nullptr ) {
@@ -220,7 +214,7 @@ void idx_element_storage_mgr::push_element(
 	idx_mgr_element* p_push_element   //!< [in] pointer of element to push
 )
 {
-	waiting_element_list& wait_list     = tls_waiting_list_.get_tls_instance( this );
+	waiting_element_list& wait_list     = tls_waiting_list_.get_tls_instance();
 	idx_mgr_element*      p_tmp_recycle = wait_list.pop();   // 新たに登録されるポインタとのチェックが重複しないように、先に読みだしておく
 
 	if ( hzrd_element_.check_ptr_in_hazard_list( p_push_element ) ) {
@@ -319,7 +313,6 @@ void idx_element_storage_mgr::rcv_wait_element_by_thread_terminating( waiting_el
 
 	idx_mgr_element* p_poped_el = p_el_list->pop();
 	while ( p_poped_el != nullptr ) {
-		printf("GGGGGGGGGGGGGUUUUUUUUUUUUUuuuuuuuuuuuuaaaaaaaa!!!!!\n");
 		rcv_wait_element_list_.push( p_poped_el );
 		p_poped_el = p_el_list->pop();
 	}
@@ -329,9 +322,8 @@ void idx_element_storage_mgr::rcv_wait_element_by_thread_terminating( waiting_el
 
 ////////////////////////////////////////////////////////////////////////////////
 
-waiting_idx_list::waiting_idx_list( idx_mgr* p_owner_of_idx_arg, const int idx_buff_size_arg, const int ver_arg )
-  : p_owner_of_idx_( p_owner_of_idx_arg )
-  , ver_( ver_arg )
+waiting_idx_list::waiting_idx_list( const int idx_buff_size_arg, const int ver_arg )
+  : ver_( ver_arg )
   , idx_buff_size_( idx_buff_size_arg )
   , idx_top_idx_( 0 )
   , p_idx_buff_( nullptr )
@@ -355,16 +347,9 @@ waiting_idx_list::~waiting_idx_list()
 			LogOutput( log_type::WARN, buf );
 		}
 		LogOutput( log_type::WARN, "}" );
-
 	}
 
 	delete[] p_idx_buff_;
-}
-
-void waiting_idx_list::threadlocal_destructor( void )
-{
-	p_owner_of_idx_->rcv_wait_idx_by_thread_terminating( this );
-	return;
 }
 
 void waiting_idx_list::chk_reset_and_set_size( const int idx_buff_size_arg, const int ver_arg )
@@ -457,11 +442,12 @@ idx_mgr::idx_mgr(
   , p_idx_mgr_element_array_( nullptr )
   , invalid_element_storage_( &idx_mgr_element::p_invalid_idx_next_element_ )
   , valid_element_storage_( &idx_mgr_element::p_valid_idx_next_element_ )
-  , rcv_waiting_idx_list_( this, idx_size_, idx_size_ver_ )
+  , tls_waiting_idx_list_( rcv_idx_by_thread_terminating( this ) )
+  , rcv_waiting_idx_list_( idx_size_, idx_size_ver_ )
 {
 	if ( idx_size_ < 0 ) return;
 
-	tls_waiting_idx_list_.get_tls_instance( this, idx_size_, idx_size_ver_ );
+	tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
 
 	set_idx_size( idx_size_ );
 	return;
@@ -499,7 +485,7 @@ void idx_mgr::set_idx_size( const int idx_size_arg )
 int idx_mgr::pop( void )
 {
 	int               ans       = -1;
-	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( this, idx_size_, idx_size_ver_ );
+	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
 
 	ans = wait_list.pop_from_tls( idx_size_, idx_size_ver_ );
 	if ( ans != -1 ) {
@@ -531,7 +517,7 @@ void idx_mgr::push(
 	const int idx_arg   //!< [in] 返却するインデックス番号
 )
 {
-	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( this, idx_size_, idx_size_ver_ );
+	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
 
 	idx_mgr_element* p_invalid_element = invalid_element_storage_.pop_element();
 
@@ -566,7 +552,7 @@ void idx_mgr::dump( void )
 {
 	char buf[2048];
 
-	const waiting_idx_list& tmp_wel = tls_waiting_idx_list_.get_tls_instance( this, idx_size_, idx_size_ver_ );
+	const waiting_idx_list& tmp_wel = tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
 
 	snprintf( buf, 2047,
 	          "object idx_mgr_%p as %p {\n"

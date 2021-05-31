@@ -16,9 +16,8 @@ namespace concurrent {
 
 namespace internal {
 
-thread_local_fifo_list::thread_local_fifo_list( free_nd_storage* p_free_nd_storage_arg )
-  : p_free_nd_storage_( p_free_nd_storage_arg )
-  , head_( nullptr )
+thread_local_fifo_list::thread_local_fifo_list( void )
+  : head_( nullptr )
   , tail_( nullptr )
 {
 	return;
@@ -35,13 +34,6 @@ thread_local_fifo_list::~thread_local_fifo_list()
 			p_cur = p_nxt;
 		} while ( p_cur != nullptr );
 	}
-
-	return;
-}
-
-void thread_local_fifo_list::threadlocal_destructor( void )
-{
-	p_free_nd_storage_->rcv_thread_local_fifo_list( this );
 
 	return;
 }
@@ -213,7 +205,8 @@ bool fifo_free_nd_list::check_hazard_list( fifo_free_nd_list::node_pointer const
 
 free_nd_storage::free_nd_storage( void )
   : allocated_node_count_( 0 )
-  , rcv_thread_local_fifo_list_( this )
+  , tls_fifo_( rcv_fifo_list_by_thread_terminating( this ) )
+  , rcv_thread_local_fifo_list_()
 {
 }
 

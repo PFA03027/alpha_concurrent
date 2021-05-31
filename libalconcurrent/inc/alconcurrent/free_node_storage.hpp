@@ -97,11 +97,9 @@ public:
 	using node_type    = node_of_list;
 	using node_pointer = node_type*;
 
-	thread_local_fifo_list( free_nd_storage* p_free_nd_storage_arg );
+	thread_local_fifo_list( void );
 
 	~thread_local_fifo_list();
-
-	void threadlocal_destructor( void );
 
 	void push( node_pointer const p_push_node );
 
@@ -120,9 +118,8 @@ private:
 
 	static constexpr node_of_list::next_slot_idx next_slot_idx_ = node_of_list::next_slot_idx::TL_LIST_SLOT;
 
-	free_nd_storage* p_free_nd_storage_;
-	node_pointer     head_;
-	node_pointer     tail_;
+	node_pointer head_;
+	node_pointer tail_;
 };
 
 /*!
@@ -287,13 +284,25 @@ public:
 
 	int get_allocated_num( void );
 
-	void rcv_thread_local_fifo_list( thread_local_fifo_list* p_rcv );
-
 private:
 	free_nd_storage( const free_nd_storage& ) = delete;
 	free_nd_storage( free_nd_storage&& )      = delete;
 	free_nd_storage operator=( const free_nd_storage& ) = delete;
 	free_nd_storage operator=( free_nd_storage&& ) = delete;
+
+	struct rcv_fifo_list_by_thread_terminating {
+		rcv_fifo_list_by_thread_terminating( free_nd_storage* p_fns_arg )
+		  : p_fns_( p_fns_arg )
+		{
+		}
+
+		void operator()( thread_local_fifo_list& destructing_tls )
+		{
+			p_fns_->rcv_thread_local_fifo_list( &destructing_tls );
+		}
+
+		free_nd_storage* p_fns_;
+	};
 
 	template <typename ALLOC_NODE_T>
 	inline ALLOC_NODE_T* allocate_new_node( void )
@@ -308,9 +317,11 @@ private:
 
 	inline thread_local_fifo_list* check_local_storage( void )
 	{
-		thread_local_fifo_list* p_ans = &( tls_fifo_.get_tls_instance( this ) );
+		thread_local_fifo_list* p_ans = &( tls_fifo_.get_tls_instance() );
 		return p_ans;
 	}
+
+	void rcv_thread_local_fifo_list( thread_local_fifo_list* p_rcv );
 
 	static constexpr int num_recycle_exec = 16;   //!< recycle処理を行うノード数。処理量を一定化するために、ループ回数を定数化する。２以上とする事。だいたいCPU数程度にすればよい。
 
@@ -318,12 +329,10 @@ private:
 
 	fifo_free_nd_list node_list_;
 
-	dynamic_tls<thread_local_fifo_list> tls_fifo_;
+	dynamic_tls<thread_local_fifo_list, rcv_fifo_list_by_thread_terminating> tls_fifo_;
 
 	std::mutex             mtx_rcv_thread_local_fifo_list_;
 	thread_local_fifo_list rcv_thread_local_fifo_list_;
-
-	//	friend pthread_key_create;
 };
 
 }   // namespace internal

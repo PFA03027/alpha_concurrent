@@ -34,20 +34,6 @@ namespace concurrent {
 
 namespace internal {
 
-struct is_callable_threadlocal_destructor_impl {
-	template <typename T>
-	static auto check( T* ) -> decltype(
-		std::declval<T*>()->threadlocal_destructor(),
-		std::true_type() );
-
-	template <typename T>
-	static auto check( ... ) -> std::false_type;
-};
-
-template <typename T>
-struct is_callable_threadlocal_destructor : decltype( is_callable_threadlocal_destructor_impl::check<T>( nullptr ) ) {
-};
-
 /*!
  * @breif	動的スレッドローカルストレージで使用する内部処理用クラス
  *
@@ -89,28 +75,7 @@ public:
 
 	/*!
 	 * @breif	スレッド終了時に管理しているスレッドローカルストレージを解放する。
-	 *
-	 * Tがthreadlocal_destructor(void)というメンバ関数を持つ場合、これを呼び出してからデストラクタを呼び出す。
 	 */
-	template <typename U = T, typename std::enable_if<is_callable_threadlocal_destructor<U>::value>::type* = nullptr>
-	void release_owner( void )
-	{
-		p_value->threadlocal_destructor();
-
-		p_value->~T();
-		std::free( p_value );
-
-		p_value = nullptr;
-		status_.store( ocupied_status::UNUSED, std::memory_order_release );
-		return;
-	}
-
-	/*!
-	 * @breif	スレッド終了時に管理しているスレッドローカルストレージを解放する。
-	 *
-	 * Tがthreadlocal_destructor(void)というメンバ関数を持たない場合、すぐにデストラクタを呼び出す。
-	 */
-	template <typename U = T, typename std::enable_if<!is_callable_threadlocal_destructor<U>::value>::type* = nullptr>
 	void release_owner( void )
 	{
 		pre_exec_( *p_value );
@@ -164,10 +129,26 @@ private:
 
 }   // namespace internal
 
+/*!
+ * @breif	スレッド終了時にスレッドローカルストレージを解放する前に呼び出されるファンクタ
+ *
+ * @param [in]	T	ファンクタに引数として渡される型。実際の引数は、この型の参照T&となる。
+ *
+ * このファンクタ自身は、何もしないというファンクタとして動作する。
+ *
+ *
+ * @breif A functor called before freeing thread-local storage at the end of a thread
+ *
+ * @param [in] T The type passed as an argument to the functor. The actual argument is a reference T & of this type.
+ *
+ * This funktor itself acts as a funktor that does nothing.
+ */
 template <typename T>
 struct threadlocal_destructor_functor {
 	using value_reference = T&;
-	void operator()( value_reference data )
+	void operator()(
+		value_reference data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
+	)
 	{
 		return;
 	}
@@ -176,12 +157,28 @@ struct threadlocal_destructor_functor {
 /*!
  * @breif	動的スレッドローカルストレージを実現するクラス
  *
- * T型が、threadlocal_destructor()というメンバ関数を持つ場合、スレッド終了時にスレッドローカルストレージをdestructする前に、threadlocal_destructor()を呼び出す。
- * このクラスのインスタンス変数自体がdestructされる場合は、threadlocal_destructor()は呼び出されない。
+ * スレッド終了時にスレッドローカルストレージをdestructする前に、コンストラクタで指定されたTL_DESTRUCTORのインスタンスが呼び出される。
+ * このクラスのインスタンス変数自体がdestructされる場合は、呼び出されない。
+ *
+ * @param [in]	T	スレッドローカルストレージとして確保する型
+ * @param [in]	TL_DESTRUCTOR	スレッド終了時にスレッドローカルストレージを解放する前に呼び出されるファンクタ
  *
  * @note
  * lf_mem_allocクラスで使用するため、
  * コンポーネントの上下関係から、メモリの確保にはnewを使用せず、malloc/freeと配置newのみを使用する。
+ *
+ *
+ * @breif Class that realizes dynamic thread local storage
+ *
+ * At the end of the thread, the instance of TL_DESTRUCTOR specified in the constructor is called before destructing the thread local storage.
+ * If the instance variable of this class itself is destroyed, it will not be called.
+ *
+ * @param [in] T Type reserved as thread local storage
+ * @param [in] TL_DESTRUCTOR A functor called before freeing thread-local storage at the end of a thread
+ *
+ * @note
+ * Because it is used in the lf_mem_alloc class
+ * Due to the hierarchical relationship of components, new is not used to allocate memory, only malloc/free and placement new are used.
  */
 template <typename T, typename TL_DESTRUCTOR = threadlocal_destructor_functor<T>>
 class dynamic_tls {
