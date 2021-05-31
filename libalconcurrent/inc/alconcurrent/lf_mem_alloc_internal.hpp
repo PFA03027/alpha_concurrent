@@ -450,8 +450,9 @@ public:
 	chunk_statistics get_statistics( void ) const;
 
 private:
-	param_chunk_allocation                alloc_conf_;    //!< allocation configuration paramter
-	std::atomic<chunk_header_multi_slot*> p_top_chunk_;   //!< pointer to chunk_header that is top of list.
+	param_chunk_allocation                alloc_conf_;     //!< allocation configuration paramter
+	std::atomic<chunk_header_multi_slot*> p_top_chunk_;    //!< pointer to chunk_header that is top of list.
+	std::atomic<chunk_header_multi_slot*> p_hint_chunk_;   //!< pointer to chunk_header that is success to allocate recently.
 };
 
 }   // namespace internal
