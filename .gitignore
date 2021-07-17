@@ -4,3 +4,4 @@
 *.a
 *.d
 *.so
+/test/build_googletest/build
