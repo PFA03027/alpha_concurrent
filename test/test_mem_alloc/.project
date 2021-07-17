@@ -3,6 +3,7 @@
 	<name>test_mem_alloc</name>
 	<comment></comment>
 	<projects>
+		<project>build_googletest</project>
 		<project>libalconcurrent</project>
 	</projects>
 	<buildSpec>

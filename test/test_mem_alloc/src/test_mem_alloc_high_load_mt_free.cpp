@@ -8,11 +8,17 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
+#define ENABLE_GTEST
+
 #include <pthread.h>
 
 #include <chrono>
 #include <iostream>
 #include <random>
+
+#ifdef ENABLE_GTEST
+#include "gtest/gtest.h"
+#endif
 
 #include "alconcurrent/lf_fifo.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
@@ -26,6 +32,8 @@ static alpha::concurrent::param_chunk_allocation param[] = {
 	{ 512, 1600 },
 	{ 1024, 2800 },
 };
+
+std::atomic<bool> err_flag( false );
 
 static pthread_barrier_t barrier;
 
@@ -90,7 +98,8 @@ void* func_test_fifo( void* p_data )
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
 				printf( "fifo size count: %d\n", p_test_obj->get_size() );
-				exit( 1 );
+				err_flag.store( true );
+				return nullptr;
 			}
 
 			p_tmg->deallocate( p_tmp_alloc );
@@ -133,6 +142,8 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 	std::cout << "thread is " << num_of_thd
 			  << " func_test_fifo() Exec time: " << diff.count() << " msec" << std::endl;
 
+	EXPECT_FALSE( err_flag.load() );
+
 	std::list<alpha::concurrent::chunk_statistics> statistics = p_tmg_arg->get_statistics();
 
 	for ( auto& e : statistics ) {
@@ -151,11 +162,28 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 	}
 }
 
+#ifdef ENABLE_GTEST
+TEST( lfmemAlloc, TestAllocFreeBwMultThread )
+{
+	alpha::concurrent::general_mem_allocator test1_gma( nullptr, 0 );
+	alpha::concurrent::general_mem_allocator test2_gma( param, 7 );
+
+	err_flag.store( false );
+	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread( num_thread, &test1_gma ) );
+
+	err_flag.store( false );
+	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread( num_thread, &test2_gma ) );
+}
+#else
 void load_test_alloc_free_bw_mult_thread( void )
 {
 	alpha::concurrent::general_mem_allocator test1_gma( nullptr, 0 );
 	alpha::concurrent::general_mem_allocator test2_gma( param, 7 );
 
+	err_flag.store( false );
 	load_test_lockfree_bw_mult_thread( num_thread, &test1_gma );
+
+	err_flag.store( false );
 	load_test_lockfree_bw_mult_thread( num_thread, &test2_gma );
 }
+#endif

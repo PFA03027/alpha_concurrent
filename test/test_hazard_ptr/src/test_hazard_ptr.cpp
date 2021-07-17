@@ -9,6 +9,8 @@
 #include <iostream>
 #include <pthread.h>
 
+#include "gtest/gtest.h"
+
 #include "alconcurrent/hazard_ptr.hpp"
 
 class delete_test {
@@ -122,6 +124,7 @@ void* func_delete_owner( void* data )
 	return reinterpret_cast<void*>( ans );
 }
 
+#if 0
 int test_case1( void )
 {
 	std::atomic<delete_test*> atm_p_test_obj( new delete_test );
@@ -185,4 +188,65 @@ int main( void )
 
 	std::cout << "!!!End World!!!" << std::endl;   // prints !!!Hello World!!!
 	return 0;
+}
+#endif
+
+void test_case1( void )
+{
+	std::atomic<delete_test*> atm_p_test_obj( new delete_test );
+
+	pthread_barrier_init( &barrier, NULL, num_thread + 2 );
+	pthread_t* threads = new pthread_t[num_thread + 1];
+
+	pthread_create( &threads[0], NULL, func_delete_owner, reinterpret_cast<void*>( &atm_p_test_obj ) );
+	for ( int i = 1; i <= num_thread; i++ ) {
+		//		std::cout << "Thread " << i << " is created." << std::endl;
+		pthread_create( &threads[i], NULL, func_refarencing, reinterpret_cast<void*>( &atm_p_test_obj ) );
+	}
+	std::cout << "!!!Ready!!!" << std::endl;
+
+	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
+	std::cout << "!!!GO!!!" << std::endl;
+	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
+	pthread_barrier_wait( &barrier );
+
+	int sum = 0;
+	for ( int i = 0; i <= num_thread; i++ ) {
+		uintptr_t e;
+		pthread_join( threads[i], reinterpret_cast<void**>( &e ) );
+		//		std::cout << "Thread " << i << ": last dequeued = " << e << std::endl;
+		sum += e;
+	}
+
+	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
+
+	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
+	std::cout << "thread is " << num_thread << "  Exec time: " << diff.count() << " msec" << std::endl;
+
+	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
+	// に等しくなるはず。
+	std::cout << "Expect: 1" << std::endl;
+	std::cout << "Sum: " << sum << std::endl;
+	ASSERT_EQ( 1, sum );
+
+	delete[] threads;
+
+	//	auto [hzrd_size, del_size] = alpha::concurrent::hazard_ptr<delete_test>::debug_get_glist_size();
+	//	printf( "glist_size: hazard ptr=%d, del ptr=%d\n", hzrd_size, del_size );
+
+	return;
+}
+
+TEST( HazardPtr, TC1 )
+{
+	std::cout << "!!!Start World!!!" << std::endl;   // prints !!!Hello World!!!
+
+	for ( int i = 0; i < num_thread; i++ ) {
+		//	for ( int i = 0; i < 1; i++ ) {
+		std::cout << "\t!!!Start " << i << std::endl;   // prints !!!Hello World!!!
+		ASSERT_NO_FATAL_FAILURE( test_case1() );
+	}
+
+	std::cout << "!!!End World!!!" << std::endl;   // prints !!!Hello World!!!
+	return;
 }

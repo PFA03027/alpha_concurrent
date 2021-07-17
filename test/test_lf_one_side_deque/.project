@@ -3,6 +3,7 @@
 	<name>test_lf_one_side_deque</name>
 	<comment></comment>
 	<projects>
+		<project>build_googletest</project>
 		<project>libalconcurrent</project>
 	</projects>
 	<buildSpec>

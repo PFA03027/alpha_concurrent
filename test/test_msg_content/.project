@@ -3,6 +3,7 @@
 	<name>test_msg_content</name>
 	<comment></comment>
 	<projects>
+		<project>build_googletest</project>
 		<project>libalconcurrent</project>
 	</projects>
 	<buildSpec>
