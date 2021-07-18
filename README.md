@@ -1,5 +1,4 @@
-# Semi lock-free concurrent software asset
- Semi lock-free concurrent software asset
+# libalconcurrent is Semi lock-free concurrent software asset
 
 # Pre-requirement
 * C++11 standard and standard C++ library are required.
@@ -106,18 +105,44 @@ Whether the provided class is lock-free depends on whether the POSIX API for thr
 
 If the POSIX thread-local storage API is lock-free, the main operations such as push () / pop () will behave as lock-free.
 
+# Build
+## How to build libalconcurrent.a
+1. Change the current directory to libalconcurrent
+2. Execute "make all"
+
+There is no platform specific code. Therefore I expect to build this regardless Linux/Windows.
+If you would like to build this library as a shared library on your platform, please modify Makefile.
+
+## To install your system
+Current libalconcurrent builder is not prepared installing logic.
+Therefore please do below by your build system or manual operation.
+1. copy the folder libalconcurrent/inc/alconcurrent into your expected header file directory
+2. copy the library file "libalconcurrent/libalconcurrent.a" into your expected header file directory
+
+If you build libalconcurrent as a shared library, please copy it.
+
+## How to build test code
+### Pre-condition:
+1. Checkout googletest.
+   Because libalconcurrent includes googletset as submodule, please execute below to checkout googletest;
+   $ git submodule update --init --recursive
+
+   Currently, libalconcurrent uses googletest v1.11.0.
+
+2. Please prepare cmake. This is required by google test.
+   In case of Windows system, please download cmake windows binary from https://cmake.org/download/.
+   After install, please copy xxx/CMake/yyy to zzz/migwin/.
+   Cmake is installed into C:\Program Files\CMake normally. And E.g, the eclipse environment is C:\Eclipse\pleiades\eclipse\mingw.
+   In this case, Copy all folders in C:\Program Files\CMake to C:\Eclipse\pleiades\eclipse\mingw.
+
+### Build step
+0. Build libalconcurrent.a
+1. Change the current directory to test/build_googletest
+2. Execute "sh make_googletest.sh"
+3. Change current direcotry to each test folder. Then, execute "make all".
+
+Current linking library of test is static library. If you would like to link a shared library, please modify Makefile.
+
+
 # License
-License type: 0BSD license
-
-Copyright (C) 2020 by Teruaki Ata <PFA03027@nifty.com>
-
-Permission to use, copy, modify, and/or distribute this software for any purpose
-with or without fee is hereby granted.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
-OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
-THIS SOFTWARE.
+Please see "LICENSE.txt"
