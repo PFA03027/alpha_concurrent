@@ -83,8 +83,7 @@ Non lock free behavior cases are below;
 * Construct a instance itself.
 * Any initial API call by each thread.
 * pop_front()/push_front()/push_back() call in case of no free internal node.
-
-** In case that template parameter ALLOW_TO_ALLOCATE is false, these API does not allocate internal node. therefore push()/push_front()/push_back()/insert() is lock free.
+  * In case that template parameter ALLOW_TO_ALLOCATE is false, these API does not allocate internal node. therefore push()/push_front()/push_back()/insert() is lock free.
 
 
 # dynamic_tls class in dynamic_tls.hpp
@@ -123,15 +122,15 @@ If you build libalconcurrent as a shared library, please copy it.
 
 ## How to build test code
 ### Pre-condition:
-1. Checkout googletest.
-Because libalconcurrent includes googletset as submodule, please execute below to checkout googletest;
-$ git submodule update --init --recursive
+1. Checkout googletest.  
+Because libalconcurrent includes googletset as submodule, please execute below to checkout googletest;  
+        $ git submodule update --init --recursive  
 Currently, libalconcurrent uses googletest v1.11.0.
 
-2. Please prepare cmake. This is required by google test.
-In case of Windows system, please download cmake windows binary from https://cmake.org/download/.
-After install, please copy xxx/CMake/yyy to zzz/migwin/.
-Cmake is installed into C:\Program Files\CMake normally. And E.g, the eclipse environment is C:\Eclipse\pleiades\eclipse\mingw.
+2. Please prepare cmake. This is required by google test.  
+In case of Windows system, please download cmake windows binary from https://cmake.org/download/.  
+After install, please copy xxx/CMake/yyy to zzz/migwin/.  
+Cmake is installed into C:\Program Files\CMake normally. And E.g, the eclipse environment is C:\Eclipse\pleiades\eclipse\mingw.  
 In this case, Copy all folders in C:\Program Files\CMake to C:\Eclipse\pleiades\eclipse\mingw.
 
 ### Build step
