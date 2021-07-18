@@ -117,23 +117,22 @@ If you would like to build this library as a shared library on your platform, pl
 Current libalconcurrent builder is not prepared installing logic.
 Therefore please do below by your build system or manual operation.
 1. copy the folder libalconcurrent/inc/alconcurrent into your expected header file directory
-2. copy the library file "libalconcurrent/libalconcurrent.a" into your expected header file directory
+2. copy the library file "libalconcurrent/libalconcurrent.a" into your expected library files directory
 
 If you build libalconcurrent as a shared library, please copy it.
 
 ## How to build test code
 ### Pre-condition:
 1. Checkout googletest.
-   Because libalconcurrent includes googletset as submodule, please execute below to checkout googletest;
-   $ git submodule update --init --recursive
-
-   Currently, libalconcurrent uses googletest v1.11.0.
+Because libalconcurrent includes googletset as submodule, please execute below to checkout googletest;
+$ git submodule update --init --recursive
+Currently, libalconcurrent uses googletest v1.11.0.
 
 2. Please prepare cmake. This is required by google test.
-   In case of Windows system, please download cmake windows binary from https://cmake.org/download/.
-   After install, please copy xxx/CMake/yyy to zzz/migwin/.
-   Cmake is installed into C:\Program Files\CMake normally. And E.g, the eclipse environment is C:\Eclipse\pleiades\eclipse\mingw.
-   In this case, Copy all folders in C:\Program Files\CMake to C:\Eclipse\pleiades\eclipse\mingw.
+In case of Windows system, please download cmake windows binary from https://cmake.org/download/.
+After install, please copy xxx/CMake/yyy to zzz/migwin/.
+Cmake is installed into C:\Program Files\CMake normally. And E.g, the eclipse environment is C:\Eclipse\pleiades\eclipse\mingw.
+In this case, Copy all folders in C:\Program Files\CMake to C:\Eclipse\pleiades\eclipse\mingw.
 
 ### Build step
 0. Build libalconcurrent.a
