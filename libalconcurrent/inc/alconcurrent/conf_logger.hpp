@@ -11,8 +11,10 @@
 #ifndef INC_CONF_LOGGER_HPP_
 #define INC_CONF_LOGGER_HPP_
 
-#include <memory>
 #include <stdio.h>
+#include <string.h>
+
+#include <memory>
 
 #define CONF_LOGGER_INTERNAL_BUFF_SIZE ( 2048 )
 
@@ -119,6 +121,19 @@ inline void LogOutput( const log_type lt, const char* p_format, Args... args )
 	if ( internal::is_allowed_to_output( lt ) ) {
 		char buff[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 		snprintf( buff, CONF_LOGGER_INTERNAL_BUFF_SIZE, p_format, args... );
+		buff[CONF_LOGGER_INTERNAL_BUFF_SIZE - 1] = 0;
+
+		internal::p_concrete_logger_if->output_log( lt, CONF_LOGGER_INTERNAL_BUFF_SIZE, buff );
+	}
+
+	return;
+}
+
+inline void LogOutput( const log_type lt, const char* p_str )
+{
+	if ( internal::is_allowed_to_output( lt ) ) {
+		char buff[CONF_LOGGER_INTERNAL_BUFF_SIZE];
+		strncpy( buff, p_str, CONF_LOGGER_INTERNAL_BUFF_SIZE );
 		buff[CONF_LOGGER_INTERNAL_BUFF_SIZE - 1] = 0;
 
 		internal::p_concrete_logger_if->output_log( lt, CONF_LOGGER_INTERNAL_BUFF_SIZE, buff );

@@ -85,15 +85,15 @@ void* func_test_fifo( void* p_data )
 	for ( int i = 0; i < num_loop; i++ ) {
 		int cur_alloc_num = num_dist( engine );
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
-			void* p_tmp_alloc = p_tmg->allocate( size_dist( engine ) );
+			void* p_tmp_alloc_to_push = p_tmg->allocate( size_dist( engine ) );
 
-			p_test_obj->push( p_tmp_alloc );
+			p_test_obj->push( p_tmp_alloc_to_push );
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [pop_flag, p_tmp_alloc] = p_test_obj->pop();
 #else
-			auto local_ret = p_test_obj->pop();
-			auto pop_flag  = std::get<0>( local_ret );
-			p_tmp_alloc    = std::get<1>( local_ret );
+			auto local_ret   = p_test_obj->pop();
+			auto pop_flag    = std::get<0>( local_ret );
+			auto p_tmp_alloc = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );

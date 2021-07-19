@@ -60,6 +60,7 @@ public:
 	{
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 		auto [p_cur, cur_mark] = head_.get_next();
+		//cur_mark = true;	// Dummy access to avoid compiler warning(-Wunused-variable)
 #else
 		auto local_ret = head_.get_next();
 		auto p_cur     = std::get<0>( local_ret );
