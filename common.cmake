@@ -1,0 +1,15 @@
+
+# Common compile options
+set(CMAKE_C_FLAGS "-Wall")
+
+# set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11")	# for test purpose
+# set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++14")	# for test purpose
+# set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++17")	# for test purpose
+
+set(CMAKE_C_FLAGS_DEBUG "-g -O2")
+set(CMAKE_C_FLAGS_RELEASE "-O2")
+set(CMAKE_CXX_FLAGS_DEBUG ${CMAKE_C_FLAGS_DEBUG})
+set(CMAKE_CXX_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE})
+
+set(CMAKE_C_FLAGS "-DCONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP")
+# set(CMAKE_C_FLAGS "-DNOT_USE_LOCK_FREE_MEM_ALLOC")

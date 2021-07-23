@@ -105,14 +105,21 @@ Whether the provided class is lock-free depends on whether the POSIX API for thr
 If the POSIX thread-local storage API is lock-free, the main operations such as push () / pop () will behave as lock-free.
 
 # Build
-## How to build libalconcurrent.a
+There is 2way for build
+1. build by make  
+Even if your build environment has no cmake, at least you could make libalconcurrent at least
+2. build by cmake  
+This build way builds not only libalconcurrent but also test code is possible to build.
+
+## Build by make
+### How to build libalconcurrent.a by make
 1. Change the current directory to libalconcurrent
 2. Execute "make all"
 
 There is no platform specific code. Therefore I expect to build this regardless Linux/Windows.
 If you would like to build this library as a shared library on your platform, please modify Makefile.
 
-## To install your system
+### To install your system
 Current libalconcurrent builder is not prepared installing logic.
 Therefore please do below by your build system or manual operation.
 1. copy the folder libalconcurrent/inc/alconcurrent into your expected header file directory
@@ -120,26 +127,31 @@ Therefore please do below by your build system or manual operation.
 
 If you build libalconcurrent as a shared library, please copy it.
 
-## How to build test code
+## How to build by cmake
 ### Pre-condition:
 1. Checkout googletest.  
 Because libalconcurrent includes googletset as submodule, please execute below to checkout googletest;  
         $ git submodule update --init --recursive  
 Currently, libalconcurrent uses googletest v1.11.0.
 
-2. Please prepare cmake. This is required by google test.  
+2. Please prepare cmake on your system.  
 In case of Windows system, please download cmake windows binary from https://cmake.org/download/.  
 After install, please copy xxx/CMake/yyy to zzz/migwin/.  
 Cmake is installed into C:\Program Files\CMake normally. And E.g, the eclipse environment is C:\Eclipse\pleiades\eclipse\mingw.  
 In this case, Copy all folders in C:\Program Files\CMake to C:\Eclipse\pleiades\eclipse\mingw.
 
 ### Build step
-0. Build libalconcurrent.a
-1. Change the current directory to test/build_googletest
-2. Execute "sh make_googletest.sh"
-3. Change current direcotry to each test folder. Then, execute "make all".
+1. Prepare build directory for cmake build
+2. type command in the prepared directory  
+        $ mkdir build  
+        $ cd build  
+        $ cmake -G "your target generater" <path of alpha_concurrent>  
+        $ cmake --build  
+You could refer make_win_eclipse.sh as the sample for above commands
 
-Current linking library of test is static library. If you would like to link a shared library, please modify Makefile.
+Current linking library of test decided by cmake.
+Therefore please configure cmake global option "BUILD_SHARED_LIBS" according your purpose like below;
+        $ cmake -D BUILD_SHARED_LIBS=ON .....(other command line options)
 
 
 # License

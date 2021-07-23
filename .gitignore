@@ -4,4 +4,5 @@
 *.a
 *.d
 *.so
-/test/build_googletest/build
+/build_win_eclipse
+/build/
