@@ -153,6 +153,9 @@ Current linking library of test decided by cmake.
 Therefore please configure cmake global option "BUILD_SHARED_LIBS" according your purpose like below;
         $ cmake -D BUILD_SHARED_LIBS=ON .....(other command line options)
 
+If you would like to do parallel build, please use -j N option or environment variable CMAKE_BUILD_PARALLEL_LEVEL for CMake.
+Especially, in case that you will use Eclipse with CMake project, please select the approach "environment variable CMAKE_BUILD_PARALLEL_LEVEL for CMake".
+
 
 # License
 Please see "LICENSE.txt"
