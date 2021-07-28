@@ -6,8 +6,6 @@
 // Description : Hello World in C, Ansi-style
 //============================================================================
 
-#define ENABLE_GTEST
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -18,9 +16,7 @@
 #include <iostream>
 #include <random>
 
-#ifdef ENABLE_GTEST
 #include "gtest/gtest.h"
-#endif
 
 #include "alconcurrent/lf_fifo.hpp"
 
@@ -139,7 +135,6 @@ void* func_test_fifo_consumer( void* data )
 	return reinterpret_cast<void*>( 1 );
 }
 
-#ifdef ENABLE_GTEST
 TEST( MsgContent, TC1 )
 {
 	test_fifo_type test_obj;
@@ -191,71 +186,3 @@ TEST( MsgContent, TC1 )
 
 	return;
 }
-#else
-int test_case( void )
-{
-	test_fifo_type test_obj;
-
-	int numof_pro = num_thread / 4;
-	int numof_con = num_thread;
-
-	pthread_barrier_init( &barrier, NULL, numof_pro + numof_con + 1 );
-	pthread_t* producer_threads = new pthread_t[numof_pro];
-	pthread_t* consumer_threads = new pthread_t[numof_con];
-
-	for ( int i = 0; i < numof_pro; i++ ) {
-		pthread_create( &producer_threads[i], NULL, func_test_fifo_producer, reinterpret_cast<void*>( &test_obj ) );
-	}
-	for ( int i = 0; i < numof_con; i++ ) {
-		pthread_create( &consumer_threads[i], NULL, func_test_fifo_consumer, reinterpret_cast<void*>( &test_obj ) );
-	}
-	std::cout << "!!!Ready!!!" << std::endl;
-
-	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
-	std::cout << "!!!GO!!!" << std::endl;
-	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-	pthread_barrier_wait( &barrier );
-
-	for ( int i = 0; i < numof_pro; i++ ) {
-		uintptr_t e;
-		pthread_join( producer_threads[i], reinterpret_cast<void**>( &e ) );
-	}
-
-	for ( int i = 0; i < numof_con; i++ ) {
-		test_msg_obj* p_one_msg = new test_msg_obj( true );
-		test_obj.push( p_one_msg );
-	}
-
-	for ( int i = 0; i < numof_con; i++ ) {
-		uintptr_t e;
-		pthread_join( consumer_threads[i], reinterpret_cast<void**>( &e ) );
-	}
-
-	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
-
-	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
-	std::cout << "thread is " << num_thread << "  Exec time: " << diff.count() << " msec" << std::endl;
-
-	delete[] producer_threads;
-	delete[] consumer_threads;
-
-	return 0;
-}
-#endif
-
-#ifndef ENABLE_GTEST
-int main( void )
-{
-	std::cout << "!!!Start World!!!" << std::endl;   // prints !!!Hello World!!!
-
-	for ( int i = 0; i < 4; i++ ) {
-		std::cout << "!!! " << i << " World!!!" << std::endl;   // prints !!!Hello World!!!
-
-		test_case();
-	}
-
-	std::cout << "!!!End World!!!" << std::endl;   // prints !!!Hello World!!!
-
-	return EXIT_SUCCESS;
-}
-#endif

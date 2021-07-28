@@ -6,7 +6,6 @@
 // Description : Hello World in C, Ansi-style
 //============================================================================
 
-#define ENABLE_GTEST
 
 #include <pthread.h>
 
@@ -16,9 +15,7 @@
 #include <random>
 #include <thread>
 
-#ifdef ENABLE_GTEST
 #include "gtest/gtest.h"
-#endif
 
 #include "alconcurrent/lf_list.hpp"
 #include "alconcurrent/lf_mem_alloc_type.hpp"
@@ -37,7 +34,6 @@ static alpha::concurrent::param_chunk_allocation param[] = {
 	{ 128, 100 },
 };
 
-#ifdef ENABLE_GTEST
 class lflistTest : public ::testing::Test {
 protected:
 	virtual void SetUp()
@@ -58,7 +54,6 @@ protected:
 #endif
 	}
 };
-#endif
 
 /**
  * 各スレッドの先頭から追加して、最後から取り出すことで、カウントアップを繰り返す。
@@ -128,7 +123,6 @@ void* func_test_list_back2front( void* data )
 	return reinterpret_cast<void*>( v );
 }
 
-#ifdef ENABLE_GTEST
 TEST_F( lflistTest, TC1 )
 {
 	test_list count_list;
@@ -174,57 +168,6 @@ TEST_F( lflistTest, TC1 )
 
 	return;
 }
-#else
-int test1( void )
-{
-	test_list count_list;
-
-	pthread_barrier_init( &barrier, NULL, num_thread * 2 + 1 );
-	pthread_t* threads = new pthread_t[num_thread * 2];
-
-	for ( int i = 0; i < num_thread; i++ ) {
-		pthread_create( &threads[i], NULL, func_test_list_front2back, reinterpret_cast<void*>( &count_list ) );
-	}
-
-	for ( int i = 0; i < num_thread; i++ ) {
-		pthread_create( &threads[num_thread + i], NULL, func_test_list_back2front, reinterpret_cast<void*>( &count_list ) );
-	}
-
-	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
-	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-	pthread_barrier_wait( &barrier );
-
-	int sum = 0;
-	for ( int i = 0; i < num_thread * 2; i++ ) {
-		uintptr_t e;
-		pthread_join( threads[i], reinterpret_cast<void**>( &e ) );
-		std::cout << "Thread " << i << ": last dequeued = " << e << std::endl;
-		sum += e;
-	}
-
-	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
-
-	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
-	std::cout << "thread is " << num_thread << "  Exec time: " << diff.count() << " msec" << std::endl;
-
-	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
-	// に等しくなるはず。
-	std::cout << "Expect: " << std::to_string( num_thread * 2 * loop_num ) << std::endl;
-	std::cout << "Sum:    " << sum << std::endl;
-	if ( sum == ( num_thread * 2 * loop_num ) ) {
-		std::cout << "OK!" << std::endl;
-	} else {
-		std::cout << "NGGGGGGgggggg!" << std::endl;
-		return EXIT_FAILURE;
-	}
-
-	delete[] threads;
-
-	std::cout << "Allocated nodes:    " << count_list.get_allocated_num() << std::endl;
-
-	return EXIT_SUCCESS;
-}
-#endif
 
 constexpr typename test_list::value_type target_value = 1;
 constexpr typename test_list::value_type target_min   = target_value - 1;
@@ -284,7 +227,6 @@ void* func_test_list_insert_remove( void* data )
 	return reinterpret_cast<void*>( v );
 }
 
-#ifdef ENABLE_GTEST
 TEST_F( lflistTest, TC2 )
 {
 	test_list count_list;
@@ -330,57 +272,6 @@ TEST_F( lflistTest, TC2 )
 
 	return;
 }
-#else
-int test2( void )
-{
-	test_list count_list;
-
-	count_list.push_back( target_min );
-	count_list.push_back( target_max );
-
-	pthread_barrier_init( &barrier, NULL, num_thread + 1 );
-	pthread_t* threads = new pthread_t[num_thread];
-
-	for ( int i = 0; i < num_thread; i++ ) {
-		pthread_create( &threads[i], NULL, func_test_list_insert_remove, reinterpret_cast<void*>( &count_list ) );
-	}
-
-	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
-	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-	pthread_barrier_wait( &barrier );
-
-	int sum = 0;
-	for ( int i = 0; i < num_thread; i++ ) {
-		uintptr_t e;
-		pthread_join( threads[i], reinterpret_cast<void**>( &e ) );
-		std::cout << "Thread " << i << ": last dequeued = " << e << std::endl;
-		sum += e;
-	}
-
-	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
-
-	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
-	std::cout << "thread is " << num_thread << "  Exec time: " << diff.count() << " msec" << std::endl;
-
-	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
-	// に等しくなるはず。
-	std::cout << "Expect: " << std::to_string( num_thread * loop_num ) << std::endl;
-	std::cout << "Sum:    " << sum << std::endl;
-	if ( sum == ( num_thread * loop_num ) ) {
-		std::cout << "OK!" << std::endl;
-	} else {
-		std::cout << "NGGGGGGgggggg!" << std::endl;
-		return EXIT_FAILURE;
-	}
-
-	delete[] threads;
-
-	std::cout << "nodes:              " << count_list.get_size() << std::endl;
-	std::cout << "Allocated nodes:    " << count_list.get_allocated_num() << std::endl;
-
-	return EXIT_SUCCESS;
-}
-#endif
 
 struct data_tc {
 	test_list*            p_test_obj;
@@ -443,7 +334,6 @@ void* func_test_list_remove_all( void* data )
 	return reinterpret_cast<void*>( v );
 }
 
-#ifdef ENABLE_GTEST
 TEST_F( lflistTest, TC3 )
 {
 	test_list count_list;
@@ -495,66 +385,7 @@ TEST_F( lflistTest, TC3 )
 
 	return;
 }
-#else
-int test3( void )
-{
-	test_list count_list;
 
-	pthread_barrier_init( &barrier, NULL, num_thread * 2 + 1 );
-	pthread_t* threads = new pthread_t[num_thread * 2];
-	data_tc* test_data_set = new data_tc[num_thread];
-
-	for ( int i = 0; i < num_thread; i++ ) {
-		test_data_set[i].p_test_obj = &count_list;
-		test_data_set[i].tc_data = i;
-	}
-
-	for ( int i = 0; i < num_thread; i++ ) {
-		pthread_create( &threads[i], NULL, func_test_list_push, reinterpret_cast<void*>( &( test_data_set[i] ) ) );
-	}
-
-	for ( int i = 0; i < num_thread; i++ ) {
-		pthread_create( &threads[num_thread + i], NULL, func_test_list_remove_all, reinterpret_cast<void*>( &( test_data_set[i] ) ) );
-	}
-
-	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
-	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-	pthread_barrier_wait( &barrier );
-
-	int sum = 0;
-	for ( int i = 0; i < num_thread * 2; i++ ) {
-		uintptr_t e;
-		pthread_join( threads[i], reinterpret_cast<void**>( &e ) );
-		std::cout << "Thread " << i << ": last dequeued = " << e << std::endl;
-		sum += e;
-	}
-
-	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
-
-	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
-	std::cout << "thread is " << num_thread << "  Exec time: " << diff.count() << " msec" << std::endl;
-
-	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
-	// に等しくなるはず。
-	std::cout << "Expect: " << std::to_string( num_thread * 2 * loop_num ) << std::endl;
-	std::cout << "Sum:    " << sum << std::endl;
-	if ( sum == ( num_thread * 2 * loop_num ) ) {
-		std::cout << "OK!" << std::endl;
-	} else {
-		std::cout << "NGGGGGGgggggg!" << std::endl;
-		return EXIT_FAILURE;
-	}
-
-	delete[] threads;
-
-	std::cout << "nodes:              " << count_list.get_size() << std::endl;
-	std::cout << "Allocated nodes:    " << count_list.get_allocated_num() << std::endl;
-
-	return EXIT_SUCCESS;
-}
-#endif
-
-#ifdef ENABLE_GTEST
 TEST_F( lflistTest, TC4 )
 {
 	test_list count_list;
@@ -585,46 +416,7 @@ TEST_F( lflistTest, TC4 )
 
 	return;
 }
-#else
-int test4( void )
-{
-	test_list count_list;
 
-	for ( std::uintptr_t i = 0; i <= loop_num; i++ ) {
-		if ( !count_list.push_front( i ) ) {
-			printf( "Bugggggggyyyy  func_test_list_push()!!!  %llu\n", i );
-			printf( "list size count: %d\n", count_list.get_size() );
-			return EXIT_FAILURE;
-		}
-	}
-
-	std::uintptr_t sum = 0;
-	count_list.for_each( [&sum]( test_list::value_type& ref_value ) {
-		sum += ref_value;
-	} );
-
-	std::uintptr_t expect = 0;
-	if ( ( loop_num % 2 ) == 0 ) {
-		// 偶数の場合
-		expect = loop_num * ( loop_num / 2 ) + loop_num / 2;
-	} else {
-		// 奇数の場合
-		expect = loop_num * ( ( loop_num + 1 ) / 2 );
-	}
-	std::cout << "Expect: " << expect << std::endl;
-	std::cout << "Sum:    " << sum << std::endl;
-	if ( sum == expect ) {
-		std::cout << "OK!" << std::endl;
-	} else {
-		std::cout << "NGGGGGGgggggg!" << std::endl;
-		return EXIT_FAILURE;
-	}
-
-	return EXIT_SUCCESS;
-}
-#endif
-
-#ifdef ENABLE_GTEST
 TEST_F( lflistTest, Pointer )
 {
 	using test_fifo_type3 = alpha::concurrent::lockfree_list<int*>;
@@ -650,35 +442,6 @@ TEST_F( lflistTest, Pointer )
 
 	std::cout << "End Pointer test" << std::endl;
 }
-#else
-void test_pointer( void )
-{
-	using test_fifo_type3 = alpha::concurrent::lockfree_list<int*>;
-	test_fifo_type3* p_test_obj;
-
-	std::cout << "Pointer test#1" << std::endl;
-	p_test_obj = new test_fifo_type3( 8 );
-
-	p_test_obj->push_front( new int() );
-
-	delete p_test_obj;
-
-	std::cout << "Pointer test#2" << std::endl;
-	p_test_obj = new test_fifo_type3( 8 );
-
-	p_test_obj->push_front( new int() );
-	auto ret = p_test_obj->pop_front();
-	if ( std::get<0>( ret ) ) {
-		delete std::get<1>( ret );
-	} else {
-		std::cout << "NGGGGGGgggggg!" << std::endl;
-		exit( 1 );
-	}
-	delete p_test_obj;
-
-	std::cout << "End Pointer test" << std::endl;
-}
-#endif
 
 class array_test {
 public:
@@ -698,7 +461,6 @@ private:
 	int x;
 };
 
-#ifdef ENABLE_GTEST
 TEST_F( lflistTest, Array )
 {
 	using test_fifo_type3 = alpha::concurrent::lockfree_list<array_test[]>;
@@ -724,61 +486,3 @@ TEST_F( lflistTest, Array )
 
 	std::cout << "End Array array_test[] test" << std::endl;
 }
-#else
-void test_array( void )
-{
-	using test_fifo_type3 = alpha::concurrent::lockfree_list<array_test[]>;
-	test_fifo_type3* p_test_obj;
-
-	std::cout << "Array array_test[] test#1" << std::endl;
-	p_test_obj = new test_fifo_type3( 8 );
-
-	p_test_obj->push_front( new array_test[2] );
-
-	delete p_test_obj;
-
-	std::cout << "Array array_test[] test#2" << std::endl;
-	p_test_obj = new test_fifo_type3( 8 );
-
-	p_test_obj->push_front( new array_test[2] );
-	auto ret = p_test_obj->pop_front();
-	if ( std::get<0>( ret ) ) {
-		delete[] std::get<1>( ret );
-	} else {
-		std::cout << "NGGGGGGgggggg!" << std::endl;
-		exit( 1 );
-	}
-	delete p_test_obj;
-
-	std::cout << "End Array array_test[] test" << std::endl;
-}
-#endif
-
-#ifndef ENABLE_GTEST
-int main( void )
-{
-	std::cout << "!!!Start World!!!" << std::endl;   // prints !!!Hello World!!!
-
-#ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
-	set_param_to_free_nd_mem_alloc( param, 3 );
-#endif
-
-	test_pointer();
-	test_array();
-
-	test1();
-	test2();
-	test3();
-	test4();
-
-#ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
-	std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::internal::node_of_list::get_statistics();
-
-	for ( auto& e : statistics ) {
-		printf( "%s\n", e.print().c_str() );
-	}
-#endif
-	std::cout << "!!!End World!!!" << std::endl;   // prints !!!Hello World!!!
-	return EXIT_SUCCESS;
-}
-#endif

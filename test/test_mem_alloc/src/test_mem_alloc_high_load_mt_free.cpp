@@ -8,7 +8,6 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#define ENABLE_GTEST
 
 #include <pthread.h>
 
@@ -16,9 +15,7 @@
 #include <iostream>
 #include <random>
 
-#ifdef ENABLE_GTEST
 #include "gtest/gtest.h"
-#endif
 
 #include "alconcurrent/lf_fifo.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
@@ -162,7 +159,6 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 	}
 }
 
-#ifdef ENABLE_GTEST
 TEST( lfmemAlloc, TestAllocFreeBwMultThread )
 {
 	alpha::concurrent::general_mem_allocator test1_gma( nullptr, 0 );
@@ -174,16 +170,3 @@ TEST( lfmemAlloc, TestAllocFreeBwMultThread )
 	err_flag.store( false );
 	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread( num_thread, &test2_gma ) );
 }
-#else
-void load_test_alloc_free_bw_mult_thread( void )
-{
-	alpha::concurrent::general_mem_allocator test1_gma( nullptr, 0 );
-	alpha::concurrent::general_mem_allocator test2_gma( param, 7 );
-
-	err_flag.store( false );
-	load_test_lockfree_bw_mult_thread( num_thread, &test1_gma );
-
-	err_flag.store( false );
-	load_test_lockfree_bw_mult_thread( num_thread, &test2_gma );
-}
-#endif
