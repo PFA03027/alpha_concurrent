@@ -17,7 +17,7 @@
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 #include "alconcurrent/lf_stack.hpp"
 
-constexpr int            num_thread = 16;   // Tested until 128.
+constexpr int            num_thread = 128;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 100000;
 
 using test_lifo_type_part = alpha::concurrent::internal::lifo_nd_list<std::uintptr_t>;
@@ -26,9 +26,9 @@ pthread_barrier_t barrier;
 
 // example
 static alpha::concurrent::param_chunk_allocation param[] = {
-	{ 32, 100 },
-	{ 64, 100 },
-	{ 128, 100 },
+	{ 32, 100000 },
+	{ 64, 100000 },
+	{ 128, 100000 },
 };
 
 class lfStackTest : public ::testing::Test {
