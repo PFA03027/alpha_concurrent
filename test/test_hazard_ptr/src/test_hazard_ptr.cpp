@@ -124,7 +124,6 @@ void* func_delete_owner( void* data )
 	return reinterpret_cast<void*>( ans );
 }
 
-
 void test_case1( void )
 {
 	std::atomic<delete_test*> atm_p_test_obj( new delete_test );
@@ -138,11 +137,9 @@ void test_case1( void )
 		pthread_create( &threads[i], NULL, func_refarencing, reinterpret_cast<void*>( &atm_p_test_obj ) );
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
-
-	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
-	std::cout << "!!!GO!!!" << std::endl;
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	pthread_barrier_wait( &barrier );
+	std::cout << "!!!GO!!!" << std::endl;
 
 	int sum = 0;
 	for ( int i = 0; i <= num_thread; i++ ) {
@@ -181,6 +178,8 @@ TEST( HazardPtr, TC1 )
 		ASSERT_NO_FATAL_FAILURE( test_case1() );
 	}
 
+	printf( "number of keys of pthread_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
+	printf( "max number of keys of pthread_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
 	std::cout << "!!!End World!!!" << std::endl;   // prints !!!Hello World!!!
 	return;
 }

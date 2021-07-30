@@ -53,6 +53,9 @@ protected:
 			printf( "%s\n", e.print().c_str() );
 		}
 #endif
+
+		printf( "number of keys of pthread_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
+		printf( "max number of keys of pthread_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
 	}
 };
 
@@ -147,7 +150,7 @@ TEST_F( lffifoTest, TC1 )
 	auto [p_node, val] = p_test_obj->pop();
 #else
 	auto local_ret = p_test_obj->pop();
-	auto p_node    = std::get<0>( local_ret );
+	auto p_node = std::get<0>( local_ret );
 //	auto val = std::get<1>( local_ret );
 #endif
 
@@ -230,7 +233,6 @@ TEST_F( lffifoTest, TC2 )
 
 	return;
 }
-
 
 /**
  * 各スレッドのメインルーチン。
@@ -333,8 +335,8 @@ void test_case3( void )
 	auto [a1, a2] = func_test_fifo2<TEST_FIFO_TYPE>( p_test_obj );
 #else
 	auto local_ret = func_test_fifo2<TEST_FIFO_TYPE>( p_test_obj );
-	auto a1        = std::get<0>( local_ret );
-	auto a2        = std::get<1>( local_ret );
+	auto a1 = std::get<0>( local_ret );
+	auto a2 = std::get<1>( local_ret );
 #endif
 	std::cout << "Thread X: last dequeued = " << a1 << ", " << a2;
 	std::cout << std::endl;
@@ -514,8 +516,8 @@ void test_case4( void )
 	auto [a1, a2] = func_test4_fifo2<TEST_FIFO_TYPE>( p_test_obj );
 #else
 	auto local_ret = func_test4_fifo2<TEST_FIFO_TYPE>( p_test_obj );
-	auto a1        = std::get<0>( local_ret );
-	auto a2        = std::get<1>( local_ret );
+	auto a1 = std::get<0>( local_ret );
+	auto a2 = std::get<1>( local_ret );
 #endif
 	std::cout << "Thread X: last dequeued = " << a1 << ", " << a2;
 	std::cout << std::endl;
@@ -553,7 +555,6 @@ TEST_F( lffifoTest, TC4 )
 {
 	ASSERT_NO_FATAL_FAILURE( test_case4<test_fifo_type2>() );
 }
-
 
 TEST_F( lffifoTest, Pointer1 )
 {
@@ -676,4 +677,3 @@ TEST_F( lffifoTest, FixedArray2 )
 
 	std::cout << "End Array array_test[2] test" << std::endl;
 }
-

@@ -35,6 +35,38 @@ namespace concurrent {
 namespace internal {
 
 /*!
+ * @breif	call pthread_key_create() and count up the number of dynamic thread local memory
+ *
+ *　pthread_key_create()での割り当て数を１つ増やす。pthread_key_create()を呼び出すときに併せて呼び出す。
+ *　不具合解析など使用する。
+ */
+void dynamic_tls_pthread_key_create( pthread_key_t* p_key, void ( *destructor )( void* ) );
+
+/*!
+ * @breif	call pthread_key_delete() and count down the number of dynamic thread local memory
+ *
+ *　pthread_key_create()での割り当て数を１つ減らす。pthread_key_delete()を呼び出すときに併せて呼び出す。
+ *　不具合解析など使用する。
+ */
+void dynamic_tls_pthread_key_delete( pthread_key_t key );
+
+/*!
+ * @breif	get the number of dynamic thread local memory
+ *
+ *　pthread_key_create()での割り当て数を取得する。
+ *　不具合解析など使用する。
+ */
+int get_num_of_tls_key( void );
+
+/*!
+ * @breif	get the max number of dynamic thread local memory
+ *
+ *　pthread_key_create()での割り当て数を取得する。
+ *　不具合解析など使用する。
+ */
+int get_max_num_of_tls_key( void );
+
+/*!
  * @breif	動的スレッドローカルストレージで使用する内部処理用クラス
  *
  * @note
@@ -163,6 +195,10 @@ struct threadlocal_destructor_functor {
  * @param [in]	T	スレッドローカルストレージとして確保する型
  * @param [in]	TL_PRE_DESTRUCTOR	スレッド終了時にスレッドローカルストレージを解放(delete)する前に呼び出されるファンクタ
  *
+ * @warn
+ * デストラクタ処理と、スレッド終了処理によるdestr_fn()の同時呼び出しは、不定動作とする。　@n
+ * よって、インスタンスの破棄とスレッドの終了処理を同時に発生しないようにすること。
+ *
  * @note
  * lf_mem_allocクラスで使用するため、
  * コンポーネントの上下関係から、メモリの確保にはnewを使用せず、malloc/freeと配置newのみを使用する。
@@ -175,6 +211,10 @@ struct threadlocal_destructor_functor {
  *
  * @param [in] T Type reserved as thread local storage
  * @param [in] TL_PRE_DESTRUCTOR A functor called before freeing(delete) thread-local storage at the end of a thread
+ *
+ * @warn
+ * Simultaneous call of destr_fn () by destructor processing and thread termination processing is an indefinite operation. @n
+ * Therefore, do not destroy the instance and terminate the thread at the same time.
  *
  * @note
  * Because it is used in the lf_mem_alloc class
@@ -190,44 +230,28 @@ public:
 	  : pre_exec_()
 	  , head_( nullptr )
 	{
-		int status = pthread_key_create( &tls_key, destr_fn );
-		if ( status < 0 ) {
-			LogOutput( log_type::ERR, "pthread_key_create failed, errno=%d", errno );
-			exit( 1 );
-		}
+		internal::dynamic_tls_pthread_key_create( &tls_key, destr_fn );
 	}
 
 	dynamic_tls( const TL_PRE_DESTRUCTOR& tl_dest_functor_arg )
 	  : pre_exec_( tl_dest_functor_arg )
 	  , head_( nullptr )
 	{
-		int status = pthread_key_create( &tls_key, destr_fn );
-		if ( status < 0 ) {
-			LogOutput( log_type::ERR, "pthread_key_create failed, errno=%d", errno );
-			exit( 1 );
-		}
+		internal::dynamic_tls_pthread_key_create( &tls_key, destr_fn );
 	}
 
 	dynamic_tls( TL_PRE_DESTRUCTOR&& tl_dest_functor_arg )
 	  : pre_exec_( std::move( tl_dest_functor_arg ) )
 	  , head_( nullptr )
 	{
-		int status = pthread_key_create( &tls_key, destr_fn );
-		if ( status < 0 ) {
-			LogOutput( log_type::ERR, "pthread_key_create failed, errno=%d", errno );
-			exit( 1 );
-		}
+		internal::dynamic_tls_pthread_key_create( &tls_key, destr_fn );
 	}
 
 	~dynamic_tls()
 	{
 		LogOutput( log_type::DEBUG, "dynamic_tls::destructor is called" );
 
-		int status = pthread_key_delete( tls_key );
-		if ( status < 0 ) {
-			LogOutput( log_type::ERR, "pthread_key_delete failed, errno=%d", errno );
-			exit( 1 );
-		}
+		internal::dynamic_tls_pthread_key_delete( tls_key );
 
 		// メモリリークが無いように、スレッドローカルストレージを削除する
 		// この処理と、スレッド終了処理によるdestr_fn()の同時呼び出しは、不定動作とする。
