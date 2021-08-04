@@ -1,6 +1,3 @@
+set(EXEC_TARGET test_hazard_ptr)
 
-file(GLOB SOURCES src/*.cpp )
-add_executable(test_hazard_ptr ${SOURCES})
-
-target_link_libraries(test_hazard_ptr alconcurrent gtest gtest_main pthread)
-
+include(../build_test.cmake)

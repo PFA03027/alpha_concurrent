@@ -146,7 +146,7 @@ In this case, Copy all folders in C:\Program Files\CMake to C:\Eclipse\pleiades\
         $ mkdir build  
         $ cd build  
         $ cmake -G "your target generater" <path of alpha_concurrent>  
-        $ cmake --build  
+        $ cmake --build .  
 You could refer make_win_eclipse.sh as the sample for above commands
 
 Current linking library of test decided by cmake.
@@ -155,6 +155,11 @@ Therefore please configure cmake global option "BUILD_SHARED_LIBS" according you
 
 If you would like to do parallel build, please use -j N option or environment variable CMAKE_BUILD_PARALLEL_LEVEL for CMake.
 Especially, in case that you will use Eclipse with CMake project, please select the approach "environment variable CMAKE_BUILD_PARALLEL_LEVEL for CMake".
+
+### Build test code and execute test
+After Build step, please execute below commands  
+        $ cmake --build . --target build-test  
+        $ cmake --build . --target test  
 
 
 # License
