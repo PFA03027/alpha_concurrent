@@ -586,10 +586,10 @@ void load_test_malloc_free_actual_behavior( int num_of_thd )
 
 TEST( lfmemAlloc, LoadTest )
 {
-	// load_test_empty( 1 );
-	// load_test_malloc_free( 1 );
+#if 1
+	load_test_empty( 1 );
+	load_test_malloc_free( 1 );
 	load_test_lockfree_min2( 1 );
-#if 0
 	load_test_lockfree( 1 );
 	load_test_empty_actual_behavior( 1 );
 	load_test_malloc_free_actual_behavior( 1 );
