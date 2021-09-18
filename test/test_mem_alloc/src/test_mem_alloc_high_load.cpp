@@ -304,6 +304,8 @@ void load_test_lockfree( int num_of_thd )
 		        (int)e.alloc_collision_cnt_,
 		        (int)e.dealloc_collision_cnt_ );
 	}
+
+	delete[] threads;
 }
 
 void load_test_lockfree_actual_behavior( int num_of_thd )
@@ -349,6 +351,8 @@ void load_test_lockfree_actual_behavior( int num_of_thd )
 		        (int)e.alloc_collision_cnt_,
 		        (int)e.dealloc_collision_cnt_ );
 	}
+
+	delete[] threads;
 }
 
 void load_test_lockfree_min2( int num_of_thd )
@@ -356,13 +360,13 @@ void load_test_lockfree_min2( int num_of_thd )
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
-	alpha::concurrent::general_mem_allocator* free_gma_array[num_of_thd];
+	std::vector<std::unique_ptr<alpha::concurrent::general_mem_allocator>> free_gma_array(num_of_thd);
 	for ( int i = 0; i < num_of_thd; i++ ) {
-		free_gma_array[i] = new alpha::concurrent::general_mem_allocator( param2, 1 );
+		free_gma_array[i] = std::make_unique<alpha::concurrent::general_mem_allocator>( param2, 1 );
 	}
 
 	for ( int i = 0; i < num_of_thd; i++ ) {
-		pthread_create( &threads[i], NULL, one_load_lock_free_min2, free_gma_array[i] );
+		pthread_create( &threads[i], NULL, one_load_lock_free_min2, free_gma_array[i].get() );
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
 
@@ -399,6 +403,11 @@ void load_test_lockfree_min2( int num_of_thd )
 			        (int)e.dealloc_collision_cnt_ );
 		}
 	}
+
+	for ( int i = 0; i < num_of_thd; i++ ) {
+		free_gma_array[i].reset();
+	}
+	delete[] threads;
 }
 
 void load_test_lockfree_min2_actual_behavior( int num_of_thd )
@@ -449,6 +458,8 @@ void load_test_lockfree_min2_actual_behavior( int num_of_thd )
 			        (int)e.dealloc_collision_cnt_ );
 		}
 	}
+
+	delete[] threads;
 }
 
 void load_test_empty( int num_of_thd )
@@ -477,6 +488,8 @@ void load_test_empty( int num_of_thd )
 	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
 	std::cout << "thread is " << num_of_thd
 			  << " load_test_empty() Exec time: " << diff.count() << " msec" << std::endl;
+
+	delete[] threads;
 }
 
 void load_test_empty_actual_behavior( int num_of_thd )
@@ -505,6 +518,8 @@ void load_test_empty_actual_behavior( int num_of_thd )
 	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
 	std::cout << "thread is " << num_of_thd
 			  << " one_load_empty_actual_behavior() Exec time: " << diff.count() << " msec" << std::endl;
+
+	delete[] threads;
 }
 
 // malloc/freeの場合のCPU負荷計測
@@ -534,6 +549,8 @@ void load_test_malloc_free( int num_of_thd )
 	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
 	std::cout << "thread is " << num_of_thd
 			  << " load_test_malloc_free() Exec time: " << diff.count() << " msec" << std::endl;
+
+	delete[] threads;
 }
 
 // malloc/freeの場合のCPU負荷計測
@@ -563,14 +580,16 @@ void load_test_malloc_free_actual_behavior( int num_of_thd )
 	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
 	std::cout << "thread is " << num_of_thd
 			  << " load_test_malloc_free_actual_behavior() Exec time: " << diff.count() << " msec" << std::endl;
+
+	delete[] threads;
 }
 
 TEST( lfmemAlloc, LoadTest )
 {
-#if 1
-	load_test_empty( 1 );
-	load_test_malloc_free( 1 );
+	// load_test_empty( 1 );
+	// load_test_malloc_free( 1 );
 	load_test_lockfree_min2( 1 );
+#if 0
 	load_test_lockfree( 1 );
 	load_test_empty_actual_behavior( 1 );
 	load_test_malloc_free_actual_behavior( 1 );

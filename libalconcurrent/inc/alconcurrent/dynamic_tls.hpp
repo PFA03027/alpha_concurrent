@@ -97,12 +97,14 @@ public:
 
 	~tls_data_container()
 	{
-		LogOutput( log_type::DEBUG, "tls_data_container::destructor is called  - %p", this );
+		LogOutput( log_type::DEBUG, "tls_data_container::destructor is called  - %p, p_value - %p", this, p_value );
 
-		p_value->~T();
-		std::free( p_value );
+		if( p_value != nullptr) {
+			p_value->~T();
+			std::free( p_value );
 
-		p_value = nullptr;
+			p_value = nullptr;
+		}
 	}
 
 	/*!
@@ -110,18 +112,19 @@ public:
 	 */
 	void release_owner( void )
 	{
-		pre_exec_( *p_value );
+		if(p_value != nullptr) {
+			pre_exec_( *p_value );
 
-		p_value->~T();
-		std::free( p_value );
+			p_value->~T();
+			std::free( p_value );
 
-		p_value = nullptr;
+			p_value = nullptr;
+		}
 		status_.store( ocupied_status::UNUSED, std::memory_order_release );
 		return;
 	}
 
-	bool
-	try_to_get_owner( void )
+	bool try_to_get_owner( void )
 	{
 		ocupied_status cur;
 		cur = get_status();
@@ -258,7 +261,7 @@ public:
 		tls_cont_pointer p_cur = head_.load( std::memory_order_acquire );
 		while ( p_cur != nullptr ) {
 			tls_cont_pointer p_nxt = p_cur->get_next();
-			p_cur->~tls_data_container();
+			p_cur->~tls_cont();
 			std::free( p_cur );
 			p_cur = p_nxt;
 		}
@@ -284,10 +287,6 @@ private:
 		tls_cont_pointer p_tls = reinterpret_cast<tls_cont_pointer>( pthread_getspecific( tls_key ) );
 		if ( p_tls == nullptr ) {
 			p_tls = allocate_free_tls_container();
-			if ( p_tls == nullptr ) {
-				void* p_tmp = std::malloc( sizeof( tls_cont ) );
-				p_tls       = new ( p_tmp ) tls_cont( pre_exec_ );
-			}
 			p_tls->p_value = pred();
 
 			int status;
@@ -327,6 +326,15 @@ private:
 			}
 			p_ans = p_ans->get_next();
 		}
+
+		void* p_tmp = std::malloc( sizeof( tls_cont ) );
+		p_ans       = new ( p_tmp ) tls_cont( pre_exec_ );
+
+		// リストの先頭に追加
+		tls_cont_pointer p_cur_head = head_.load( std::memory_order_acquire );
+		do {
+			p_ans->set_next(p_cur_head);
+		} while(!head_.compare_exchange_strong(p_cur_head, p_ans));
 
 		LogOutput( log_type::DEBUG, "glist is added." );
 		return p_ans;

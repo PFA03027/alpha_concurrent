@@ -382,6 +382,7 @@ TEST_F( lflistTest, TC3 )
 	EXPECT_EQ( num_thread * 2 * loop_num, sum );
 
 	delete[] threads;
+	delete[] test_data_set;
 
 	std::cout << "nodes:              " << count_list.get_size() << std::endl;
 	std::cout << "Allocated nodes:    " << count_list.get_allocated_num() << std::endl;

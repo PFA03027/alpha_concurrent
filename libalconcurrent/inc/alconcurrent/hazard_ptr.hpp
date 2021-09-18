@@ -243,6 +243,16 @@ private:
 				p_hzrd_ptr_node->release_owner();
 			}
 		}
+		~hazard_node_head()
+		{
+			node_for_hazard_ptr* p_cur = head_.load( std::memory_order_acquire );
+			while ( p_cur != nullptr ) {
+				node_for_hazard_ptr* p_nxt = p_cur->get_next();
+				delete p_cur;
+				p_cur = p_nxt;
+			}
+			return;
+		}
 
 		static hazard_node_head& get_instance( void )
 		{

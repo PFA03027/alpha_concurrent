@@ -230,6 +230,7 @@ TEST_F( lffifoTest, TC2 )
 	EXPECT_EQ( num_thread * loop_num, sum );
 
 	delete[] threads;
+	delete p_test_obj;
 
 	return;
 }

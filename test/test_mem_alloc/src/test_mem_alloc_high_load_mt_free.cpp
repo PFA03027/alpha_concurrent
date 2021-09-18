@@ -157,6 +157,8 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 		        (int)e.alloc_collision_cnt_,
 		        (int)e.dealloc_collision_cnt_ );
 	}
+
+	delete[] threads;
 }
 
 TEST( lfmemAlloc, TestAllocFreeBwMultThread )

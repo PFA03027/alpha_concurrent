@@ -4,6 +4,7 @@ add_custom_target(build-test)
 
 
 add_subdirectory(googletest)
+add_subdirectory(test_mem_alloc_sanitize)
 add_subdirectory(test_hazard_ptr)
 add_subdirectory(test_lf_fifo)
 add_subdirectory(test_lf_list)
