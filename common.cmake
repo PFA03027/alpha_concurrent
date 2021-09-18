@@ -11,9 +11,9 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 #set(CMAKE_CXX_STANDARD 14)	# for test purpose
 #set(CMAKE_CXX_STANDARD 17)	# for test purpose
 
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=leak")	# for test purpose
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")	# for test purpose
-#set(CMAKE_EXE_LINKER_FLAGS_INIT "${CMAKE_EXE_LINKER_FLAGS_INIT} -fsanitize=address")	# for test purpose
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=leak")	# for test purpose
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")	# for test purpose
+# set(CMAKE_EXE_LINKER_FLAGS_INIT "${CMAKE_EXE_LINKER_FLAGS_INIT} -fsanitize=address")	# for test purpose
 
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} ${CMAKE_C_FLAGS} -g -O2")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} ${CMAKE_C_FLAGS} -O2")

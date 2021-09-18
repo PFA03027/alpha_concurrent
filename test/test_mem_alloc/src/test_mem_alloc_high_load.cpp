@@ -459,6 +459,9 @@ void load_test_lockfree_min2_actual_behavior( int num_of_thd )
 		}
 	}
 
+	for ( int i = 0; i < num_of_thd; i++ ) {
+		delete free_gma_array[i];
+	}
 	delete[] threads;
 }
 
