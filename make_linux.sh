@@ -12,7 +12,7 @@ BUILDTARGET=common
 if [ $# -eq 0 ]; then
 	mkdir -p build
 	cd build
-	cmake -D BUILD_TARGET=${BUILDTARGET} -G "Eclipse CDT4 - Unix Makefiles" ../
+	cmake -D BUILD_TARGET=${BUILDTARGET} -G "Unix Makefiles" ../
 	cmake --build . -j 8 -v
 else
 	if [ "$1" = "clean" ]; then
@@ -20,7 +20,7 @@ else
 	else
 		mkdir -p build
 		cd build
-		cmake -D BUILD_TARGET=${BUILDTARGET} -G "Eclipse CDT4 - Unix Makefiles" ../
+		cmake -D BUILD_TARGET=${BUILDTARGET} -G "Unix Makefiles" ../
 		if [ "$1" = "full" ]; then
 			cmake --build . --clean-first -j 8 -v
 		else
