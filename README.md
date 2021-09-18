@@ -147,7 +147,7 @@ In this case, Copy all folders in C:\Program Files\CMake to C:\Eclipse\pleiades\
         $ cd build  
         $ cmake -G "your target generater" <path of alpha_concurrent>  
         $ cmake --build .  
-You could refer make_win_eclipse.sh as the sample for above commands
+You could refer make_win_eclipse.sh or make_linux.sh as the sample for above commands
 
 Current linking library of test decided by cmake.
 Therefore please configure cmake global option "BUILD_SHARED_LIBS" according your purpose like below;
