@@ -32,7 +32,7 @@ namespace internal {
  *
  * @note
  * std::function型を多用している理由は以下。 @n
- * テンプレートメンバ関数の場合、生成される関数インスタンスが予測できないため、ハザードポインタを管理するスロット数を事前確定できなくな。 @n
+ * テンプレートメンバ関数の場合、生成される関数インスタンスが予測できないため、ハザードポインタを管理するスロット数を事前確定できない。 @n
  * そのため、メンバ関数のテンプレート化を避ける必要がある。
  */
 template <typename T, typename DELETER = default_deleter<T>>
@@ -303,7 +303,7 @@ public:
 			p_prev = p_curr;
 		}
 
-		return std::move( internal_func );
+		return internal_func;	// expected to omit copy or just use move.
 	}
 
 	/*!

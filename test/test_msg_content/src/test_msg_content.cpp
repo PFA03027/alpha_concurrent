@@ -22,8 +22,8 @@
 
 #include "test_crc32.hpp"
 
-constexpr int            num_thread = 16;   // Tested until 128.
-constexpr std::uintptr_t loop_num   = 10000000;
+constexpr int            num_thread = 32;   // Tested until 128.
+constexpr std::uintptr_t loop_num   = 100000;
 
 std::atomic<bool> err_flag( false );
 

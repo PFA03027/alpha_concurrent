@@ -1,13 +1,14 @@
 cmake_minimum_required(VERSION 3.1)
 project(alpha_concurrent CXX)
-
-enable_testing()
+set(CMAKE_VERBOSE_MAKEFILE 1)
 
 # Switch build target
 set(BUILD_TARGET common CACHE STRING "Build target?")
 
 message("[BUILD] ${BUILD_TARGET}")
 include(${BUILD_TARGET}.cmake)
+
+enable_testing()
 
 add_subdirectory(libalconcurrent)
 

@@ -30,45 +30,48 @@ struct one_way_list_node : public node_of_list {
 	using value_type = typename std::decay<T>::type;
 
 	one_way_list_node( void )
-	  : target_()
-	  , next_( nullptr )
+	  : next_( nullptr )
+	  , guard_val_(false)
+	  , target_()
 	{
 		static_assert( std::is_copy_assignable<value_type>::value, "T need to be copy assignable." );
 	}
 
 	one_way_list_node( const value_type& cont_arg )
-	  : target_( cont_arg )
-	  , next_( nullptr )
+	  : next_( nullptr )
+	  , guard_val_(false)
+	  , target_( cont_arg )
 	{
 	}
 
 	virtual ~one_way_list_node()
 	{
+		next_.store( nullptr, std::memory_order_release );
 		return;
 	}
 
 	value_type get_value( void ) const
 	{
-		std::atomic_thread_fence( std::memory_order_acquire );
+		guard_val_.load( std::memory_order_acquire );
 		return target_;
 	}
 
 	value_type& ref_value( void )
 	{
-		std::atomic_thread_fence( std::memory_order_acquire );
+		guard_val_.load( std::memory_order_acquire );
 		return target_;
 	}
 
 	const value_type& ref_value( void ) const
 	{
-		std::atomic_thread_fence( std::memory_order_acquire );
+		guard_val_.load( std::memory_order_acquire );
 		return target_;
 	}
 
 	void set_value( const value_type& value_arg )
 	{
 		target_ = value_arg;
-		std::atomic_thread_fence( std::memory_order_release );
+		guard_val_.store( false, std::memory_order_release );
 	}
 
 	one_way_list_node* get_next( void ) const
@@ -88,8 +91,9 @@ struct one_way_list_node : public node_of_list {
 	}
 
 private:
-	value_type                      target_;
 	std::atomic<one_way_list_node*> next_;
+	std::atomic<bool>	guard_val_;
+	value_type                      target_;
 };
 
 template <typename T>
@@ -97,8 +101,9 @@ struct one_way_list_node_markable : public node_of_list {
 	using value_type = typename std::decay<T>::type;
 
 	one_way_list_node_markable( void )
-	  : target_()
-	  , next_( 0 )
+	  : next_( 0 )
+	  , guard_val_(false)
+	  , target_()
 	{
 		static_assert( std::is_copy_assignable<value_type>::value, "T need to be copy assignable." );
 
@@ -106,38 +111,40 @@ struct one_way_list_node_markable : public node_of_list {
 	}
 
 	one_way_list_node_markable( const value_type& cont_arg )
-	  : target_( cont_arg )
-	  , next_( 0 )
+	  : next_( 0 )
+	  , guard_val_(false)
+	  , target_(cont_arg)
 	{
 	}
 
 	virtual ~one_way_list_node_markable()
 	{
+		next_.store(0,std::memory_order_release);
 		return;
 	}
 
 	value_type get_value( void ) const
 	{
-		std::atomic_thread_fence( std::memory_order_acquire );
+		guard_val_.load(std::memory_order_acquire);
 		return target_;
 	}
 
 	value_type& ref_value( void )
 	{
-		std::atomic_thread_fence( std::memory_order_acquire );
+		guard_val_.load(std::memory_order_acquire);
 		return target_;
 	}
 
 	const value_type& ref_value( void ) const
 	{
-		std::atomic_thread_fence( std::memory_order_acquire );
+		guard_val_.load(std::memory_order_acquire);
 		return target_;
 	}
 
 	void set_value( const value_type& value_arg )
 	{
 		target_ = value_arg;
-		std::atomic_thread_fence( std::memory_order_release );
+		guard_val_.store( true, std::memory_order_release);
 	}
 
 	std::tuple<one_way_list_node_markable*, bool> get_next( void ) const
@@ -171,8 +178,9 @@ struct one_way_list_node_markable : public node_of_list {
 	}
 
 private:
-	value_type            target_;
 	std::atomic_uintptr_t next_;
+	std::atomic_bool	  guard_val_;
+	value_type            target_;
 };
 
 //////////////////////////////////////////////////////////////////////

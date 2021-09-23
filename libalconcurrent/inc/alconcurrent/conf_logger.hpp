@@ -120,7 +120,7 @@ inline void LogOutput( const log_type lt, const char* p_format, Args... args )
 {
 	if ( internal::is_allowed_to_output( lt ) ) {
 		char buff[CONF_LOGGER_INTERNAL_BUFF_SIZE];
-		snprintf( buff, CONF_LOGGER_INTERNAL_BUFF_SIZE, p_format, args... );
+		snprintf( buff, CONF_LOGGER_INTERNAL_BUFF_SIZE-1, p_format, args... );
 		buff[CONF_LOGGER_INTERNAL_BUFF_SIZE - 1] = 0;
 
 		internal::p_concrete_logger_if->output_log( lt, CONF_LOGGER_INTERNAL_BUFF_SIZE, buff );
@@ -133,7 +133,7 @@ inline void LogOutput( const log_type lt, const char* p_str )
 {
 	if ( internal::is_allowed_to_output( lt ) ) {
 		char buff[CONF_LOGGER_INTERNAL_BUFF_SIZE];
-		strncpy( buff, p_str, CONF_LOGGER_INTERNAL_BUFF_SIZE );
+		strncpy( buff, p_str, CONF_LOGGER_INTERNAL_BUFF_SIZE-1 );
 		buff[CONF_LOGGER_INTERNAL_BUFF_SIZE - 1] = 0;
 
 		internal::p_concrete_logger_if->output_log( lt, CONF_LOGGER_INTERNAL_BUFF_SIZE, buff );

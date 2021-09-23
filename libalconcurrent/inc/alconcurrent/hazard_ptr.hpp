@@ -24,7 +24,8 @@
 
 #include "dynamic_tls.hpp"
 
-#define NUM_OF_PRE_ALLOCATED_NODES ( 0 )   //!< 事前に用意する管理ノード数。空きノードがあれば、それを流用するので、mallocが発生しない。
+#define NUM_OF_PRE_ALLOCATED_NODES ( 0 )   //!< 事前に用意する管理ノード数。なお、空きノードがあれば、それを流用するので、mallocが発生しない。
+#define ENABLE_ATOMIC_HAZARD_POINTER		//!< hazard pointerをatomic<T*>で管理する。ThreadSanitizerの誤検知対策。
 
 namespace alpha {
 namespace concurrent {
@@ -137,36 +138,53 @@ private:
 	 * このノードの集合を管理するリストは、ノード自体を削除することを行わない設計となっている。
 	 *
 	 */
-	struct node_for_hazard_ptr {
-		T* p_target_[N];
-
+	class node_for_hazard_ptr {
+	public:
 		node_for_hazard_ptr( void )
 		  : status_( ocupied_status::USING )
 		  , next_( nullptr )
+#ifdef	ENABLE_ATOMIC_HAZARD_POINTER
+#else
+		  , guard_val_(0)
+#endif
 		{
 			clear_hazard_ptr_all();
 		}
 
 		void set_hazard_ptr( T* p_target_arg, int idx )
 		{
+#ifdef	ENABLE_ATOMIC_HAZARD_POINTER
+			p_target_[idx].store( p_target_arg, std::memory_order_release );
+#else
 			p_target_[idx] = p_target_arg;
-			std::atomic_thread_fence( std::memory_order_release );
+			guard_val_.store( true, std::memory_order_release );
+#endif
 			return;
 		}
 
 		void clear_hazard_ptr( int idx )
 		{
+#ifdef	ENABLE_ATOMIC_HAZARD_POINTER
+			p_target_[idx].store( nullptr, std::memory_order_release );
+#else
 			p_target_[idx] = nullptr;
-			std::atomic_thread_fence( std::memory_order_release );
+			guard_val_.store( true, std::memory_order_release );
+#endif
 			return;
 		}
 
 		void clear_hazard_ptr_all( void )
 		{
+#ifdef	ENABLE_ATOMIC_HAZARD_POINTER
+			for ( auto& e : p_target_ ) {
+				e.store( nullptr, std::memory_order_release );
+			}
+#else
 			for ( auto& e : p_target_ ) {
 				e = nullptr;
 			}
-			std::atomic_thread_fence( std::memory_order_release );
+			guard_val_.store( true, std::memory_order_release );
+#endif
 			return;
 		}
 
@@ -180,10 +198,16 @@ private:
 		{
 			if ( get_status() == ocupied_status::UNUSED ) return false;
 
-			std::atomic_thread_fence( std::memory_order_acquire );
+#ifdef	ENABLE_ATOMIC_HAZARD_POINTER
+			for ( auto& e : p_target_ ) {
+				if ( e.load( std::memory_order_acquire ) == p_chk_ptr ) return true;
+			}
+#else
+			guard_val_.load( std::memory_order_acquire );
 			for ( auto& e : p_target_ ) {
 				if ( e == p_chk_ptr ) return true;
 			}
+#endif
 
 			return false;
 		}
@@ -228,8 +252,15 @@ private:
 		}
 
 	private:
-		std::atomic<ocupied_status>       status_;
-		std::atomic<node_for_hazard_ptr*> next_;
+		std::atomic<ocupied_status>       status_;		//!< status for used or not used yet
+		std::atomic<node_for_hazard_ptr*> next_;		//!< pointer to next node
+#ifdef	ENABLE_ATOMIC_HAZARD_POINTER
+		std::atomic<T*> p_target_[N];								//!< hazard pointer strage
+#else
+		std::atomic<bool>				  guard_val_;	//!< atomic variable of fence to sync below hazard pointers. value itself is no meaning.
+		T* p_target_[N];								//!< hazard pointer strage
+#endif
+
 	};
 
 	////////////////////////////////////////////////////////////////////////////////

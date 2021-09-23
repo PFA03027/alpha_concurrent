@@ -18,8 +18,8 @@
 #include "alconcurrent/lf_fifo.hpp"
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
-constexpr int            num_thread = 32;   // Tested until 128.
-constexpr std::uintptr_t loop_num   = 100000;
+constexpr int            num_thread = 8;   // Tested until 128.
+constexpr std::uintptr_t loop_num   = 10000;
 
 using test_fifo_type_part = alpha::concurrent::internal::fifo_nd_list<std::uintptr_t>;
 

@@ -17,17 +17,17 @@ class delete_test {
 public:
 	delete_test( void )
 	{
-		std::cout << "!!!Hello World!!!" << std::endl;   // prints !!!Hello World!!!
+		// std::cout << "!!!Hello World!!!" << std::endl;   // prints !!!Hello World!!!
 	}
 
 	~delete_test()
 	{
-		std::cout << "!!!Goodbye World!!!" << std::endl;   // prints !!!Hello World!!!
+		// std::cout << "!!!Goodbye World!!!" << std::endl;   // prints !!!Hello World!!!
 	}
 
 	void test_write( void )
 	{
-		dummy[0] = 1;
+		dummy[0] = 1;	// dummy access only. If you need to check by ThreadSanitizer, please comment out.
 		return;
 	}
 
@@ -35,7 +35,7 @@ private:
 	char dummy[1024 * 1024];
 };
 
-constexpr int       num_thread = 128;
+constexpr int       num_thread = 16;
 constexpr uintptr_t loop_num   = 100000;
 
 alpha::concurrent::hazard_ptr<delete_test, 1> hazard_ptr_to;
@@ -96,13 +96,13 @@ void* func_delete_owner( void* data )
 			alpha::concurrent::hazard_ptr<delete_test, 1>::hzrd_max_slot>
 			hzrd_ref( hazard_ptr_to, 0 );
 
-		printf( "p_target: %p\n", p_test_obj );
+		// printf( "p_target: %p\n", p_test_obj );
 
 		hazard_ptr_to.regist_ptr_as_hazard_ptr( p_test_obj, 0 );
 
-		std::cout << "!!!Ready!!!" << std::endl;   // prints !!!Hello World!!!
+		// std::cout << "!!!Ready!!!" << std::endl;   // prints !!!Hello World!!!
 		pthread_barrier_wait( &barrier );
-		printf( "func_delete_owner GO now!!!\n" );
+		// printf( "func_delete_owner GO now!!!\n" );
 
 		//		std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
 
@@ -120,7 +120,7 @@ void* func_delete_owner( void* data )
 
 	ans = 1;
 
-	printf( "Exit func_delete_owner!!!\n" );
+	// printf( "Exit func_delete_owner!!!\n" );
 	return reinterpret_cast<void*>( ans );
 }
 
@@ -136,10 +136,10 @@ void test_case1( void )
 		//		std::cout << "Thread " << i << " is created." << std::endl;
 		pthread_create( &threads[i], NULL, func_refarencing, reinterpret_cast<void*>( &atm_p_test_obj ) );
 	}
-	std::cout << "!!!Ready!!!" << std::endl;
-	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
+	// std::cout << "!!!Ready!!!" << std::endl;
+	// std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	pthread_barrier_wait( &barrier );
-	std::cout << "!!!GO!!!" << std::endl;
+	// std::cout << "!!!GO!!!" << std::endl;
 
 	int sum = 0;
 	for ( int i = 0; i <= num_thread; i++ ) {
@@ -149,15 +149,15 @@ void test_case1( void )
 		sum += e;
 	}
 
-	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
+	// std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
 
-	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
-	std::cout << "thread is " << num_thread << "  Exec time: " << diff.count() << " msec" << std::endl;
+	// std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
+	// std::cout << "thread is " << num_thread << "  Exec time: " << diff.count() << " msec" << std::endl;
 
 	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
 	// に等しくなるはず。
-	std::cout << "Expect: 1" << std::endl;
-	std::cout << "Sum: " << sum << std::endl;
+	// std::cout << "Expect: 1" << std::endl;
+	// std::cout << "Sum: " << sum << std::endl;
 	ASSERT_EQ( 1, sum );
 
 	delete[] threads;
@@ -174,7 +174,7 @@ TEST( HazardPtr, TC1 )
 
 	for ( int i = 0; i < num_thread; i++ ) {
 		//	for ( int i = 0; i < 1; i++ ) {
-		std::cout << "\t!!!Start " << i << std::endl;   // prints !!!Hello World!!!
+		// std::cout << "\t!!!Start " << i << std::endl;   // prints !!!Hello World!!!
 		ASSERT_NO_FATAL_FAILURE( test_case1() );
 	}
 
