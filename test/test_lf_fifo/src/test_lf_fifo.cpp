@@ -59,6 +59,7 @@ protected:
 	}
 };
 
+
 /**
  * 各スレッドのメインルーチン。
  */
@@ -189,7 +190,7 @@ void* func_test_fifo2( void* data )
 		auto vv = std::get<1>( local_ret );
 #endif
 		if ( !pop_flag ) {
-			printf( "Buggggggg!!!  %llu\n", v );
+			printf( "Buggggggg!!!  %s\n", std::to_string(v).c_str() );
 			exit( 1 );
 		}
 		v = vv + 1;
@@ -257,7 +258,7 @@ void* func_test_fifo( void* data )
 		auto vv = std::get<1>( local_ret );
 #endif
 		if ( !pop_flag ) {
-			printf( "Bugggggggyyyy  func_test_fifo()!!!  %llu\n", v );
+			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string(v).c_str() );
 			printf( "fifo size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
@@ -285,7 +286,7 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( TEST_FIFO_TYPE* p_test_obj[] )
 			auto vv = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
-				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %llu\n", v1 );
+				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string(v1).c_str() );
 				printf( "fifo size count idx 0: %d\n", p_test_obj[0]->get_size() );
 				exit( 1 );
 			}
@@ -300,7 +301,7 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( TEST_FIFO_TYPE* p_test_obj[] )
 			auto vv = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
-				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %llu\n", v2 );
+				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string(v2).c_str() );
 				printf( "fifo size count idx 1: %d\n", p_test_obj[1]->get_size() );
 				exit( 1 );
 			}
@@ -415,7 +416,7 @@ void* func_test4_fifo( void* data )
 		auto vv = std::get<1>( local_ret );
 #endif
 		if ( !pop_flag ) {
-			printf( "Bugggggggyyyy  func_test4_fifo()!!!  %llu\n", v );
+			printf( "Bugggggggyyyy  func_test4_fifo()!!!  %s\n", std::to_string(v).c_str() );
 			printf( "fifo size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
@@ -466,7 +467,7 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( TEST_FIFO_TYPE* p_test_obj[] 
 			auto vv = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
-				printf( "Bugggggggyyyy!!!  func_test4_fifo2()  %llu\n", v1 );
+				printf( "Bugggggggyyyy!!!  func_test4_fifo2()  %s\n", std::to_string(v1).c_str()  );
 				printf( "fifo size count idx 0: %d\n", p_test_obj[0]->get_size() );
 				exit( 1 );
 			}
@@ -481,7 +482,7 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( TEST_FIFO_TYPE* p_test_obj[] 
 			auto vv = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
-				printf( "Bugggggggyyyy!!!  func_test4_fifo2()  %llu\n", v2 );
+				printf( "Bugggggggyyyy!!!  func_test4_fifo2()  %s\n", std::to_string(v2).c_str() );
 				printf( "fifo size count idx 1: %d\n", p_test_obj[1]->get_size() );
 				exit( 1 );
 			}

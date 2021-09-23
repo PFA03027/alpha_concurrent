@@ -78,7 +78,7 @@ void* func_test_one_side_deque_front2front( void* data )
 		auto vv        = std::get<1>( local_ret );
 #endif
 		if ( !pop_flag ) {
-			printf( "Bugggggggyyyy  func_test_one_side_deque_front2back()!!!  %llu\n", v );
+			printf( "Bugggggggyyyy  func_test_one_side_deque_front2back()!!!  %s\n", std::to_string(v).c_str() );
 			printf( "list size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
@@ -108,7 +108,7 @@ void* func_test_one_side_deque_back2front( void* data )
 		auto vv        = std::get<1>( local_ret );
 #endif
 		if ( !pop_flag ) {
-			printf( "Bugggggggyyyy  func_test_one_side_deque_back2front()!!!  %llu\n", v );
+			printf( "Bugggggggyyyy  func_test_one_side_deque_back2front()!!!  %s\n", std::to_string(v).c_str() );
 			printf( "list size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
