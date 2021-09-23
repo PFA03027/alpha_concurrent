@@ -25,7 +25,7 @@
 #include "dynamic_tls.hpp"
 
 #define NUM_OF_PRE_ALLOCATED_NODES ( 0 )   //!< 事前に用意する管理ノード数。なお、空きノードがあれば、それを流用するので、mallocが発生しない。
-#define ENABLE_ATOMIC_HAZARD_POINTER		//!< hazard pointerをatomic<T*>で管理する。ThreadSanitizerの誤検知対策。
+#define ENABLE_ATOMIC_HAZARD_POINTER       //!< hazard pointerをatomic<T*>で管理する。ThreadSanitizerの誤検知対策。
 
 namespace alpha {
 namespace concurrent {
@@ -143,9 +143,9 @@ private:
 		node_for_hazard_ptr( void )
 		  : status_( ocupied_status::USING )
 		  , next_( nullptr )
-#ifdef	ENABLE_ATOMIC_HAZARD_POINTER
+#ifdef ENABLE_ATOMIC_HAZARD_POINTER
 #else
-		  , guard_val_(0)
+		  , guard_val_( 0 )
 #endif
 		{
 			clear_hazard_ptr_all();
@@ -153,7 +153,7 @@ private:
 
 		void set_hazard_ptr( T* p_target_arg, int idx )
 		{
-#ifdef	ENABLE_ATOMIC_HAZARD_POINTER
+#ifdef ENABLE_ATOMIC_HAZARD_POINTER
 			p_target_[idx].store( p_target_arg, std::memory_order_release );
 #else
 			p_target_[idx] = p_target_arg;
@@ -164,7 +164,7 @@ private:
 
 		void clear_hazard_ptr( int idx )
 		{
-#ifdef	ENABLE_ATOMIC_HAZARD_POINTER
+#ifdef ENABLE_ATOMIC_HAZARD_POINTER
 			p_target_[idx].store( nullptr, std::memory_order_release );
 #else
 			p_target_[idx] = nullptr;
@@ -175,7 +175,7 @@ private:
 
 		void clear_hazard_ptr_all( void )
 		{
-#ifdef	ENABLE_ATOMIC_HAZARD_POINTER
+#ifdef ENABLE_ATOMIC_HAZARD_POINTER
 			for ( auto& e : p_target_ ) {
 				e.store( nullptr, std::memory_order_release );
 			}
@@ -198,7 +198,7 @@ private:
 		{
 			if ( get_status() == ocupied_status::UNUSED ) return false;
 
-#ifdef	ENABLE_ATOMIC_HAZARD_POINTER
+#ifdef ENABLE_ATOMIC_HAZARD_POINTER
 			for ( auto& e : p_target_ ) {
 				if ( e.load( std::memory_order_acquire ) == p_chk_ptr ) return true;
 			}
@@ -252,15 +252,14 @@ private:
 		}
 
 	private:
-		std::atomic<ocupied_status>       status_;		//!< status for used or not used yet
-		std::atomic<node_for_hazard_ptr*> next_;		//!< pointer to next node
-#ifdef	ENABLE_ATOMIC_HAZARD_POINTER
-		std::atomic<T*> p_target_[N];								//!< hazard pointer strage
+		std::atomic<ocupied_status>       status_;   //!< status for used or not used yet
+		std::atomic<node_for_hazard_ptr*> next_;     //!< pointer to next node
+#ifdef ENABLE_ATOMIC_HAZARD_POINTER
+		std::atomic<T*> p_target_[N];   //!< hazard pointer strage
 #else
-		std::atomic<bool>				  guard_val_;	//!< atomic variable of fence to sync below hazard pointers. value itself is no meaning.
-		T* p_target_[N];								//!< hazard pointer strage
+		std::atomic<bool> guard_val_;     //!< atomic variable of fence to sync below hazard pointers. value itself is no meaning.
+		T*                p_target_[N];   //!< hazard pointer strage
 #endif
-
 	};
 
 	////////////////////////////////////////////////////////////////////////////////

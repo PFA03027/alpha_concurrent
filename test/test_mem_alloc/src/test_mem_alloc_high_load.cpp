@@ -8,7 +8,6 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-
 #include <pthread.h>
 
 #include <chrono>
@@ -91,7 +90,6 @@ TEST( lfmemAlloc, OneChunkLoad )
 
 	return;
 }
-
 
 // lf_mem_allocを共有した場合のCPU負荷
 void* one_load_lock_free_actual_behavior( void* p_data )
@@ -177,7 +175,6 @@ void* one_load_empty_actual_behavior( void* p_data )
 	return nullptr;
 }
 
-
 static alpha::concurrent::param_chunk_allocation param2[] = {
 	{ 1024, max_slot_size + 100 },
 };
@@ -221,8 +218,6 @@ void* one_load_lock_free_min2( void* p_data )
 
 	return nullptr;
 }
-
-
 
 // loop処理部のCPU負荷計測
 void* one_load_empty( void* )
@@ -360,7 +355,7 @@ void load_test_lockfree_min2( int num_of_thd )
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
-	std::vector<std::unique_ptr<alpha::concurrent::general_mem_allocator>> free_gma_array(num_of_thd);
+	std::vector<std::unique_ptr<alpha::concurrent::general_mem_allocator>> free_gma_array( num_of_thd );
 	for ( int i = 0; i < num_of_thd; i++ ) {
 		free_gma_array[i] = std::make_unique<alpha::concurrent::general_mem_allocator>( param2, 1 );
 	}

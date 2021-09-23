@@ -99,7 +99,7 @@ public:
 	{
 		LogOutput( log_type::DEBUG, "tls_data_container::destructor is called  - %p, p_value - %p", this, p_value );
 
-		if( p_value != nullptr) {
+		if ( p_value != nullptr ) {
 			p_value->~T();
 			std::free( p_value );
 
@@ -112,7 +112,7 @@ public:
 	 */
 	void release_owner( void )
 	{
-		if(p_value != nullptr) {
+		if ( p_value != nullptr ) {
 			pre_exec_( *p_value );
 
 			p_value->~T();
@@ -286,7 +286,7 @@ private:
 		// pthread_getspecific()が、ロックフリーであることを祈る。
 		tls_cont_pointer p_tls = reinterpret_cast<tls_cont_pointer>( pthread_getspecific( tls_key ) );
 		if ( p_tls == nullptr ) {
-			p_tls = allocate_free_tls_container();
+			p_tls          = allocate_free_tls_container();
 			p_tls->p_value = pred();
 
 			int status;
@@ -333,8 +333,8 @@ private:
 		// リストの先頭に追加
 		tls_cont_pointer p_cur_head = head_.load( std::memory_order_acquire );
 		do {
-			p_ans->set_next(p_cur_head);
-		} while(!head_.compare_exchange_strong(p_cur_head, p_ans));
+			p_ans->set_next( p_cur_head );
+		} while ( !head_.compare_exchange_strong( p_cur_head, p_ans ) );
 
 		LogOutput( log_type::DEBUG, "glist is added." );
 		return p_ans;

@@ -36,13 +36,10 @@ struct chunk_statistics {
 	int                    alloc_collision_cnt_;
 	int                    dealloc_collision_cnt_;
 
-	std::string print(void);
+	std::string print( void );
 };
-
 
 }   // namespace concurrent
 }   // namespace alpha
-
-
 
 #endif /* INC_ALCONCURRENT_LF_MEM_ALLOC_TYPE_HPP_ */

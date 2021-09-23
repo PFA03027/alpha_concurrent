@@ -6,7 +6,6 @@
 // Description : Hello World in C++, Ansi-style
 //============================================================================
 
-
 #include <pthread.h>
 
 #include <cstdint>
@@ -167,7 +166,7 @@ void* func_test_fifo2( void* data )
 		p_test_obj->push( p_node );
 		auto p_pop_node = p_test_obj->pop();
 		if ( p_pop_node == nullptr ) {
-			printf( "Buggggggg!!!  %s\n", std::to_string(v).c_str() );
+			printf( "Buggggggg!!!  %s\n", std::to_string( v ).c_str() );
 			exit( 1 );
 		}
 		auto vv = p_pop_node->get_value();
@@ -238,7 +237,7 @@ void* func_test_fifo( void* data )
 		auto vv        = std::get<1>( local_ret );
 #endif
 		if ( !pop_flag ) {
-			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string(v).c_str() );
+			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "fifo size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
@@ -265,7 +264,7 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( test_lifo_type* p_test_obj[] )
 			auto vv        = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
-				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string(v1).c_str() );
+				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v1 ).c_str() );
 				printf( "fifo size count idx 0: %d\n", p_test_obj[0]->get_size() );
 				exit( 1 );
 			}
@@ -280,7 +279,7 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( test_lifo_type* p_test_obj[] )
 			auto vv        = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
-				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string(v2).c_str() );
+				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v2 ).c_str() );
 				printf( "fifo size count idx 1: %d\n", p_test_obj[1]->get_size() );
 				exit( 1 );
 			}
@@ -315,8 +314,8 @@ TEST_F( lfStackTest, TC3 )
 	auto [a1, a2] = func_test_fifo2( p_test_obj );
 #else
 	auto local_ret = func_test_fifo2( p_test_obj );
-	auto a1        = std::get<0>( local_ret );
-	auto a2        = std::get<1>( local_ret );
+	auto a1 = std::get<0>( local_ret );
+	auto a2 = std::get<1>( local_ret );
 #endif
 	std::cout << "Thread X: last dequeued = " << a1 << ", " << a2 << std::endl;
 
@@ -379,11 +378,11 @@ void* func_test4_fifo( void* data )
 		auto [pop_flag, vv] = p_test_obj->pop();
 #else
 		auto local_ret = p_test_obj->pop();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
+		auto pop_flag = std::get<0>( local_ret );
+		auto vv = std::get<1>( local_ret );
 #endif
 		if ( !pop_flag ) {
-			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string(v).c_str() );
+			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "fifo size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
@@ -424,11 +423,11 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( test_lifo_type2* p_test_obj[]
 			auto [pop_flag, vv] = p_test_obj[0]->pop();
 #else
 			auto local_ret = p_test_obj[0]->pop();
-			auto pop_flag  = std::get<0>( local_ret );
-			auto vv        = std::get<1>( local_ret );
+			auto pop_flag = std::get<0>( local_ret );
+			auto vv = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
-				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string(v1).c_str() );
+				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v1 ).c_str() );
 				printf( "fifo size count idx 0: %d\n", p_test_obj[0]->get_size() );
 				exit( 1 );
 			}
@@ -439,11 +438,11 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( test_lifo_type2* p_test_obj[]
 			auto [pop_flag, vv] = p_test_obj[1]->pop();
 #else
 			auto local_ret = p_test_obj[1]->pop();
-			auto pop_flag  = std::get<0>( local_ret );
-			auto vv        = std::get<1>( local_ret );
+			auto pop_flag = std::get<0>( local_ret );
+			auto vv = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
-				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string(v2).c_str() );
+				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v2 ).c_str() );
 				printf( "fifo size count idx 1: %d\n", p_test_obj[1]->get_size() );
 				exit( 1 );
 			}
@@ -478,8 +477,8 @@ TEST_F( lfStackTest, TC4 )
 	auto [a1, a2] = func_test4_fifo2( p_test_obj );
 #else
 	auto local_ret = func_test4_fifo2( p_test_obj );
-	auto a1        = std::get<0>( local_ret );
-	auto a2        = std::get<1>( local_ret );
+	auto a1 = std::get<0>( local_ret );
+	auto a2 = std::get<1>( local_ret );
 #endif
 	std::cout << "Thread X: last dequeued = " << a1 << ", " << a2 << std::endl;
 

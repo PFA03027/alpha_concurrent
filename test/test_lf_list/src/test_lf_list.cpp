@@ -6,7 +6,6 @@
 // Description : Hello World in C, Ansi-style
 //============================================================================
 
-
 #include <pthread.h>
 
 #include <chrono>
@@ -70,7 +69,7 @@ void* func_test_list_front2back( void* data )
 	typename test_list::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		if ( !p_test_obj->push_front( v ) ) {
-			printf( "Bugggggggyyyy  func_test_list_front2back()!!!  %s\n", std::to_string(v).c_str() );
+			printf( "Bugggggggyyyy  func_test_list_front2back()!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
@@ -82,7 +81,7 @@ void* func_test_list_front2back( void* data )
 		auto vv        = std::get<1>( local_ret );
 #endif
 		if ( !pop_flag ) {
-			printf( "Bugggggggyyyy  func_test_list_front2back()!!!  %s\n", std::to_string(v).c_str() );
+			printf( "Bugggggggyyyy  func_test_list_front2back()!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
@@ -104,7 +103,7 @@ void* func_test_list_back2front( void* data )
 	typename test_list::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		if ( !p_test_obj->push_back( v ) ) {
-			printf( "Bugggggggyyyy  func_test_list_back2front()!!!  %s\n", std::to_string(v).c_str() );
+			printf( "Bugggggggyyyy  func_test_list_back2front()!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
@@ -116,7 +115,7 @@ void* func_test_list_back2front( void* data )
 		auto vv        = std::get<1>( local_ret );
 #endif
 		if ( !pop_flag ) {
-			printf( "Bugggggggyyyy  func_test_list_back2front()!!!  %s\n", std::to_string(v).c_str() );
+			printf( "Bugggggggyyyy  func_test_list_back2front()!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
@@ -205,15 +204,15 @@ void* func_test_list_insert_remove( void* data )
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [ins_chk_ret, ins_allc_ret] = p_test_obj->insert( target_value, search_insert_pos );
 #else
-			auto local_ret = p_test_obj->insert( target_value, search_insert_pos );
-			auto ins_chk_ret = std::get<0>( local_ret );
+			auto local_ret    = p_test_obj->insert( target_value, search_insert_pos );
+			auto ins_chk_ret  = std::get<0>( local_ret );
 			auto ins_allc_ret = std::get<1>( local_ret );
 #endif
 			if ( ins_chk_ret ) break;
 			if ( ins_allc_ret ) {
 				// フリーノードストレージからの管理ノードアロケーションに成功しながらも、挿入位置を見つけられなかったことを示す。
 				// テスト条件として、これは起きてはならないため、エラー終了する。
-				printf( "Bugggggggyyyy  func_test_list_insert_remove()!!!  %s\n", std::to_string(i).c_str() );
+				printf( "Bugggggggyyyy  func_test_list_insert_remove()!!!  %s\n", std::to_string( i ).c_str() );
 				printf( "list size count: %d\n", p_test_obj->get_size() );
 				return reinterpret_cast<void*>( 0 );
 			} else {
@@ -289,14 +288,14 @@ void* func_test_list_push( void* data )
 	data_tc*   p_tc       = reinterpret_cast<data_tc*>( data );
 	test_list* p_test_obj = p_tc->p_test_obj;
 
-	printf( "func_test_list_push()!!! -> %s\n", std::to_string(p_tc->tc_data).c_str() );
+	printf( "func_test_list_push()!!! -> %s\n", std::to_string( p_tc->tc_data ).c_str() );
 
 	pthread_barrier_wait( &barrier );
 
 	typename test_list::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		if ( !p_test_obj->push_front( p_tc->tc_data ) ) {
-			printf( "Bugggggggyyyy  func_test_list_push()!!!  %s\n", std::to_string(v).c_str() );
+			printf( "Bugggggggyyyy  func_test_list_push()!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %d\n", p_test_obj->get_size() );
 			return reinterpret_cast<void*>( v );
 		}
@@ -321,7 +320,7 @@ void* func_test_list_remove_all( void* data )
 		return ( p_tc->tc_data == a );
 	};
 
-	printf( "func_test_list_remove_all()!!! -> %s\n", std::to_string(p_tc->tc_data).c_str()  );
+	printf( "func_test_list_remove_all()!!! -> %s\n", std::to_string( p_tc->tc_data ).c_str() );
 
 	pthread_barrier_wait( &barrier );
 

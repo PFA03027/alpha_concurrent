@@ -27,7 +27,7 @@ public:
 
 	void test_write( void )
 	{
-		dummy[0] = 1;	// dummy access only. If you need to check by ThreadSanitizer, please comment out.
+		dummy[0] = 1;   // dummy access only. If you need to check by ThreadSanitizer, please comment out.
 		return;
 	}
 
