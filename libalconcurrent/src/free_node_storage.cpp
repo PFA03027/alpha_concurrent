@@ -217,9 +217,19 @@ free_nd_storage::~free_nd_storage()
 
 bool free_nd_storage::recycle( free_nd_storage::node_pointer p_retire_node )
 {
+	if ( p_retire_node != nullptr ) {
+		p_retire_node->teardown_by_recycle();
+	}
+
+	return post_recycle(p_retire_node);
+}
+
+bool free_nd_storage::post_recycle( free_nd_storage::node_pointer p_retire_node )
+{
 	thread_local_fifo_list* p_tls_fifo_ = check_local_storage();
 
 	if ( p_retire_node != nullptr ) {
+		// まず、スレッドローカルストレージのフリーノードリストへ登録する
 		p_tls_fifo_->push( p_retire_node );
 	}
 
@@ -321,6 +331,16 @@ std::list<chunk_statistics> node_of_list::get_statistics( void )
 }
 
 #endif
+
+void node_of_list::setup_by_alloc( void )
+{
+	return;
+}
+
+void node_of_list::teardown_by_recycle( void )
+{
+	return;
+}
 
 }   // namespace internal
 

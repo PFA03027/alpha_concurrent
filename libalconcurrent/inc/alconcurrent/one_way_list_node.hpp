@@ -56,11 +56,13 @@ struct one_way_list_node : public node_of_list {
 		return target_;
 	}
 
+#if 1
 	value_type& ref_value( void )
 	{
 		guard_val_.load( std::memory_order_acquire );
 		return target_;
 	}
+#endif
 
 	const value_type& ref_value( void ) const
 	{

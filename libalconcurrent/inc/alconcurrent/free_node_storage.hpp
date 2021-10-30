@@ -67,6 +67,9 @@ struct node_of_list {
 		return next_[(int)cur_slot_idx].compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
 	}
 
+	virtual void setup_by_alloc( void );
+	virtual void teardown_by_recycle( void );
+
 #ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
 	void* operator new( std::size_t n );             // usual new...(1)
 	void  operator delete( void* p_mem ) noexcept;   // usual new...(2)
@@ -189,18 +192,22 @@ public:
 	~free_nd_storage();
 
 	/*!
-	 * @breif	ローカルストレージのノードリストからフリーノードリストへの登録を試みる
+	 * @breif	フリーノードのリサイクル処理を行う。
 	 *
-	 * @return	フリーノードリストへの登録の試みが実施できたかどうかを返す。
-	 * @retval	true	ローカルストレージのノードリストにリストが残っていて、フリーノードリストへの登録を試みることができた。
-	 * @retval	false	ローカルストレージのノードリストが空で、フリーノードリストへの登録を試みることはできなかった。
+	 * p_retire_node経由でteardown_by_recycle()を呼び出した後、post_recycle()処理を行う。
+	 *
+	 * post_recycle()内で、フリーノードのリサイクル処理を行う。
+	 *
+	 * @return	post_recycle()の戻り値
 	 */
 	bool recycle( node_pointer p_retire_node );
 
 	/*!
 	 * @breif	フリーノードを取り出す。
 	 *
-	 * フリーノードがなければ、ヒープからメモリをallocate()する。
+	 * フリーノードリストからallocate()する場合は、setup_by_alloc()を呼び出す。
+	 *
+	 * フリーノードがなければ、ヒープからメモリをallocate()する。この場合は、setup_by_alloc()相当処理は、コンストラクタ内で実施されていると想定。
 	 *
 	 * pred は、引数で指定されたノードポインタに対し、呼び出し側から見た使用可否を判定する関数オブジェクト
 	 * @li	true 使用可能
@@ -225,7 +232,7 @@ public:
 				if ( pred( p_down_casted_ans ) ) {
 					return p_down_casted_ans;
 				} else {
-					this->recycle( p_chk );
+					this->post_recycle( p_chk );
 				}
 			} else {
 				// もし、ダウンキャストに失敗したら、そもそも不具合であるし、不要なので、削除する。
@@ -238,7 +245,7 @@ public:
 		for ( int i = 0; i < num_recycle_exec; i++ ) {
 			node_pointer p_ans = node_list_.pop();
 			if ( p_ans == nullptr ) {
-				if ( recycle( nullptr ) ) {
+				if ( post_recycle( nullptr ) ) {
 					continue;
 				} else {
 					break;   // ローカルストレージが空で、かつフリーノードリストも空なので、フリーノードを取り出せる可能性は低い。よって、ループを抜ける。
@@ -247,6 +254,7 @@ public:
 
 			ALLOC_NODE_T* p_down_casted_ans = chk_and_recycle( p_ans );
 			if ( p_down_casted_ans != nullptr ) {
+				p_down_casted_ans->setup_by_alloc();   // フリーノードから割り当てられたので、setup_by_allocを呼び出す。
 				return p_down_casted_ans;
 			}
 		}
@@ -258,6 +266,7 @@ public:
 				if ( p_ans != nullptr ) {
 					ALLOC_NODE_T* p_down_casted_ans = chk_and_recycle( p_ans );
 					if ( p_down_casted_ans != nullptr ) {
+						p_down_casted_ans->setup_by_alloc();   // フリーノードから割り当てられたので、setup_by_allocを呼び出す。
 						return p_down_casted_ans;
 					}
 				}
@@ -265,7 +274,7 @@ public:
 		}
 
 		if ( does_allow_allocate ) {
-			// ここに来たら、利用可能なfree nodeがなかったこと示すので、新しいノードをヒープから確保する。
+			// ここに来たら、利用可能なfree nodeがなかったこと示すので、新しいノードをヒープから確保する。setup_by_allocは実行済み
 			return allocate_new_node<ALLOC_NODE_T>();
 		} else {
 			return nullptr;
@@ -275,7 +284,9 @@ public:
 	template <typename ALLOC_NODE_T>
 	void init_and_pre_allocate( int pre_alloc_nodes )
 	{
-		node_list_.initial_push( (node_pointer)allocate_new_node<ALLOC_NODE_T>() );
+		node_pointer p_init_sentinel = (node_pointer)allocate_new_node<ALLOC_NODE_T>();
+		p_init_sentinel->teardown_by_recycle();
+		node_list_.initial_push( p_init_sentinel );
 
 		for ( int i = 0; i < pre_alloc_nodes; i++ ) {
 			recycle( (node_pointer)allocate_new_node<ALLOC_NODE_T>() );
@@ -320,6 +331,19 @@ private:
 		thread_local_fifo_list* p_ans = &( tls_fifo_.get_tls_instance() );
 		return p_ans;
 	}
+
+	/*!
+	 * @breif	ローカルストレージのノードリストからフリーノードリストへの登録を試みる
+	 *
+	 * p_retire_node経由でteardown_by_recycle()を呼び出す。その後、ローカルストレージのフリーノードへ登録する。
+	 * その後、ローカルストレージから共通フリーノードリストへの登録の試る。
+	 *
+	 * @return	共通フリーノードリストへの登録の試みが実施できたかどうかを返す。
+	 * @retval	true	ローカルストレージのノードリストにリストが残っていて、フリーノードリストへの登録を試みることができた。
+	 * @retval	false	ローカルストレージのノードリストが空で、フリーノードリストへの登録を試みることはできなかった。
+	 */
+	bool post_recycle( node_pointer p_retire_node );
+
 
 	void rcv_thread_local_fifo_list( thread_local_fifo_list* p_rcv );
 
