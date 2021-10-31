@@ -442,18 +442,21 @@ struct one_way_list_node : public node_of_list, public HANDLING_POLICY {
 	using value_type = typename std::decay<T>::type;
 
 	one_way_list_node( void )
-	  : next_( nullptr )
+	  : HANDLING_POLICY()
+	  , next_( nullptr )
 	{
 		static_assert( std::is_copy_assignable<value_type>::value, "T need to be copy assignable." );
 	}
 
 	one_way_list_node( const value_type& cont_arg )
-	  : next_( nullptr )
+	  : HANDLING_POLICY( cont_arg )
+	  , next_( nullptr )
 	{
 	}
 
 	one_way_list_node( value_type&& cont_arg )
-	  : next_( nullptr )
+	  : HANDLING_POLICY( std::move( cont_arg ) )
+	  , next_( nullptr )
 	{
 	}
 

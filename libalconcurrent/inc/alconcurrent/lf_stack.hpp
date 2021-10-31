@@ -302,6 +302,7 @@ public:
 		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type>( false, value_type {} );
 
 		value_type ans_value = p_poped_node->get_value();
+		p_poped_node->lost_ownership();
 
 		free_nd_.recycle( (free_node_pointer)p_poped_node );
 

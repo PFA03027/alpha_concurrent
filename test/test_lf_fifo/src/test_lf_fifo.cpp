@@ -127,7 +127,7 @@ TEST_F( lffifoTest, TC1 )
 	for ( int i = 0; i < num_thread; i++ ) {
 		uintptr_t e;
 		pthread_join( threads[i], reinterpret_cast<void**>( &e ) );
-		//		std::cout << "Thread " << i << ": last dequeued = " << e << std::endl;
+				std::cout << "Thread " << i << ": last dequeued = " << e << std::endl;
 		sum += e;
 	}
 
