@@ -38,19 +38,7 @@ constexpr int max_alloc_size = 900;
 constexpr int num_loop       = 1200;
 constexpr int num_thread     = 10;
 
-struct test_deleter {
-
-	static alpha::concurrent::general_mem_allocator* p_tmg;
-
-	void operator()( void* p_mem )
-	{
-		p_tmg->deallocate( p_mem );
-		return;
-	}
-};
-alpha::concurrent::general_mem_allocator* test_deleter::p_tmg;
-
-using test_fifo_type = alpha::concurrent::fifo_list<void*, true, test_deleter>;
+using test_fifo_type = alpha::concurrent::fifo_list<void*, true, false>;
 
 struct test_params {
 	test_fifo_type*                           p_test_obj;
@@ -107,8 +95,6 @@ void* func_test_fifo( void* p_data )
 
 void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::general_mem_allocator* p_tmg_arg )
 {
-	test_deleter::p_tmg = p_tmg_arg;
-
 	test_fifo_type fifo;
 
 	test_params tda;

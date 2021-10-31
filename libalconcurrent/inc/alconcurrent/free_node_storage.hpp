@@ -68,6 +68,7 @@ struct node_of_list {
 	}
 
 	virtual void setup_by_alloc( void );
+	virtual void lost_ownership( void );
 	virtual void teardown_by_recycle( void );
 
 #ifndef NOT_USE_LOCK_FREE_MEM_ALLOC

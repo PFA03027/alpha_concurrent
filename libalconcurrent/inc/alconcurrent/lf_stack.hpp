@@ -32,12 +32,12 @@ namespace internal {
  * @note
  * https://www.slideshare.net/kumagi/lock-free-safe?next_slideshow=1 @n
  */
-template <typename T, typename DELETER = default_deleter<T>>
+template <typename T, bool HAS_OWNERSHIP = true>
 class lifo_nd_list {
 public:
 	static constexpr int hzrd_max_slot_ = 3;
 	using value_type                    = typename std::decay<T>::type;
-	using node_type                     = one_way_list_node<T>;
+	using node_type                     = one_way_list_node<T, HAS_OWNERSHIP>;
 	using node_pointer                  = node_type*;
 	using hazard_ptr_storage            = hazard_ptr<node_type, hzrd_max_slot_>;
 
@@ -56,11 +56,8 @@ public:
 		if ( p_cur != nullptr ) {
 			// 先頭ノードは番兵のため、nullptrであることはありえないが、チェックする。
 			// ノード自体は、フリーノードストレージに戻さず削除するが、ここは戻さない仕様で割り切る。
-			// TODO T型がpointerの場合、ポインタの先のオブジェクトを削除していないため、メモリリークとなる。
-			DELETER dt;
 			do {
 				node_pointer const p_nxt = p_cur->get_next();
-				dt( p_cur->ref_value() );
 				delete p_cur;
 				p_cur = p_nxt;
 			} while ( p_cur != nullptr );
@@ -199,7 +196,7 @@ private:
  * @note
  * To resolve ABA issue, this Stack queue uses hazard pointer approach.
  */
-template <typename T, bool ALLOW_TO_ALLOCATE = true, typename DELETER = internal::default_deleter<T>>
+template <typename T, bool ALLOW_TO_ALLOCATE = true, bool HAS_OWNERSHIP = true>
 class stack_list {
 public:
 #if 0
@@ -342,7 +339,7 @@ private:
 	using free_nd_storage_type = internal::free_nd_storage;
 	using free_node_type       = typename free_nd_storage_type::node_type;
 	using free_node_pointer    = typename free_nd_storage_type::node_pointer;
-	using lifo_type            = internal::lifo_nd_list<T, DELETER>;
+	using lifo_type            = internal::lifo_nd_list<T, HAS_OWNERSHIP>;
 	using lifo_node_type       = typename lifo_type::node_type;
 	using lifo_node_pointer    = typename lifo_type::node_pointer;
 

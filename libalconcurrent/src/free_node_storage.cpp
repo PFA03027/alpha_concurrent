@@ -337,6 +337,11 @@ void node_of_list::setup_by_alloc( void )
 	return;
 }
 
+void node_of_list::lost_ownership( void )
+{
+	return;
+}
+
 void node_of_list::teardown_by_recycle( void )
 {
 	return;

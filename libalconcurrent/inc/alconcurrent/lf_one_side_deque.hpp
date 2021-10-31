@@ -41,7 +41,7 @@ namespace concurrent {
  * @note
  * To resolve ABA issue, this one side deque uses hazard pointer approach.
  */
-template <typename T, bool ALLOW_TO_ALLOCATE = true, typename DELETER = internal::default_deleter<T>>
+template <typename T, bool ALLOW_TO_ALLOCATE = true, bool HAS_OWNERSHIP = true>
 class one_side_deque {
 public:
 	using value_type = typename std::decay<T>::type;
@@ -183,8 +183,8 @@ private:
 	one_side_deque& operator=( const one_side_deque& ) = delete;
 	one_side_deque& operator=( one_side_deque&& ) = delete;
 
-	using head_stack_t = stack_list<T, ALLOW_TO_ALLOCATE, DELETER>;
-	using tail_fifo_t  = fifo_list<T, ALLOW_TO_ALLOCATE, DELETER>;
+	using head_stack_t = stack_list<T, ALLOW_TO_ALLOCATE, HAS_OWNERSHIP>;
+	using tail_fifo_t  = fifo_list<T, ALLOW_TO_ALLOCATE, HAS_OWNERSHIP>;
 
 	head_stack_t head_side_;
 	tail_fifo_t  tail_size_;
