@@ -16,8 +16,8 @@
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 #include "alconcurrent/lf_stack.hpp"
 
-constexpr int            num_thread = 32;   // Tested until 128.
-constexpr std::uintptr_t loop_num   = 100000;
+constexpr int            num_thread = 10;   // Tested until 128.
+constexpr std::uintptr_t loop_num   = 10000;
 
 using test_lifo_type_part = alpha::concurrent::internal::lifo_nd_list<std::uintptr_t>;
 
