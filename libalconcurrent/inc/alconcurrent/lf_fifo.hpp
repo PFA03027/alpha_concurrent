@@ -68,7 +68,7 @@ public:
 			// ノード自体は、フリーノードストレージに戻すことが基本だが、デストラクタの場合は、戻さない仕様で割り切る。
 
 			// 先頭ノードは番兵ノードで、既にリソースは取り出し済み。よって、デストラクタ時点でリソースの所有権喪失が確定される。
-			p_cur->lost_ownership();
+			p_cur->release_ownership();
 			do {
 				// リソースの所有権が保持されている２番目のノード以降の破棄を行う。ノードのデストラクタで所有中のリソースは破棄される。
 				node_pointer const p_nxt = p_cur->get_next();
@@ -172,8 +172,8 @@ public:
 					size_count_--;
 					// ここで、firstの取り出しと所有権確保が完了
 					// ただし、ハザードポインタをチェックしていないため、まだ参照している人がいるかもしれない。
-					value_type ans_2nd = p_cur_next->exchange_ticket_to_value( ans_2nd_ticket );   // firstが取り出せたので、値を取り出すための権利を取得。チケットを使って、値を取り出す。
-					p_cur_first->lost_ownership();                                                 // 値を取り出した結果として、firstが管理する情報の所有権ロストが確定したため、それを書き込む。
+					value_type ans_2nd = p_cur_next->exchange_ticket_and_move_value( ans_2nd_ticket );   // firstが取り出せたので、nextから値を取り出すための権利を取得。チケットを使って、値を取り出す。
+					p_cur_first->release_ownership();                                                    // 値を取り出した結果として、firstが管理する情報の所有権ロストが確定したため、それを書き込む。
 					return std::tuple<node_pointer, value_type>( p_cur_first, ans_2nd );
 				}
 			}

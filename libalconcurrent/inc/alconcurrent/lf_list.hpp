@@ -35,7 +35,7 @@ namespace internal {
  * テンプレートメンバ関数の場合、生成される関数インスタンスが予測できないため、ハザードポインタを管理するスロット数を事前確定できない。 @n
  * そのため、メンバ関数のテンプレート化を避ける必要がある。
  */
-template <typename T, typename DELETER = default_deleter<T>>
+template <typename T>
 class lockfree_list_base {
 public:
 	using value_type                 = typename std::decay<T>::type;                //!< 保持対象の型
@@ -43,7 +43,6 @@ public:
 	using node_pointer               = node_type*;                                  //!< 実際の値を保持するノードクラスのインスタンスへのポインタ型
 	using find_predicate_t           = std::function<bool( const node_pointer )>;   //!< find関数で使用する述語関数を保持するfunction型
 	using for_each_func_t            = std::function<void( value_type& )>;          //!< for_each関数で各要素の処理を実行するための関数を保持するfunction型
-	using remove_operator_t          = std::function<void( value_type& )>;          //!< remove処理が行われたノードが保持する保持対象のインスタンスに対して何らかの処理を行う関数を保持するfunction型
 	using hazard_ptr_scoped_ref_if_t = hazard_ptr_scoped_ref_if<node_type>;         //!< ハザードポインタの参照制御をサポートするI/Fクラスの型
 
 	lockfree_list_base( void )
@@ -126,31 +125,32 @@ public:
 				next_addr_and_mark = p_curr->get_next();                       // p_nextがまだ有効かどうかを再確認
 				if ( p_next != std::get<0>( next_addr_and_mark ) ) continue;   // nextが変わっていたので、nextを取だし直す。
 
-				if ( std::get<1>( next_addr_and_mark ) ) {             // 	p_currに削除マークがついていたら、削除を試みる
-					bool snip = p_prev->next_CAS( &p_curr, p_next );   // p_currを削除を試みる。
-					if ( !snip ) {
-						// 削除に失敗。誰かがすでに削除を成功させたので、検索を最初からやり直す。
-						break;
+				if ( std::get<1>( next_addr_and_mark ) ) {   // 	p_currに削除マークがついていた
+					if ( !hzrd_ptr_cp_hdling_.check_ptr_in_hazard_list( p_curr ) ) {
+						// ハザードポインタにはもう登録されていないので、削除を試みる。
+						bool snip = p_prev->next_CAS( &p_curr, p_next );   // p_currを削除を試みる。
+						if ( !snip ) {
+							// 削除に失敗。誰かがすでに削除を成功させたので、検索を最初からやり直す。
+							break;
+						}
+
+						node_pointer p_detached = p_curr;
+						p_curr                  = p_next;
+						scoped_ref_curr.regist_ptr_as_hazard_ptr( p_curr );   // p_currのハザードポインタを更新
+
+						// p_currを削除できたので、フリーノードストレージへ登録
+						fn_strg.recycle( p_detached );
+
+						continue;   // p_currの削除フラグ確認からやり直す。
 					}
-
-					node_pointer p_detached = p_curr;
-					p_curr                  = p_next;
-					scoped_ref_curr.regist_ptr_as_hazard_ptr( p_curr );   // p_currのハザードポインタを更新
-
-					// p_currを削除できたので、フリーノードストレージへ登録
-					DELETER dt;   // TODO 本当にフリーノードストレージへ戻せたときに削除処理を行う必要がある。。。
-					dt( p_detached->ref_value() );
-					fn_strg.recycle( p_detached );
-
-					continue;   // p_currの削除フラグ確認からやり直す。
-				}
-
-				// p_currは削除されていないので、条件に当てはまるかどうかを確認する
-				if ( pred( p_curr ) ) {
-					// 条件に合致したので、検索を完了する
-					ans_prev_ref.regist_ptr_as_hazard_ptr( p_prev );
-					ans_curr_ref.regist_ptr_as_hazard_ptr( p_curr );
-					return std::tuple<node_pointer, node_pointer>( p_prev, p_curr );
+				} else {
+					// p_currは削除されていないので、条件に当てはまるかどうかを確認する
+					if ( pred( p_curr ) ) {
+						// 条件に合致したので、検索を完了する
+						ans_prev_ref.regist_ptr_as_hazard_ptr( p_prev );
+						ans_curr_ref.regist_ptr_as_hazard_ptr( p_curr );
+						return std::tuple<node_pointer, node_pointer>( p_prev, p_curr );
+					}
 				}
 
 				// p_currは検索条件に合致しなかったので、次を調べる。
@@ -203,18 +203,29 @@ public:
 	 * 引数の管理ノードは、事前にcheck_hazard_list()を使用してハザードポインタに登録されていないことを確認していること。
 	 */
 	bool remove(
-		free_nd_storage&   fn_strg,   //!< [in]	削除ノードを差し戻すためのFree node storageへの参照
-		node_pointer       prev,      //!< [in]	find_ifの戻り値の第１パラメータ
-		node_pointer       curr,      //!< [in]	find_ifの戻り値の第２パラメータ。削除するノード
-		remove_operator_t& rm_op      //!< [in/out]	currの削除に成功した場合、currが保持している値への参照を引数に呼び出される。
+		free_nd_storage& fn_strg,       //!< [in]	削除ノードを差し戻すためのFree node storageへの参照
+		node_pointer     prev,          //!< [in]	find_ifの戻り値の第１パラメータ
+		node_pointer     curr,          //!< [in]	find_ifの戻り値の第２パラメータ。削除するノード
+		value_type*      p_rmed_value   //!< [out]	currの削除に成功した場合、currが保持している値をムーブ、あるいはコピーする
 	)
 	{
+		scoped_hazard_cp_handling_ref scoped_ref_curr( hzrd_ptr_cp_hdling_, 0 );
+		scoped_ref_curr.regist_ptr_as_hazard_ptr( curr );
+
 		bool ans = curr->set_mark_on();
 
 		if ( ans ) {
+			// 削除できたので、currの所有権を確保
 			--size_count_;
 
-			rm_op( curr->ref_value() );
+			if ( p_rmed_value != nullptr ) {
+				// currが保持していた値の引き出し、かつ所有権を移動
+				auto ticket   = curr->get_ticket();
+				*p_rmed_value = curr->exchange_ticket_and_move_value( ticket );
+			} else {
+				// 後々のrecyle内でリソース破棄が行われるため、ここで破棄しない実装としてみた
+				// curr->teardown_by_recycle();
+			}
 
 			scoped_hazard_ref scoped_ref_next( hzrd_ptr_, (int)hazard_ptr_idx::REMOVE_FUNC_NEXT );
 
@@ -229,7 +240,7 @@ public:
 					if ( prev->next_CAS( &p_curr, p_next ) ) {
 						fn_strg.recycle( curr );
 					}
-					// 失敗しても気にしない。
+					// 失敗しても気にしない。あとで、他の誰かがやってくれる。
 				}
 			}
 		}
@@ -239,8 +250,6 @@ public:
 
 	/*!
 	 * @breif	currのノードを削除する
-	 *
-	 * 削除時には、ノードが保持する値に対して、DELETERが適用される。
 	 *
 	 * @retval	true	削除に成功
 	 * @retval	false	削除に失敗
@@ -254,8 +263,7 @@ public:
 		node_pointer     curr       //!< [in]	find_ifの戻り値の第２パラメータ。削除するノード
 	)
 	{
-		remove_operator_t rm_op = DELETER();
-		return remove( fn_strg, prev, curr, rm_op );
+		return remove( fn_strg, prev, curr, nullptr );
 	}
 
 	/*!
@@ -296,7 +304,10 @@ public:
 			if ( p_curr != std::get<0>( next_addr_and_mark ) ) continue;   // p_currポインタが書き換わっていたら読み出しからやり直し。
 			if ( !std::get<1>( next_addr_and_mark ) ) {
 				// ノードに削除マークがなければ、関数適用開始
-				internal_func( p_curr->ref_value() );
+				// TODO: 競合が起こる方法。他にいい方法はないか？　一つの解決方法はSTMなんだろうけど。。。
+				value_type cur_v = p_curr->get_value();
+				internal_func( cur_v );
+				p_curr->set_value( cur_v );
 			}
 
 			scoped_ref_prev.regist_ptr_as_hazard_ptr( p_curr );
@@ -351,29 +362,32 @@ public:
 	}
 
 private:
-	static constexpr int hzrd_max_slot_ = 6;
+	enum class hazard_ptr_idx : int {
+		FIND_FUNC_PREV   = 0,
+		FIND_FUNC_CURR   = 1,
+		FIND_FUNC_NEXT   = 2,
+		REMOVE_FUNC_CURR = 3,
+		REMOVE_FUNC_NEXT = 4,
+		FOR_EACH_PREV    = 5,
+		FOR_EACH_CURR    = 6
+	};
+	static constexpr int hzrd_max_slot_ = 7;
 	using hazard_ptr_storage            = hazard_ptr<node_type, hzrd_max_slot_>;
 	using scoped_hazard_ref             = hazard_ptr_scoped_ref<node_type, hzrd_max_slot_>;
+	using hazard_ptr_cp_handling        = hazard_ptr<node_type, 1>;
+	using scoped_hazard_cp_handling_ref = hazard_ptr_scoped_ref<node_type, 1>;
 
 	lockfree_list_base( const lockfree_list_base& ) = delete;
 	lockfree_list_base( lockfree_list_base&& )      = delete;
 	lockfree_list_base operator=( const lockfree_list_base& ) = delete;
 	lockfree_list_base operator=( lockfree_list_base&& ) = delete;
 
-	enum class hazard_ptr_idx : int {
-		FIND_FUNC_PREV   = 0,
-		FIND_FUNC_CURR   = 1,
-		FIND_FUNC_NEXT   = 2,
-		REMOVE_FUNC_NEXT = 3,
-		FOR_EACH_PREV    = 4,
-		FOR_EACH_CURR    = 5
-	};
-
 	node_type        head_;
 	node_type        sentinel_node_;
 	std::atomic<int> size_count_;
 
-	hazard_ptr_storage hzrd_ptr_;
+	hazard_ptr_storage     hzrd_ptr_;
+	hazard_ptr_cp_handling hzrd_ptr_cp_hdling_;
 };
 
 }   // namespace internal
@@ -399,7 +413,7 @@ private:
  * @note
  * To resolve ABA issue, this Stack queue uses hazard pointer approach.
  */
-template <typename T, bool ALLOW_TO_ALLOCATE = true, typename DELETER = internal::default_deleter<T>>
+template <typename T, bool ALLOW_TO_ALLOCATE = true>
 class lockfree_list {
 public:
 	using value_type      = typename std::decay<T>::type;
@@ -463,7 +477,7 @@ public:
 		predicate_t&      pred        //!< [in]	A predicate function to specify the insertion position. const value_type& is passed as an argument
 	)
 	{
-		typename list_type::find_predicate_t pred_common = [&pred]( const list_node_pointer a ) { return pred( a->ref_value() ); };
+		typename list_type::find_predicate_t pred_common = [&pred]( const list_node_pointer a ) { return pred( a->get_value() ); };
 
 		list_node_pointer p_new_node = free_nd_.allocate<list_node_type>(
 			ALLOW_TO_ALLOCATE,
@@ -509,7 +523,7 @@ public:
 	)
 	{
 		int                                  ans         = 0;
-		typename list_type::find_predicate_t pred_common = [&pred]( const list_node_pointer a ) { return pred( a->ref_value() ); };
+		typename list_type::find_predicate_t pred_common = [&pred]( const list_node_pointer a ) { return pred( a->get_value() ); };
 
 		scoped_hazard_ref hzrd_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_PREV );
 		scoped_hazard_ref hzrd_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_CURR );
@@ -541,7 +555,7 @@ public:
 	{
 		bool ans = false;
 
-		typename list_type::find_predicate_t pred_common = [&pred]( const list_node_pointer a ) { return pred( a->ref_value() ); };
+		typename list_type::find_predicate_t pred_common = [&pred]( const list_node_pointer a ) { return pred( a->get_value() ); };
 
 		scoped_hazard_ref hzrd_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_PREV );
 		scoped_hazard_ref hzrd_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_CURR );
@@ -606,9 +620,7 @@ public:
 
 		typename list_type::find_predicate_t pred_common = []( const list_node_pointer a ) { return true; };
 
-		value_type                            ans_value {};
-		internal::default_mover<T>            dm;
-		typename list_type::remove_operator_t remove_op = [&ans_value, &dm]( value_type& a ) { dm(a, ans_value); return; };
+		value_type ans_value {};
 
 		while ( true ) {
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
@@ -623,7 +635,7 @@ public:
 				return std::tuple<bool, value_type>( false, ans_value );
 			}
 
-			if ( base_list_.remove( free_nd_, p_prev, p_curr, remove_op ) ) {
+			if ( base_list_.remove( free_nd_, p_prev, p_curr, &ans_value ) ) {
 				break;
 			}
 		}
@@ -671,9 +683,7 @@ public:
 
 		typename list_type::find_predicate_t pred_common = []( const list_node_pointer a ) { return false; };
 
-		value_type                            ans_value {};
-		internal::default_mover<value_type>   dm;
-		typename list_type::remove_operator_t remove_op = [&ans_value, &dm]( value_type& a ) { dm(a, ans_value); return; };
+		value_type ans_value {};
 
 		while ( true ) {
 			list_node_pointer p_last;
@@ -704,7 +714,7 @@ public:
 #endif
 			if ( base_list_.is_end_node( p_curr ) ) continue;
 
-			if ( base_list_.remove( free_nd_, p_prev, p_curr, remove_op ) ) {
+			if ( base_list_.remove( free_nd_, p_prev, p_curr, &ans_value ) ) {
 				break;
 			}
 		}
@@ -762,7 +772,7 @@ private:
 	lockfree_list& operator=( const lockfree_list& ) = delete;
 	lockfree_list& operator=( lockfree_list&& ) = delete;
 
-	using list_type            = internal::lockfree_list_base<T, DELETER>;
+	using list_type            = internal::lockfree_list_base<T>;
 	using list_node_type       = typename list_type::node_type;
 	using list_node_pointer    = typename list_type::node_pointer;
 	using free_nd_storage_type = internal::free_nd_storage;

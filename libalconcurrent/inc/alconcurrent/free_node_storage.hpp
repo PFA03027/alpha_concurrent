@@ -67,8 +67,7 @@ struct node_of_list {
 		return next_[(int)cur_slot_idx].compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
 	}
 
-	virtual void setup_by_alloc( void );
-	virtual void lost_ownership( void );
+	virtual void release_ownership( void );
 	virtual void teardown_by_recycle( void );
 
 #ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
@@ -193,13 +192,14 @@ public:
 	~free_nd_storage();
 
 	/*!
-	 * @breif	フリーノードのリサイクル処理を行う。
+	 * @breif	使用済みノードのリサイクル処理を行う。
 	 *
-	 * p_retire_node経由でteardown_by_recycle()を呼び出した後、post_recycle()処理を行う。
+	 * まず、スレッドローカルストレージへノードを一時登録した後、ハザードポインタをチェックする。
+	 * ハザードポインタに登録されていなければ、teardown_by_recycle()を呼び出した後、共通フリーノードリストへの登録処理を行う。
 	 *
-	 * post_recycle()内で、フリーノードのリサイクル処理を行う。
-	 *
-	 * @return	post_recycle()の戻り値
+	 * @return	共通フリーノードリストへの登録の試みが実施できたかどうかを返す。
+	 * @retval	true	ローカルストレージのノードリストにリストが残っていて、フリーノードリストへの登録を試みることができた。
+	 * @retval	false	ローカルストレージのノードリストが空で、フリーノードリストへの登録を試みることはできなかった。
 	 */
 	bool recycle( node_pointer p_retire_node );
 
@@ -233,20 +233,31 @@ public:
 				if ( pred( p_down_casted_ans ) ) {
 					return p_down_casted_ans;
 				} else {
-					this->post_recycle( p_chk );
+					this->recycle( p_chk );
 				}
 			} else {
 				// もし、ダウンキャストに失敗したら、そもそも不具合であるし、不要なので、削除する。
-				LogOutput( log_type::ERR, "Info: fail to down cast. discard the node that have unexpected type." );
+				LogOutput( log_type::ERR, "ERROR: fail to down cast. discard the node that have unexpected type." );
 				delete p_chk;
 			}
 			return nullptr;
 		};
 
+		{
+			std::unique_lock<std::mutex> lk( mtx_rcv_thread_local_fifo_list_, std::try_to_lock );
+			if ( lk.owns_lock() ) {
+				// 他のスレッドから預託されたノードをフリーノードへ差し回す。
+				node_pointer p_ans = rcv_thread_local_fifo_list_.pop();
+				if ( p_ans != nullptr ) {
+					recycle( p_ans );
+				}
+			}
+		}
+
 		for ( int i = 0; i < num_recycle_exec; i++ ) {
 			node_pointer p_ans = node_list_.pop();
 			if ( p_ans == nullptr ) {
-				if ( post_recycle( nullptr ) ) {
+				if ( recycle( nullptr ) ) {
 					continue;
 				} else {
 					break;   // ローカルストレージが空で、かつフリーノードリストも空なので、フリーノードを取り出せる可能性は低い。よって、ループを抜ける。
@@ -255,22 +266,7 @@ public:
 
 			ALLOC_NODE_T* p_down_casted_ans = chk_and_recycle( p_ans );
 			if ( p_down_casted_ans != nullptr ) {
-				p_down_casted_ans->setup_by_alloc();   // フリーノードから割り当てられたので、setup_by_allocを呼び出す。
 				return p_down_casted_ans;
-			}
-		}
-
-		{
-			std::unique_lock<std::mutex> lk( mtx_rcv_thread_local_fifo_list_, std::try_to_lock );
-			if ( lk.owns_lock() ) {
-				node_pointer p_ans = rcv_thread_local_fifo_list_.pop();
-				if ( p_ans != nullptr ) {
-					ALLOC_NODE_T* p_down_casted_ans = chk_and_recycle( p_ans );
-					if ( p_down_casted_ans != nullptr ) {
-						p_down_casted_ans->setup_by_alloc();   // フリーノードから割り当てられたので、setup_by_allocを呼び出す。
-						return p_down_casted_ans;
-					}
-				}
 			}
 		}
 
@@ -332,19 +328,6 @@ private:
 		thread_local_fifo_list* p_ans = &( tls_fifo_.get_tls_instance() );
 		return p_ans;
 	}
-
-	/*!
-	 * @breif	ローカルストレージのノードリストからフリーノードリストへの登録を試みる
-	 *
-	 * p_retire_node経由でteardown_by_recycle()を呼び出す。その後、ローカルストレージのフリーノードへ登録する。
-	 * その後、ローカルストレージから共通フリーノードリストへの登録の試る。
-	 *
-	 * @return	共通フリーノードリストへの登録の試みが実施できたかどうかを返す。
-	 * @retval	true	ローカルストレージのノードリストにリストが残っていて、フリーノードリストへの登録を試みることができた。
-	 * @retval	false	ローカルストレージのノードリストが空で、フリーノードリストへの登録を試みることはできなかった。
-	 */
-	bool post_recycle( node_pointer p_retire_node );
-
 
 	void rcv_thread_local_fifo_list( thread_local_fifo_list* p_rcv );
 

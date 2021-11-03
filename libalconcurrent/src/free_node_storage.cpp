@@ -217,15 +217,6 @@ free_nd_storage::~free_nd_storage()
 
 bool free_nd_storage::recycle( free_nd_storage::node_pointer p_retire_node )
 {
-	if ( p_retire_node != nullptr ) {
-		p_retire_node->teardown_by_recycle();
-	}
-
-	return post_recycle(p_retire_node);
-}
-
-bool free_nd_storage::post_recycle( free_nd_storage::node_pointer p_retire_node )
-{
 	thread_local_fifo_list* p_tls_fifo_ = check_local_storage();
 
 	if ( p_retire_node != nullptr ) {
@@ -241,8 +232,10 @@ bool free_nd_storage::post_recycle( free_nd_storage::node_pointer p_retire_node 
 		node_pointer p_chk = p_tls_fifo_->pop();
 		if ( p_chk == nullptr ) break;
 		if ( node_list_.check_hazard_list( p_chk ) ) {
-			p_tls_fifo_->push( p_chk );   // 差し戻し
+			// まだ、ハザードポインタに登録されているので、差し戻す。
+			p_tls_fifo_->push( p_chk );
 		} else {
+			// ハザードポインタに登録されていないので、共通フリーノードリストへ登録する。
 			node_list_.push( p_chk );
 		}
 	}
@@ -332,12 +325,7 @@ std::list<chunk_statistics> node_of_list::get_statistics( void )
 
 #endif
 
-void node_of_list::setup_by_alloc( void )
-{
-	return;
-}
-
-void node_of_list::lost_ownership( void )
+void node_of_list::release_ownership( void )
 {
 	return;
 }

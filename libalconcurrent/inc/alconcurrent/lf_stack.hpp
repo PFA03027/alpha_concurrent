@@ -199,13 +199,6 @@ private:
 template <typename T, bool ALLOW_TO_ALLOCATE = true, bool HAS_OWNERSHIP = true>
 class stack_list {
 public:
-#if 0
-	using value_type = T;
-	using value_type = typename std::conditional<
-		std::is_array<T>::value,
-		std::decay<T>::type,
-		T>::type;
-#endif
 	using value_type = typename std::decay<T>::type;
 
 	/*!
@@ -301,8 +294,9 @@ public:
 
 		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type>( false, value_type {} );
 
-		value_type ans_value = p_poped_node->get_value();
-		p_poped_node->lost_ownership();
+		// p_poped_nodeが保持していた値の引き出し、かつ所有権を移動
+		auto       ticket    = p_poped_node->get_ticket();
+		value_type ans_value = p_poped_node->exchange_ticket_and_move_value( ticket );
 
 		free_nd_.recycle( (free_node_pointer)p_poped_node );
 
