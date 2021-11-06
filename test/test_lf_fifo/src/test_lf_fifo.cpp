@@ -9,8 +9,10 @@
 #include <pthread.h>
 
 #include <cstdint>
+#include <deque>
 #include <iostream>
 #include <list>
+#include <mutex>
 #include <random>
 
 #include "gtest/gtest.h"
@@ -21,7 +23,7 @@
 constexpr int            num_thread = 8;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 10000;
 
-using test_fifo_type_part = alpha::concurrent::internal::fifo_nd_list<std::uintptr_t>;
+using test_fifo_type_part = alpha::concurrent::internal::fifo_nd_list<std::uintptr_t>;   // ownership=TRUE設定のfifoのベースクラスとして定義
 
 using test_fifo_type  = alpha::concurrent::fifo_list<std::uintptr_t>;
 using test_fifo_type2 = alpha::concurrent::fifo_list<std::uintptr_t, false>;
@@ -59,27 +61,40 @@ protected:
 	}
 };
 
+std::mutex                                  mtx_pointer_strage;
+std::deque<test_fifo_type_part::node_type*> pointer_strage;   // 管理ノードを一時保管するストレージ。ownership=TRUEの管理ノードを想定
+
 /**
- * 各スレッドのメインルーチン。
+ * pushのテストをするスレッドのメインルーチン。
+ * 生成したポインタは、呼び出し元のTEST_F( lffifoTest, TC1 )で破棄される。
  */
 void* func_push( void* data )
 {
-	test_fifo_type_part* p_test_obj = reinterpret_cast<test_fifo_type_part*>( data );
+	std::deque<test_fifo_type_part::node_type*> pointer_strage_local;
+	test_fifo_type_part*                        p_test_obj = reinterpret_cast<test_fifo_type_part*>( data );
 
 	pthread_barrier_wait( &barrier );
 
 	typename test_fifo_type_part::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		auto p_node = new test_fifo_type_part::node_type( i );
+		pointer_strage_local.emplace_back( p_node );
 		p_test_obj->push( p_node );
 		v++;
+	}
+
+	{
+		std::lock_guard<std::mutex> lk( mtx_pointer_strage );
+		for ( auto& e : pointer_strage_local ) {
+			pointer_strage.emplace_back( e );
+		}
 	}
 
 	return reinterpret_cast<void*>( v );
 }
 
 /**
- * 各スレッドのメインルーチン。
+ * popの各スレッドのメインルーチン。
  */
 void* func_pop( void* data )
 {
@@ -160,6 +175,14 @@ TEST_F( lffifoTest, TC1 )
 	std::cout << "Sum:    " << sum << std::endl;
 	EXPECT_EQ( num_thread * loop_num, sum );
 
+	{
+		std::lock_guard<std::mutex> lk( mtx_pointer_strage );
+		for ( auto& e : pointer_strage ) {
+			delete e;
+		}
+		pointer_strage.clear();
+	}
+
 	delete[] threads;
 
 	delete p_test_obj;
@@ -167,32 +190,44 @@ TEST_F( lffifoTest, TC1 )
 	return;
 }
 
+std::mutex                                  mtx_pointer_strage2;
+std::deque<test_fifo_type_part::node_type*> pointer_strage2;   // 管理ノードを一時保管するストレージ。ownership=TRUEの管理ノードを想定
+
 /**
  * 各スレッドのメインルーチン。
  * テスト目的上、メモリリークが発生するが、想定通りの振る舞い。
  */
 void* func_test_fifo2( void* data )
 {
-	test_fifo_type_part* p_test_obj = reinterpret_cast<test_fifo_type_part*>( data );
+	std::deque<test_fifo_type_part::node_type*> pointer_strage_local;
+	test_fifo_type_part*                        p_test_obj = reinterpret_cast<test_fifo_type_part*>( data );
 
 	pthread_barrier_wait( &barrier );
 
 	typename test_fifo_type_part::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		auto p_node = new test_fifo_type_part::node_type( v );
+		pointer_strage_local.emplace_back( p_node );
 		p_test_obj->push( p_node );
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 		auto [pop_flag, vv] = p_test_obj->pop();
 #else
 		auto local_ret = p_test_obj->pop();
-		auto pop_flag = std::get<0>( local_ret );
+		auto p_poped_node = std::get<0>( local_ret );
 		auto vv = std::get<1>( local_ret );
 #endif
-		if ( !pop_flag ) {
+		if ( p_poped_node == nullptr ) {
 			printf( "Buggggggg!!!  %s\n", std::to_string( v ).c_str() );
 			exit( 1 );
 		}
 		v = vv + 1;
+	}
+
+	{
+		std::lock_guard<std::mutex> lk( mtx_pointer_strage2 );
+		for ( auto& e : pointer_strage_local ) {
+			pointer_strage2.emplace_back( e );
+		}
 	}
 
 	return reinterpret_cast<void*>( v );
@@ -228,6 +263,14 @@ TEST_F( lffifoTest, TC2 )
 	std::cout << "Expect: " << std::to_string( num_thread * loop_num ) << std::endl;
 	std::cout << "Sum:    " << sum << std::endl;
 	EXPECT_EQ( num_thread * loop_num, sum );
+
+	{
+		std::lock_guard<std::mutex> lk( mtx_pointer_strage2 );
+		for ( auto& e : pointer_strage2 ) {
+			delete e;
+		}
+		pointer_strage2.clear();
+	}
 
 	delete[] threads;
 	delete p_test_obj;
