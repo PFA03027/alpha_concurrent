@@ -36,8 +36,9 @@ template <typename T, bool HAS_OWNERSHIP = true>
 class lifo_nd_list {
 public:
 	static constexpr int hzrd_max_slot_ = 3;
-	using value_type                    = typename std::decay<T>::type;
 	using node_type                     = one_way_list_node<T, HAS_OWNERSHIP>;
+	using input_type                    = typename node_type::input_type;
+	using value_type                    = typename node_type::value_type;
 	using node_pointer                  = node_type*;
 	using hazard_ptr_storage            = hazard_ptr<node_type, hzrd_max_slot_>;
 
@@ -199,7 +200,9 @@ private:
 template <typename T, bool ALLOW_TO_ALLOCATE = true, bool HAS_OWNERSHIP = true>
 class stack_list {
 public:
-	using value_type = typename std::decay<T>::type;
+	using lifo_type  = internal::lifo_nd_list<T, HAS_OWNERSHIP>;
+	using input_type = typename lifo_type::input_type;
+	using value_type = typename lifo_type::value_type;
 
 	/*!
 	 * @breif	Constructor
@@ -224,33 +227,28 @@ public:
 	/*!
 	 * @breif	Push a value to this LIFO stack
 	 *
-	 * cont_arg will copy to LIFO stack.
-	 *
 	 * @note
 	 * In case that template parameter ALLOW_TO_ALLOCATE is true, this I/F is valid.
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push(
-		const value_type& cont_arg   //!< [in]	a value to push this LIFO queue
+		const input_type& cont_arg   //!< [in]	a value to push this LIFO queue
 		) -> typename std::enable_if<BOOL_VALUE, void>::type
 	{
-		lifo_node_pointer p_new_node = free_nd_.allocate<lifo_node_type>(
-			true,
-			[this]( lifo_node_pointer p_chk_node ) {
-				return !( this->lifo_.check_hazard_list( p_chk_node ) );
-				//				return false;
-			} );
-
-		p_new_node->set_value( cont_arg );
-
-		lifo_.push( p_new_node );
+		push_common( cont_arg );
+		return;
+	}
+	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
+	auto push(
+		input_type&& cont_arg   //!< [in]	a value to push this LIFO queue
+		) -> typename std::enable_if<BOOL_VALUE, void>::type
+	{
+		push_common( std::move( cont_arg ) );
 		return;
 	}
 
 	/*!
 	 * @breif	Push a value to this LIFO stack
-	 *
-	 * cont_arg will copy to LIFO stack.
 	 *
 	 * @return	success or fail to push
 	 * @retval	true	success to push copy value of cont_arg to LIFO
@@ -262,24 +260,17 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push(
-		const value_type& cont_arg   //!< [in]	a value to push this LIFO queue
+		const input_type& cont_arg   //!< [in]	a value to push this LIFO queue
 		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
 	{
-		lifo_node_pointer p_new_node = free_nd_.allocate<lifo_node_type>(
-			false,
-			[this]( lifo_node_pointer p_chk_node ) {
-				return !( this->lifo_.check_hazard_list( p_chk_node ) );
-				//				return false;
-			} );
-
-		if ( p_new_node != nullptr ) {
-			p_new_node->set_value( cont_arg );
-
-			lifo_.push( p_new_node );
-			return true;
-		} else {
-			return false;
-		}
+		return push_common( cont_arg );
+	}
+	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
+	auto push(
+		input_type&& cont_arg   //!< [in]	a value to push this LIFO queue
+		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
+	{
+		return push_common( std::move( cont_arg ) );
 	}
 
 	/*!
@@ -300,7 +291,7 @@ public:
 
 		free_nd_.recycle( (free_node_pointer)p_poped_node );
 
-		return std::tuple<bool, value_type>( true, ans_value );
+		return std::tuple<bool, value_type>( true, std::move( ans_value ) );
 	}
 
 	/*!
@@ -334,9 +325,48 @@ private:
 	using free_nd_storage_type = internal::free_nd_storage;
 	using free_node_type       = typename free_nd_storage_type::node_type;
 	using free_node_pointer    = typename free_nd_storage_type::node_pointer;
-	using lifo_type            = internal::lifo_nd_list<T, HAS_OWNERSHIP>;
 	using lifo_node_type       = typename lifo_type::node_type;
 	using lifo_node_pointer    = typename lifo_type::node_pointer;
+
+	template <typename TRANSFER_T, bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
+	auto push_common(
+		TRANSFER_T cont_arg   //!< [in]	a value to push this LIFO queue
+		) -> typename std::enable_if<BOOL_VALUE, void>::type
+	{
+		lifo_node_pointer p_new_node = free_nd_.allocate<lifo_node_type>(
+			true,
+			[this]( lifo_node_pointer p_chk_node ) {
+				return !( this->lifo_.check_hazard_list( p_chk_node ) );
+				//				return false;
+			} );
+
+		p_new_node->set_value( std::forward<TRANSFER_T>( cont_arg ) );
+
+		lifo_.push( p_new_node );
+		return;
+	}
+
+	template <typename TRANSFER_T, bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
+	auto push_common(
+		TRANSFER_T cont_arg   //!< [in]	a value to push this LIFO queue
+		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
+	{
+		lifo_node_pointer p_new_node = free_nd_.allocate<lifo_node_type>(
+			false,
+			[this]( lifo_node_pointer p_chk_node ) {
+				return !( this->lifo_.check_hazard_list( p_chk_node ) );
+				//				return false;
+			} );
+
+		if ( p_new_node != nullptr ) {
+			p_new_node->set_value( std::forward<TRANSFER_T>( cont_arg ) );
+
+			lifo_.push( p_new_node );
+			return true;
+		} else {
+			return false;
+		}
+	}
 
 	lifo_type            lifo_;
 	free_nd_storage_type free_nd_;

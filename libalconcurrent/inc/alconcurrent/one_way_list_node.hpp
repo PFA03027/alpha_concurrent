@@ -13,6 +13,7 @@
 
 #include <cassert>
 
+#include <array>
 #include <atomic>
 #include <memory>
 #include <stdexcept>
@@ -94,29 +95,124 @@ template <typename T>
 struct is_atomic_lockfree<T*> : std::conditional<ATOMIC_POINTER_LOCK_FREE == 2, std::true_type, std::false_type>::type {
 };
 
-/*!
- * @brief T型が、std::atomic<T>がlock freeで利用できる場合に使用する値保持クラス
- *
- * このクラスは、T型がpointer型であってもポインタ先のリソースの所有権を持たないクラス。
- *
- * @tparam T 保持する情報の型
- */
 template <typename T>
-struct value_holder_available_lf_atomic {
-	using value_type  = typename std::decay<T>::type;
-	using ticket_type = value_type;
+struct is_variable_length_array : std::false_type {
+};
 
-	value_holder_available_lf_atomic( void )
+template <typename T>
+struct is_variable_length_array<T[]> : std::true_type {
+};
+
+template <typename T, size_t N>
+struct is_variable_length_array<T[N]> : std::false_type {
+};
+
+template <typename T>
+struct is_fixed_length_array : std::false_type {
+};
+
+template <typename T>
+struct is_fixed_length_array<T[]> : std::false_type {
+};
+
+template <typename T, size_t N>
+struct is_fixed_length_array<T[N]> : std::true_type {
+};
+
+template <typename T>
+struct concept_allocation_required : std::conditional<
+										 !is_atomic_lockfree<typename std::decay<T>::type>::value || is_fixed_length_array<T>::value,
+										 std::true_type,
+										 std::false_type>::type {
+};
+
+template <typename T, bool MV_OWNERSHIP>
+struct concept_deallocation_required : std::conditional<
+										   concept_allocation_required<T>::value || ( MV_OWNERSHIP && ( std::is_pointer<T>::value || is_variable_length_array<T>::value ) ),
+										   std::true_type,
+										   std::false_type>::type {
+};
+
+template <typename T,
+          typename HOLDER_T,
+          bool MV_OWNERSHIP,
+          typename IS_REQUIRED_DEALLOCATION    = void,
+          typename IS_REQUIRED_ARRAY_FREE_TYPE = void>
+struct concept_type_deallocater;
+
+template <typename T, typename HOLDER_T, bool MV_OWNERSHIP>
+struct concept_type_deallocater<
+	T,
+	HOLDER_T,
+	MV_OWNERSHIP,
+	typename std::enable_if<!concept_deallocation_required<T, MV_OWNERSHIP>::value>::type,
+	void> {
+	static void dealloc( HOLDER_T& x )
+	{
+		return;
+	}
+};
+
+template <typename T, typename HOLDER_T, bool MV_OWNERSHIP>
+struct concept_type_deallocater<
+	T,
+	HOLDER_T,
+	MV_OWNERSHIP,
+	typename std::enable_if<concept_deallocation_required<T, MV_OWNERSHIP>::value>::type,
+	typename std::enable_if<!std::is_array<T>::value>::type> {
+	static void dealloc( HOLDER_T& x )
+	{
+		delete x;
+		return;
+	}
+};
+
+template <typename T, typename HOLDER_T, bool MV_OWNERSHIP>
+struct concept_type_deallocater<
+	T,
+	HOLDER_T,
+	MV_OWNERSHIP,
+	typename std::enable_if<concept_deallocation_required<T, MV_OWNERSHIP>::value>::type,
+	typename std::enable_if<std::is_array<T>::value>::type> {
+	static void dealloc( HOLDER_T& x )
+	{
+		delete[] x;
+		return;
+	}
+};
+
+template <
+	typename T,                                      //!< Type as original
+	bool MV_OWNERSHIP                      = true,   //!< move an ownership into a instance of class. If true, destructor will call delete operator.
+	typename CONCEPT_ALLOCATION_REQUIRED   = void,   //!< concept switch. if T requires to allocate, this will be defined.
+	typename CONCEPT_DEALLOCATION_REQUIRED = void    //!< concept switch. if T requires to deallocate, this will be defined.
+	>
+class value_holder;
+
+// (1)
+template <typename T, bool MV_OWNERSHIP>
+class value_holder<
+	T,
+	MV_OWNERSHIP,
+	typename std::enable_if<!concept_allocation_required<T>::value>::type,
+	typename std::enable_if<!concept_deallocation_required<T, MV_OWNERSHIP>::value>::type> {
+public:
+	using input_type  = T;
+	using value_type  = typename std::decay<T>::type;
+	using holder_type = value_type;
+	using ticket_type = holder_type;
+
+	value_holder( void )
 	  : a_val_()
 	{
 	}
 
-	value_holder_available_lf_atomic( const T& cont_arg )
+	value_holder( const T& cont_arg )
 	  : a_val_( cont_arg )
 	{
 	}
 
-	value_holder_available_lf_atomic( T&& cont_arg )
+	value_holder( T&& cont_arg )
 	  : a_val_( std::move( cont_arg ) )
 	{
 	}
@@ -156,192 +252,47 @@ private:
 	std::atomic<value_type> a_val_;
 };
 
-// specialized for non ownership pointer
-template <typename T>
-struct value_holder_available_lf_atomic<T*> {
-	using value_type  = typename std::decay<T*>::type;
-	using ticket_type = value_type;
+// (2)
+template <typename T, bool MV_OWNERSHIP>
+class value_holder<
+	T,
+	MV_OWNERSHIP,
+	typename std::enable_if<concept_allocation_required<T>::value>::type,
+	typename std::enable_if<concept_deallocation_required<T, MV_OWNERSHIP>::value>::type> {
+public:
+	using input_type  = T;
+	using value_type  = T;
+	using holder_type = value_type*;
+	using ticket_type = holder_type;
 
-	value_holder_available_lf_atomic( void )
-	  : a_val_( nullptr )
-	{
-	}
-
-#if 1
-	value_holder_available_lf_atomic( const value_type cont_arg )
-	  : a_val_( cont_arg )
-	{
-	}
-#else
-	value_holder_available_lf_atomic( const value_type& cont_arg )
-	  : a_val_( cont_arg )
-	{
-	}
-
-	value_holder_available_lf_atomic( value_type&& cont_arg )
-	  : a_val_( std::move( cont_arg ) )
-	{
-	}
-#endif
-
-	value_type get_value( void ) const
-	{
-		return a_val_.load( std::memory_order_acquire );
-	}
-
-	ticket_type get_ticket( void ) const
-	{
-		return a_val_.load( std::memory_order_acquire );
-	}
-
-	// このAPIの結果、所有権の移動が行われる。
-	// ただし、このクラスでは、ポインタの先のリソースに対しては所有権を持たないので、コピーが行われるだけ。
-	value_type exchange_ticket_and_move_value( ticket_type tkt )
-	{
-		return tkt;
-	}
-
-	void set_value( value_type value_arg )
-	{
-		a_val_.store( value_arg, std::memory_order_release );
-	}
-
-protected:
-	void holder_release_ownership( void )
-	{
-		a_val_.store( nullptr, std::memory_order_release );
-	}
-
-	void holder_teardown_by_recycle( void )
-	{
-		a_val_.store( nullptr, std::memory_order_release );
-	}
-
-private:
-	std::atomic<value_type> a_val_;
-};
-
-/*!
- * @brief T型が、std::atomic<T>がlock freeで利用できる場合に使用する値保持クラス
- *
- * このクラスは、pointer型専用で、かつポインタ先のリソースの所有権を持つクラス。
- *
- * @tparam T 保持する情報の型
- */
-template <typename T>
-struct value_holder_available_lf_atomic_pointer_ownership {
-	using value_type  = typename std::decay<T>::type;
-	using ticket_type = value_type;
-
-	value_holder_available_lf_atomic_pointer_ownership( void )
-	  : a_val_( nullptr )
-	{
-		static_assert( std::is_pointer<T>::value, "T is not a pointer" );
-	}
-
-	value_holder_available_lf_atomic_pointer_ownership( const T& cont_arg )
-	  : a_val_( cont_arg )
-	{
-	}
-
-	value_holder_available_lf_atomic_pointer_ownership( T&& cont_arg )
-	  : a_val_( std::move( cont_arg ) )
-	{
-	}
-
-	~value_holder_available_lf_atomic_pointer_ownership()
-	{
-		holder_teardown_by_recycle();
-	}
-
-	value_type get_value( void ) const
-	{
-		return a_val_.load( std::memory_order_acquire );
-	}
-
-	ticket_type get_ticket( void ) const
-	{
-		return a_val_.load( std::memory_order_acquire );
-	}
-
-	// このAPIの結果、所有権の移動が行われる。
-	// このクラスでは所有権がmove相当となるように、自身のメンバ変数のnullptrへの置き換えを試みる。
-	value_type exchange_ticket_and_move_value( ticket_type tkt )
-	{
-		ticket_type p_tmp = tkt;
-		a_val_.compare_exchange_strong( p_tmp, nullptr );   // 所有権がmove相当となるように、nullptrへの置き換えを試みる。既に書き換わっていたら誰かがrelease_ownership()で処理済み。
-		return tkt;
-	}
-
-	void set_value( value_type value_arg )
-	{
-		value_type p_my = a_val_.load( std::memory_order_acquire );
-		while ( !a_val_.compare_exchange_strong( p_my, value_arg ) ) {}
-		if ( p_my != nullptr ) {
-			delete p_my;
-		}
-	}
-
-protected:
-	void holder_release_ownership( void )
-	{
-		a_val_.store( nullptr, std::memory_order_release );
-	}
-
-	void holder_teardown_by_recycle( void )
-	{
-		value_type p_my = a_val_.load( std::memory_order_acquire );
-		if ( p_my == nullptr ) {
-			return;
-		}
-
-		if ( a_val_.compare_exchange_strong( p_my, nullptr ) ) {
-			delete p_my;
-		}
-	}
-
-private:
-	std::atomic<value_type> a_val_;
-};
-
-/*!
- * @brief T型が、std::atomic<T>がlock freeで利用できる場合に使用する値保持クラス
- *
- * @tparam T 保持する情報の型
- */
-template <typename T>
-struct value_holder_non_atomic {
-	using value_type       = typename std::decay<T>::type;
-	using pointer_to_value = value_type*;
-	using ticket_type      = value_type*;
-
-	value_holder_non_atomic( void )
+	value_holder( void )
 	  : ap_val_( nullptr )
 	{
+		static_assert( is_atomic_lockfree<holder_type>::value, "T* is not lockfree. Therefore, it is impossible to be lock free." );
 	}
 
-	value_holder_non_atomic( const T& cont_arg )
+	value_holder( const T& cont_arg )
 	  : ap_val_( nullptr )
 	{
-		pointer_to_value p_val = allocate_and_construct_data_area( cont_arg );
+		holder_type p_val = allocate_and_construct_data_area( cont_arg );
 		ap_val_.store( p_val, std::memory_order_release );
 	}
 
-	value_holder_non_atomic( T&& cont_arg )
+	value_holder( T&& cont_arg )
 	  : ap_val_( nullptr )
 	{
-		pointer_to_value p_val = allocate_and_construct_data_area( std::move( cont_arg ) );
+		holder_type p_val = allocate_and_construct_data_area( std::move( cont_arg ) );
 		ap_val_.store( p_val, std::memory_order_release );
 	}
 
-	~value_holder_non_atomic()
+	~value_holder()
 	{
 		holder_teardown_by_recycle();
 	}
 
 	const value_type& get_value( void ) const
 	{
-		pointer_to_value p_my = ap_val_.load( std::memory_order_acquire );
+		holder_type p_my = ap_val_.load( std::memory_order_acquire );
 		if ( p_my == nullptr ) {
 			throw std::logic_error( "Access by get_value. But, this instance has no valid data. This should not happen." );
 		}
@@ -381,27 +332,27 @@ struct value_holder_non_atomic {
 		}
 
 		value_type ans = std::move( *tkt );
-		delete tkt;
+		deallocator::dealloc( tkt );   // delete tkt;
 		return ans;
 	}
 
 	void set_value( const value_type& value_arg )
 	{
-		pointer_to_value p_desire = allocate_and_construct_data_area( value_arg );
-		pointer_to_value p_my     = ap_val_.load( std::memory_order_acquire );
+		holder_type p_desire = allocate_and_construct_data_area( value_arg );
+		holder_type p_my     = ap_val_.load( std::memory_order_acquire );
 		while ( !ap_val_.compare_exchange_strong( p_my, p_desire ) ) {}
 		if ( p_my != nullptr ) {
-			delete p_my;
+			deallocator::dealloc( p_my );   // delete p_my;
 		}
 	}
 
 	void set_value( value_type&& value_arg )
 	{
-		pointer_to_value p_desire = allocate_and_construct_data_area( std::move( value_arg ) );
-		pointer_to_value p_my     = ap_val_.load( std::memory_order_acquire );
+		holder_type p_desire = allocate_and_construct_data_area( std::move( value_arg ) );
+		holder_type p_my     = ap_val_.load( std::memory_order_acquire );
 		while ( !ap_val_.compare_exchange_strong( p_my, p_desire ) ) {}
 		if ( p_my != nullptr ) {
-			delete p_my;
+			deallocator::dealloc( p_my );   // delete p_my;
 		}
 	}
 
@@ -413,63 +364,399 @@ protected:
 
 	void holder_teardown_by_recycle( void )
 	{
-		pointer_to_value p_my = ap_val_.load( std::memory_order_acquire );
+		holder_type p_my = ap_val_.load( std::memory_order_acquire );
 		if ( p_my == nullptr ) {
 			return;
 		}
 
 		if ( ap_val_.compare_exchange_strong( p_my, nullptr ) ) {
-			delete p_my;
+			deallocator::dealloc( p_my );   // delete p_my;
 		}
 	}
 
 private:
-	static pointer_to_value allocate_and_construct_data_area( void )
+	using deallocator = concept_type_deallocater<value_type, holder_type, MV_OWNERSHIP>;
+
+	static holder_type allocate_and_construct_data_area( void )
 	{
 		return new value_type();
 	}
 
-	static pointer_to_value allocate_and_construct_data_area( const value_type& value_arg )
+	static holder_type allocate_and_construct_data_area( const value_type& value_arg )
 	{
 		return new value_type( value_arg );
 	}
 
-	static pointer_to_value allocate_and_construct_data_area( value_type&& value_arg )
+	static holder_type allocate_and_construct_data_area( value_type&& value_arg )
 	{
 		return new value_type( std::move( value_arg ) );
 	}
 
-	std::atomic<ticket_type> ap_val_;
+	std::atomic<holder_type> ap_val_;
 };
 
-template <
-	typename T,
-	bool HAS_OWNERSHIP       = true,
-	typename HANDLING_POLICY = typename std::conditional<
-		is_atomic_lockfree<T>::value,
-		typename std::conditional<
-			HAS_OWNERSHIP && std::is_pointer<T>::value,
-			value_holder_available_lf_atomic_pointer_ownership<T>,
-			value_holder_available_lf_atomic<T>>::type,
-		value_holder_non_atomic<T>>::type>
-struct one_way_list_node : public node_of_list, public HANDLING_POLICY {
-	using value_type = typename std::decay<T>::type;
+// (4) pointer and mv resource owner
+template <typename T, bool MV_OWNERSHIP>
+class value_holder<
+	T*,
+	MV_OWNERSHIP,
+	typename std::enable_if<!concept_allocation_required<T*>::value>::type,
+	typename std::enable_if<concept_deallocation_required<T*, MV_OWNERSHIP>::value>::type> {
+public:
+	using input_type  = T*;
+	using value_type  = T*;
+	using holder_type = value_type;
+	using ticket_type = holder_type;
+
+	value_holder( void )
+	  : a_val_( nullptr )
+	{
+		static_assert( std::is_pointer<T*>::value, "T is not a pointer" );
+	}
+
+	value_holder( const T& cont_arg )
+	  : a_val_( cont_arg )
+	{
+	}
+
+	value_holder( T&& cont_arg )
+	  : a_val_( std::move( cont_arg ) )
+	{
+	}
+
+	~value_holder()
+	{
+		holder_teardown_by_recycle();
+	}
+
+	value_type get_value( void ) const
+	{
+		return a_val_.load( std::memory_order_acquire );
+	}
+
+	ticket_type get_ticket( void ) const
+	{
+		return a_val_.load( std::memory_order_acquire );
+	}
+
+	// このAPIの結果、所有権の移動が行われる。
+	// このクラスでは所有権がmove相当となるように、自身のメンバ変数のnullptrへの置き換えを試みる。
+	value_type exchange_ticket_and_move_value( ticket_type tkt )
+	{
+		ticket_type p_tmp = tkt;
+		a_val_.compare_exchange_strong( p_tmp, nullptr );   // 所有権がmove相当となるように、nullptrへの置き換えを試みる。既に書き換わっていたら誰かがrelease_ownership()で処理済み。
+		return tkt;
+	}
+
+	void set_value( value_type value_arg )
+	{
+		value_type p_my = a_val_.load( std::memory_order_acquire );
+		while ( !a_val_.compare_exchange_strong( p_my, value_arg ) ) {}
+		if ( p_my != nullptr ) {
+			deallocator::dealloc( p_my );   // delete p_my;
+		}
+	}
+
+protected:
+	void holder_release_ownership( void )
+	{
+		a_val_.store( nullptr, std::memory_order_release );
+	}
+
+	void holder_teardown_by_recycle( void )
+	{
+		value_type p_my = a_val_.load( std::memory_order_acquire );
+		if ( p_my == nullptr ) {
+			return;
+		}
+
+		if ( a_val_.compare_exchange_strong( p_my, nullptr ) ) {
+			deallocator::dealloc( p_my );   // delete p_my;
+		}
+	}
+
+private:
+	using deallocator = concept_type_deallocater<input_type, holder_type, MV_OWNERSHIP>;
+
+	std::atomic<holder_type> a_val_;
+};
+
+// (4) non fixed array and mv resource owner
+template <typename T, bool MV_OWNERSHIP>
+class value_holder<
+	T[],
+	MV_OWNERSHIP,
+	typename std::enable_if<!concept_allocation_required<T[]>::value>::type,
+	typename std::enable_if<concept_deallocation_required<T[], MV_OWNERSHIP>::value>::type> {
+public:
+	using input_type  = T*;
+	using value_type  = T*;
+	using holder_type = value_type;
+	using ticket_type = holder_type;
+
+	value_holder( void )
+	  : a_val_( nullptr )
+	{
+		static_assert( std::is_array<T[]>::value, "T is not non fixed lenegth array type(is not a type: T[])" );
+	}
+
+	value_holder( input_type cont_arg )
+	  : a_val_( cont_arg )
+	{
+	}
+
+	~value_holder()
+	{
+		holder_teardown_by_recycle();
+	}
+
+	value_type get_value( void ) const
+	{
+		return reinterpret_cast<value_type>( a_val_.load( std::memory_order_acquire ) );
+	}
+
+	ticket_type get_ticket( void ) const
+	{
+		return a_val_.load( std::memory_order_acquire );
+	}
+
+	// このAPIの結果、所有権の移動が行われる。
+	// このクラスでは所有権がmove相当となるように、自身のメンバ変数のnullptrへの置き換えを試みる。
+	value_type exchange_ticket_and_move_value( ticket_type tkt )
+	{
+		ticket_type p_tmp = tkt;
+		a_val_.compare_exchange_strong( p_tmp, nullptr );   // 所有権がmove相当となるように、nullptrへの置き換えを試みる。既に書き換わっていたら誰かがrelease_ownership()で処理済み。
+		return reinterpret_cast<value_type>( tkt );
+	}
+
+	void set_value( value_type value_arg )
+	{
+		holder_type p_my = a_val_.load( std::memory_order_acquire );
+		while ( !a_val_.compare_exchange_strong( p_my, reinterpret_cast<holder_type>( value_arg ) ) ) {}
+		if ( p_my != nullptr ) {
+			deallocator::dealloc( p_my );   // delete[] p_my;   // 配列型なので、delete[]を呼び出す
+		}
+	}
+
+protected:
+	void holder_release_ownership( void )
+	{
+		a_val_.store( nullptr, std::memory_order_release );
+	}
+
+	void holder_teardown_by_recycle( void )
+	{
+		holder_type p_my = a_val_.load( std::memory_order_acquire );
+		if ( p_my == nullptr ) {
+			return;
+		}
+
+		if ( a_val_.compare_exchange_strong( p_my, nullptr ) ) {
+			deallocator::dealloc( p_my );   // delete[] p_my;   // 配列型なので、delete[]を呼び出す
+		}
+	}
+
+private:
+	using deallocator = concept_type_deallocater<T[], holder_type, MV_OWNERSHIP>;
+
+	std::atomic<holder_type> a_val_;
+};
+
+// (3) This is same behavior that T is structure
+template <typename T, size_t N, bool MV_OWNERSHIP>
+class value_holder<
+	T[N],
+	MV_OWNERSHIP,
+	typename std::enable_if<concept_allocation_required<T[N]>::value>::type,
+	typename std::enable_if<concept_deallocation_required<T[N], MV_OWNERSHIP>::value>::type> {
+public:
+	using input_type  = T[N];
+	using value_type  = std::array<T, N>;
+	using holder_type = value_type*;
+	using ticket_type = holder_type;
+
+	value_holder( void )
+	  : ap_val_( nullptr )
+	{
+		static_assert( is_atomic_lockfree<holder_type>::value, "std::array<T, N>* is not lockfree. Therefore, it is impossible to keep T[N] as lock free." );
+	}
+
+	value_holder( const input_type& cont_arg )
+	  : ap_val_( nullptr )
+	{
+		holder_type p_val = allocate_and_construct_data_area( cont_arg );
+		ap_val_.store( p_val, std::memory_order_release );
+	}
+
+	value_holder( input_type&& cont_arg )
+	  : ap_val_( nullptr )
+	{
+		holder_type p_val = allocate_and_construct_data_area( std::move( cont_arg ) );
+		ap_val_.store( p_val, std::memory_order_release );
+	}
+
+	~value_holder()
+	{
+		holder_teardown_by_recycle();
+	}
+
+	const value_type& get_value( void ) const
+	{
+		holder_type p_my = ap_val_.load( std::memory_order_acquire );
+		if ( p_my == nullptr ) {
+			throw std::logic_error( "Access by get_value. But, this instance has no valid data. This should not happen." );
+		}
+		return *p_my;
+	}
+
+	ticket_type get_ticket( void ) const
+	{
+		ticket_type ans = ap_val_.load( std::memory_order_acquire );
+#if 0
+		// lf_listのデバッグ用コード。
+		// lf_fifoの場合、アルゴリズム上この様な条件が発生しうるため、lf_listのデバッグ中のみ有効化可能なコード
+		if ( ans == nullptr ) {
+			// lf_listで、リソースがないノードから情報を取得しようとしている。
+			// よって、このルートは、起きてはならいルートであるため、execptionを投げる。
+			throw std::logic_error( "Access by get_ticket. But, this instance has no valid data. This should not happen." );
+		}
+#endif
+		return ans;
+	}
+
+	// このAPIの結果、所有権の移動が行われる。
+	// このクラスでは所有権がmove相当となるように、自身のメンバ変数のnullptrへの置き換えを試みる。
+	value_type exchange_ticket_and_move_value( ticket_type tkt )
+	{
+		ticket_type p_tmp = tkt;
+		if ( !ap_val_.compare_exchange_strong( p_tmp, nullptr ) ) {
+#if 0
+		// lf_listのデバッグ用コード。
+		// lf_fifoの場合、アルゴリズム上この様な条件が発生しうるため、lf_listのデバッグ中のみ有効化可能なコード
+
+			// lf_listの場合、所有権がmove相当となるように、nullptrへの置き換えを試みる。既に書き換わっていたら誰かが所有権の移動を実施済み。
+			// 呼び出し側にとっては、所有権獲得済みなのに所有できなかったこと示す。
+			// よって、このルートは、起きてはならいルートであるため、execptionを投げる。
+			throw std::logic_error( "Access by exchange_ticket_and_move_value. But, this instance has no valid data. This should not happen." );
+#endif
+		}
+
+		value_type ans;
+		for ( size_t i = 0; i < N; i++ ) {
+			ans[i] = std::move( ( *tkt )[i] );
+		}
+		deallocator::dealloc( tkt );   // delete tkt;
+		return ans;
+	}
+
+	void set_value( const input_type& value_arg )
+	{
+		holder_type p_desire = allocate_and_construct_data_area( value_arg );
+		holder_type p_my     = ap_val_.load( std::memory_order_acquire );
+		while ( !ap_val_.compare_exchange_strong( p_my, p_desire ) ) {}
+		if ( p_my != nullptr ) {
+			deallocator::dealloc( p_my );   // delete p_my;
+		}
+	}
+
+	void set_value( const T* value_arg )
+	{
+		holder_type p_desire = allocate_and_construct_data_area( value_arg );
+		holder_type p_my     = ap_val_.load( std::memory_order_acquire );
+		while ( !ap_val_.compare_exchange_strong( p_my, p_desire ) ) {}
+		if ( p_my != nullptr ) {
+			deallocator::dealloc( p_my );   // delete p_my;
+		}
+	}
+
+	void set_value( input_type&& value_arg )
+	{
+		holder_type p_desire = allocate_and_construct_data_area( std::move( value_arg ) );
+		holder_type p_my     = ap_val_.load( std::memory_order_acquire );
+		while ( !ap_val_.compare_exchange_strong( p_my, p_desire ) ) {}
+		if ( p_my != nullptr ) {
+			deallocator::dealloc( p_my );   // delete p_my;
+		}
+	}
+
+protected:
+	void holder_release_ownership( void )
+	{
+		ap_val_.store( nullptr, std::memory_order_release );
+	}
+
+	void holder_teardown_by_recycle( void )
+	{
+		holder_type p_my = ap_val_.load( std::memory_order_acquire );
+		if ( p_my == nullptr ) {
+			return;
+		}
+
+		if ( ap_val_.compare_exchange_strong( p_my, nullptr ) ) {
+			deallocator::dealloc( p_my );   // delete p_my;
+		}
+	}
+
+private:
+	using deallocator = concept_type_deallocater<value_type, holder_type, MV_OWNERSHIP>;
+
+	static holder_type allocate_and_construct_data_area( void )
+	{
+		holder_type p_ans = new value_type;
+		return p_ans;
+	}
+
+	static holder_type allocate_and_construct_data_area( const input_type& value_arg )
+	{
+		holder_type p_ans = new value_type;
+		for ( size_t i = 0; i < N; i++ ) {
+			( *p_ans )[i] = value_arg[i];
+		}
+		return p_ans;
+	}
+
+	static holder_type allocate_and_construct_data_area( const T* value_arg )
+	{
+		holder_type p_ans = new value_type;
+		for ( size_t i = 0; i < N; i++ ) {
+			( *p_ans )[i] = value_arg[i];
+		}
+		return p_ans;
+	}
+
+	static holder_type allocate_and_construct_data_area( input_type&& value_arg )
+	{
+		holder_type p_ans = new value_type;
+		for ( size_t i = 0; i < N; i++ ) {
+			( *p_ans )[i] = std::move( value_arg[i] );
+		}
+		return p_ans;
+	}
+
+	std::atomic<holder_type> ap_val_;
+};
+
+template <typename T, bool HAS_OWNERSHIP = true>
+struct one_way_list_node : public node_of_list, public value_holder<T, HAS_OWNERSHIP> {
+public:
+	using value_holder_type = value_holder<T, HAS_OWNERSHIP>;
+	using value_type        = typename value_holder_type::value_type;
 
 	one_way_list_node( void )
-	  : HANDLING_POLICY()
+	  : value_holder_type()
 	  , next_( nullptr )
 	{
 		static_assert( std::is_copy_assignable<value_type>::value, "T need to be copy assignable." );
 	}
 
-	one_way_list_node( const value_type& cont_arg )
-	  : HANDLING_POLICY( cont_arg )
+	one_way_list_node( const T& cont_arg )
+	  : value_holder_type( cont_arg )
 	  , next_( nullptr )
 	{
 	}
 
-	one_way_list_node( value_type&& cont_arg )
-	  : HANDLING_POLICY( std::move( cont_arg ) )
+	one_way_list_node( T&& cont_arg )
+	  : value_holder_type( std::move( cont_arg ) )
 	  , next_( nullptr )
 	{
 	}
@@ -500,34 +787,27 @@ struct one_way_list_node : public node_of_list, public HANDLING_POLICY {
 	// 値の所有権を放棄する。以降、このノードはメモリ領域の開放をしなくなる。元々所有権を持たない場合、HANDLING_POLICY側で何もしない実装となっている。
 	void release_ownership( void )
 	{
-		HANDLING_POLICY::holder_release_ownership();
+		value_holder_type::holder_release_ownership();
 	}
 
 	// 値の所有権の有無に従い、メモリ領域を解放する。
 	void teardown_by_recycle( void )
 	{
-		HANDLING_POLICY::holder_teardown_by_recycle();
+		value_holder_type::holder_teardown_by_recycle();
 	}
 
 private:
 	std::atomic<one_way_list_node*> next_;
 };
 
-template <
-	typename T,
-	bool HAS_OWNERSHIP       = true,
-	typename HANDLING_POLICY = typename std::conditional<
-		is_atomic_lockfree<T>::value,
-		typename std::conditional<
-			HAS_OWNERSHIP && std::is_pointer<T>::value,
-			value_holder_available_lf_atomic_pointer_ownership<T>,
-			value_holder_available_lf_atomic<T>>::type,
-		value_holder_non_atomic<T>>::type>
-struct one_way_list_node_markable : public node_of_list, public HANDLING_POLICY {
-	using value_type = typename std::decay<T>::type;
+template <typename T, bool HAS_OWNERSHIP = true>
+struct one_way_list_node_markable : public node_of_list, public value_holder<T, HAS_OWNERSHIP> {
+public:
+	using value_holder_type = value_holder<T, HAS_OWNERSHIP>;
+	using value_type        = typename value_holder_type::value_type;
 
 	one_way_list_node_markable( void )
-	  : HANDLING_POLICY()
+	  : value_holder_type()
 	  , next_( 0 )
 	{
 		static_assert( std::is_copy_assignable<value_type>::value, "T need to be copy assignable." );
@@ -535,14 +815,14 @@ struct one_way_list_node_markable : public node_of_list, public HANDLING_POLICY 
 		//		assert( next_.is_lock_free() );   // std::atomic_uintptr_t is not lock-free.
 	}
 
-	one_way_list_node_markable( const value_type& cont_arg )
-	  : HANDLING_POLICY( cont_arg )
+	one_way_list_node_markable( const T& cont_arg )
+	  : value_holder_type( cont_arg )
 	  , next_( 0 )
 	{
 	}
 
-	one_way_list_node_markable( value_type&& cont_arg )
-	  : HANDLING_POLICY( std::move( cont_arg ) )
+	one_way_list_node_markable( T&& cont_arg )
+	  : value_holder_type( std::move( cont_arg ) )
 	  , next_( 0 )
 	{
 	}
@@ -586,13 +866,13 @@ struct one_way_list_node_markable : public node_of_list, public HANDLING_POLICY 
 	// 値の所有権を放棄する。以降、このノードはメモリ領域の開放をしなくなる。元々所有権を持たない場合、HANDLING_POLICY側で何もしない実装となっている。
 	void release_ownership( void )
 	{
-		HANDLING_POLICY::holder_release_ownership();
+		value_holder_type::holder_release_ownership();
 	}
 
 	// 値の所有権の有無に従い、メモリ領域を解放する。
 	void teardown_by_recycle( void )
 	{
-		HANDLING_POLICY::holder_teardown_by_recycle();
+		value_holder_type::holder_teardown_by_recycle();
 	}
 
 private:

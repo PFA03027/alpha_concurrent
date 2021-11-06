@@ -35,15 +35,16 @@ namespace internal {
  * テンプレートメンバ関数の場合、生成される関数インスタンスが予測できないため、ハザードポインタを管理するスロット数を事前確定できない。 @n
  * そのため、メンバ関数のテンプレート化を避ける必要がある。
  */
-template <typename T>
+template <typename T, bool HAS_OWNERSHIP = true>
 class lockfree_list_base {
 public:
-	using value_type                 = typename std::decay<T>::type;                //!< 保持対象の型
-	using node_type                  = one_way_list_node_markable<T>;               //!< 実際の値を保持するノードクラス。
-	using node_pointer               = node_type*;                                  //!< 実際の値を保持するノードクラスのインスタンスへのポインタ型
-	using find_predicate_t           = std::function<bool( const node_pointer )>;   //!< find関数で使用する述語関数を保持するfunction型
-	using for_each_func_t            = std::function<void( value_type& )>;          //!< for_each関数で各要素の処理を実行するための関数を保持するfunction型
-	using hazard_ptr_scoped_ref_if_t = hazard_ptr_scoped_ref_if<node_type>;         //!< ハザードポインタの参照制御をサポートするI/Fクラスの型
+	using node_type                  = one_way_list_node_markable<T, HAS_OWNERSHIP>;   //!< 実際の値を保持するノードクラス。
+	using input_type                 = typename node_type::input_type;                 //!< 入力用の型
+	using value_type                 = typename node_type::value_type;                 //!< 保持対象の型
+	using node_pointer               = node_type*;                                     //!< 実際の値を保持するノードクラスのインスタンスへのポインタ型
+	using find_predicate_t           = std::function<bool( const node_pointer )>;      //!< find関数で使用する述語関数を保持するfunction型
+	using for_each_func_t            = std::function<void( value_type& )>;             //!< for_each関数で各要素の処理を実行するための関数を保持するfunction型
+	using hazard_ptr_scoped_ref_if_t = hazard_ptr_scoped_ref_if<node_type>;            //!< ハザードポインタの参照制御をサポートするI/Fクラスの型
 
 	lockfree_list_base( void )
 	  : head_()
@@ -413,10 +414,12 @@ private:
  * @note
  * To resolve ABA issue, this Stack queue uses hazard pointer approach.
  */
-template <typename T, bool ALLOW_TO_ALLOCATE = true>
+template <typename T, bool ALLOW_TO_ALLOCATE = true, bool HAS_OWNERSHIP = true>
 class lockfree_list {
 public:
-	using value_type      = typename std::decay<T>::type;
+	using list_type       = internal::lockfree_list_base<T, HAS_OWNERSHIP>;
+	using input_type      = typename list_type::input_type;
+	using value_type      = typename list_type::value_type;
 	using predicate_t     = std::function<bool( const value_type& )>;
 	using for_each_func_t = std::function<void( value_type& )>;
 
@@ -595,12 +598,20 @@ public:
 	 * @li	In case that return value is false, User side has a role to recover this condition(fail to allocate the free node) by User side itself, e.g. backoff approach is one of recovery approach.
 	 */
 	bool push_front(
-		const value_type& cont_arg   //!< [in]	a value to insert this list
+		const input_type& cont_arg   //!< [in]	a value to insert this list
 	)
 	{
 		typename list_type::find_predicate_t pred_common = []( const list_node_pointer a ) { return true; };
 
 		return push_internal_common( cont_arg, pred_common );
+	}
+	bool push_front(
+		input_type&& cont_arg   //!< [in]	a value to insert this list
+	)
+	{
+		typename list_type::find_predicate_t pred_common = []( const list_node_pointer a ) { return true; };
+
+		return push_internal_common( std::move( cont_arg ), pred_common );
 	}
 
 	/*!
@@ -632,7 +643,7 @@ public:
 #endif
 
 			if ( base_list_.is_end_node( p_curr ) ) {
-				return std::tuple<bool, value_type>( false, ans_value );
+				return std::tuple<bool, value_type>( false, std::move( ans_value ) );
 			}
 
 			if ( base_list_.remove( free_nd_, p_prev, p_curr, &ans_value ) ) {
@@ -640,7 +651,7 @@ public:
 			}
 		}
 
-		return std::tuple<bool, value_type>( true, ans_value );
+		return std::tuple<bool, value_type>( true, std::move( ans_value ) );
 	}
 
 	/*!
@@ -657,12 +668,20 @@ public:
 	 * @li	In case that return value is false, User side has a role to recover this condition(fail to allocate the free node) by User side itself, e.g. backoff approach is one of recovery approach.
 	 */
 	bool push_back(
-		const value_type& cont_arg   //!< [in]	a value to copy this list
+		const input_type& cont_arg   //!< [in]	a value to copy this list
 	)
 	{
 		typename list_type::find_predicate_t pred_common = []( const list_node_pointer a ) { return false; };
 
 		return push_internal_common( cont_arg, pred_common );
+	}
+	bool push_back(
+		input_type&& cont_arg   //!< [in]	a value to copy this list
+	)
+	{
+		typename list_type::find_predicate_t pred_common = []( const list_node_pointer a ) { return false; };
+
+		return push_internal_common( std::move( cont_arg ), pred_common );
 	}
 
 	/*!
@@ -698,7 +717,7 @@ public:
 #endif
 				if ( !base_list_.is_end_node( p_curr ) ) continue;
 				if ( base_list_.is_head_node( p_prev ) ) {
-					return std::tuple<bool, value_type>( false, ans_value );
+					return std::tuple<bool, value_type>( false, std::move( ans_value ) );
 				}
 				p_last = p_prev;
 				hzrd_ref_last.regist_ptr_as_hazard_ptr( p_last );
@@ -719,7 +738,7 @@ public:
 			}
 		}
 
-		return std::tuple<bool, value_type>( true, ans_value );
+		return std::tuple<bool, value_type>( true, std::move( ans_value ) );
 	}
 
 	/*!
@@ -772,7 +791,6 @@ private:
 	lockfree_list& operator=( const lockfree_list& ) = delete;
 	lockfree_list& operator=( lockfree_list&& ) = delete;
 
-	using list_type            = internal::lockfree_list_base<T>;
 	using list_node_type       = typename list_type::node_type;
 	using list_node_pointer    = typename list_type::node_pointer;
 	using free_nd_storage_type = internal::free_nd_storage;
@@ -802,8 +820,9 @@ private:
 	 * @li	In case that template parameter ALLOW_TO_ALLOCATE is false, this I/F will have a possibility to return false.
 	 * @li	In case that return value is false, User side has a role to recover this condition(fail to allocate the free node) by User side itself, e.g. backoff approach is one of recovery approach.
 	 */
+	template <typename TRANSFER_T>
 	bool push_internal_common(
-		const value_type&                     cont_arg,     //!< [in]	a value to copy this list
+		TRANSFER_T                            cont_arg,     //!< [in]	a value to copy this list
 		typename list_type::find_predicate_t& pred_common   //!< [in]	const list_node_pointer& is provided.
 	)
 	{
@@ -817,7 +836,7 @@ private:
 
 		if ( p_new_node == nullptr ) return false;
 
-		p_new_node->set_value( cont_arg );
+		p_new_node->set_value( std::forward<TRANSFER_T>( cont_arg ) );
 
 		scoped_hazard_ref hzrd_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_PREV );
 		scoped_hazard_ref hzrd_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_CURR );

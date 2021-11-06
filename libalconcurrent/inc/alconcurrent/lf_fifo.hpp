@@ -39,9 +39,10 @@ template <typename T, bool HAS_OWNERSHIP = true>
 class fifo_nd_list {
 public:
 	static constexpr int hzrd_max_slot_ = 5;
-	using value_type                    = typename std::decay<T>::type;
 	using node_type                     = one_way_list_node<T, HAS_OWNERSHIP>;
-	using ticket_type                   = typename one_way_list_node<T, HAS_OWNERSHIP>::ticket_type;
+	using input_type                    = typename node_type::input_type;
+	using value_type                    = typename node_type::value_type;
+	using ticket_type                   = typename node_type::ticket_type;
 	using node_pointer                  = node_type*;
 	using hazard_ptr_storage            = hazard_ptr<node_type, hzrd_max_slot_>;
 
@@ -247,7 +248,9 @@ private:
 template <typename T, bool ALLOW_TO_ALLOCATE = true, bool HAS_OWNERSHIP = true>
 class fifo_list {
 public:
-	using value_type = typename std::decay<T>::type;
+	using fifo_type  = internal::fifo_nd_list<T, HAS_OWNERSHIP>;
+	using input_type = typename fifo_type::input_type;
+	using value_type = typename fifo_type::value_type;
 
 	/*!
 	 * @breif	Constructor
@@ -279,21 +282,18 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push(
-		const value_type& cont_arg   //!< [in]	a value to push this FIFO queue
+		const input_type& cont_arg   //!< [in]	a value to push this FIFO queue
 		) -> typename std::enable_if<BOOL_VALUE, void>::type
 	{
-		std::atomic_thread_fence( std::memory_order_release );
-
-		fifo_node_pointer p_new_node = free_nd_.allocate<fifo_node_type>(
-			true,
-			[this]( fifo_node_pointer p_chk_node ) {
-				return !( this->fifo_.check_hazard_list( p_chk_node ) );
-				//				return false;
-			} );
-
-		p_new_node->set_value( cont_arg );
-
-		fifo_.push( p_new_node );
+		push_common( cont_arg );
+		return;
+	}
+	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
+	auto push(
+		input_type&& cont_arg   //!< [in]	a value to push this FIFO queue
+		) -> typename std::enable_if<BOOL_VALUE, void>::type
+	{
+		push_common( std::move( cont_arg ) );
 		return;
 	}
 
@@ -312,26 +312,17 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push(
-		const value_type& cont_arg   //!< [in]	a value to push this FIFO queue
+		const input_type& cont_arg   //!< [in]	a value to push this FIFO queue
 		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
 	{
-		std::atomic_thread_fence( std::memory_order_release );
-
-		fifo_node_pointer p_new_node = free_nd_.allocate<fifo_node_type>(
-			false,
-			[this]( fifo_node_pointer p_chk_node ) {
-				return !( this->fifo_.check_hazard_list( p_chk_node ) );
-				//				return false;
-			} );
-
-		if ( p_new_node != nullptr ) {
-			p_new_node->set_value( cont_arg );
-
-			fifo_.push( p_new_node );
-			return true;
-		} else {
-			return false;
-		}
+		return push_common( cont_arg );
+	}
+	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
+	auto push(
+		input_type&& cont_arg   //!< [in]	a value to push this FIFO queue
+		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
+	{
+		return push_common( std::move( cont_arg ) );
 	}
 
 	/*!
@@ -352,11 +343,11 @@ public:
 
 		std::atomic_thread_fence( std::memory_order_acquire );
 
-		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type>( false, ans_value );
+		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type>( false, std::move( ans_value ) );
 
 		free_nd_.recycle( (free_node_pointer)p_poped_node );
 
-		return std::tuple<bool, value_type>( true, ans_value );
+		return std::tuple<bool, value_type>( true, std::move( ans_value ) );
 	}
 
 	/*!
@@ -390,9 +381,52 @@ private:
 	using free_nd_storage_type = internal::free_nd_storage;
 	using free_node_type       = typename free_nd_storage_type::node_type;
 	using free_node_pointer    = typename free_nd_storage_type::node_pointer;
-	using fifo_type            = internal::fifo_nd_list<T, HAS_OWNERSHIP>;
 	using fifo_node_type       = typename fifo_type::node_type;
 	using fifo_node_pointer    = typename fifo_type::node_pointer;
+
+	template <typename TRANSFER_T, bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
+	auto push_common(
+		TRANSFER_T cont_arg   //!< [in]	a value to push this FIFO queue
+		) -> typename std::enable_if<BOOL_VALUE, void>::type
+	{
+		std::atomic_thread_fence( std::memory_order_release );
+
+		fifo_node_pointer p_new_node = free_nd_.allocate<fifo_node_type>(
+			true,
+			[this]( fifo_node_pointer p_chk_node ) {
+				return !( this->fifo_.check_hazard_list( p_chk_node ) );
+				//				return false;
+			} );
+
+		p_new_node->set_value( std::forward<TRANSFER_T>( cont_arg ) );
+
+		fifo_.push( p_new_node );
+		return;
+	}
+
+	template <typename TRANSFER_T, bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
+	auto push_common(
+		TRANSFER_T cont_arg   //!< [in]	a value to push this FIFO queue
+		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
+	{
+		std::atomic_thread_fence( std::memory_order_release );
+
+		fifo_node_pointer p_new_node = free_nd_.allocate<fifo_node_type>(
+			false,
+			[this]( fifo_node_pointer p_chk_node ) {
+				return !( this->fifo_.check_hazard_list( p_chk_node ) );
+				//				return false;
+			} );
+
+		if ( p_new_node != nullptr ) {
+			p_new_node->set_value( std::forward<TRANSFER_T>( cont_arg ) );
+
+			fifo_.push( p_new_node );
+			return true;
+		} else {
+			return false;
+		}
+	}
 
 	fifo_type            fifo_;
 	free_nd_storage_type free_nd_;

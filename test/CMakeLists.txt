@@ -1,4 +1,7 @@
 
+add_custom_target(build-test-type)
+add_subdirectory(test_type)
+
 add_custom_target(build-test)
 #add_custom_target(test DEPENDS build-test)
 
