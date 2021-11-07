@@ -182,11 +182,11 @@ public:
 		std::tuple<bool, value_type> ans;
 		ans = head_side_.pop();
 		if ( std::get<0>( ans ) ) {
-			return std::move( ans );
+			return ans;
 		}
 
 		ans = tail_size_.pop();
-		return std::move( ans );
+		return ans;
 	}
 
 	/*!
