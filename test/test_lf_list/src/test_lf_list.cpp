@@ -103,7 +103,7 @@ void* func_test_list_back2front( void* data )
 	typename test_list::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		if ( !p_test_obj->push_back( v ) ) {
-			printf( "Bugggggggyyyy  func_test_list_back2front()!!!  %s\n", std::to_string( v ).c_str() );
+			printf( "Bugggggggyyyy  func_test_list_back2front() by push_back!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
@@ -115,7 +115,7 @@ void* func_test_list_back2front( void* data )
 		auto vv        = std::get<1>( local_ret );
 #endif
 		if ( !pop_flag ) {
-			printf( "Bugggggggyyyy  func_test_list_back2front()!!!  %s\n", std::to_string( v ).c_str() );
+			printf( "Bugggggggyyyy  func_test_list_back2front() by pop_front!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
