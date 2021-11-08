@@ -9,15 +9,17 @@
 #include <pthread.h>
 
 #include <cstdint>
+#include <deque>
 #include <iostream>
+#include <mutex>
 
 #include "gtest/gtest.h"
 
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 #include "alconcurrent/lf_stack.hpp"
 
-constexpr int            num_thread = 32;   // Tested until 128.
-constexpr std::uintptr_t loop_num   = 100000;
+constexpr int            num_thread = 10;   // Tested until 128.
+constexpr std::uintptr_t loop_num   = 10000;
 
 using test_lifo_type_part = alpha::concurrent::internal::lifo_nd_list<std::uintptr_t>;
 
@@ -54,11 +56,17 @@ protected:
 	}
 };
 
+
+
+std::mutex                                  mtx_pointer_strage;
+std::deque<test_lifo_type_part::node_type*> pointer_strage;   // 管理ノードを一時保管するストレージ。ownership=TRUEの管理ノードを想定
+
 /**
  * 各スレッドのメインルーチン。
  */
 void* func_push( void* data )
 {
+	std::deque<test_lifo_type_part::node_type*> pointer_strage_local;
 	test_lifo_type_part* p_test_obj = reinterpret_cast<test_lifo_type_part*>( data );
 
 	pthread_barrier_wait( &barrier );
@@ -66,8 +74,16 @@ void* func_push( void* data )
 	typename test_lifo_type_part::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		auto p_node = new test_lifo_type_part::node_type( i );
+		pointer_strage_local.emplace_back( p_node );
 		p_test_obj->push( p_node );
 		v++;
+	}
+
+	{
+		std::lock_guard<std::mutex> lk( mtx_pointer_strage );
+		for ( auto& e : pointer_strage_local ) {
+			pointer_strage.emplace_back( e );
+		}
 	}
 
 	return reinterpret_cast<void*>( v );
@@ -143,6 +159,14 @@ TEST_F( lfStackTest, TC1 )
 	std::cout << "Sum:    " << sum << std::endl;
 	EXPECT_EQ( num_thread * loop_num, sum );
 
+	{
+		std::lock_guard<std::mutex> lk( mtx_pointer_strage );
+		for ( auto& e : pointer_strage ) {
+			delete e;
+		}
+		pointer_strage.clear();
+	}
+
 	delete[] threads;
 
 	delete p_test_obj;
@@ -150,12 +174,17 @@ TEST_F( lfStackTest, TC1 )
 	return;
 }
 
+
+std::mutex                                  mtx_pointer_strage2;
+std::deque<test_lifo_type_part::node_type*> pointer_strage2;   // 管理ノードを一時保管するストレージ。ownership=TRUEの管理ノードを想定
+
 /**
  * 各スレッドのメインルーチン。
  * テスト目的上、メモリリークが発生するが、想定通りの振る舞い。
  */
 void* func_test_fifo2( void* data )
 {
+	std::deque<test_lifo_type_part::node_type*> pointer_strage_local;
 	test_lifo_type_part* p_test_obj = reinterpret_cast<test_lifo_type_part*>( data );
 
 	pthread_barrier_wait( &barrier );
@@ -163,6 +192,7 @@ void* func_test_fifo2( void* data )
 	typename test_lifo_type_part::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		auto p_node = new test_lifo_type_part::node_type( v );
+		pointer_strage_local.emplace_back( p_node );
 		p_test_obj->push( p_node );
 		auto p_pop_node = p_test_obj->pop();
 		if ( p_pop_node == nullptr ) {
@@ -171,6 +201,13 @@ void* func_test_fifo2( void* data )
 		}
 		auto vv = p_pop_node->get_value();
 		v       = vv + 1;
+	}
+
+	{
+		std::lock_guard<std::mutex> lk( mtx_pointer_strage2 );
+		for ( auto& e : pointer_strage_local ) {
+			pointer_strage2.emplace_back( e );
+		}
 	}
 
 	return reinterpret_cast<void*>( v );
@@ -207,6 +244,14 @@ TEST_F( lfStackTest, TC2 )
 	std::cout << "Sum:    " << sum << std::endl;
 
 	EXPECT_EQ( num_thread * loop_num, sum );
+
+	{
+		std::lock_guard<std::mutex> lk( mtx_pointer_strage2 );
+		for ( auto& e : pointer_strage2 ) {
+			delete e;
+		}
+		pointer_strage2.clear();
+	}
 
 	delete[] threads;
 	delete p_test_obj;

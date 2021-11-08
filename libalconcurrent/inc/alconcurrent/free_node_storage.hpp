@@ -67,6 +67,9 @@ struct node_of_list {
 		return next_[(int)cur_slot_idx].compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
 	}
 
+	virtual void release_ownership( void );
+	virtual void teardown_by_recycle( void );
+
 #ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
 	void* operator new( std::size_t n );             // usual new...(1)
 	void  operator delete( void* p_mem ) noexcept;   // usual new...(2)
@@ -189,9 +192,12 @@ public:
 	~free_nd_storage();
 
 	/*!
-	 * @breif	ローカルストレージのノードリストからフリーノードリストへの登録を試みる
+	 * @breif	使用済みノードのリサイクル処理を行う。
 	 *
-	 * @return	フリーノードリストへの登録の試みが実施できたかどうかを返す。
+	 * まず、スレッドローカルストレージへノードを一時登録した後、ハザードポインタをチェックする。
+	 * ハザードポインタに登録されていなければ、teardown_by_recycle()を呼び出した後、共通フリーノードリストへの登録処理を行う。
+	 *
+	 * @return	共通フリーノードリストへの登録の試みが実施できたかどうかを返す。
 	 * @retval	true	ローカルストレージのノードリストにリストが残っていて、フリーノードリストへの登録を試みることができた。
 	 * @retval	false	ローカルストレージのノードリストが空で、フリーノードリストへの登録を試みることはできなかった。
 	 */
@@ -200,7 +206,9 @@ public:
 	/*!
 	 * @breif	フリーノードを取り出す。
 	 *
-	 * フリーノードがなければ、ヒープからメモリをallocate()する。
+	 * フリーノードリストからallocate()する場合は、setup_by_alloc()を呼び出す。
+	 *
+	 * フリーノードがなければ、ヒープからメモリをallocate()する。この場合は、setup_by_alloc()相当処理は、コンストラクタ内で実施されていると想定。
 	 *
 	 * pred は、引数で指定されたノードポインタに対し、呼び出し側から見た使用可否を判定する関数オブジェクト
 	 * @li	true 使用可能
@@ -229,11 +237,22 @@ public:
 				}
 			} else {
 				// もし、ダウンキャストに失敗したら、そもそも不具合であるし、不要なので、削除する。
-				LogOutput( log_type::ERR, "Info: fail to down cast. discard the node that have unexpected type." );
+				LogOutput( log_type::ERR, "ERROR: fail to down cast. discard the node that have unexpected type." );
 				delete p_chk;
 			}
 			return nullptr;
 		};
+
+		{
+			std::unique_lock<std::mutex> lk( mtx_rcv_thread_local_fifo_list_, std::try_to_lock );
+			if ( lk.owns_lock() ) {
+				// 他のスレッドから預託されたノードをフリーノードへ差し回す。
+				node_pointer p_ans = rcv_thread_local_fifo_list_.pop();
+				if ( p_ans != nullptr ) {
+					recycle( p_ans );
+				}
+			}
+		}
 
 		for ( int i = 0; i < num_recycle_exec; i++ ) {
 			node_pointer p_ans = node_list_.pop();
@@ -251,21 +270,8 @@ public:
 			}
 		}
 
-		{
-			std::unique_lock<std::mutex> lk( mtx_rcv_thread_local_fifo_list_, std::try_to_lock );
-			if ( lk.owns_lock() ) {
-				node_pointer p_ans = rcv_thread_local_fifo_list_.pop();
-				if ( p_ans != nullptr ) {
-					ALLOC_NODE_T* p_down_casted_ans = chk_and_recycle( p_ans );
-					if ( p_down_casted_ans != nullptr ) {
-						return p_down_casted_ans;
-					}
-				}
-			}
-		}
-
 		if ( does_allow_allocate ) {
-			// ここに来たら、利用可能なfree nodeがなかったこと示すので、新しいノードをヒープから確保する。
+			// ここに来たら、利用可能なfree nodeがなかったこと示すので、新しいノードをヒープから確保する。setup_by_allocは実行済み
 			return allocate_new_node<ALLOC_NODE_T>();
 		} else {
 			return nullptr;
@@ -275,7 +281,9 @@ public:
 	template <typename ALLOC_NODE_T>
 	void init_and_pre_allocate( int pre_alloc_nodes )
 	{
-		node_list_.initial_push( (node_pointer)allocate_new_node<ALLOC_NODE_T>() );
+		node_pointer p_init_sentinel = (node_pointer)allocate_new_node<ALLOC_NODE_T>();
+		p_init_sentinel->teardown_by_recycle();
+		node_list_.initial_push( p_init_sentinel );
 
 		for ( int i = 0; i < pre_alloc_nodes; i++ ) {
 			recycle( (node_pointer)allocate_new_node<ALLOC_NODE_T>() );

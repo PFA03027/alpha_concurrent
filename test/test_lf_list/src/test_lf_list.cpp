@@ -19,8 +19,8 @@
 #include "alconcurrent/lf_list.hpp"
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
-constexpr int            num_thread = 64;   // Tested until 128.
-constexpr std::uintptr_t loop_num   = 1000;
+constexpr int            num_thread = 12;   // Tested until 128.
+constexpr std::uintptr_t loop_num   = 10000;
 
 using test_list = alpha::concurrent::lockfree_list<std::uintptr_t>;
 
@@ -28,9 +28,9 @@ pthread_barrier_t barrier;
 
 // example
 static alpha::concurrent::param_chunk_allocation param[] = {
-	{ 32, 100 },
-	{ 64, 100 },
-	{ 128, 100 },
+	{ 32, 10000 },
+	{ 64, 10000 },
+	{ 128, 10000 },
 };
 
 class lflistTest : public ::testing::Test {
@@ -103,7 +103,7 @@ void* func_test_list_back2front( void* data )
 	typename test_list::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		if ( !p_test_obj->push_back( v ) ) {
-			printf( "Bugggggggyyyy  func_test_list_back2front()!!!  %s\n", std::to_string( v ).c_str() );
+			printf( "Bugggggggyyyy  func_test_list_back2front() by push_back!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
@@ -115,7 +115,7 @@ void* func_test_list_back2front( void* data )
 		auto vv        = std::get<1>( local_ret );
 #endif
 		if ( !pop_flag ) {
-			printf( "Bugggggggyyyy  func_test_list_back2front()!!!  %s\n", std::to_string( v ).c_str() );
+			printf( "Bugggggggyyyy  func_test_list_back2front() by pop_front!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %d\n", p_test_obj->get_size() );
 			exit( 1 );
 		}
@@ -134,9 +134,11 @@ TEST_F( lflistTest, TC1 )
 
 	for ( int i = 0; i < num_thread; i++ ) {
 		pthread_create( &threads[i], NULL, func_test_list_front2back, reinterpret_cast<void*>( &count_list ) );
+		// pthread_create( &threads[i], NULL, func_test_list_back2front, reinterpret_cast<void*>( &count_list ) );
 	}
 
 	for ( int i = 0; i < num_thread; i++ ) {
+		// pthread_create( &threads[num_thread + i], NULL, func_test_list_front2back, reinterpret_cast<void*>( &count_list ) );
 		pthread_create( &threads[num_thread + i], NULL, func_test_list_back2front, reinterpret_cast<void*>( &count_list ) );
 	}
 
@@ -357,7 +359,7 @@ TEST_F( lflistTest, TC3 )
 		pthread_create( &threads[num_thread + i], NULL, func_test_list_remove_all, reinterpret_cast<void*>( &( test_data_set[i] ) ) );
 	}
 
-	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
+	// std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	pthread_barrier_wait( &barrier );
 

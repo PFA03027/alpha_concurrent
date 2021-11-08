@@ -10,7 +10,8 @@ echo $@
 BUILDTARGET=common
 
 # Debug or Release or ...
-BUILDTYPE=Debug
+#BUILDTYPE=Debug
+BUILDTYPE=Release
 
 if [ $# -eq 0 ]; then
 	mkdir -p build

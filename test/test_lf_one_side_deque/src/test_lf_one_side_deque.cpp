@@ -19,8 +19,8 @@
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 #include "alconcurrent/lf_one_side_deque.hpp"
 
-constexpr int            num_thread = 64;   // Tested until 128.
-constexpr std::uintptr_t loop_num   = 100000;
+constexpr int            num_thread = 5;   // Tested until 128.
+constexpr std::uintptr_t loop_num   = 10000;
 
 using test_list = alpha::concurrent::one_side_deque<std::uintptr_t>;
 

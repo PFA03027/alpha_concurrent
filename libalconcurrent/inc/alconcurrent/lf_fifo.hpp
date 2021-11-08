@@ -35,12 +35,14 @@ namespace internal {
  *
  * キューに登録された値そのものは、head_.nextが指すノードに存在する。
  */
-template <typename T, typename DELETER = default_deleter<T>>
+template <typename T, bool HAS_OWNERSHIP = true>
 class fifo_nd_list {
 public:
 	static constexpr int hzrd_max_slot_ = 5;
-	using value_type                    = typename std::decay<T>::type;
-	using node_type                     = one_way_list_node<T>;
+	using node_type                     = one_way_list_node<T, HAS_OWNERSHIP>;
+	using input_type                    = typename node_type::input_type;
+	using value_type                    = typename node_type::value_type;
+	using ticket_type                   = typename node_type::ticket_type;
 	using node_pointer                  = node_type*;
 	using hazard_ptr_storage            = hazard_ptr<node_type, hzrd_max_slot_>;
 
@@ -65,16 +67,14 @@ public:
 		if ( p_cur != nullptr ) {
 			// 先頭ノードは番兵のため、nullptrであることはありえないが、チェックする。
 			// ノード自体は、フリーノードストレージに戻すことが基本だが、デストラクタの場合は、戻さない仕様で割り切る。
-			// T型がpointerの場合、ポインタの先のオブジェクトを削除してから、ノードを削除する。
-			DELETER dt;
+
+			// 先頭ノードは番兵ノードで、既にリソースは取り出し済み。よって、デストラクタ時点でリソースの所有権喪失が確定される。
+			p_cur->release_ownership();
 			do {
+				// リソースの所有権が保持されている２番目のノード以降の破棄を行う。ノードのデストラクタで所有中のリソースは破棄される。
 				node_pointer const p_nxt = p_cur->get_next();
 				delete p_cur;
 				p_cur = p_nxt;
-				if ( p_cur != nullptr ) {
-					// 先頭ノードに残っているポインタは、既に取り出し済みである。よって、２番目のノード以降のポインタの破棄を行う。
-					dt( p_cur->ref_value() );
-				}
 			} while ( p_cur != nullptr );
 		}
 
@@ -166,13 +166,15 @@ public:
 					// headが他のスレッドでpopされた。
 					continue;
 				}
-				value_type ans_2nd = p_cur_next->get_value();   // この処理が必要になるため、T型は、copy assignableでなければならい。
+				ticket_type ans_2nd_ticket = p_cur_next->get_ticket();   // 値の取り出しに使用するチケットを得る。
 				// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
 				// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
 				if ( head_.compare_exchange_weak( p_cur_first, p_cur_next ) ) {
 					size_count_--;
 					// ここで、firstの取り出しと所有権確保が完了
 					// ただし、ハザードポインタをチェックしていないため、まだ参照している人がいるかもしれない。
+					value_type ans_2nd = p_cur_next->exchange_ticket_and_move_value( ans_2nd_ticket );   // firstが取り出せたので、nextから値を取り出すための権利を取得。チケットを使って、値を取り出す。
+					p_cur_first->release_ownership();                                                    // 値を取り出した結果として、firstが管理する情報の所有権ロストが確定したため、それを書き込む。
 					return std::tuple<node_pointer, value_type>( p_cur_first, ans_2nd );
 				}
 			}
@@ -224,8 +226,6 @@ private:
 /*!
  * @breif	semi-lock free FIFO type queue
  *
- * Type T should be copy assignable.
- *
  * In case that template parameter ALLOW_TO_ALLOCATE is true, @n
  * In case of no avialable free node that carries a value, new node is allocated from heap internally. @n
  * In this case, this queue may be locked. And push() may trigger this behavior. @n
@@ -238,13 +238,19 @@ private:
  * In case of no avialable free node, push() member function will return false. In this case, it fails to push a value @n
  * User side has a role to recover this condition by User side itself, e.g. backoff approach.
  *
+ * If T is pointer, HAS_OWNERSHIP impacts to free of resource. @n
+ * If HAS_OWNERSHIP is true, this class free a pointer resource by delete when a this class instance destructed.
+ * If HAS_OWNERSHIP is false, this class does not handle a pointer resource when a this class instance destructed.
+ *
  * @note
  * To resolve ABA issue, this FIFO queue uses hazard pointer approach.
  */
-template <typename T, bool ALLOW_TO_ALLOCATE = true, typename DELETER = internal::default_deleter<T>>
+template <typename T, bool ALLOW_TO_ALLOCATE = true, bool HAS_OWNERSHIP = true>
 class fifo_list {
 public:
-	using value_type = typename std::decay<T>::type;
+	using fifo_type  = internal::fifo_nd_list<T, HAS_OWNERSHIP>;
+	using input_type = typename fifo_type::input_type;
+	using value_type = typename fifo_type::value_type;
 
 	/*!
 	 * @breif	Constructor
@@ -276,21 +282,18 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push(
-		const value_type& cont_arg   //!< [in]	a value to push this FIFO queue
+		const input_type& cont_arg   //!< [in]	a value to push this FIFO queue
 		) -> typename std::enable_if<BOOL_VALUE, void>::type
 	{
-		std::atomic_thread_fence( std::memory_order_release );
-
-		fifo_node_pointer p_new_node = free_nd_.allocate<fifo_node_type>(
-			true,
-			[this]( fifo_node_pointer p_chk_node ) {
-				return !( this->fifo_.check_hazard_list( p_chk_node ) );
-				//				return false;
-			} );
-
-		p_new_node->set_value( cont_arg );
-
-		fifo_.push( p_new_node );
+		push_common( cont_arg );
+		return;
+	}
+	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
+	auto push(
+		input_type&& cont_arg   //!< [in]	a value to push this FIFO queue
+		) -> typename std::enable_if<BOOL_VALUE, void>::type
+	{
+		push_common( std::move( cont_arg ) );
 		return;
 	}
 
@@ -309,26 +312,17 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push(
-		const value_type& cont_arg   //!< [in]	a value to push this FIFO queue
+		const input_type& cont_arg   //!< [in]	a value to push this FIFO queue
 		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
 	{
-		std::atomic_thread_fence( std::memory_order_release );
-
-		fifo_node_pointer p_new_node = free_nd_.allocate<fifo_node_type>(
-			false,
-			[this]( fifo_node_pointer p_chk_node ) {
-				return !( this->fifo_.check_hazard_list( p_chk_node ) );
-				//				return false;
-			} );
-
-		if ( p_new_node != nullptr ) {
-			p_new_node->set_value( cont_arg );
-
-			fifo_.push( p_new_node );
-			return true;
-		} else {
-			return false;
-		}
+		return push_common( cont_arg );
+	}
+	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
+	auto push(
+		input_type&& cont_arg   //!< [in]	a value to push this FIFO queue
+		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
+	{
+		return push_common( std::move( cont_arg ) );
 	}
 
 	/*!
@@ -349,11 +343,11 @@ public:
 
 		std::atomic_thread_fence( std::memory_order_acquire );
 
-		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type>( false, ans_value );
+		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type>( false, std::move( ans_value ) );
 
 		free_nd_.recycle( (free_node_pointer)p_poped_node );
 
-		return std::tuple<bool, value_type>( true, ans_value );
+		return std::tuple<bool, value_type>( true, std::move( ans_value ) );
 	}
 
 	/*!
@@ -387,9 +381,52 @@ private:
 	using free_nd_storage_type = internal::free_nd_storage;
 	using free_node_type       = typename free_nd_storage_type::node_type;
 	using free_node_pointer    = typename free_nd_storage_type::node_pointer;
-	using fifo_type            = internal::fifo_nd_list<T, DELETER>;
 	using fifo_node_type       = typename fifo_type::node_type;
 	using fifo_node_pointer    = typename fifo_type::node_pointer;
+
+	template <typename TRANSFER_T, bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
+	auto push_common(
+		TRANSFER_T cont_arg   //!< [in]	a value to push this FIFO queue
+		) -> typename std::enable_if<BOOL_VALUE, void>::type
+	{
+		std::atomic_thread_fence( std::memory_order_release );
+
+		fifo_node_pointer p_new_node = free_nd_.allocate<fifo_node_type>(
+			true,
+			[this]( fifo_node_pointer p_chk_node ) {
+				return !( this->fifo_.check_hazard_list( p_chk_node ) );
+				//				return false;
+			} );
+
+		p_new_node->set_value( std::forward<TRANSFER_T>( cont_arg ) );
+
+		fifo_.push( p_new_node );
+		return;
+	}
+
+	template <typename TRANSFER_T, bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
+	auto push_common(
+		TRANSFER_T cont_arg   //!< [in]	a value to push this FIFO queue
+		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
+	{
+		std::atomic_thread_fence( std::memory_order_release );
+
+		fifo_node_pointer p_new_node = free_nd_.allocate<fifo_node_type>(
+			false,
+			[this]( fifo_node_pointer p_chk_node ) {
+				return !( this->fifo_.check_hazard_list( p_chk_node ) );
+				//				return false;
+			} );
+
+		if ( p_new_node != nullptr ) {
+			p_new_node->set_value( std::forward<TRANSFER_T>( cont_arg ) );
+
+			fifo_.push( p_new_node );
+			return true;
+		} else {
+			return false;
+		}
+	}
 
 	fifo_type            fifo_;
 	free_nd_storage_type free_nd_;
