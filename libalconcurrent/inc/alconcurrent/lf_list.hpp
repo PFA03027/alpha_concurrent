@@ -164,7 +164,7 @@ public:
 
 		LogOutput( log_type::ERR, "ERR: find_if_common go into logic error" );
 		return std::tuple<node_pointer, node_pointer>( nullptr, nullptr );   // 到達不可能コード。安全のために残す。
-																			 // TODO ここに到達する場合は、アルゴリズムか実装がおかしいので、例外をスローするか？
+		                                                                     // TODO ここに到達する場合は、アルゴリズムか実装がおかしいので、例外をスローするか？
 	}
 
 	/*!
@@ -643,7 +643,16 @@ public:
 #endif
 
 			if ( base_list_.is_end_node( p_curr ) ) {
-				return std::tuple<bool, value_type>( false, std::move( ans_value ) );
+				// p_currが番兵ノードである場合、リストは空かもしれない。
+				// しかし、find_ifの処理の時点では正しくノードをピックアップできていたとしても、
+				// この条件の検証までに状態が変わる可能性がある。
+				// 具体的には、find_ifの時点で先頭ノードを取り出した後、pop_back()で、番兵ノードにまで移動してしまう場合もある。
+				// よって、リストが空でない限り、再度ノードの取り出しのためのfind_ifから処理をし直す。
+				if ( get_size() > 0 ) {   // 削除マーキングが終わってからカウント変更処理が行われるため、リストの空判定を誤ることはない。
+					continue;
+				} else {
+					return std::tuple<bool, value_type>( false, std::move( ans_value ) );
+				}
 			}
 
 			if ( base_list_.remove( free_nd_, p_prev, p_curr, &ans_value ) ) {
@@ -711,18 +720,28 @@ public:
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 				auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
 #else
-				auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
-				auto p_prev    = std::get<0>( local_ret );
-				auto p_curr    = std::get<1>( local_ret );
+                auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+                auto p_prev    = std::get<0>( local_ret );
+                auto p_curr    = std::get<1>( local_ret );
 #endif
 				if ( !base_list_.is_end_node( p_curr ) ) continue;
 				if ( base_list_.is_head_node( p_prev ) ) {
-					return std::tuple<bool, value_type>( false, std::move( ans_value ) );
+					// p_currが番兵ノードで、かつp_prevがヘッドノードである場合、リストは空かもしれない。
+					// しかし、find_ifの処理の時点では正しくノードをピックアップできていたとしても、
+					// この条件の検証までに状態が変わる可能性がある。
+					// 具体的には、find_ifの時点で最終ノードを取り出した後、pop_front()で、headまで移動してしまう場合もある。
+					// よって、リストが空でない限り、再度ノードの取り出しのためのfind_ifから処理をし直す。
+					if ( get_size() > 0 ) {   // 削除マーキングが終わってからカウント変更処理が行われるため、リストの空判定を誤ることはない。
+						continue;
+					} else {
+						return std::tuple<bool, value_type>( false, std::move( ans_value ) );
+					}
 				}
 				p_last = p_prev;
-				hzrd_ref_last.regist_ptr_as_hazard_ptr( p_last );
+				hzrd_ref_last.regist_ptr_as_hazard_ptr( p_last );   // ここで番兵ノードより１つ手前のノード=最終ノードが判明する。
 			}
 
+			// 最終ノードとその一つ手前のノードの情報を得るため、再度find_ifを行う。
 			typename list_type::find_predicate_t pred_common2 = [p_last]( const list_node_pointer a ) { return ( a == p_last ); };
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common2 );
@@ -767,7 +786,7 @@ public:
 	 * @breif	number of the queued values in FIFO
 	 *
 	 * @warning
-	 * This FIFO will be access by several thread concurrently. So, true number of this FIFO queue may be changed when caller uses the returned value.
+	 * This list will be access by several thread concurrently. So, true number of node in this list may be changed when caller uses the returned value.
 	 */
 	int get_size( void ) const
 	{
