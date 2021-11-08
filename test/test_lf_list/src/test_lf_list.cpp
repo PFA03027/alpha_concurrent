@@ -19,7 +19,7 @@
 #include "alconcurrent/lf_list.hpp"
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
-constexpr int            num_thread = 5;   // Tested until 128.
+constexpr int            num_thread = 12;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 10000;
 
 using test_list = alpha::concurrent::lockfree_list<std::uintptr_t>;
@@ -28,9 +28,9 @@ pthread_barrier_t barrier;
 
 // example
 static alpha::concurrent::param_chunk_allocation param[] = {
-	{ 32, 100 },
-	{ 64, 100 },
-	{ 128, 100 },
+	{ 32, 10000 },
+	{ 64, 10000 },
+	{ 128, 10000 },
 };
 
 class lflistTest : public ::testing::Test {
@@ -134,9 +134,11 @@ TEST_F( lflistTest, TC1 )
 
 	for ( int i = 0; i < num_thread; i++ ) {
 		pthread_create( &threads[i], NULL, func_test_list_front2back, reinterpret_cast<void*>( &count_list ) );
+		// pthread_create( &threads[i], NULL, func_test_list_back2front, reinterpret_cast<void*>( &count_list ) );
 	}
 
 	for ( int i = 0; i < num_thread; i++ ) {
+		// pthread_create( &threads[num_thread + i], NULL, func_test_list_front2back, reinterpret_cast<void*>( &count_list ) );
 		pthread_create( &threads[num_thread + i], NULL, func_test_list_back2front, reinterpret_cast<void*>( &count_list ) );
 	}
 
@@ -357,7 +359,7 @@ TEST_F( lflistTest, TC3 )
 		pthread_create( &threads[num_thread + i], NULL, func_test_list_remove_all, reinterpret_cast<void*>( &( test_data_set[i] ) ) );
 	}
 
-	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
+	// std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	pthread_barrier_wait( &barrier );
 
