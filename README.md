@@ -161,6 +161,11 @@ After Build step, please execute below commands
         $ cmake --build . --target build-test  
         $ cmake --build . --target test  
 
+# Patent
+## Hazard pointer algorithm
+US Patent of Hazard pointer algrithm: US20040107227A1 is now abandoned.
+https://patents.google.com/patent/US20040107227
+
 
 # License
 Please see "LICENSE.txt"
