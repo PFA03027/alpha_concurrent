@@ -6,3 +6,4 @@
 *.so
 /build_win_eclipse
 /build/
+/Servers/
