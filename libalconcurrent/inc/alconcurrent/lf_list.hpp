@@ -68,7 +68,7 @@ public:
 #endif
 
 		if ( !is_end_node( p_cur ) ) {
-			LogOutput( log_type::ERR, "ERR: lockfree_list_base is deleted before all data deletion." );
+			internal::LogOutput( log_type::ERR, "ERR: lockfree_list_base is deleted before all data deletion." );
 		}
 
 		return;
@@ -162,7 +162,7 @@ public:
 			}
 		}
 
-		LogOutput( log_type::ERR, "ERR: find_if_common go into logic error" );
+		internal::LogOutput( log_type::ERR, "ERR: find_if_common go into logic error" );
 		return std::tuple<node_pointer, node_pointer>( nullptr, nullptr );   // 到達不可能コード。安全のために残す。
 		                                                                     // TODO ここに到達する場合は、アルゴリズムか実装がおかしいので、例外をスローするか？
 	}
@@ -435,7 +435,7 @@ public:
 	)
 	{
 		if ( !ALLOW_TO_ALLOCATE && ( pre_alloc_nodes < 1 ) ) {
-			LogOutput( log_type::WARN, "Warning: in case that ALLOW_TO_ALLOCATE is false, argument pre_alloc_nodes must be equal or than 1, now %d. Therefore it will be modified to 1. This value should be at least the number of CPUs. Also, it is recommended to double the number of threads to access.", pre_alloc_nodes );
+			internal::LogOutput( log_type::WARN, "Warning: in case that ALLOW_TO_ALLOCATE is false, argument pre_alloc_nodes must be equal or than 1, now %d. Therefore it will be modified to 1. This value should be at least the number of CPUs. Also, it is recommended to double the number of threads to access.", pre_alloc_nodes );
 			pre_alloc_nodes = 1;
 		}
 

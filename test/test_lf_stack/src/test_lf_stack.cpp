@@ -56,8 +56,6 @@ protected:
 	}
 };
 
-
-
 std::mutex                                  mtx_pointer_strage;
 std::deque<test_lifo_type_part::node_type*> pointer_strage;   // 管理ノードを一時保管するストレージ。ownership=TRUEの管理ノードを想定
 
@@ -67,7 +65,7 @@ std::deque<test_lifo_type_part::node_type*> pointer_strage;   // 管理ノード
 void* func_push( void* data )
 {
 	std::deque<test_lifo_type_part::node_type*> pointer_strage_local;
-	test_lifo_type_part* p_test_obj = reinterpret_cast<test_lifo_type_part*>( data );
+	test_lifo_type_part*                        p_test_obj = reinterpret_cast<test_lifo_type_part*>( data );
 
 	pthread_barrier_wait( &barrier );
 
@@ -171,9 +169,18 @@ TEST_F( lfStackTest, TC1 )
 
 	delete p_test_obj;
 
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
+
 	return;
 }
-
 
 std::mutex                                  mtx_pointer_strage2;
 std::deque<test_lifo_type_part::node_type*> pointer_strage2;   // 管理ノードを一時保管するストレージ。ownership=TRUEの管理ノードを想定
@@ -185,7 +192,7 @@ std::deque<test_lifo_type_part::node_type*> pointer_strage2;   // 管理ノー�
 void* func_test_fifo2( void* data )
 {
 	std::deque<test_lifo_type_part::node_type*> pointer_strage_local;
-	test_lifo_type_part* p_test_obj = reinterpret_cast<test_lifo_type_part*>( data );
+	test_lifo_type_part*                        p_test_obj = reinterpret_cast<test_lifo_type_part*>( data );
 
 	pthread_barrier_wait( &barrier );
 

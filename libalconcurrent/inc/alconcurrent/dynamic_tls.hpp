@@ -92,12 +92,12 @@ public:
 	  , next_( nullptr )
 	  , pre_exec_( df )
 	{
-		LogOutput( log_type::DEBUG, "tls_data_container::constructor is called - %p", this );
+		internal::LogOutput( log_type::DEBUG, "tls_data_container::constructor is called - %p", this );
 	}
 
 	~tls_data_container()
 	{
-		LogOutput( log_type::DEBUG, "tls_data_container::destructor is called  - %p, p_value - %p", this, p_value );
+		internal::LogOutput( log_type::DEBUG, "tls_data_container::destructor is called  - %p, p_value - %p", this, p_value );
 
 		if ( p_value != nullptr ) {
 			p_value->~T();
@@ -252,7 +252,7 @@ public:
 
 	~dynamic_tls()
 	{
-		LogOutput( log_type::DEBUG, "dynamic_tls::destructor is called" );
+		internal::LogOutput( log_type::DEBUG, "dynamic_tls::destructor is called" );
 
 		internal::dynamic_tls_pthread_key_delete( tls_key );
 
@@ -292,7 +292,7 @@ private:
 			int status;
 			status = pthread_setspecific( tls_key, (void*)p_tls );
 			if ( status < 0 ) {
-				LogOutput( log_type::ERR, "pthread_setspecific failed, errno %d", errno );
+				internal::LogOutput( log_type::ERR, "pthread_setspecific failed, errno %d", errno );
 				pthread_exit( (void*)1 );
 			}
 		}
@@ -302,7 +302,7 @@ private:
 
 	static void destr_fn( void* parm )
 	{
-		LogOutput( log_type::DEBUG, "dynamic_tls::destr_fn is called              - %p", parm );
+		internal::LogOutput( log_type::DEBUG, "dynamic_tls::destr_fn is called              - %p", parm );
 
 		if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。どうしようもないので、諦める。
 
@@ -320,7 +320,7 @@ private:
 		while ( p_ans != nullptr ) {
 			if ( p_ans->get_status() == tls_cont::ocupied_status::UNUSED ) {
 				if ( p_ans->try_to_get_owner() ) {
-					LogOutput( log_type::DEBUG, "node is allocated." );
+					internal::LogOutput( log_type::DEBUG, "node is allocated." );
 					return p_ans;
 				}
 			}
@@ -336,7 +336,7 @@ private:
 			p_ans->set_next( p_cur_head );
 		} while ( !head_.compare_exchange_strong( p_cur_head, p_ans ) );
 
-		LogOutput( log_type::DEBUG, "glist is added." );
+		internal::LogOutput( log_type::DEBUG, "glist is added." );
 		return p_ans;
 	}
 

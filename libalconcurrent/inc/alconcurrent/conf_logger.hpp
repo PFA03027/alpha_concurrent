@@ -55,49 +55,47 @@ public:
 };
 
 namespace internal {
+
 extern logger_if_abst* p_concrete_logger_if;
 
-#if ( __cplusplus >= 201402L /* check C++14 */ ) && defined( __cpp_constexpr )
-constexpr
-#else
-inline
-#endif
-	bool
-	is_allowed_to_output(
-		const log_type lt   //!< [in]	log type to check
-	)
+/*!
+ * @breif	filter for logging
+ *
+ * Default configuration allows to pass ERR and WARN.
+ * @li If compiled with CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO definition, this I/F allows to path INFO.
+ * @li If compiled with CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DEBUG definition, this I/F allows to path DEBUG.
+ * @li If compiled with CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST definition, this I/F allows to path TEST.
+ * @li If compiled with CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP definition, this I/F allows to path DUMP.
+ */
+bool is_allowed_to_output(
+	const log_type lt   //!< [in]	log type to check
+);
+
+template <typename... Args>
+inline void LogOutput( const log_type lt, const char* p_format, Args... args )
 {
-	bool ans = false;
-	switch ( lt ) {
-		case log_type::ERR:
-		case log_type::WARN:
-			ans = true;
-			break;
-		case log_type::INFO:
-#ifdef CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO
-			ans = true;
-#endif
-			break;
-		case log_type::DEBUG:
-#ifdef CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DEBUG
-			ans = true;
-#endif
-			break;
-		case log_type::TEST:
-#ifdef CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST
-			ans = true;
-#endif
-			break;
-		case log_type::DUMP:
-#ifdef CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP
-			ans = true;
-#endif
-			break;
-		default:
-			break;
+	if ( internal::is_allowed_to_output( lt ) ) {
+		char buff[CONF_LOGGER_INTERNAL_BUFF_SIZE + 1];
+		snprintf( buff, CONF_LOGGER_INTERNAL_BUFF_SIZE, p_format, args... );
+		buff[CONF_LOGGER_INTERNAL_BUFF_SIZE] = 0;
+
+		internal::p_concrete_logger_if->output_log( lt, CONF_LOGGER_INTERNAL_BUFF_SIZE, buff );
 	}
 
-	return ans;
+	return;
+}
+
+inline void LogOutput( const log_type lt, const char* p_str )
+{
+	if ( internal::is_allowed_to_output( lt ) ) {
+		char buff[CONF_LOGGER_INTERNAL_BUFF_SIZE + 1];
+		strncpy( buff, p_str, CONF_LOGGER_INTERNAL_BUFF_SIZE );
+		buff[CONF_LOGGER_INTERNAL_BUFF_SIZE] = 0;
+
+		internal::p_concrete_logger_if->output_log( lt, CONF_LOGGER_INTERNAL_BUFF_SIZE, buff );
+	}
+
+	return;
 }
 
 }   // namespace internal
@@ -115,32 +113,25 @@ inline
  */
 void SetLoggerIf( std::unique_ptr<logger_if_abst> up_logger_if_inst );
 
-template <typename... Args>
-inline void LogOutput( const log_type lt, const char* p_format, Args... args )
-{
-	if ( internal::is_allowed_to_output( lt ) ) {
-		char buff[CONF_LOGGER_INTERNAL_BUFF_SIZE];
-		snprintf( buff, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1, p_format, args... );
-		buff[CONF_LOGGER_INTERNAL_BUFF_SIZE - 1] = 0;
+/*!
+ * @breif	Get the number of ERR type and WARN type log output
+ *
+ * This is test/debug purpose.
+ */
+void GetErrorWarningLogCount(
+	int* p_num_err,   //!< [out] the pointer to store the number of ERR type log output
+	int* p_num_warn   //!< [out] the pointer to store the number of WARN type log output
+);
 
-		internal::p_concrete_logger_if->output_log( lt, CONF_LOGGER_INTERNAL_BUFF_SIZE, buff );
-	}
-
-	return;
-}
-
-inline void LogOutput( const log_type lt, const char* p_str )
-{
-	if ( internal::is_allowed_to_output( lt ) ) {
-		char buff[CONF_LOGGER_INTERNAL_BUFF_SIZE];
-		strncpy( buff, p_str, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1 );
-		buff[CONF_LOGGER_INTERNAL_BUFF_SIZE - 1] = 0;
-
-		internal::p_concrete_logger_if->output_log( lt, CONF_LOGGER_INTERNAL_BUFF_SIZE, buff );
-	}
-
-	return;
-}
+/*!
+ * @breif	Get the number of ERR type and WARN type log output, then reset those numbers.
+ *
+ * This is test/debug purpose.
+ */
+void GetErrorWarningLogCountAndReset(
+	int* p_num_err,   //!< [out] the pointer to store the number of ERR type log output
+	int* p_num_warn   //!< [out] the pointer to store the number of WARN type log output
+);
 
 }   // namespace concurrent
 }   // namespace alpha

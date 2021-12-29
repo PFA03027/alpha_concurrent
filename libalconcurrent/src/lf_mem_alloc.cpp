@@ -17,6 +17,7 @@
 
 #include "alconcurrent/lf_mem_alloc.hpp"
 #include "alconcurrent/lf_mem_alloc_internal.hpp"
+#include "alconcurrent/conf_logger.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -37,8 +38,8 @@ idx_mgr_element::idx_mgr_element( void )
  */
 void idx_mgr_element::dump( void ) const
 {
-	char buf[2048];
-	snprintf( buf, 2047,
+	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 	          "object idx_mgr_element_%p as %p {\n"
 	          "\t idx_ = %d\n"
 	          "\t p_invalid_idx_next_element_ = %p\n"
@@ -50,27 +51,27 @@ void idx_mgr_element::dump( void ) const
 	          p_invalid_idx_next_element_.load(),
 	          p_valid_idx_next_element_.load(),
 	          p_waiting_next_element_ );
-	LogOutput( log_type::DUMP, buf );
+	internal::LogOutput( log_type::DUMP, buf );
 
 	if ( p_invalid_idx_next_element_.load() != nullptr ) {
-		snprintf( buf, 2047,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 		          "%p --> %p : invalid\n",
 		          this, p_invalid_idx_next_element_.load() );
-		LogOutput( log_type::DUMP, buf );
+		internal::LogOutput( log_type::DUMP, buf );
 	}
 
 	if ( p_valid_idx_next_element_.load() != nullptr ) {
-		snprintf( buf, 2047,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 		          "%p --> %p : valid\n",
 		          this, p_valid_idx_next_element_.load() );
-		LogOutput( log_type::DUMP, buf );
+		internal::LogOutput( log_type::DUMP, buf );
 	}
 
 	if ( p_waiting_next_element_ != nullptr ) {
-		snprintf( buf, 2047,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 		          "%p --> %p : waiting\n",
 		          this, p_waiting_next_element_ );
-		LogOutput( log_type::DUMP, buf );
+		internal::LogOutput( log_type::DUMP, buf );
 	}
 
 	return;
@@ -121,9 +122,9 @@ void waiting_element_list::push(
 
 void waiting_element_list::dump( void ) const
 {
-	char buf[2048];
+	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 
-	snprintf( buf, 2047,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 	          "object waiting_element_list_%p as %p {\n"
 	          "\t head_ = %p\n"
 	          "\t tail_ = %p\n"
@@ -131,20 +132,20 @@ void waiting_element_list::dump( void ) const
 	          this, this,
 	          head_,
 	          tail_ );
-	LogOutput( log_type::DUMP, buf );
+	internal::LogOutput( log_type::DUMP, buf );
 
 	if ( head_ != nullptr ) {
-		snprintf( buf, 2047,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 		          "%p --> %p\n",
 		          this, head_ );
-		LogOutput( log_type::DUMP, buf );
+		internal::LogOutput( log_type::DUMP, buf );
 	}
 
 	if ( tail_ != nullptr ) {
-		snprintf( buf, 2047,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 		          "%p --> %p\n",
 		          this, tail_ );
-		LogOutput( log_type::DUMP, buf );
+		internal::LogOutput( log_type::DUMP, buf );
 	}
 
 	return;
@@ -338,15 +339,15 @@ waiting_idx_list::waiting_idx_list( const int idx_buff_size_arg, const int ver_a
 waiting_idx_list::~waiting_idx_list()
 {
 	if ( idx_top_idx_ > 0 ) {
-		char buf[2048];
+		char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 
-		snprintf( buf, 2047, "waiting_idx_list_%p is destructed. but it has some index {", this );
-		LogOutput( log_type::WARN, buf );
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1, "waiting_idx_list_%p is destructed. but it has some index {", this );
+		internal::LogOutput( log_type::WARN, buf );
 		for ( int i = 0; i < idx_top_idx_; i++ ) {
-			snprintf( buf, 2047, "\t%d,", p_idx_buff_[i] );
-			LogOutput( log_type::WARN, buf );
+			snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1, "\t%d,", p_idx_buff_[i] );
+			internal::LogOutput( log_type::WARN, buf );
 		}
-		LogOutput( log_type::WARN, "}" );
+		internal::LogOutput( log_type::WARN, "}" );
 	}
 
 	delete[] p_idx_buff_;
@@ -397,9 +398,9 @@ void waiting_idx_list::push_to_tls( const int valid_idx, const int idx_buff_size
 
 void waiting_idx_list::dump( void ) const
 {
-	char buf[2048];
+	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 
-	snprintf( buf, 2047,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 	          "object waiting_idx_list_%p as %p {\n"
 	          "\t idx_buff_size_ = %d\n"
 	          "\t idx_top_idx_ = %d\n"
@@ -409,22 +410,22 @@ void waiting_idx_list::dump( void ) const
 	          idx_buff_size_,
 	          idx_top_idx_,
 	          p_idx_buff_ );
-	LogOutput( log_type::DUMP, buf );
+	internal::LogOutput( log_type::DUMP, buf );
 
 	if ( p_idx_buff_ != nullptr ) {
-		snprintf( buf, 2047,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 		          "object p_idx_buff_%p as %p {\n",
 		          this, this );
-		LogOutput( log_type::DUMP, buf );
+		internal::LogOutput( log_type::DUMP, buf );
 
 		for ( int i = 0; i < idx_buff_size_; i++ ) {
-			snprintf( buf, 2047,
+			snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 			          "\t %d => %d\n",
 			          i, p_idx_buff_[i] );
-			LogOutput( log_type::DUMP, buf );
+			internal::LogOutput( log_type::DUMP, buf );
 		}
 
-		LogOutput( log_type::DUMP, "}\n" );
+		internal::LogOutput( log_type::DUMP, "}\n" );
 	}
 
 	return;
@@ -550,11 +551,11 @@ void idx_mgr::rcv_wait_idx_by_thread_terminating( waiting_idx_list* p_idx_list )
 
 void idx_mgr::dump( void )
 {
-	char buf[2048];
+	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 
 	const waiting_idx_list& tmp_wel = tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
 
-	snprintf( buf, 2047,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 	          "object idx_mgr_%p as %p {\n"
 	          "\t idx_size_ = %d\n"
 	          "\t idx_size_ver_ = %d\n"
@@ -570,29 +571,29 @@ void idx_mgr::dump( void )
 	          &invalid_element_storage_,
 	          &valid_element_storage_,
 	          &tmp_wel );
-	LogOutput( log_type::DUMP, buf );
+	internal::LogOutput( log_type::DUMP, buf );
 
 	if ( p_idx_mgr_element_array_ != nullptr ) {
-		snprintf( buf, 2047,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 		          "%p --> %p \n",
 		          this, p_idx_mgr_element_array_ );
-		LogOutput( log_type::DUMP, buf );
+		internal::LogOutput( log_type::DUMP, buf );
 	}
 
-	snprintf( buf, 2047,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 	          "%p --> %p \n",
 	          this, &invalid_element_storage_ );
-	LogOutput( log_type::DUMP, buf );
+	internal::LogOutput( log_type::DUMP, buf );
 
-	snprintf( buf, 2047,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 	          "%p --> %p \n",
 	          this, &valid_element_storage_ );
-	LogOutput( log_type::DUMP, buf );
+	internal::LogOutput( log_type::DUMP, buf );
 
-	snprintf( buf, 2047,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 	          "%p --> %p \n",
 	          this, &tmp_wel );
-	LogOutput( log_type::DUMP, buf );
+	internal::LogOutput( log_type::DUMP, buf );
 
 	if ( p_idx_mgr_element_array_ != nullptr ) {
 		for ( int i = 0; i < idx_size_; i++ ) {
@@ -804,7 +805,7 @@ bool chunk_header_multi_slot::recycle_mem_slot(
 
 	if ( !result ) {
 		// double free has occured.
-		LogOutput( log_type::ERR, "double free has occured." );
+		internal::LogOutput( log_type::ERR, "double free has occured." );
 		//		fflush( NULL );
 		statistics_dealloc_req_err_cnt_++;
 		return true;
@@ -866,12 +867,12 @@ slot_chk_result chunk_header_multi_slot::get_chunk(
 
 	slot_chk_result ret = p_slot_addr->chk_header_data();
 	if ( !( ret.correct ) ) {
-		char buf[2048];
+		char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 
-		snprintf( buf, 2047,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 		          "a header of slot_header is corrupted %p\n",
 		          p_addr );
-		LogOutput( log_type::WARN, buf );
+		internal::LogOutput( log_type::WARN, buf );
 	}
 
 	return ret;
@@ -904,31 +905,31 @@ chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
  */
 void chunk_header_multi_slot::dump( void )
 {
-	char buf[2048];
+	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 
 	if ( p_chunk_ != nullptr ) {
-		snprintf( buf, 2047,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 		          "object chunk_%p as %p \n",
 		          p_chunk_, p_chunk_ );
-		LogOutput( log_type::DUMP, buf );
+		internal::LogOutput( log_type::DUMP, buf );
 	}
 
 	if ( p_free_slot_mark_ != nullptr ) {
-		snprintf( buf, 2047,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 		          "object p_free_slot_mark_%p as %p {\n",
 		          p_free_slot_mark_, p_free_slot_mark_ );
-		LogOutput( log_type::DUMP, buf );
+		internal::LogOutput( log_type::DUMP, buf );
 
 		for ( std::size_t i = 0; i < alloc_conf_.num_of_pieces_; i++ ) {
-			snprintf( buf, 2047,
+			snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 			          "%zu = %s \n",
 			          i, p_free_slot_mark_[i].load() ? "true" : "false" );
-			LogOutput( log_type::DUMP, buf );
+			internal::LogOutput( log_type::DUMP, buf );
 		}
-		LogOutput( log_type::DUMP, "}\n" );
+		internal::LogOutput( log_type::DUMP, "}\n" );
 	}
 
-	snprintf( buf, 2047,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 	          "object chunk_header_multi_slot_%p as %p {\n"
 	          "\t alloc_conf_.size_of_one_piece_ = %zu \n"
 	          "\t alloc_conf_.num_of_pieces_ = %zu \n"
@@ -944,7 +945,7 @@ void chunk_header_multi_slot::dump( void )
 	          p_free_slot_mark_,
 	          p_chunk_,
 	          &free_slot_idx_mgr_ );
-	LogOutput( log_type::DUMP, buf );
+	internal::LogOutput( log_type::DUMP, buf );
 
 	free_slot_idx_mgr_.dump();
 
@@ -1201,7 +1202,7 @@ void general_mem_allocator::set_param(
 )
 {
 	if ( pr_ch_size_ > 0 ) {
-		LogOutput( log_type::WARN, "paramter has already set. ignore this request." );
+		internal::LogOutput( log_type::WARN, "paramter has already set. ignore this request." );
 		return;
 	}
 
@@ -1244,8 +1245,8 @@ std::list<chunk_statistics> general_mem_allocator::get_statistics( void ) const
 
 std::string chunk_statistics::print( void )
 {
-	char buf[2048];
-	snprintf( buf, 2047,
+	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
 	          "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d",
 	          (int)alloc_conf_.size_of_one_piece_,
 	          (int)alloc_conf_.num_of_pieces_,

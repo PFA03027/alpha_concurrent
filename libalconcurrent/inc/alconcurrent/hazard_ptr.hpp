@@ -74,7 +74,7 @@ public:
 	inline void regist_ptr_as_hazard_ptr( T* p_target, int idx )
 	{
 		if ( idx >= N ) {
-			LogOutput( log_type::ERR, "Error: the requested index is over max index." );
+			internal::LogOutput( log_type::ERR, "Error: the requested index is over max index." );
 			return;
 		}
 
@@ -297,7 +297,7 @@ private:
 			while ( p_ans != nullptr ) {
 				if ( p_ans->get_status() == ocupied_status::UNUSED ) {
 					if ( p_ans->try_to_get_owner() ) {
-						LogOutput( log_type::DEBUG, "node is allocated." );
+						internal::LogOutput( log_type::DEBUG, "node is allocated." );
 						return p_ans;
 					}
 				}
@@ -307,7 +307,7 @@ private:
 			// 空きノードが見つからなかったので、新しいノードを用意する。
 			p_ans = add_one_new_hazard_ptr_node();
 
-			LogOutput( log_type::DEBUG, "glist is added." );
+			internal::LogOutput( log_type::DEBUG, "glist is added." );
 			return p_ans;
 		}
 
@@ -355,7 +355,7 @@ private:
 			} while ( !cas_success );   // CASが成功するまで繰り返す。
 			node_count_++;
 
-			LogOutput( log_type::DEBUG, "glist is added." );
+			internal::LogOutput( log_type::DEBUG, "glist is added." );
 			return p_ans;
 		}
 

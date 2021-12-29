@@ -35,12 +35,12 @@ void error_log_output( int errno_arg, const char* p_func_name )
 	buff[STRERROR_BUFF_SIZE - 1] = 0;
 
 	if ( tr_ret == 0 ) {
-		LogOutput(
+		internal::LogOutput(
 			log_type::ERR,
 			"%s failed, num of tls key: %d, errno=%d, %s",
 			p_func_name, cur_count_of_tls_keys.load(), errno_arg, buff );
 	} else {
-		LogOutput(
+		internal::LogOutput(
 			log_type::ERR,
 			"%s failed, num of tls key: %d, errno=%d, and strerror_r() also fail %d",
 			p_func_name, cur_count_of_tls_keys.load(), errno_arg, tr_ret );
@@ -51,12 +51,12 @@ void error_log_output( int errno_arg, const char* p_func_name )
 	buff[STRERROR_BUFF_SIZE - 1] = 0;
 
 	if ( tr_ret == 0 ) {
-		LogOutput(
+		internal::LogOutput(
 			log_type::ERR,
 			"%s failed, num of tls key: %d, errno=%d, %s",
 			p_func_name, cur_count_of_tls_keys.load(), errno_arg, buff );
 	} else {
-		LogOutput(
+		internal::LogOutput(
 			log_type::ERR,
 			"%s failed, num of tls key: %d, errno=%d, and strerror_r() also fail %d",
 			p_func_name, cur_count_of_tls_keys.load(), errno_arg, tr_ret );
@@ -65,7 +65,7 @@ void error_log_output( int errno_arg, const char* p_func_name )
 	char* errstr                 = strerror_r( errno_arg, buff, STRERROR_BUFF_SIZE - 1 );
 	buff[STRERROR_BUFF_SIZE - 1] = 0;
 
-	LogOutput(
+	internal::LogOutput(
 		log_type::ERR,
 		"%s failed, num of tls key: %d, errno=%d, %s",
 		p_func_name, cur_count_of_tls_keys.load(), errno_arg, errstr );

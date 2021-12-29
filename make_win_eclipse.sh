@@ -16,7 +16,7 @@ BUILDTYPE=Release
 if [ $# -eq 0 ]; then
 	mkdir -p build
 	cd build
-	cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -D BUILD_TARGET=${BUILDTARGET} -G "Eclipse CDT4 - Unix Makefiles" ../
+	cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -G "Eclipse CDT4 - Unix Makefiles" ../
 	cmake --build . -j 8 -v
 else
 	if [ "$1" = "clean" ]; then
@@ -24,7 +24,8 @@ else
 	else
 		mkdir -p build
 		cd build
-		cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -D BUILD_TARGET=${BUILDTARGET} -G "Eclipse CDT4 - Unix Makefiles" ../
+		#cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -DSANITIZER_TYPE=1 -G "Eclipse CDT4 - Unix Makefiles" ../
+		cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -G "Eclipse CDT4 - Unix Makefiles" ../
 		if [ "$1" = "full" ]; then
 			cmake --build . --clean-first -j 8 -v
 		else
