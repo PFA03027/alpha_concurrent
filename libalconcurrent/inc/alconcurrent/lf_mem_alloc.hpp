@@ -24,6 +24,11 @@
 namespace alpha {
 namespace concurrent {
 
+#define CACHE_LINE_BYTES ( 64 )   //!< cache line bytes. This is configurable value
+
+extern const unsigned int           num_of_default_param_array;   //!< array size of default parameter array
+extern const param_chunk_allocation default_param_array[];        //!< pointer to default parameter array
+
 /*!
  * @breif	semi lock-free memory allocator based on multi chunk size list
  *
@@ -61,7 +66,7 @@ public:
 	 *
 	 * @warn
 	 * This I/F is NOT thread safe. @n
-	 * This should be called before launching any threads
+	 * This should be called before launching any threads. Therefore mostly debug or sample code purpose only.
 	 */
 	void set_param(
 		const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
@@ -82,6 +87,22 @@ private:
 	unsigned int                        pr_ch_size_;          // array size of chunk and param array
 	std::unique_ptr<param_chunk_comb[]> up_param_ch_array_;   //!< unique pointer to chunk and param array
 };
+
+/*!
+ * @breif	allocate memory
+ *
+ * This I/F allocates a memory from a global general_mem_allocator instance. @n
+ * The allocated memory must free by gm_mem_deallocate().
+ *
+ * @note
+ * This uses default_param_array and num_of_default_param_array as initial allocation parameter
+ */
+void* gmem_allocate( std::size_t n );
+
+/*!
+ * @breif	deallocate memory
+ */
+void gmem_deallocate( void* p_mem );
 
 }   // namespace concurrent
 }   // namespace alpha

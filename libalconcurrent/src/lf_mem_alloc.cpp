@@ -15,9 +15,9 @@
 #include <stdexcept>
 #include <vector>
 
+#include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
 #include "alconcurrent/lf_mem_alloc_internal.hpp"
-#include "alconcurrent/conf_logger.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -39,7 +39,7 @@ idx_mgr_element::idx_mgr_element( void )
 void idx_mgr_element::dump( void ) const
 {
 	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
-	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 	          "object idx_mgr_element_%p as %p {\n"
 	          "\t idx_ = %d\n"
 	          "\t p_invalid_idx_next_element_ = %p\n"
@@ -54,21 +54,21 @@ void idx_mgr_element::dump( void ) const
 	internal::LogOutput( log_type::DUMP, buf );
 
 	if ( p_invalid_idx_next_element_.load() != nullptr ) {
-		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 		          "%p --> %p : invalid\n",
 		          this, p_invalid_idx_next_element_.load() );
 		internal::LogOutput( log_type::DUMP, buf );
 	}
 
 	if ( p_valid_idx_next_element_.load() != nullptr ) {
-		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 		          "%p --> %p : valid\n",
 		          this, p_valid_idx_next_element_.load() );
 		internal::LogOutput( log_type::DUMP, buf );
 	}
 
 	if ( p_waiting_next_element_ != nullptr ) {
-		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 		          "%p --> %p : waiting\n",
 		          this, p_waiting_next_element_ );
 		internal::LogOutput( log_type::DUMP, buf );
@@ -124,7 +124,7 @@ void waiting_element_list::dump( void ) const
 {
 	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 
-	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 	          "object waiting_element_list_%p as %p {\n"
 	          "\t head_ = %p\n"
 	          "\t tail_ = %p\n"
@@ -135,14 +135,14 @@ void waiting_element_list::dump( void ) const
 	internal::LogOutput( log_type::DUMP, buf );
 
 	if ( head_ != nullptr ) {
-		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 		          "%p --> %p\n",
 		          this, head_ );
 		internal::LogOutput( log_type::DUMP, buf );
 	}
 
 	if ( tail_ != nullptr ) {
-		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 		          "%p --> %p\n",
 		          this, tail_ );
 		internal::LogOutput( log_type::DUMP, buf );
@@ -341,10 +341,10 @@ waiting_idx_list::~waiting_idx_list()
 	if ( idx_top_idx_ > 0 ) {
 		char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 
-		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1, "waiting_idx_list_%p is destructed. but it has some index {", this );
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1, "waiting_idx_list_%p is destructed. but it has some index {", this );
 		internal::LogOutput( log_type::WARN, buf );
 		for ( int i = 0; i < idx_top_idx_; i++ ) {
-			snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1, "\t%d,", p_idx_buff_[i] );
+			snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1, "\t%d,", p_idx_buff_[i] );
 			internal::LogOutput( log_type::WARN, buf );
 		}
 		internal::LogOutput( log_type::WARN, "}" );
@@ -400,7 +400,7 @@ void waiting_idx_list::dump( void ) const
 {
 	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 
-	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 	          "object waiting_idx_list_%p as %p {\n"
 	          "\t idx_buff_size_ = %d\n"
 	          "\t idx_top_idx_ = %d\n"
@@ -413,13 +413,13 @@ void waiting_idx_list::dump( void ) const
 	internal::LogOutput( log_type::DUMP, buf );
 
 	if ( p_idx_buff_ != nullptr ) {
-		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 		          "object p_idx_buff_%p as %p {\n",
 		          this, this );
 		internal::LogOutput( log_type::DUMP, buf );
 
 		for ( int i = 0; i < idx_buff_size_; i++ ) {
-			snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+			snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 			          "\t %d => %d\n",
 			          i, p_idx_buff_[i] );
 			internal::LogOutput( log_type::DUMP, buf );
@@ -555,7 +555,7 @@ void idx_mgr::dump( void )
 
 	const waiting_idx_list& tmp_wel = tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
 
-	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 	          "object idx_mgr_%p as %p {\n"
 	          "\t idx_size_ = %d\n"
 	          "\t idx_size_ver_ = %d\n"
@@ -574,23 +574,23 @@ void idx_mgr::dump( void )
 	internal::LogOutput( log_type::DUMP, buf );
 
 	if ( p_idx_mgr_element_array_ != nullptr ) {
-		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 		          "%p --> %p \n",
 		          this, p_idx_mgr_element_array_ );
 		internal::LogOutput( log_type::DUMP, buf );
 	}
 
-	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 	          "%p --> %p \n",
 	          this, &invalid_element_storage_ );
 	internal::LogOutput( log_type::DUMP, buf );
 
-	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 	          "%p --> %p \n",
 	          this, &valid_element_storage_ );
 	internal::LogOutput( log_type::DUMP, buf );
 
-	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 	          "%p --> %p \n",
 	          this, &tmp_wel );
 	internal::LogOutput( log_type::DUMP, buf );
@@ -682,22 +682,25 @@ chunk_header_multi_slot::~chunk_header_multi_slot()
 	return;
 }
 
+#define CACHE_LINE_BYTES ( 64 )
+#define GM_ALIGN_SIZE    ( sizeof( std::max_align_t ) > CACHE_LINE_BYTES ? sizeof( std::max_align_t ) : CACHE_LINE_BYTES )
+
 constexpr std::size_t get_slot_header_size( void )
 {
-	std::size_t tmp = sizeof( slot_header ) / sizeof( std::max_align_t );
-	std::size_t adt = sizeof( slot_header ) % sizeof( std::max_align_t );
+	std::size_t tmp = sizeof( slot_header ) / GM_ALIGN_SIZE;
+	std::size_t adt = sizeof( slot_header ) % GM_ALIGN_SIZE;
 
-	std::size_t ans = ( tmp + ( ( adt > 0 ) ? 1 : 0 ) ) * sizeof( std::max_align_t );
+	std::size_t ans = ( tmp + ( ( adt > 0 ) ? 1 : 0 ) ) * GM_ALIGN_SIZE;
 
 	return ans;
 }
 
 std::size_t chunk_header_multi_slot::get_size_of_one_slot( void ) const
 {
-	std::size_t tmp = alloc_conf_.size_of_one_piece_ / sizeof( std::max_align_t );
-	std::size_t adt = alloc_conf_.size_of_one_piece_ % sizeof( std::max_align_t );
+	std::size_t tmp = alloc_conf_.size_of_one_piece_ / GM_ALIGN_SIZE;
+	std::size_t adt = alloc_conf_.size_of_one_piece_ % GM_ALIGN_SIZE;
 
-	std::size_t ans = ( tmp + ( ( adt > 0 ) ? 1 : 0 ) ) * sizeof( std::max_align_t );
+	std::size_t ans = ( tmp + ( ( adt > 0 ) ? 1 : 0 ) ) * GM_ALIGN_SIZE;
 	ans += get_slot_header_size();
 
 	return ans;
@@ -869,7 +872,7 @@ slot_chk_result chunk_header_multi_slot::get_chunk(
 	if ( !( ret.correct ) ) {
 		char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 
-		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 		          "a header of slot_header is corrupted %p\n",
 		          p_addr );
 		internal::LogOutput( log_type::WARN, buf );
@@ -908,20 +911,20 @@ void chunk_header_multi_slot::dump( void )
 	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 
 	if ( p_chunk_ != nullptr ) {
-		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 		          "object chunk_%p as %p \n",
 		          p_chunk_, p_chunk_ );
 		internal::LogOutput( log_type::DUMP, buf );
 	}
 
 	if ( p_free_slot_mark_ != nullptr ) {
-		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 		          "object p_free_slot_mark_%p as %p {\n",
 		          p_free_slot_mark_, p_free_slot_mark_ );
 		internal::LogOutput( log_type::DUMP, buf );
 
 		for ( std::size_t i = 0; i < alloc_conf_.num_of_pieces_; i++ ) {
-			snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+			snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 			          "%zu = %s \n",
 			          i, p_free_slot_mark_[i].load() ? "true" : "false" );
 			internal::LogOutput( log_type::DUMP, buf );
@@ -929,7 +932,7 @@ void chunk_header_multi_slot::dump( void )
 		internal::LogOutput( log_type::DUMP, "}\n" );
 	}
 
-	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 	          "object chunk_header_multi_slot_%p as %p {\n"
 	          "\t alloc_conf_.size_of_one_piece_ = %zu \n"
 	          "\t alloc_conf_.num_of_pieces_ = %zu \n"
@@ -1246,7 +1249,7 @@ std::list<chunk_statistics> general_mem_allocator::get_statistics( void ) const
 std::string chunk_statistics::print( void )
 {
 	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
-	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE-1,
+	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 	          "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d",
 	          (int)alloc_conf_.size_of_one_piece_,
 	          (int)alloc_conf_.num_of_pieces_,

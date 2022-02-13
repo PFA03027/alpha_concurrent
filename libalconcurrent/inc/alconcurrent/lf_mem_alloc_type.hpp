@@ -5,7 +5,7 @@
  * @date	Created on 2021/05/30
  * @details
  *
- * Copyright (C) 2021 by alpha <e-mail address>
+ * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
 #ifndef INC_ALCONCURRENT_LF_MEM_ALLOC_TYPE_HPP_
