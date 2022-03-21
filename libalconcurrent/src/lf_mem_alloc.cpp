@@ -657,7 +657,7 @@ chunk_header_multi_slot::chunk_header_multi_slot(
   : p_next_chunk_( nullptr )
   , status_( chunk_control_status::EMPTY )
   , num_of_accesser_( 0 )
-  , alloc_conf_( ch_param_arg )
+  , slot_conf_ {}
   , p_free_slot_mark_( nullptr )
   , free_slot_idx_mgr_( -1 )
   , p_chunk_( nullptr )
@@ -666,8 +666,8 @@ chunk_header_multi_slot::chunk_header_multi_slot(
   , statistics_dealloc_req_cnt_( 0 )
   , statistics_dealloc_req_err_cnt_( 0 )
 {
-	alloc_conf_.size_of_one_piece_ = get_size_of_one_slot();
-	alloc_conf_.num_of_pieces_     = ( ch_param_arg.num_of_pieces_ >= 2 ) ? ch_param_arg.num_of_pieces_ : 2;
+	slot_conf_.size_of_one_piece_ = get_size_of_one_slot( ch_param_arg );
+	slot_conf_.num_of_pieces_     = ( ch_param_arg.num_of_pieces_ >= 2 ) ? ch_param_arg.num_of_pieces_ : 2;
 
 	alloc_new_chunk();
 
@@ -682,25 +682,24 @@ chunk_header_multi_slot::~chunk_header_multi_slot()
 	return;
 }
 
-#define CACHE_LINE_BYTES ( 64 )
-#define GM_ALIGN_SIZE    ( sizeof( std::max_align_t ) > CACHE_LINE_BYTES ? sizeof( std::max_align_t ) : CACHE_LINE_BYTES )
+#define GM_ALIGN_SIZE    ( alignof( std::max_align_t ) )
 
 constexpr std::size_t get_slot_header_size( void )
 {
 	std::size_t tmp = sizeof( slot_header ) / GM_ALIGN_SIZE;
-	std::size_t adt = sizeof( slot_header ) % GM_ALIGN_SIZE;
 
-	std::size_t ans = ( tmp + ( ( adt > 0 ) ? 1 : 0 ) ) * GM_ALIGN_SIZE;
+	std::size_t ans = ( tmp +1 ) * GM_ALIGN_SIZE;
 
 	return ans;
 }
 
-std::size_t chunk_header_multi_slot::get_size_of_one_slot( void ) const
+std::size_t chunk_header_multi_slot::get_size_of_one_slot(
+	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
+)
 {
-	std::size_t tmp = alloc_conf_.size_of_one_piece_ / GM_ALIGN_SIZE;
-	std::size_t adt = alloc_conf_.size_of_one_piece_ % GM_ALIGN_SIZE;
+	std::size_t tmp = ch_param_arg.size_of_one_piece_ / GM_ALIGN_SIZE;
 
-	std::size_t ans = ( tmp + ( ( adt > 0 ) ? 1 : 0 ) ) * GM_ALIGN_SIZE;
+	std::size_t ans = ( tmp + 1 ) * GM_ALIGN_SIZE;
 	ans += get_slot_header_size();
 
 	return ans;
@@ -714,40 +713,42 @@ bool chunk_header_multi_slot::alloc_new_chunk( void )
 	if ( !result ) return false;
 
 	std::size_t tmp_size;
-	tmp_size = alloc_conf_.size_of_one_piece_ * alloc_conf_.num_of_pieces_;
+	tmp_size = slot_conf_.size_of_one_piece_ * slot_conf_.num_of_pieces_;
 
 	if ( tmp_size == 0 ) {
-		status_.store( chunk_control_status::EMPTY );
+		status_.store( chunk_control_status::EMPTY, std::memory_order_release );
 		return false;
 	}
 
 	p_chunk_ = std::malloc( tmp_size );
 	if ( p_chunk_ == nullptr ) {
-		status_.store( chunk_control_status::EMPTY );
+		status_.store( chunk_control_status::EMPTY, std::memory_order_release );
 		return false;
 	}
 
 	if ( p_free_slot_mark_ == nullptr ) {
-		p_free_slot_mark_ = new std::atomic_bool[alloc_conf_.num_of_pieces_];
-		for ( std::size_t i = 0; i < alloc_conf_.num_of_pieces_; i++ ) {
+		p_free_slot_mark_ = new std::atomic_bool[slot_conf_.num_of_pieces_];
+		for ( std::size_t i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
 			p_free_slot_mark_[i].store( true );
 		}
 	}
 
 	size_of_chunk_ = tmp_size;
 
-	free_slot_idx_mgr_.set_idx_size( alloc_conf_.num_of_pieces_ );
+	free_slot_idx_mgr_.set_idx_size( slot_conf_.num_of_pieces_ );
 
-	status_.store( chunk_control_status::NORMAL );
+	status_.store( chunk_control_status::NORMAL, std::memory_order_release );
 
 	return true;
 }
 
 void* chunk_header_multi_slot::allocate_mem_slot( void )
 {
-	if ( status_.load() != chunk_control_status::NORMAL ) return nullptr;
+	if ( status_.load( std::memory_order_acquire ) != chunk_control_status::NORMAL ) return nullptr;
 
 	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+
+	if ( status_.load( std::memory_order_acquire ) != chunk_control_status::NORMAL ) return nullptr;
 
 	statistics_alloc_req_cnt_++;
 
@@ -760,7 +761,7 @@ void* chunk_header_multi_slot::allocate_mem_slot( void )
 	p_free_slot_mark_[read_idx].store( false );
 
 	std::uintptr_t p_ans_addr = reinterpret_cast<std::uintptr_t>( p_chunk_ );
-	p_ans_addr += read_idx * alloc_conf_.size_of_one_piece_;
+	p_ans_addr += read_idx * slot_conf_.size_of_one_piece_;
 
 	slot_header* p_sh = reinterpret_cast<slot_header*>( p_ans_addr );
 	p_sh->set_addr_of_chunk_header_multi_slot( this );
@@ -797,10 +798,10 @@ bool chunk_header_multi_slot::recycle_mem_slot(
 	std::uintptr_t p_chking_addr = reinterpret_cast<std::uintptr_t>( p_slot_addr );
 	p_chking_addr -= reinterpret_cast<std::uintptr_t>( p_chunk_ );
 
-	std::uintptr_t idx = p_chking_addr / alloc_conf_.size_of_one_piece_;
-	std::uintptr_t adt = p_chking_addr % alloc_conf_.size_of_one_piece_;
+	std::uintptr_t idx = p_chking_addr / slot_conf_.size_of_one_piece_;
+	std::uintptr_t adt = p_chking_addr % slot_conf_.size_of_one_piece_;
 
-	if ( idx >= alloc_conf_.num_of_pieces_ ) return false;
+	if ( idx >= slot_conf_.num_of_pieces_ ) return false;
 	if ( adt != 0 ) return false;
 
 	bool expect_not_free = false;
@@ -823,7 +824,7 @@ bool chunk_header_multi_slot::recycle_mem_slot(
 
 const param_chunk_allocation& chunk_header_multi_slot::get_param( void ) const
 {
-	return alloc_conf_;
+	return slot_conf_;
 }
 
 bool chunk_header_multi_slot::set_delete_reservation( void )
@@ -855,7 +856,7 @@ bool chunk_header_multi_slot::exec_deletion( void )
 	delete[] p_free_slot_mark_;
 	p_free_slot_mark_ = nullptr;
 
-	status_.store( chunk_control_status::EMPTY );
+	status_.store( chunk_control_status::EMPTY, std::memory_order_release );
 
 	return true;
 }
@@ -885,11 +886,11 @@ chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
 {
 	chunk_statistics ans;
 
-	ans.alloc_conf_     = alloc_conf_;
+	ans.alloc_conf_     = slot_conf_;
 	ans.chunk_num_      = 1;
-	ans.total_slot_cnt_ = alloc_conf_.num_of_pieces_;
+	ans.total_slot_cnt_ = slot_conf_.num_of_pieces_;
 	ans.free_slot_cnt_  = 0;
-	for ( std::size_t i = 0; i < alloc_conf_.num_of_pieces_; i++ ) {
+	for ( std::size_t i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
 		if ( p_free_slot_mark_[i].load() ) ans.free_slot_cnt_++;
 	}
 	ans.alloc_req_cnt_         = statistics_alloc_req_cnt_.load();
@@ -923,7 +924,7 @@ void chunk_header_multi_slot::dump( void )
 		          p_free_slot_mark_, p_free_slot_mark_ );
 		internal::LogOutput( log_type::DUMP, buf );
 
-		for ( std::size_t i = 0; i < alloc_conf_.num_of_pieces_; i++ ) {
+		for ( std::size_t i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
 			snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 			          "%zu = %s \n",
 			          i, p_free_slot_mark_[i].load() ? "true" : "false" );
@@ -942,8 +943,8 @@ void chunk_header_multi_slot::dump( void )
 	          "\t free_slot_idx_mgr_ = %p \n"
 	          "}\n",
 	          this, this,
-	          alloc_conf_.size_of_one_piece_,
-	          alloc_conf_.num_of_pieces_,
+	          slot_conf_.size_of_one_piece_,
+	          slot_conf_.num_of_pieces_,
 	          size_of_chunk_,
 	          p_free_slot_mark_,
 	          p_chunk_,

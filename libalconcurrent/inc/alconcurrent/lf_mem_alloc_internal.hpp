@@ -217,6 +217,7 @@ struct idx_mgr {
 	/*!
 	 * @breif	用意するインデックス番号の数を設定する。
 	 *
+	 * 指定された数のインデックス番号を構築する。 @n
 	 * 既に設定済みの場合、現時点までの状態を破棄し、指定された数のインデックス番号を再度構築し直す。
 	 *
 	 * @note
@@ -370,22 +371,24 @@ public:
 	void dump( void );
 
 private:
-	param_chunk_allocation alloc_conf_;          //!< allocation configuration paramter. value is corrected internally.
-	std::size_t            size_of_chunk_ = 0;   //!< size of a chunk
+	static std::size_t get_size_of_one_slot(
+			const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
+			);
 
-	std::atomic_bool* p_free_slot_mark_ = nullptr;   //!< if slot is free, this is marked as true. This is prior information than free slot idx stack.
+	param_chunk_allocation slot_conf_;      //!< allocation configuration paramter. value is corrected internally.
+	std::size_t            size_of_chunk_;   //!< size of a chunk
+
+	std::atomic_bool* p_free_slot_mark_;   //!< if slot is free, this is marked as true. This is prior information than free slot idx stack.
 
 	idx_mgr free_slot_idx_mgr_;   //<! manager of free slot index
 
-	void* p_chunk_ = nullptr;   //!< pointer to an allocated memory as a chunk
+	void* p_chunk_;   //!< pointer to an allocated memory as a chunk
 
 	// statistics
 	std::atomic<unsigned int> statistics_alloc_req_cnt_;
 	std::atomic<unsigned int> statistics_alloc_req_err_cnt_;
 	std::atomic<unsigned int> statistics_dealloc_req_cnt_;
 	std::atomic<unsigned int> statistics_dealloc_req_err_cnt_;
-
-	std::size_t get_size_of_one_slot( void ) const;
 };
 
 struct slot_chk_result {

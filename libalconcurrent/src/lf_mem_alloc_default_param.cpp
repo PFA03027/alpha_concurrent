@@ -17,6 +17,7 @@
 namespace alpha {
 namespace concurrent {
 
+#define CACHE_LINE_BYTES ( 64 )   //!< cache line bytes. This is configurable value
 #define INITIAL_NUM_OF_SLOTS ( 32 )
 
 const unsigned int           num_of_default_param_array = 11;   //!< array size of default parameter array

@@ -24,7 +24,6 @@
 namespace alpha {
 namespace concurrent {
 
-#define CACHE_LINE_BYTES ( 64 )   //!< cache line bytes. This is configurable value
 
 extern const unsigned int           num_of_default_param_array;   //!< array size of default parameter array
 extern const param_chunk_allocation default_param_array[];        //!< pointer to default parameter array
