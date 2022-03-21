@@ -164,7 +164,7 @@ public:
 
 		internal::LogOutput( log_type::ERR, "ERR: find_if_common go into logic error" );
 		return std::tuple<node_pointer, node_pointer>( nullptr, nullptr );   // 到達不可能コード。安全のために残す。
-		                                                                     // TODO ここに到達する場合は、アルゴリズムか実装がおかしいので、例外をスローするか？
+																			 // TODO ここに到達する場合は、アルゴリズムか実装がおかしいので、例外をスローするか？
 	}
 
 	/*!
@@ -720,9 +720,9 @@ public:
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 				auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
 #else
-                auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
-                auto p_prev    = std::get<0>( local_ret );
-                auto p_curr    = std::get<1>( local_ret );
+				auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+				auto p_prev    = std::get<0>( local_ret );
+				auto p_curr    = std::get<1>( local_ret );
 #endif
 				if ( !base_list_.is_end_node( p_curr ) ) continue;
 				if ( base_list_.is_head_node( p_prev ) ) {

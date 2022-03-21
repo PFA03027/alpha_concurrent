@@ -98,10 +98,10 @@ void GetErrorWarningLogCount(
 	int* p_num_warn   //!< [out] the pointer to store the number of WARN type log output
 )
 {
-	if( p_num_err != nullptr ) {
+	if ( p_num_err != nullptr ) {
 		*p_num_err = internal::err_log_count.load();
 	}
-	if( p_num_warn != nullptr ) {
+	if ( p_num_warn != nullptr ) {
 		*p_num_warn = internal::warn_log_count.load();
 	}
 	return;
@@ -112,15 +112,15 @@ void GetErrorWarningLogCountAndReset(
 	int* p_num_warn   //!< [out] the pointer to store the number of WARN type log output
 )
 {
-	if( p_num_err != nullptr ) {
+	if ( p_num_err != nullptr ) {
 		*p_num_err = internal::err_log_count.load();
 	}
-	if( p_num_warn != nullptr ) {
+	if ( p_num_warn != nullptr ) {
 		*p_num_warn = internal::warn_log_count.load();
 	}
 
-	internal::err_log_count.store(0);
-	internal::warn_log_count.store(0);
+	internal::err_log_count.store( 0 );
+	internal::warn_log_count.store( 0 );
 
 	return;
 }
