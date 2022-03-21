@@ -163,7 +163,10 @@ After Build step, please execute below commands
 
 # Patent
 ## Hazard pointer algorithm
-US Patent of Hazard pointer algrithm: US20040107227A1 is now abandoned.
+This software uses Hazard pointer algorithm to solve ABA problem.  
+In 2002, Maged Michael of IBM filed an application for a U.S. patent on the hazard pointer technique, but the application was abandoned in 2010.  
+Therefore, there is no patent issue.  
+US Patent of Hazard pointer algrithm: US20040107227A1
 https://patents.google.com/patent/US20040107227
 
 
