@@ -39,18 +39,19 @@ TEST( lfmemAlloc, TestChunkHeaderMultiSlot )
 
 	alpha::concurrent::chunk_statistics e = p_chms->get_statistics();
 
-	printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d\n",
-	        (int)e.alloc_conf_.size_of_one_piece_,
-	        (int)e.alloc_conf_.num_of_pieces_,
-	        (int)e.chunk_num_,
-	        (int)e.total_slot_cnt_,
-	        (int)e.free_slot_cnt_,
-	        (int)e.alloc_req_cnt_,
-	        (int)e.error_alloc_req_cnt_,
-	        (int)e.dealloc_req_cnt_,
-	        (int)e.error_dealloc_req_cnt_ );
+	printf( "%s\n", e.print().c_str() );
 
 	delete p_chms;
+
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
 }
 
 TEST( lfmemAlloc, TestChunkList )
@@ -73,18 +74,19 @@ TEST( lfmemAlloc, TestChunkList )
 
 	alpha::concurrent::chunk_statistics e = p_ch_lst->get_statistics();
 
-	printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d\n",
-	        (int)e.alloc_conf_.size_of_one_piece_,
-	        (int)e.alloc_conf_.num_of_pieces_,
-	        (int)e.chunk_num_,
-	        (int)e.total_slot_cnt_,
-	        (int)e.free_slot_cnt_,
-	        (int)e.alloc_req_cnt_,
-	        (int)e.error_alloc_req_cnt_,
-	        (int)e.dealloc_req_cnt_,
-	        (int)e.error_dealloc_req_cnt_ );
+	printf( "%s\n", e.print().c_str() );
 
 	delete p_ch_lst;
+
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
 }
 
 TEST( lfmemAlloc, TestGeneralMemAllocator )
@@ -112,6 +114,16 @@ TEST( lfmemAlloc, TestGeneralMemAllocator )
 
 	printf( "number of keys of pthread_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
 	printf( "max number of keys of pthread_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
+
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
 }
 
 #define GM_ALIGN_SIZE ( alignof( std::max_align_t ) )
@@ -135,4 +147,14 @@ TEST( lfmemAlloc, TestGMemAllocator )
 
 	printf( "number of keys of pthread_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
 	printf( "max number of keys of pthread_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
+
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
 }

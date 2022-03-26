@@ -129,18 +129,7 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 	std::list<alpha::concurrent::chunk_statistics> statistics = p_tmg_arg->get_statistics();
 
 	for ( auto& e : statistics ) {
-		printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d\n",
-		        (int)e.alloc_conf_.size_of_one_piece_,
-		        (int)e.alloc_conf_.num_of_pieces_,
-		        (int)e.chunk_num_,
-		        (int)e.total_slot_cnt_,
-		        (int)e.free_slot_cnt_,
-		        (int)e.alloc_req_cnt_,
-		        (int)e.error_alloc_req_cnt_,
-		        (int)e.dealloc_req_cnt_,
-		        (int)e.error_dealloc_req_cnt_,
-		        (int)e.alloc_collision_cnt_,
-		        (int)e.dealloc_collision_cnt_ );
+		printf( "%s\n", e.print().c_str() );
 	}
 
 	delete[] threads;
@@ -156,4 +145,14 @@ TEST( lfmemAlloc, TestAllocFreeBwMultThread )
 
 	err_flag.store( false );
 	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread( num_thread, &test2_gma ) );
+
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
 }

@@ -73,20 +73,19 @@ TEST( lfmemAlloc, OneChunkLoad )
 
 	alpha::concurrent::chunk_statistics e = chms.get_statistics();
 
-	printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d\n",
-	        (int)e.alloc_conf_.size_of_one_piece_,
-	        (int)e.alloc_conf_.num_of_pieces_,
-	        (int)e.chunk_num_,
-	        (int)e.total_slot_cnt_,
-	        (int)e.free_slot_cnt_,
-	        (int)e.alloc_req_cnt_,
-	        (int)e.error_alloc_req_cnt_,
-	        (int)e.dealloc_req_cnt_,
-	        (int)e.error_dealloc_req_cnt_,
-	        (int)e.alloc_collision_cnt_,
-	        (int)e.dealloc_collision_cnt_ );
+	printf( "%s\n", e.print().c_str() );
 
 	//	chms.dump();
+
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
 
 	return;
 }
@@ -286,18 +285,7 @@ void load_test_lockfree( int num_of_thd )
 	std::list<alpha::concurrent::chunk_statistics> statistics = test_gma.get_statistics();
 
 	for ( auto& e : statistics ) {
-		printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d\n",
-		        (int)e.alloc_conf_.size_of_one_piece_,
-		        (int)e.alloc_conf_.num_of_pieces_,
-		        (int)e.chunk_num_,
-		        (int)e.total_slot_cnt_,
-		        (int)e.free_slot_cnt_,
-		        (int)e.alloc_req_cnt_,
-		        (int)e.error_alloc_req_cnt_,
-		        (int)e.dealloc_req_cnt_,
-		        (int)e.error_dealloc_req_cnt_,
-		        (int)e.alloc_collision_cnt_,
-		        (int)e.dealloc_collision_cnt_ );
+		printf( "%s\n", e.print().c_str() );
 	}
 
 	delete[] threads;
@@ -333,18 +321,7 @@ void load_test_lockfree_actual_behavior( int num_of_thd )
 	std::list<alpha::concurrent::chunk_statistics> statistics = test_gma.get_statistics();
 
 	for ( auto& e : statistics ) {
-		printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d\n",
-		        (int)e.alloc_conf_.size_of_one_piece_,
-		        (int)e.alloc_conf_.num_of_pieces_,
-		        (int)e.chunk_num_,
-		        (int)e.total_slot_cnt_,
-		        (int)e.free_slot_cnt_,
-		        (int)e.alloc_req_cnt_,
-		        (int)e.error_alloc_req_cnt_,
-		        (int)e.dealloc_req_cnt_,
-		        (int)e.error_dealloc_req_cnt_,
-		        (int)e.alloc_collision_cnt_,
-		        (int)e.dealloc_collision_cnt_ );
+		printf( "%s\n", e.print().c_str() );
 	}
 
 	delete[] threads;
@@ -384,18 +361,7 @@ void load_test_lockfree_min2( int num_of_thd )
 		std::list<alpha::concurrent::chunk_statistics> statistics = free_gma_array[i]->get_statistics();
 
 		for ( auto& e : statistics ) {
-			printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d\n",
-			        (int)e.alloc_conf_.size_of_one_piece_,
-			        (int)e.alloc_conf_.num_of_pieces_,
-			        (int)e.chunk_num_,
-			        (int)e.total_slot_cnt_,
-			        (int)e.free_slot_cnt_,
-			        (int)e.alloc_req_cnt_,
-			        (int)e.error_alloc_req_cnt_,
-			        (int)e.dealloc_req_cnt_,
-			        (int)e.error_dealloc_req_cnt_,
-			        (int)e.alloc_collision_cnt_,
-			        (int)e.dealloc_collision_cnt_ );
+			printf( "%s\n", e.print().c_str() );
 		}
 	}
 
@@ -439,18 +405,7 @@ void load_test_lockfree_min2_actual_behavior( int num_of_thd )
 		std::list<alpha::concurrent::chunk_statistics> statistics = free_gma_array[i]->get_statistics();
 
 		for ( auto& e : statistics ) {
-			printf( "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d\n",
-			        (int)e.alloc_conf_.size_of_one_piece_,
-			        (int)e.alloc_conf_.num_of_pieces_,
-			        (int)e.chunk_num_,
-			        (int)e.total_slot_cnt_,
-			        (int)e.free_slot_cnt_,
-			        (int)e.alloc_req_cnt_,
-			        (int)e.error_alloc_req_cnt_,
-			        (int)e.dealloc_req_cnt_,
-			        (int)e.error_dealloc_req_cnt_,
-			        (int)e.alloc_collision_cnt_,
-			        (int)e.dealloc_collision_cnt_ );
+			printf( "%s\n", e.print().c_str() );
 		}
 	}
 
@@ -601,5 +556,16 @@ TEST( lfmemAlloc, LoadTest )
 	load_test_lockfree_min2_actual_behavior( num_thread );
 	load_test_lockfree_actual_behavior( num_thread );
 #endif
+
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
+
 	return;
 }

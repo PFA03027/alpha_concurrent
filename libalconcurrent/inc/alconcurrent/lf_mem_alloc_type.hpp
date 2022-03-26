@@ -20,8 +20,8 @@ namespace concurrent {
  * @breif	configuration paramters when allocate chunk
  */
 struct param_chunk_allocation {
-	std::size_t size_of_one_piece_ = 0;   //!< size of one piece in a chunk
-	std::size_t num_of_pieces_     = 0;   //!< number of pieces in a chunk
+	unsigned int size_of_one_piece_ = 0;   //!< size of one piece in a chunk
+	unsigned int num_of_pieces_     = 0;   //!< number of pieces in a chunk
 };
 
 struct chunk_statistics {
@@ -29,6 +29,7 @@ struct chunk_statistics {
 	std::size_t            chunk_num_;
 	std::size_t            total_slot_cnt_;
 	std::size_t            free_slot_cnt_;
+	std::size_t            max_consum_cnt_;
 	std::size_t            alloc_req_cnt_;
 	std::size_t            error_alloc_req_cnt_;
 	std::size_t            dealloc_req_cnt_;

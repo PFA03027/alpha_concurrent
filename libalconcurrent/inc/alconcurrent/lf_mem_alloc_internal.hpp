@@ -174,7 +174,7 @@ private:
 /*!
  * @breif	ハーザードポインタ登録中でindexを登録するフリーの要素がない場合に、滞留している要素を管理するリスト
  *
- * スレッドローカルデータとして管理されるため、排他制御は不要なクラス
+ * スレッドローカルデータとして管理されることを想定しているクラスであるため、排他制御を行わないクラス。
  *
  * @note
  * スレッドローカルストレージは、情報の伝搬が難しいため、バッファの再構築の要否を判定するために、バッファ構築のバージョン情報を使用する方式を採る。
@@ -324,7 +324,18 @@ public:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	void* allocate_mem_slot( void );
+	inline void* allocate_mem_slot( void )
+	{
+		void* p_ans = allocate_mem_slot_impl();
+		if ( p_ans != nullptr ) {
+			auto cur     = statistics_consum_cnt_.fetch_add( 1 ) + 1;
+			auto cur_max = statistics_max_consum_cnt_.load( std::memory_order_acquire );
+			if ( cur > cur_max ) {
+				statistics_max_consum_cnt_.compare_exchange_strong( cur_max, cur );
+			}
+		}
+		return p_ans;
+	}
 
 	/*!
 	 * @breif	recycle memory slot
@@ -332,14 +343,16 @@ public:
 	 * @retval	true	success to recycle.
 	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
 	 */
-	bool recycle_mem_slot(
+	inline bool recycle_mem_slot(
 		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
-	);
-
-	/*!
-	 * @breif	parameter of this chunk
-	 */
-	const param_chunk_allocation& get_param( void ) const;
+	)
+	{
+		bool ans = recycle_mem_slot_impl( p_recycle_slot );
+		if ( ans ) {
+			statistics_consum_cnt_--;
+		}
+		return ans;
+	}
 
 	bool set_delete_reservation( void );
 	bool unset_delete_reservation( void );
@@ -349,7 +362,9 @@ public:
 	/*!
 	 * @breif	allocate new chunk
 	 */
-	bool alloc_new_chunk( void );
+	bool alloc_new_chunk(
+		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
+	);
 
 	/*!
 	 * @breif	get chunk_header_multi_slot address from void* address that allocate_mem_slot() returns.
@@ -372,10 +387,33 @@ public:
 
 private:
 	static std::size_t get_size_of_one_slot(
-			const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
-			);
+		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
+	);
 
-	param_chunk_allocation slot_conf_;      //!< allocation configuration paramter. value is corrected internally.
+	void set_slot_allocation_conf(
+		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
+	);
+
+	/*!
+	 * @breif	allocate new memory slot
+	 *
+	 * @return	pointer to an allocated memory slot
+	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
+	 * @retval	nullptr		fail to allocate
+	 */
+	void* allocate_mem_slot_impl( void );
+
+	/*!
+	 * @breif	recycle memory slot
+	 *
+	 * @retval	true	success to recycle.
+	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
+	 */
+	bool recycle_mem_slot_impl(
+		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
+	);
+
+	param_chunk_allocation slot_conf_;       //!< allocation configuration paramter. value is corrected internally.
 	std::size_t            size_of_chunk_;   //!< size of a chunk
 
 	std::atomic_bool* p_free_slot_mark_;   //!< if slot is free, this is marked as true. This is prior information than free slot idx stack.
@@ -385,10 +423,12 @@ private:
 	void* p_chunk_;   //!< pointer to an allocated memory as a chunk
 
 	// statistics
-	std::atomic<unsigned int> statistics_alloc_req_cnt_;
-	std::atomic<unsigned int> statistics_alloc_req_err_cnt_;
-	std::atomic<unsigned int> statistics_dealloc_req_cnt_;
-	std::atomic<unsigned int> statistics_dealloc_req_err_cnt_;
+	std::atomic<unsigned int> statistics_alloc_req_cnt_;         //!< allocation request count
+	std::atomic<unsigned int> statistics_alloc_req_err_cnt_;     //!< fail count for allocation request
+	std::atomic<unsigned int> statistics_dealloc_req_cnt_;       //!< deallocation request count
+	std::atomic<unsigned int> statistics_dealloc_req_err_cnt_;   //!< fail count for deallocation request
+	std::atomic<unsigned int> statistics_consum_cnt_;            //!< current count of allocated slots
+	std::atomic<unsigned int> statistics_max_consum_cnt_;        //!< max count of allocated slots
 };
 
 struct slot_chk_result {
@@ -401,7 +441,8 @@ struct slot_header {
 	std::uintptr_t           mark_;     //!< checker mark
 
 	void set_addr_of_chunk_header_multi_slot(
-		chunk_header_multi_slot* p_chms_arg );
+		chunk_header_multi_slot* p_chms_arg   //!< [in] pointer to a parent "chunk_header_multi_slot"
+	);
 
 	slot_chk_result chk_header_data( void ) const;
 };
@@ -443,17 +484,14 @@ public:
 	);
 
 	/*!
-	 * @breif	parameter of this chunk
-	 */
-	const param_chunk_allocation& get_param( void ) const;
-
-	/*!
 	 * @breif	get statistics
 	 */
 	chunk_statistics get_statistics( void ) const;
 
 private:
-	param_chunk_allocation                alloc_conf_;     //!< allocation configuration paramter
+	unsigned int              size_of_one_piece_;   //!< size of one piece in a chunk
+	std::atomic<unsigned int> num_of_pieces_;       //!< number of pieces in a chunk
+
 	std::atomic<chunk_header_multi_slot*> p_top_chunk_;    //!< pointer to chunk_header that is top of list.
 	std::atomic<chunk_header_multi_slot*> p_hint_chunk_;   //!< pointer to chunk_header that is success to allocate recently.
 };

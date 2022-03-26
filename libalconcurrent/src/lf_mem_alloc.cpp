@@ -9,6 +9,7 @@
  */
 
 #include <algorithm>
+#include <atomic>
 #include <cstddef>
 #include <exception>
 #include <mutex>
@@ -338,6 +339,11 @@ waiting_idx_list::waiting_idx_list( const int idx_buff_size_arg, const int ver_a
 
 waiting_idx_list::~waiting_idx_list()
 {
+#if 0
+	// ハザードポインタの対応の為に一時的に滞留しているだけで、
+	// このクラスのインスタンスが廃棄される時は、idx_mgrクラスの利用者側は、使用済みとして返却済みの為、リークを起こしているわけではない。
+	// よって、ここで残留があったとしても、idx_mgrクラスの観点では、リークしていない。
+	// この点を踏まえると、残留チェックは意味がないので、チェックを無効化する。
 	if ( idx_top_idx_ > 0 ) {
 		char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 
@@ -349,6 +355,7 @@ waiting_idx_list::~waiting_idx_list()
 		}
 		internal::LogOutput( log_type::WARN, "}" );
 	}
+#endif
 
 	delete[] p_idx_buff_;
 }
@@ -665,11 +672,10 @@ chunk_header_multi_slot::chunk_header_multi_slot(
   , statistics_alloc_req_err_cnt_( 0 )
   , statistics_dealloc_req_cnt_( 0 )
   , statistics_dealloc_req_err_cnt_( 0 )
+  , statistics_consum_cnt_( 0 )
+  , statistics_max_consum_cnt_( 0 )
 {
-	slot_conf_.size_of_one_piece_ = get_size_of_one_slot( ch_param_arg );
-	slot_conf_.num_of_pieces_     = ( ch_param_arg.num_of_pieces_ >= 2 ) ? ch_param_arg.num_of_pieces_ : 2;
-
-	alloc_new_chunk();
+	alloc_new_chunk( ch_param_arg );
 
 	return;
 }
@@ -705,15 +711,30 @@ std::size_t chunk_header_multi_slot::get_size_of_one_slot(
 	return ans;
 }
 
-bool chunk_header_multi_slot::alloc_new_chunk( void )
+void chunk_header_multi_slot::set_slot_allocation_conf(
+	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
+)
+{
+	slot_conf_.size_of_one_piece_ = get_size_of_one_slot( ch_param_arg );
+	slot_conf_.num_of_pieces_     = ( ch_param_arg.num_of_pieces_ >= 2 ) ? ch_param_arg.num_of_pieces_ : 2;
+
+	return;
+}
+
+bool chunk_header_multi_slot::alloc_new_chunk(
+	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
+)
 {
 	// get ownership to allocate a chunk
 	internal::chunk_control_status expect = chunk_control_status::EMPTY;
-	bool                           result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::RESERVED_ALLOCATION );
+	bool                           result = status_.compare_exchange_strong( expect, chunk_control_status::RESERVED_ALLOCATION );
 	if ( !result ) return false;
+	// resultが真となったので、以降、このchunkに対する、領域確保の処理実行権を保有。
+
+	set_slot_allocation_conf( ch_param_arg );
 
 	std::size_t tmp_size;
-	tmp_size = slot_conf_.size_of_one_piece_ * slot_conf_.num_of_pieces_;
+	tmp_size = (std::size_t)slot_conf_.size_of_one_piece_ * (std::size_t)slot_conf_.num_of_pieces_;
 
 	if ( tmp_size == 0 ) {
 		status_.store( chunk_control_status::EMPTY, std::memory_order_release );
@@ -728,7 +749,7 @@ bool chunk_header_multi_slot::alloc_new_chunk( void )
 
 	if ( p_free_slot_mark_ == nullptr ) {
 		p_free_slot_mark_ = new std::atomic_bool[slot_conf_.num_of_pieces_];
-		for ( std::size_t i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
+		for ( unsigned int i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
 			p_free_slot_mark_[i].store( true );
 		}
 	}
@@ -739,10 +760,12 @@ bool chunk_header_multi_slot::alloc_new_chunk( void )
 
 	status_.store( chunk_control_status::NORMAL, std::memory_order_release );
 
+	statistics_consum_cnt_.store( 0, std::memory_order_release );
+
 	return true;
 }
 
-void* chunk_header_multi_slot::allocate_mem_slot( void )
+void* chunk_header_multi_slot::allocate_mem_slot_impl( void )
 {
 	if ( status_.load( std::memory_order_acquire ) != chunk_control_status::NORMAL ) return nullptr;
 
@@ -770,7 +793,7 @@ void* chunk_header_multi_slot::allocate_mem_slot( void )
 	return reinterpret_cast<void*>( p_ans_addr + get_slot_header_size() );
 }
 
-bool chunk_header_multi_slot::recycle_mem_slot(
+bool chunk_header_multi_slot::recycle_mem_slot_impl(
 	void* p_recycle_addr   //!< [in] pointer to the memory slot to recycle.
 )
 {
@@ -821,11 +844,6 @@ bool chunk_header_multi_slot::recycle_mem_slot(
 	statistics_dealloc_req_cnt_++;
 
 	return true;
-}
-
-const param_chunk_allocation& chunk_header_multi_slot::get_param( void ) const
-{
-	return slot_conf_;
 }
 
 bool chunk_header_multi_slot::set_delete_reservation( void )
@@ -892,12 +910,13 @@ chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
 	ans.total_slot_cnt_ = slot_conf_.num_of_pieces_;
 	ans.free_slot_cnt_  = 0;
 	for ( std::size_t i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
-		if ( p_free_slot_mark_[i].load() ) ans.free_slot_cnt_++;
+		if ( p_free_slot_mark_[i].load( std::memory_order_acquire ) ) ans.free_slot_cnt_++;
 	}
-	ans.alloc_req_cnt_         = statistics_alloc_req_cnt_.load();
-	ans.error_alloc_req_cnt_   = statistics_alloc_req_err_cnt_.load();
-	ans.dealloc_req_cnt_       = statistics_dealloc_req_cnt_.load();
-	ans.error_dealloc_req_cnt_ = statistics_dealloc_req_err_cnt_.load();
+	ans.max_consum_cnt_        = statistics_max_consum_cnt_.load( std::memory_order_acquire );
+	ans.alloc_req_cnt_         = statistics_alloc_req_cnt_.load( std::memory_order_acquire );
+	ans.error_alloc_req_cnt_   = statistics_alloc_req_err_cnt_.load( std::memory_order_acquire );
+	ans.dealloc_req_cnt_       = statistics_dealloc_req_cnt_.load( std::memory_order_acquire );
+	ans.error_dealloc_req_cnt_ = statistics_dealloc_req_err_cnt_.load( std::memory_order_acquire );
 
 	ans.alloc_collision_cnt_   = free_slot_idx_mgr_.get_collision_cnt_valid_storage();
 	ans.dealloc_collision_cnt_ = free_slot_idx_mgr_.get_collision_cnt_invalid_storage();
@@ -936,8 +955,8 @@ void chunk_header_multi_slot::dump( void )
 
 	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 	          "object chunk_header_multi_slot_%p as %p {\n"
-	          "\t alloc_conf_.size_of_one_piece_ = %zu \n"
-	          "\t alloc_conf_.num_of_pieces_ = %zu \n"
+	          "\t alloc_conf_.size_of_one_piece_ = %u \n"
+	          "\t alloc_conf_.num_of_pieces_ = %u \n"
 	          "\t size_of_chunk_ = %zu \n"
 	          "\t p_free_slot_mark_ = %p \n"
 	          "\t p_chunk_ = %p \n"
@@ -961,10 +980,16 @@ void chunk_header_multi_slot::dump( void )
 chunk_list::chunk_list(
 	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
 	)
-  : alloc_conf_( ch_param_arg )
+  : size_of_one_piece_( ch_param_arg.size_of_one_piece_ )
+  , num_of_pieces_( ch_param_arg.num_of_pieces_ )
   , p_top_chunk_( nullptr )
   , p_hint_chunk_( nullptr )
 {
+	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( ch_param_arg );
+
+	p_top_chunk_.store( p_new_chms, std::memory_order_release );
+	p_hint_chunk_.store( p_new_chms, std::memory_order_release );
+
 	return;
 }
 
@@ -984,27 +1009,33 @@ void* chunk_list::allocate_mem_slot( void )
 {
 	void* p_ans = nullptr;
 
+	// hintに登録されたchunkから空きスロット検索を開始する。
 	chunk_header_multi_slot* p_start_chms       = p_hint_chunk_.load( std::memory_order_acquire );
 	chunk_header_multi_slot* p_cur_chms         = p_start_chms;
 	chunk_header_multi_slot* p_1st_rsv_del_chms = nullptr;
 	chunk_header_multi_slot* p_1st_empty_chms   = nullptr;
 	while ( p_cur_chms != nullptr ) {
+		// 空きスロットが見つかれば終了
 		p_ans = p_cur_chms->allocate_mem_slot();
 		if ( p_ans != nullptr ) {
 			p_hint_chunk_.store( p_cur_chms, std::memory_order_release );
 			return p_ans;
 		}
+		// 削除予約されたchunkがあれば、記録する。
 		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::RESERVED_DELETION ) {
 			if ( p_1st_rsv_del_chms == nullptr ) {
 				p_1st_rsv_del_chms = p_cur_chms;
 			}
 		}
+		// メモリスロットが割り当てられていないchunkがあれば、記録する。
 		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::EMPTY ) {
 			if ( p_1st_empty_chms == nullptr ) {
 				p_1st_empty_chms = p_cur_chms;
 			}
 		}
 
+		// リンクリストをたどって、次に検索するchunkを取り出す。
+		// 検索を開始したchunkに到着したら、空きスロットが見つからなかったことを示すので、検索を終了する。
 		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
 		if ( p_next_chms == nullptr ) {
 			p_next_chms = p_top_chunk_.load( std::memory_order_acquire );
@@ -1016,8 +1047,11 @@ void* chunk_list::allocate_mem_slot( void )
 		p_cur_chms = p_next_chms;
 	}
 
+	// 空きスロットが見つからなかったため、削除予約chunkの再利用を試みる。
+	// ただし、すでに削除されてしまっているかもしれない。
 	if ( p_1st_rsv_del_chms != nullptr ) {
 		if ( p_1st_rsv_del_chms->unset_delete_reservation() ) {
+			// 再利用成功
 			p_ans = p_1st_rsv_del_chms->allocate_mem_slot();
 			if ( p_ans != nullptr ) {
 				p_hint_chunk_.store( p_1st_rsv_del_chms, std::memory_order_release );
@@ -1025,6 +1059,7 @@ void* chunk_list::allocate_mem_slot( void )
 			}
 		} else {
 			if ( p_1st_rsv_del_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
+				// すでに、再利用可能な状態になっていた
 				p_ans = p_1st_rsv_del_chms->allocate_mem_slot();
 				if ( p_ans != nullptr ) {
 					p_hint_chunk_.store( p_1st_rsv_del_chms, std::memory_order_release );
@@ -1034,11 +1069,28 @@ void* chunk_list::allocate_mem_slot( void )
 		}
 	}
 
+	// 確保するスロットサイズを増やす。
+	// ここで、即座にメンバ変数の値を２倍にすると、メモリの追加確保が並行して実行された場合に、並行処理分の累乗が行われて、即座にオーバーフローしてしまう。
+	// よって、メンバ変数の値の2倍化は、chunkのリスト登録が完了してから行う。
+	unsigned int cur_slot_num = num_of_pieces_.load( std::memory_order_acquire );
+	unsigned int new_slot_num = cur_slot_num * 2;
+	if ( cur_slot_num > new_slot_num ) {
+		// オーバーフローしてしまったら、2倍化を取りやめる。
+		new_slot_num = cur_slot_num;
+	}
+	param_chunk_allocation cur_alloc_conf { size_of_one_piece_, new_slot_num };
+
+	// 空きスロットがなく、削除予約chunkの再利用にも失敗したため、
+	// 空chunkにメモリ割り当てを行い、再利用を試みる。
 	if ( p_1st_empty_chms != nullptr ) {
-		if ( p_1st_empty_chms->alloc_new_chunk() ) {
+		if ( p_1st_empty_chms->alloc_new_chunk( cur_alloc_conf ) ) {
 			p_ans = p_1st_empty_chms->allocate_mem_slot();
 			if ( p_ans != nullptr ) {
 				p_hint_chunk_.store( p_1st_empty_chms, std::memory_order_release );
+
+				// chunkの登録が終わったので、スロット数の2倍化された値を登録する。
+				num_of_pieces_.compare_exchange_strong( cur_slot_num, new_slot_num );
+
 				return p_ans;
 			}
 		} else {
@@ -1052,20 +1104,24 @@ void* chunk_list::allocate_mem_slot( void )
 		}
 	}
 
-	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( alloc_conf_ );
+	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( cur_alloc_conf );
 	p_ans                               = p_new_chms->allocate_mem_slot();
 	if ( p_ans == nullptr ) {
 		delete p_new_chms;
 		return nullptr;   // TODO: should throw exception ?
 	}
 
-	chunk_header_multi_slot* p_cur_top = nullptr;
+	// 新たに確保したchunkを、chunkリストの先頭に追加する。
+	chunk_header_multi_slot* p_cur_top = p_top_chunk_.load( std::memory_order_acquire );
 	do {
-		p_cur_top = p_top_chunk_.load( std::memory_order_acquire );
-		p_new_chms->p_next_chunk_.store( p_cur_top );
-	} while ( !std::atomic_compare_exchange_strong( &p_top_chunk_, &p_cur_top, p_new_chms ) );
+		p_new_chms->p_next_chunk_.store( p_cur_top, std::memory_order_release );
+	} while ( !p_top_chunk_.compare_exchange_weak( p_cur_top, p_new_chms ) );
 
 	p_hint_chunk_.store( p_new_chms, std::memory_order_release );
+
+	// chunkの登録が終わったので、スロット数の2倍化された値を登録する。
+	num_of_pieces_.compare_exchange_strong( cur_slot_num, new_slot_num );
+
 	return p_ans;
 }
 
@@ -1084,11 +1140,6 @@ bool chunk_list::recycle_mem_slot(
 	return false;
 }
 
-const param_chunk_allocation& chunk_list::get_param( void ) const
-{
-	return alloc_conf_;
-}
-
 /*!
  * @breif	get statistics
  */
@@ -1096,10 +1147,11 @@ chunk_statistics chunk_list::get_statistics( void ) const
 {
 	chunk_statistics ans;
 
-	ans.alloc_conf_            = alloc_conf_;
+	ans.alloc_conf_            = param_chunk_allocation { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
 	ans.chunk_num_             = 0;
 	ans.total_slot_cnt_        = 0;
 	ans.free_slot_cnt_         = 0;
+	ans.max_consum_cnt_        = 0;
 	ans.alloc_req_cnt_         = 0;
 	ans.error_alloc_req_cnt_   = 0;
 	ans.dealloc_req_cnt_       = 0;
@@ -1107,13 +1159,14 @@ chunk_statistics chunk_list::get_statistics( void ) const
 	ans.alloc_collision_cnt_   = 0;
 	ans.dealloc_collision_cnt_ = 0;
 
-	chunk_header_multi_slot* p_cur_chms = p_top_chunk_.load();
+	chunk_header_multi_slot* p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
 	while ( p_cur_chms != nullptr ) {
 		chunk_statistics one_chms_statistics = p_cur_chms->get_statistics();
-		ans.alloc_conf_                      = alloc_conf_;
+		ans.alloc_conf_                      = param_chunk_allocation { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
 		ans.chunk_num_ += one_chms_statistics.chunk_num_;
 		ans.total_slot_cnt_ += one_chms_statistics.total_slot_cnt_;
 		ans.free_slot_cnt_ += one_chms_statistics.free_slot_cnt_;
+		ans.max_consum_cnt_ += one_chms_statistics.max_consum_cnt_;
 		ans.alloc_req_cnt_ += one_chms_statistics.alloc_req_cnt_;
 		ans.error_alloc_req_cnt_ += one_chms_statistics.error_alloc_req_cnt_;
 		ans.dealloc_req_cnt_ += one_chms_statistics.dealloc_req_cnt_;
@@ -1121,7 +1174,7 @@ chunk_statistics chunk_list::get_statistics( void ) const
 		ans.alloc_collision_cnt_ += one_chms_statistics.alloc_collision_cnt_;
 		ans.dealloc_collision_cnt_ += one_chms_statistics.dealloc_collision_cnt_;
 
-		chunk_header_multi_slot* p_nxt_chms = p_cur_chms->p_next_chunk_.load();
+		chunk_header_multi_slot* p_nxt_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
 		p_cur_chms                          = p_nxt_chms;
 	}
 
@@ -1253,12 +1306,13 @@ std::string chunk_statistics::print( void )
 {
 	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
-	          "chunk conf.size=%d, conf.num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d",
+	          "chunk conf.size=%d, .num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, max consum cnt=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d",
 	          (int)alloc_conf_.size_of_one_piece_,
 	          (int)alloc_conf_.num_of_pieces_,
 	          (int)chunk_num_,
 	          (int)total_slot_cnt_,
 	          (int)free_slot_cnt_,
+	          (int)max_consum_cnt_,
 	          (int)alloc_req_cnt_,
 	          (int)error_alloc_req_cnt_,
 	          (int)dealloc_req_cnt_,
