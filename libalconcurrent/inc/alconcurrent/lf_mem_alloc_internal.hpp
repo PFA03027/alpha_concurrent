@@ -437,8 +437,8 @@ struct slot_chk_result {
 };
 
 struct slot_header {
-	chunk_header_multi_slot* p_chms_;   //!< pointer to chunk_header_multi_slot that is an owner of this slot
-	std::uintptr_t           mark_;     //!< checker mark
+	std::atomic<chunk_header_multi_slot*> at_p_chms_;   //!< pointer to chunk_header_multi_slot that is an owner of this slot
+	std::atomic<std::uintptr_t>           at_mark_;     //!< checker mark
 
 	void set_addr_of_chunk_header_multi_slot(
 		chunk_header_multi_slot* p_chms_arg   //!< [in] pointer to a parent "chunk_header_multi_slot"

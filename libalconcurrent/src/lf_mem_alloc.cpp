@@ -639,8 +639,8 @@ void slot_header::set_addr_of_chunk_header_multi_slot(
 	chunk_header_multi_slot* p_chms_arg )
 {
 	// 今は簡単な仕組みで実装する
-	p_chms_ = p_chms_arg;
-	mark_   = 0 - reinterpret_cast<std::uintptr_t>( p_chms_ ) - 1;
+	at_p_chms_.store( p_chms_arg, std::memory_order_release );
+	at_mark_.store( 0 - reinterpret_cast<std::uintptr_t>( p_chms_arg ) - 1, std::memory_order_release );
 
 	return;
 }
@@ -648,12 +648,13 @@ void slot_header::set_addr_of_chunk_header_multi_slot(
 slot_chk_result slot_header::chk_header_data( void ) const
 {
 	// 今は簡単な仕組みで実装する
-	std::uintptr_t tmp = reinterpret_cast<std::uintptr_t>( p_chms_ );
-	tmp += mark_ + 1;
+	chunk_header_multi_slot* p_this_chms = at_p_chms_.load(std::memory_order_acquire);
+	std::uintptr_t tmp = reinterpret_cast<std::uintptr_t>( p_this_chms );
+	tmp += at_mark_.load(std::memory_order_acquire) + 1;
 
 	slot_chk_result ans;
 	ans.correct_ = ( tmp == 0 );
-	ans.p_chms_  = p_chms_;
+	ans.p_chms_  = p_this_chms;
 	return ans;
 }
 
