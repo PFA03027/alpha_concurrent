@@ -12,15 +12,16 @@ echo $@
 BUILDTARGET=common
 
 # Debug or Release or ...
-#BUILDTYPE=Debug
-BUILDTYPE=Release
+BUILDTYPE=Debug
+#BUILDTYPE=Release
 
 for i in {1..14}
 do
 	rm -fr build
 	mkdir -p build
 	cd build
-	cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -DSANITIZER_TYPE=$1 -G "Unix Makefiles" ../
+	echo cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -DSANITIZER_TYPE=${i} -G "Unix Makefiles" ../
+	cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -DSANITIZER_TYPE=${i} -G "Unix Makefiles" ../
 	cmake --build . -j 8 -v --target build-test
 	echo $i / 14.
 	cmake --build . -j 8 -v --target test
