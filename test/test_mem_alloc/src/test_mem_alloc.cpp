@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <iostream>
 
@@ -113,19 +114,19 @@ TEST( lfmemAlloc, TestGeneralMemAllocator )
 	printf( "max number of keys of pthread_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
 }
 
-#define CACHE_LINE_BYTES ( 64 )
-//#define GM_ALIGN_SIZE ( sizeof( std::max_align_t ) > CACHE_LINE_BYTES ? sizeof( std::max_align_t ) : CACHE_LINE_BYTES )
+#define GM_ALIGN_SIZE ( alignof( std::max_align_t ) )
+#define RQ_SIZE       ( GM_ALIGN_SIZE + 1 )
 
 TEST( lfmemAlloc, TestGMemAllocator )
 {
-	std::size_t rq_size = CACHE_LINE_BYTES;
+	std::size_t rq_size = RQ_SIZE;
 	for ( int i = 1; i < 13; i++ ) {
 		void* test_ptr1 = alpha::concurrent::gmem_allocate( rq_size );
 		EXPECT_NE( nullptr, test_ptr1 ) << std::to_string( i ) << ": request size: " << std::to_string( rq_size ) << std::endl;
 
-		//		// CACHE_LINE_BYTESでメモリがアライメントされていることを確認する
-		//		std::uintptr_t chk_ptr_align = reinterpret_cast<std::uintptr_t>( test_ptr1 );
-		//		EXPECT_EQ( chk_ptr_align % GM_ALIGN_SIZE, 0 ) << std::to_string( i ) << ": request size: " << std::to_string( rq_size ) << std::endl;
+		// GM_ALIGN_SIZEでメモリがアライメントされていることを確認する
+		std::uintptr_t chk_ptr_align = reinterpret_cast<std::uintptr_t>( test_ptr1 );
+		EXPECT_EQ( chk_ptr_align % GM_ALIGN_SIZE, 0 ) << std::to_string( i ) << ": request size: " << std::to_string( rq_size ) << std::endl;
 
 		alpha::concurrent::gmem_deallocate( test_ptr1 );
 
