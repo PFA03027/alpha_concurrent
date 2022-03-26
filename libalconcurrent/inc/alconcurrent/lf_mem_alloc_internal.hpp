@@ -392,13 +392,13 @@ private:
 };
 
 struct slot_chk_result {
-	bool                     correct;   //!< slot header result
-	chunk_header_multi_slot* p_chms;    //!< pointer to chunk_header_multi_slot. if correct is true and this pointer value is nullptr, it is allocated by malloc with slot_header
+	bool                     correct_;   //!< slot header result
+	chunk_header_multi_slot* p_chms_;    //!< pointer to chunk_header_multi_slot. if correct is true and this pointer value is nullptr, it is allocated by malloc with slot_header
 };
 
 struct slot_header {
-	chunk_header_multi_slot* p_chms;   //!< pointer to chunk_header_multi_slot that is an owner of this slot
-	std::uintptr_t           mark;     //!< checker mark
+	chunk_header_multi_slot* p_chms_;   //!< pointer to chunk_header_multi_slot that is an owner of this slot
+	std::uintptr_t           mark_;     //!< checker mark
 
 	void set_addr_of_chunk_header_multi_slot(
 		chunk_header_multi_slot* p_chms_arg );

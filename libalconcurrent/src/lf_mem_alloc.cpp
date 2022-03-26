@@ -632,8 +632,8 @@ void slot_header::set_addr_of_chunk_header_multi_slot(
 	chunk_header_multi_slot* p_chms_arg )
 {
 	// 今は簡単な仕組みで実装する
-	p_chms = p_chms_arg;
-	mark   = 0 - reinterpret_cast<std::uintptr_t>( p_chms );
+	p_chms_ = p_chms_arg;
+	mark_   = 0 - reinterpret_cast<std::uintptr_t>( p_chms_ ) - 1;
 
 	return;
 }
@@ -641,12 +641,12 @@ void slot_header::set_addr_of_chunk_header_multi_slot(
 slot_chk_result slot_header::chk_header_data( void ) const
 {
 	// 今は簡単な仕組みで実装する
-	std::uintptr_t tmp = reinterpret_cast<std::uintptr_t>( p_chms );
-	tmp += mark;
+	std::uintptr_t tmp = reinterpret_cast<std::uintptr_t>( p_chms_ );
+	tmp += mark_ + 1;
 
 	slot_chk_result ans;
-	ans.correct = ( tmp == 0 );
-	ans.p_chms  = p_chms;
+	ans.correct_ = ( tmp == 0 );
+	ans.p_chms_  = p_chms_;
 	return ans;
 }
 
@@ -682,13 +682,13 @@ chunk_header_multi_slot::~chunk_header_multi_slot()
 	return;
 }
 
-#define GM_ALIGN_SIZE    ( alignof( std::max_align_t ) )
+#define GM_ALIGN_SIZE ( alignof( std::max_align_t ) )
 
 constexpr std::size_t get_slot_header_size( void )
 {
 	std::size_t tmp = sizeof( slot_header ) / GM_ALIGN_SIZE;
 
-	std::size_t ans = ( tmp +1 ) * GM_ALIGN_SIZE;
+	std::size_t ans = ( tmp + 1 ) * GM_ALIGN_SIZE;
 
 	return ans;
 }
@@ -763,6 +763,7 @@ void* chunk_header_multi_slot::allocate_mem_slot( void )
 	std::uintptr_t p_ans_addr = reinterpret_cast<std::uintptr_t>( p_chunk_ );
 	p_ans_addr += read_idx * slot_conf_.size_of_one_piece_;
 
+	// always overwrite header information to fix a corrupted header
 	slot_header* p_sh = reinterpret_cast<slot_header*>( p_ans_addr );
 	p_sh->set_addr_of_chunk_header_multi_slot( this );
 
@@ -805,7 +806,7 @@ bool chunk_header_multi_slot::recycle_mem_slot(
 	if ( adt != 0 ) return false;
 
 	bool expect_not_free = false;
-	bool result          = std::atomic_compare_exchange_strong( &p_free_slot_mark_[idx], &expect_not_free, true );
+	bool result          = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, true );
 
 	if ( !result ) {
 		// double free has occured.
@@ -870,13 +871,13 @@ slot_chk_result chunk_header_multi_slot::get_chunk(
 	slot_header* p_slot_addr = reinterpret_cast<slot_header*>( slot_header_addr_tmp );
 
 	slot_chk_result ret = p_slot_addr->chk_header_data();
-	if ( !( ret.correct ) ) {
+	if ( !( ret.correct_ ) ) {
 		char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 
 		snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 		          "a header of slot_header is corrupted %p\n",
 		          p_addr );
-		internal::LogOutput( log_type::WARN, buf );
+		internal::LogOutput( log_type::ERR, buf );
 	}
 
 	return ret;
@@ -1179,9 +1180,9 @@ void general_mem_allocator::deallocate(
 {
 	internal::slot_chk_result chk_ret = internal::chunk_header_multi_slot::get_chunk( p_mem );
 
-	if ( chk_ret.correct ) {
-		if ( chk_ret.p_chms != nullptr ) {
-			chk_ret.p_chms->recycle_mem_slot( p_mem );
+	if ( chk_ret.correct_ ) {
+		if ( chk_ret.p_chms_ != nullptr ) {
+			chk_ret.p_chms_->recycle_mem_slot( p_mem );
 		} else {
 			std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
 			tmp_addr -= internal::get_slot_header_size();
@@ -1194,6 +1195,7 @@ void general_mem_allocator::deallocate(
 			if ( ret ) return;
 		}
 
+		// header is corrupted and unknown memory slot deallocation is requested. try to call free()
 		std::free( p_mem );   // TODO should not do this ?
 	}
 
