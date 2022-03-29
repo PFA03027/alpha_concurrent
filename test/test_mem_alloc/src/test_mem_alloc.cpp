@@ -23,19 +23,69 @@ TEST( lfmemAlloc, TestChunkHeaderMultiSlot )
 {
 	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new alpha::concurrent::internal::chunk_header_multi_slot( param );
 
-	void* test_ptr1 = p_chms->allocate_mem_slot();
-	void* test_ptr2 = p_chms->allocate_mem_slot();
-	void* test_ptr3 = p_chms->allocate_mem_slot();
+	void* test_ptr1 = p_chms->allocate_mem_slot(
+#ifdef __GNUC__
+		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+		nullptr, 0, nullptr
+#endif
+	);
+	void* test_ptr2 = p_chms->allocate_mem_slot(
+#ifdef __GNUC__
+		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+		nullptr, 0, nullptr
+#endif
+	);
+	void* test_ptr3 = p_chms->allocate_mem_slot(
+#ifdef __GNUC__
+		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+		nullptr, 0, nullptr
+#endif
+	);
 
 	EXPECT_NE( nullptr, test_ptr1 );
 	EXPECT_NE( nullptr, test_ptr2 );
 	EXPECT_EQ( nullptr, test_ptr3 );
 
-	EXPECT_FALSE( p_chms->recycle_mem_slot( test_ptr3 ) );
-	EXPECT_FALSE( p_chms->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 ) ) );
+	EXPECT_FALSE( p_chms->recycle_mem_slot( test_ptr3
+#ifdef __GNUC__
+	                                        ,
+	                                        __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+	                                        ,
+	                                        nullptr, 0, nullptr
+#endif
+	                                            ) );
+	EXPECT_FALSE( p_chms->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 )
+#ifdef __GNUC__
+	                                            ,
+	                                        __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+	                                            ,
+	                                        nullptr, 0, nullptr
+#endif
+	                                            ) );
 
-	EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr1 ) );
-	EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr2 ) );
+	EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr1
+#ifdef __GNUC__
+	                                       ,
+	                                       __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+	                                       ,
+	                                       nullptr, 0, nullptr
+#endif
+	                                           ) );
+	EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr2
+#ifdef __GNUC__
+	                                       ,
+	                                       __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+	                                       ,
+	                                       nullptr, 0, nullptr
+#endif
+	                                           ) );
 
 	alpha::concurrent::chunk_statistics e = p_chms->get_statistics();
 
@@ -58,19 +108,69 @@ TEST( lfmemAlloc, TestChunkList )
 {
 	alpha::concurrent::internal::chunk_list* p_ch_lst = new alpha::concurrent::internal::chunk_list( param );
 
-	void* test_ptr1 = p_ch_lst->allocate_mem_slot();
-	void* test_ptr2 = p_ch_lst->allocate_mem_slot();
-	void* test_ptr3 = p_ch_lst->allocate_mem_slot();
+	void* test_ptr1 = p_ch_lst->allocate_mem_slot(
+#ifdef __GNUC__
+		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+		nullptr, 0, nullptr
+#endif
+	);
+	void* test_ptr2 = p_ch_lst->allocate_mem_slot(
+#ifdef __GNUC__
+		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+		nullptr, 0, nullptr
+#endif
+	);
+	void* test_ptr3 = p_ch_lst->allocate_mem_slot(
+#ifdef __GNUC__
+		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+		nullptr, 0, nullptr
+#endif
+	);
 
 	EXPECT_NE( nullptr, test_ptr1 );
 	EXPECT_NE( nullptr, test_ptr2 );
 	EXPECT_NE( nullptr, test_ptr3 );
 
-	EXPECT_TRUE( p_ch_lst->recycle_mem_slot( test_ptr3 ) );
-	EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 ) ) );
+	EXPECT_TRUE( p_ch_lst->recycle_mem_slot( test_ptr3
+#ifdef __GNUC__
+	                                         ,
+	                                         __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+	                                         ,
+	                                         nullptr, 0, nullptr
+#endif
+	                                             ) );
+	EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 )
+#ifdef __GNUC__
+	                                              ,
+	                                          __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+	                                              ,
+	                                          nullptr, 0, nullptr
+#endif
+	                                              ) );
 
-	EXPECT_TRUE( p_ch_lst->recycle_mem_slot( test_ptr1 ) );
-	EXPECT_TRUE( p_ch_lst->recycle_mem_slot( test_ptr2 ) );
+	EXPECT_TRUE( p_ch_lst->recycle_mem_slot( test_ptr1
+#ifdef __GNUC__
+	                                         ,
+	                                         __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+	                                         ,
+	                                         nullptr, 0, nullptr
+#endif
+	                                             ) );
+	EXPECT_TRUE( p_ch_lst->recycle_mem_slot( test_ptr2
+#ifdef __GNUC__
+	                                         ,
+	                                         __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+	                                         ,
+	                                         nullptr, 0, nullptr
+#endif
+	                                             ) );
 
 	alpha::concurrent::chunk_statistics e = p_ch_lst->get_statistics();
 

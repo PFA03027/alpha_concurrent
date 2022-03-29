@@ -324,9 +324,21 @@ public:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	inline void* allocate_mem_slot( void )
+	inline void* allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+		const char* caller_src_fname,   //!< [in] caller side source file name
+		const int   caller_lineno,      //!< [in] caller side line number
+		const char* caller_func_name    //!< [in] function name calling this I/F
+#else
+		void
+#endif
+	)
 	{
-		void* p_ans = allocate_mem_slot_impl();
+		void* p_ans = allocate_mem_slot_impl(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+			caller_src_fname, caller_lineno, caller_func_name
+#endif
+		);
 		if ( p_ans != nullptr ) {
 			auto cur     = statistics_consum_cnt_.fetch_add( 1 ) + 1;
 			auto cur_max = statistics_max_consum_cnt_.load( std::memory_order_acquire );
@@ -345,9 +357,21 @@ public:
 	 */
 	inline bool recycle_mem_slot(
 		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+		,
+		const char* caller_src_fname,   //!< [in] caller side source file name
+		const int   caller_lineno,      //!< [in] caller side line number
+		const char* caller_func_name    //!< [in] function name calling this I/F
+#endif
 	)
 	{
-		bool ans = recycle_mem_slot_impl( p_recycle_slot );
+		bool ans = recycle_mem_slot_impl(
+			p_recycle_slot
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+			,
+			caller_src_fname, caller_lineno, caller_func_name
+#endif
+		);
 		if ( ans ) {
 			statistics_consum_cnt_--;
 		}
@@ -401,7 +425,15 @@ private:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	void* allocate_mem_slot_impl( void );
+	void* allocate_mem_slot_impl(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+		const char* caller_src_fname,   //!< [in] caller side source file name
+		const int   caller_lineno,      //!< [in] caller side line number
+		const char* caller_func_name    //!< [in] function name calling this I/F
+#else
+		void
+#endif
+	);
 
 	/*!
 	 * @breif	recycle memory slot
@@ -411,6 +443,12 @@ private:
 	 */
 	bool recycle_mem_slot_impl(
 		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+		,
+		const char* caller_src_fname,   //!< [in] caller side source file name
+		const int   caller_lineno,      //!< [in] caller side line number
+		const char* caller_func_name    //!< [in] function name calling this I/F
+#endif
 	);
 
 	param_chunk_allocation slot_conf_;       //!< allocation configuration paramter. value is corrected internally.
@@ -439,10 +477,29 @@ struct slot_chk_result {
 struct slot_header {
 	std::atomic<chunk_header_multi_slot*> at_p_chms_;   //!< pointer to chunk_header_multi_slot that is an owner of this slot
 	std::atomic<std::uintptr_t>           at_mark_;     //!< checker mark
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+	const char* p_caller_src_fname_;   //!< caller side source file name
+	int         caller_lineno_;        //!< caller side line number
+	const char* p_caller_func_name_;   //!< function name calling this I/F
+#endif
 
 	void set_addr_of_chunk_header_multi_slot(
 		chunk_header_multi_slot* p_chms_arg   //!< [in] pointer to a parent "chunk_header_multi_slot"
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+		,
+		const char* caller_src_fname,   //!< [in] caller side source file name
+		const int   caller_lineno,      //!< [in] caller side line number
+		const char* caller_func_name    //!< [in] function name calling this I/F
+#endif
 	);
+
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+	void set_caller_context_info(
+		const char* caller_src_fname,   //!< [in] caller side source file name
+		const int   caller_lineno,      //!< [in] caller side line number
+		const char* caller_func_name    //!< [in] function name calling this I/F
+	);
+#endif
 
 	slot_chk_result chk_header_data( void ) const;
 };
@@ -471,7 +528,15 @@ public:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	void* allocate_mem_slot( void );
+	void* allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+		const char* caller_src_fname,   //!< [in] caller side source file name
+		const int   caller_lineno,      //!< [in] caller side line number
+		const char* caller_func_name    //!< [in] function name calling this I/F
+#else
+		void
+#endif
+	);
 
 	/*!
 	 * @breif	recycle memory slot
@@ -481,6 +546,12 @@ public:
 	 */
 	bool recycle_mem_slot(
 		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+		,
+		const char* caller_src_fname,   //!< [in] caller side source file name
+		const int   caller_lineno,      //!< [in] caller side line number
+		const char* caller_func_name    //!< [in] function name calling this I/F
+#endif
 	);
 
 	/*!

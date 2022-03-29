@@ -636,8 +636,19 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 
 void slot_header::set_addr_of_chunk_header_multi_slot(
-	chunk_header_multi_slot* p_chms_arg )
+	chunk_header_multi_slot* p_chms_arg
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+	,
+	const char* caller_src_fname,   //!< [in] caller side source file name
+	const int   caller_lineno,      //!< [in] caller side line number
+	const char* caller_func_name    //!< [in] function name calling this I/F
+#endif
+)
 {
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+	set_caller_context_info( caller_src_fname, caller_lineno, caller_func_name );
+#endif
+
 	// 今は簡単な仕組みで実装する
 	at_p_chms_.store( p_chms_arg, std::memory_order_release );
 	at_mark_.store( 0 - reinterpret_cast<std::uintptr_t>( p_chms_arg ) - 1, std::memory_order_release );
@@ -645,12 +656,25 @@ void slot_header::set_addr_of_chunk_header_multi_slot(
 	return;
 }
 
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+void slot_header::set_caller_context_info(
+	const char* caller_src_fname,   //!< [in] caller side source file name
+	const int   caller_lineno,      //!< [in] caller side line number
+	const char* caller_func_name    //!< [in] function name calling this I/F
+)
+{
+	p_caller_src_fname_ = caller_src_fname;
+	caller_lineno_      = caller_lineno;
+	p_caller_func_name_ = caller_func_name;
+}
+#endif
+
 slot_chk_result slot_header::chk_header_data( void ) const
 {
 	// 今は簡単な仕組みで実装する
-	chunk_header_multi_slot* p_this_chms = at_p_chms_.load(std::memory_order_acquire);
-	std::uintptr_t tmp = reinterpret_cast<std::uintptr_t>( p_this_chms );
-	tmp += at_mark_.load(std::memory_order_acquire) + 1;
+	chunk_header_multi_slot* p_this_chms = at_p_chms_.load( std::memory_order_acquire );
+	std::uintptr_t           tmp         = reinterpret_cast<std::uintptr_t>( p_this_chms );
+	tmp += at_mark_.load( std::memory_order_acquire ) + 1;
 
 	slot_chk_result ans;
 	ans.correct_ = ( tmp == 0 );
@@ -766,7 +790,15 @@ bool chunk_header_multi_slot::alloc_new_chunk(
 	return true;
 }
 
-void* chunk_header_multi_slot::allocate_mem_slot_impl( void )
+void* chunk_header_multi_slot::allocate_mem_slot_impl(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+	const char* caller_src_fname,   //!< [in] caller side source file name
+	const int   caller_lineno,      //!< [in] caller side line number
+	const char* caller_func_name    //!< [in] function name calling this I/F
+#else
+	void
+#endif
+)
 {
 	if ( status_.load( std::memory_order_acquire ) != chunk_control_status::NORMAL ) return nullptr;
 
@@ -789,13 +821,25 @@ void* chunk_header_multi_slot::allocate_mem_slot_impl( void )
 
 	// always overwrite header information to fix a corrupted header
 	slot_header* p_sh = reinterpret_cast<slot_header*>( p_ans_addr );
-	p_sh->set_addr_of_chunk_header_multi_slot( this );
+	p_sh->set_addr_of_chunk_header_multi_slot(
+		this
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+		,
+		caller_src_fname, caller_lineno, caller_func_name
+#endif
+	);
 
 	return reinterpret_cast<void*>( p_ans_addr + get_slot_header_size() );
 }
 
 bool chunk_header_multi_slot::recycle_mem_slot_impl(
 	void* p_recycle_addr   //!< [in] pointer to the memory slot to recycle.
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+	,
+	const char* caller_src_fname,   //!< [in] caller side source file name
+	const int   caller_lineno,      //!< [in] caller side line number
+	const char* caller_func_name    //!< [in] function name calling this I/F
+#endif
 )
 {
 	switch ( status_.load( std::memory_order_acquire ) ) {
@@ -829,18 +873,33 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 	if ( idx >= slot_conf_.num_of_pieces_ ) return false;
 	if ( adt != 0 ) return false;
 
-	bool expect_not_free = false;
-	bool result          = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, true );
+	slot_header* p_sh            = reinterpret_cast<slot_header*>( p_slot_addr );
+	bool         expect_not_free = false;
+	bool         result          = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, true );
 
 	if ( !result ) {
 		// double free has occured.
 		internal::LogOutput( log_type::ERR, "double free has occured." );
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+		internal::LogOutput(
+			log_type::ERR,
+			"previous free call is: %s, line no %d, function=%s",
+			p_sh->p_caller_src_fname_, p_sh->caller_lineno_, p_sh->p_caller_func_name_ );
+		internal::LogOutput(
+			log_type::ERR,
+			"current free call is: %s, line no %d, function=%s",
+			caller_src_fname, caller_lineno, caller_func_name );
+#endif
 		//		fflush( NULL );
 		statistics_dealloc_req_err_cnt_++;
 		return true;
 	}
 
 	// OK. correct address
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+	p_sh->set_caller_context_info( caller_src_fname, caller_lineno, caller_func_name );
+#endif
+
 	free_slot_idx_mgr_.push( idx );
 	statistics_dealloc_req_cnt_++;
 
@@ -1006,7 +1065,15 @@ chunk_list::~chunk_list()
 	return;
 }
 
-void* chunk_list::allocate_mem_slot( void )
+void* chunk_list::allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+	const char* caller_src_fname,   //!< [in] caller side source file name
+	const int   caller_lineno,      //!< [in] caller side line number
+	const char* caller_func_name    //!< [in] function name calling this I/F
+#else
+	void
+#endif
+)
 {
 	void* p_ans = nullptr;
 
@@ -1017,7 +1084,11 @@ void* chunk_list::allocate_mem_slot( void )
 	chunk_header_multi_slot* p_1st_empty_chms   = nullptr;
 	while ( p_cur_chms != nullptr ) {
 		// 空きスロットが見つかれば終了
-		p_ans = p_cur_chms->allocate_mem_slot();
+		p_ans = p_cur_chms->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+			caller_src_fname, caller_lineno, caller_func_name
+#endif
+		);
 		if ( p_ans != nullptr ) {
 			p_hint_chunk_.store( p_cur_chms, std::memory_order_release );
 			return p_ans;
@@ -1053,7 +1124,11 @@ void* chunk_list::allocate_mem_slot( void )
 	if ( p_1st_rsv_del_chms != nullptr ) {
 		if ( p_1st_rsv_del_chms->unset_delete_reservation() ) {
 			// 再利用成功
-			p_ans = p_1st_rsv_del_chms->allocate_mem_slot();
+			p_ans = p_1st_rsv_del_chms->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+				caller_src_fname, caller_lineno, caller_func_name
+#endif
+			);
 			if ( p_ans != nullptr ) {
 				p_hint_chunk_.store( p_1st_rsv_del_chms, std::memory_order_release );
 				return p_ans;
@@ -1061,7 +1136,11 @@ void* chunk_list::allocate_mem_slot( void )
 		} else {
 			if ( p_1st_rsv_del_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
 				// すでに、再利用可能な状態になっていた
-				p_ans = p_1st_rsv_del_chms->allocate_mem_slot();
+				p_ans = p_1st_rsv_del_chms->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+					caller_src_fname, caller_lineno, caller_func_name
+#endif
+				);
 				if ( p_ans != nullptr ) {
 					p_hint_chunk_.store( p_1st_rsv_del_chms, std::memory_order_release );
 					return p_ans;
@@ -1085,7 +1164,12 @@ void* chunk_list::allocate_mem_slot( void )
 	// 空chunkにメモリ割り当てを行い、再利用を試みる。
 	if ( p_1st_empty_chms != nullptr ) {
 		if ( p_1st_empty_chms->alloc_new_chunk( cur_alloc_conf ) ) {
-			p_ans = p_1st_empty_chms->allocate_mem_slot();
+			// 再割り当て成功
+			p_ans = p_1st_empty_chms->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+				caller_src_fname, caller_lineno, caller_func_name
+#endif
+			);
 			if ( p_ans != nullptr ) {
 				p_hint_chunk_.store( p_1st_empty_chms, std::memory_order_release );
 
@@ -1095,8 +1179,14 @@ void* chunk_list::allocate_mem_slot( void )
 				return p_ans;
 			}
 		} else {
+			// 再割り当て失敗
 			if ( p_1st_empty_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
-				p_ans = p_1st_empty_chms->allocate_mem_slot();
+				//　自身による再割り当てに失敗はしたが、既に別のスレッドで再割り当て完了済みだった
+				p_ans = p_1st_empty_chms->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+					caller_src_fname, caller_lineno, caller_func_name
+#endif
+				);
 				if ( p_ans != nullptr ) {
 					p_hint_chunk_.store( p_1st_empty_chms, std::memory_order_release );
 					return p_ans;
@@ -1105,8 +1195,14 @@ void* chunk_list::allocate_mem_slot( void )
 		}
 	}
 
+	// 既存のchunkの再利用に失敗したので、新しいchunkを確保する。
+	// new演算子を使用するため、ここでロックが発生する可能性がある。
 	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( cur_alloc_conf );
-	p_ans                               = p_new_chms->allocate_mem_slot();
+	p_ans                               = p_new_chms->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+		caller_src_fname, caller_lineno, caller_func_name
+#endif
+	);
 	if ( p_ans == nullptr ) {
 		delete p_new_chms;
 		return nullptr;   // TODO: should throw exception ?
@@ -1128,11 +1224,25 @@ void* chunk_list::allocate_mem_slot( void )
 
 bool chunk_list::recycle_mem_slot(
 	void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+	,
+	const char* caller_src_fname,   //!< [in] caller side source file name
+	const int   caller_lineno,      //!< [in] caller side line number
+	const char* caller_func_name    //!< [in] function name calling this I/F
+#endif
 )
 {
 	chunk_header_multi_slot* p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
 	while ( p_cur_chms != nullptr ) {
-		bool ret = p_cur_chms->recycle_mem_slot( p_recycle_slot );
+		bool ret = p_cur_chms->recycle_mem_slot(
+			p_recycle_slot
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+			,
+			caller_src_fname,
+			caller_lineno,
+			caller_func_name
+#endif
+		);
 		if ( ret ) return true;
 		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
 		p_cur_chms                           = p_next_chms;
@@ -1205,12 +1315,23 @@ general_mem_allocator::general_mem_allocator(
 
 void* general_mem_allocator::allocate(
 	std::size_t n   //!< [in] required memory size
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+	,
+	const char* caller_src_fname,   //!< [in] caller side source file name
+	const int   caller_lineno,      //!< [in] caller side line number
+	const char* caller_func_name    //!< [in] function name calling this I/F
+#endif
 )
 {
 	void* p_ans = nullptr;
 	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
+		// liner search
 		if ( up_param_ch_array_[i].param_.size_of_one_piece_ >= n ) {
-			p_ans = up_param_ch_array_[i].up_chunk_lst_->allocate_mem_slot();
+			p_ans = up_param_ch_array_[i].up_chunk_lst_->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+				caller_src_fname, caller_lineno, caller_func_name
+#endif
+			);
 			if ( p_ans != nullptr ) {
 				return p_ans;
 			}
@@ -1219,7 +1340,13 @@ void* general_mem_allocator::allocate(
 
 	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( std::malloc( n + internal::get_slot_header_size() ) );
 
-	p_sh->set_addr_of_chunk_header_multi_slot( nullptr );
+	p_sh->set_addr_of_chunk_header_multi_slot(
+		nullptr
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+		,
+		caller_src_fname, caller_lineno, caller_func_name
+#endif
+	);
 
 	std::uintptr_t tmp_ans = reinterpret_cast<std::uintptr_t>( p_sh );
 	tmp_ans += internal::get_slot_header_size();
@@ -1230,13 +1357,25 @@ void* general_mem_allocator::allocate(
 
 void general_mem_allocator::deallocate(
 	void* p_mem   //!< [in] pointer to allocated memory by allocate()
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+	,
+	const char* caller_src_fname,   //!< [in] caller side source file name
+	const int   caller_lineno,      //!< [in] caller side line number
+	const char* caller_func_name    //!< [in] function name calling this I/F
+#endif
 )
 {
 	internal::slot_chk_result chk_ret = internal::chunk_header_multi_slot::get_chunk( p_mem );
 
 	if ( chk_ret.correct_ ) {
 		if ( chk_ret.p_chms_ != nullptr ) {
-			chk_ret.p_chms_->recycle_mem_slot( p_mem );
+			chk_ret.p_chms_->recycle_mem_slot(
+				p_mem
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+				,
+				caller_src_fname, caller_lineno, caller_func_name
+#endif
+			);
 		} else {
 			std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
 			tmp_addr -= internal::get_slot_header_size();
@@ -1245,7 +1384,13 @@ void general_mem_allocator::deallocate(
 	} else {
 
 		for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
-			bool ret = up_param_ch_array_[i].up_chunk_lst_->recycle_mem_slot( p_mem );
+			bool ret = up_param_ch_array_[i].up_chunk_lst_->recycle_mem_slot(
+				p_mem
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+				,
+				caller_src_fname, caller_lineno, caller_func_name
+#endif
+			);
 			if ( ret ) return;
 		}
 

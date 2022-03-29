@@ -24,7 +24,6 @@
 namespace alpha {
 namespace concurrent {
 
-
 extern const unsigned int           num_of_default_param_array;   //!< array size of default parameter array
 extern const param_chunk_allocation default_param_array[];        //!< pointer to default parameter array
 
@@ -51,12 +50,40 @@ public:
 	/*!
 	 * @breif	allocate memory
 	 */
-	void* allocate( std::size_t n );
+	void* allocate(
+		std::size_t n   //!< [in] memory size to allocate
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+		,
+#ifdef __GNUC__
+		const char* caller_src_fname = __builtin_FILE(),      //!< [in] caller side source file name
+		const int   caller_lineno    = __builtin_LINE(),      //!< [in] caller side line number
+		const char* caller_func_name = __builtin_FUNCTION()   //!< [in] function name calling this I/F
+#else
+		const char* caller_src_fname = nullptr,   //!< [in] caller side source file name
+		const int   caller_lineno    = 0,         //!< [in] caller side line number
+		const char* caller_func_name = nullptr    //!< [in] function name calling this I/F
+#endif
+#endif
+	);
 
 	/*!
 	 * @breif	deallocate memory
 	 */
-	void deallocate( void* p_mem );
+	void deallocate(
+		void* p_mem   //!< [in] pointer to allocated memory by allocate()
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+		,
+#ifdef __GNUC__
+		const char* caller_src_fname = __builtin_FILE(),      //!< [in] caller side source file name
+		const int   caller_lineno    = __builtin_LINE(),      //!< [in] caller side line number
+		const char* caller_func_name = __builtin_FUNCTION()   //!< [in] function name calling this I/F
+#else
+		const char* caller_src_fname = nullptr,   //!< [in] caller side source file name
+		const int   caller_lineno    = 0,         //!< [in] caller side line number
+		const char* caller_func_name = nullptr    //!< [in] function name calling this I/F
+#endif
+#endif
+	);
 
 	/*!
 	 * @breif	set parameter
@@ -91,17 +118,50 @@ private:
  * @breif	allocate memory
  *
  * This I/F allocates a memory from a global general_mem_allocator instance. @n
- * The allocated memory must free by gm_mem_deallocate().
+ * The allocated memory must free by gmem_deallocate().
  *
  * @note
  * This uses default_param_array and num_of_default_param_array as initial allocation parameter
  */
-void* gmem_allocate( std::size_t n );
+void* gmem_allocate(
+	std::size_t n   //!< [in] memory size to allocate
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+	,
+#ifdef __GNUC__
+	const char* caller_src_fname = __builtin_FILE(),      //!< [in] caller side source file name
+	const int   caller_lineno    = __builtin_LINE(),      //!< [in] caller side line number
+	const char* caller_func_name = __builtin_FUNCTION()   //!< [in] function name calling this I/F
+#else
+	const char* caller_src_fname = nullptr,   //!< [in] caller side source file name
+	const int caller_lineno = 0,              //!< [in] caller side line number
+	const char* caller_func_name = nullptr    //!< [in] function name calling this I/F
+#endif
+#endif
+);
 
 /*!
  * @breif	deallocate memory
+ *
+ * This I/F free a memory area that is allocated by gmem_allocate().
+ *
+ * @note
+ * If p_mem is not a memory that is not allocated by gmem_allocate(), this I/F will try to free by calling free().
  */
-void gmem_deallocate( void* p_mem );
+void gmem_deallocate(
+	void* p_mem   //!< [in] pointer to free.
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
+	,
+#ifdef __GNUC__
+	const char* caller_src_fname = __builtin_FILE(),      //!< [in] caller side source file name
+	const int   caller_lineno    = __builtin_LINE(),      //!< [in] caller side line number
+	const char* caller_func_name = __builtin_FUNCTION()   //!< [in] function name calling this I/F
+#else
+	const char* caller_src_fname = nullptr,   //!< [in] caller side source file name
+	const int caller_lineno = 0,              //!< [in] caller side line number
+	const char* caller_func_name = nullptr    //!< [in] function name calling this I/F
+#endif
+#endif
+);
 
 }   // namespace concurrent
 }   // namespace alpha

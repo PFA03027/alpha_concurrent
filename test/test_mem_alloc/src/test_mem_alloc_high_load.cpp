@@ -59,7 +59,13 @@ TEST( lfmemAlloc, OneChunkLoad )
 	for ( int i = 0; i < 1; i++ ) {
 		int cur_alloc_num = 15;
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
-			alloc_addr[j] = chms.allocate_mem_slot();
+			alloc_addr[j] = chms.allocate_mem_slot(
+#ifdef __GNUC__
+				__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+				nullptr, 0, nullptr
+#endif
+			);
 		}
 
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
@@ -67,7 +73,15 @@ TEST( lfmemAlloc, OneChunkLoad )
 		}
 
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
-			ASSERT_TRUE( chms.recycle_mem_slot( alloc_addr[j] ) );
+			ASSERT_TRUE( chms.recycle_mem_slot( alloc_addr[j]
+#ifdef __GNUC__
+			                                    ,
+			                                    __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
+#else
+			                                    ,
+			                                    nullptr, 0, nullptr
+#endif
+			                                        ) );
 		}
 	}
 
