@@ -563,8 +563,8 @@ private:
 	unsigned int              size_of_one_piece_;   //!< size of one piece in a chunk
 	std::atomic<unsigned int> num_of_pieces_;       //!< number of pieces in a chunk
 
-	std::atomic<chunk_header_multi_slot*> p_top_chunk_;    //!< pointer to chunk_header that is top of list.
-	std::atomic<chunk_header_multi_slot*> p_hint_chunk_;   //!< pointer to chunk_header that is success to allocate recently.
+	std::atomic<chunk_header_multi_slot*> p_top_chunk_;       //!< pointer to chunk_header that is top of list.
+	dynamic_tls<chunk_header_multi_slot*> tls_p_hint_chunk;   //!< thread loacal pointer to chunk_header that is success to allocate recently for a thread.
 };
 
 }   // namespace internal

@@ -1043,12 +1043,12 @@ chunk_list::chunk_list(
   : size_of_one_piece_( ch_param_arg.size_of_one_piece_ )
   , num_of_pieces_( ch_param_arg.num_of_pieces_ )
   , p_top_chunk_( nullptr )
-  , p_hint_chunk_( nullptr )
+  , tls_p_hint_chunk()
 {
 	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( ch_param_arg );
 
 	p_top_chunk_.store( p_new_chms, std::memory_order_release );
-	p_hint_chunk_.store( p_new_chms, std::memory_order_release );
+	tls_p_hint_chunk.get_tls_instance( p_new_chms ) = p_new_chms;
 
 	return;
 }
@@ -1078,7 +1078,8 @@ void* chunk_list::allocate_mem_slot(
 	void* p_ans = nullptr;
 
 	// hintに登録されたchunkから空きスロット検索を開始する。
-	chunk_header_multi_slot* p_start_chms       = p_hint_chunk_.load( std::memory_order_acquire );
+	chunk_header_multi_slot* p_start_chms = tls_p_hint_chunk.get_tls_instance( p_top_chunk_.load( std::memory_order_acquire ) );
+
 	chunk_header_multi_slot* p_cur_chms         = p_start_chms;
 	chunk_header_multi_slot* p_1st_rsv_del_chms = nullptr;
 	chunk_header_multi_slot* p_1st_empty_chms   = nullptr;
@@ -1090,7 +1091,7 @@ void* chunk_list::allocate_mem_slot(
 #endif
 		);
 		if ( p_ans != nullptr ) {
-			p_hint_chunk_.store( p_cur_chms, std::memory_order_release );
+			tls_p_hint_chunk.get_tls_instance( p_cur_chms ) = p_cur_chms;
 			return p_ans;
 		}
 		// 削除予約されたchunkがあれば、記録する。
@@ -1130,7 +1131,7 @@ void* chunk_list::allocate_mem_slot(
 #endif
 			);
 			if ( p_ans != nullptr ) {
-				p_hint_chunk_.store( p_1st_rsv_del_chms, std::memory_order_release );
+				tls_p_hint_chunk.get_tls_instance( p_1st_rsv_del_chms ) = p_1st_rsv_del_chms;
 				return p_ans;
 			}
 		} else {
@@ -1142,7 +1143,7 @@ void* chunk_list::allocate_mem_slot(
 #endif
 				);
 				if ( p_ans != nullptr ) {
-					p_hint_chunk_.store( p_1st_rsv_del_chms, std::memory_order_release );
+					tls_p_hint_chunk.get_tls_instance( p_1st_rsv_del_chms ) = p_1st_rsv_del_chms;
 					return p_ans;
 				}
 			}
@@ -1171,7 +1172,7 @@ void* chunk_list::allocate_mem_slot(
 #endif
 			);
 			if ( p_ans != nullptr ) {
-				p_hint_chunk_.store( p_1st_empty_chms, std::memory_order_release );
+				tls_p_hint_chunk.get_tls_instance( p_1st_empty_chms ) = p_1st_empty_chms;
 
 				// chunkの登録が終わったので、スロット数の2倍化された値を登録する。
 				num_of_pieces_.compare_exchange_strong( cur_slot_num, new_slot_num );
@@ -1188,7 +1189,7 @@ void* chunk_list::allocate_mem_slot(
 #endif
 				);
 				if ( p_ans != nullptr ) {
-					p_hint_chunk_.store( p_1st_empty_chms, std::memory_order_release );
+					tls_p_hint_chunk.get_tls_instance( p_1st_empty_chms ) = p_1st_empty_chms;
 					return p_ans;
 				}
 			}
@@ -1214,7 +1215,7 @@ void* chunk_list::allocate_mem_slot(
 		p_new_chms->p_next_chunk_.store( p_cur_top, std::memory_order_release );
 	} while ( !p_top_chunk_.compare_exchange_weak( p_cur_top, p_new_chms ) );
 
-	p_hint_chunk_.store( p_new_chms, std::memory_order_release );
+	tls_p_hint_chunk.get_tls_instance( p_new_chms ) = p_new_chms;
 
 	// chunkの登録が終わったので、スロット数の2倍化された値を登録する。
 	num_of_pieces_.compare_exchange_strong( cur_slot_num, new_slot_num );
