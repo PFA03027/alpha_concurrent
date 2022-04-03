@@ -25,6 +25,25 @@ namespace concurrent {
 
 namespace internal {
 
+chunk_statistics chms_statistics::get_statistics( void ) const
+{
+	chunk_statistics ans;
+
+	ans.chunk_num_             = chunk_num_.load( std::memory_order_acquire );
+	ans.total_slot_cnt_        = total_slot_cnt_.load( std::memory_order_acquire );
+	ans.free_slot_cnt_         = free_slot_cnt_.load( std::memory_order_acquire );
+	ans.consum_cnt_            = consum_cnt_.load( std::memory_order_acquire );
+	ans.max_consum_cnt_        = max_consum_cnt_.load( std::memory_order_acquire );
+	ans.alloc_req_cnt_         = alloc_req_cnt_.load( std::memory_order_acquire );
+	ans.error_alloc_req_cnt_   = alloc_req_err_cnt_.load( std::memory_order_acquire );
+	ans.dealloc_req_cnt_       = dealloc_req_cnt_.load( std::memory_order_acquire );
+	ans.error_dealloc_req_cnt_ = dealloc_req_err_cnt_.load( std::memory_order_acquire );
+	ans.alloc_collision_cnt_   = alloc_collision_cnt_.load( std::memory_order_acquire );
+	ans.dealloc_collision_cnt_ = dealloc_collision_cnt_.load( std::memory_order_acquire );
+
+	return ans;
+}
+
 idx_mgr_element::idx_mgr_element( void )
   : idx_( -1 )
   , p_invalid_idx_next_element_( nullptr )
@@ -157,14 +176,15 @@ void waiting_element_list::dump( void ) const
  * @breif	インデックス管理スロットのロックフリーストレージクラス
  */
 idx_element_storage_mgr::idx_element_storage_mgr(
-	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_arg   //!< [in] nextポインタを保持しているメンバ変数へのメンバ変数ポインタ
+	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_arg,   //!< [in] nextポインタを保持しているメンバ変数へのメンバ変数ポインタ
+	std::atomic<unsigned int>*                      p_collition_counter      //!< [in] 衝突が発生した回数を記録するアトミック変数へのポインタ
 	)
   : tls_waiting_list_( rcv_el_by_thread_terminating( this ) )
   , head_( nullptr )
   , tail_( nullptr )
   , p_next_ptr_offset_( p_next_ptr_offset_arg )
   , rcv_wait_element_list_()
-  , collision_cnt_( 0 )
+  , p_collision_cnt_( p_collition_counter )
 {
 	return;
 }
@@ -249,7 +269,7 @@ idx_mgr_element* idx_element_storage_mgr::pop_element_from_list( void )
 		idx_mgr_element* p_cur_first = head_.load( std::memory_order_acquire );
 		scoped_ref_first.regist_ptr_as_hazard_ptr( p_cur_first );
 		if ( p_cur_first != head_.load( std::memory_order_acquire ) ) {
-			collision_cnt_++;
+			( *p_collision_cnt_ )++;
 			continue;
 		}
 
@@ -261,7 +281,7 @@ idx_mgr_element* idx_element_storage_mgr::pop_element_from_list( void )
 		idx_mgr_element* p_cur_next = ( p_cur_first->*p_next_ptr_offset_ ).load();
 		scoped_ref_next.regist_ptr_as_hazard_ptr( p_cur_next );
 		if ( p_cur_next != ( p_cur_first->*p_next_ptr_offset_ ).load() ) {
-			collision_cnt_++;
+			( *p_collision_cnt_ )++;
 			continue;
 		}
 
@@ -272,7 +292,7 @@ idx_mgr_element* idx_element_storage_mgr::pop_element_from_list( void )
 			// ただし、ハザードポインタをチェックしていないため、まだ参照している人がいるかもしれない。
 			return p_cur_first;
 		}
-		collision_cnt_++;
+		( *p_collision_cnt_ )++;
 	}
 	return nullptr;
 }
@@ -292,7 +312,7 @@ void idx_element_storage_mgr::push_element_to_list(
 		idx_mgr_element* p_cur_top = head_.load( std::memory_order_acquire );
 		scoped_ref_cur.regist_ptr_as_hazard_ptr( p_cur_top );
 		if ( p_cur_top != head_.load( std::memory_order_acquire ) ) {
-			collision_cnt_++;
+			( *p_collision_cnt_ )++;
 			continue;
 		}
 
@@ -304,7 +324,7 @@ void idx_element_storage_mgr::push_element_to_list(
 		if ( head_.compare_exchange_weak( p_cur_top, p_push_element ) ) {
 			return;   // 追加完了
 		}
-		collision_cnt_++;
+		( *p_collision_cnt_ )++;
 	}
 	return;
 }
@@ -443,13 +463,17 @@ void waiting_idx_list::dump( void ) const
  * @breif	コンストラクタ
  */
 idx_mgr::idx_mgr(
-	const int idx_size_arg   //!< [in] 用意するインデックス番号の数。-1の場合、割り当てを保留する。
+	const int                  idx_size_arg,                 //!< [in] 用意するインデックス番号の数。-1の場合、割り当てを保留する。
+	std::atomic<unsigned int>* p_alloc_collision_cnt_arg,    //!< [in] 衝突回数をカウントする変数へのポインタ。ポインタ先のインスタンスは、このインスタンス以上のライフタイムを持つこと
+	std::atomic<unsigned int>* p_dealloc_collision_cnt_arg   //!< [in] 衝突回数をカウントする変数へのポインタ。ポインタ先のインスタンスは、このインスタンス以上のライフタイムを持つこと
 	)
   : idx_size_( idx_size_arg )
   , idx_size_ver_( 0 )
+  , p_alloc_collision_cnt_( p_alloc_collision_cnt_arg )
+  , p_dealloc_collision_cnt_( p_dealloc_collision_cnt_arg )
   , p_idx_mgr_element_array_( nullptr )
-  , invalid_element_storage_( &idx_mgr_element::p_invalid_idx_next_element_ )
-  , valid_element_storage_( &idx_mgr_element::p_valid_idx_next_element_ )
+  , invalid_element_storage_( &idx_mgr_element::p_invalid_idx_next_element_, p_alloc_collision_cnt_ )
+  , valid_element_storage_( &idx_mgr_element::p_valid_idx_next_element_, p_dealloc_collision_cnt_ )
   , tls_waiting_idx_list_( rcv_idx_by_thread_terminating( this ) )
   , rcv_waiting_idx_list_( idx_size_, idx_size_ver_ )
 {
@@ -684,22 +708,21 @@ slot_chk_result slot_header::chk_header_data( void ) const
 
 ////////////////////////////////////////////////////////////////////////////////
 chunk_header_multi_slot::chunk_header_multi_slot(
-	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
+	const param_chunk_allocation& ch_param_arg,     //!< [in] chunk allocation paramter
+	chms_statistics*              p_chms_stat_arg   //!< [in] pointer to statistics inforation to store activity
 	)
   : p_next_chunk_( nullptr )
   , status_( chunk_control_status::EMPTY )
   , num_of_accesser_( 0 )
+  , statistics_imp_()
+  , statistics_( ( p_chms_stat_arg == nullptr ) ? statistics_imp_ : ( *p_chms_stat_arg ) )
   , slot_conf_ {}
+  , free_slot_idx_mgr_( -1, &statistics_.alloc_collision_cnt_, &statistics_.dealloc_collision_cnt_ )
   , p_free_slot_mark_( nullptr )
-  , free_slot_idx_mgr_( -1 )
   , p_chunk_( nullptr )
-  , statistics_alloc_req_cnt_( 0 )
-  , statistics_alloc_req_err_cnt_( 0 )
-  , statistics_dealloc_req_cnt_( 0 )
-  , statistics_dealloc_req_err_cnt_( 0 )
-  , statistics_consum_cnt_( 0 )
-  , statistics_max_consum_cnt_( 0 )
 {
+	statistics_.chunk_num_++;
+
 	alloc_new_chunk( ch_param_arg );
 
 	return;
@@ -709,6 +732,8 @@ chunk_header_multi_slot::~chunk_header_multi_slot()
 {
 	delete[] p_free_slot_mark_;
 	std::free( p_chunk_ );
+
+	statistics_.chunk_num_--;
 
 	return;
 }
@@ -783,9 +808,10 @@ bool chunk_header_multi_slot::alloc_new_chunk(
 
 	free_slot_idx_mgr_.set_idx_size( slot_conf_.num_of_pieces_ );
 
-	status_.store( chunk_control_status::NORMAL, std::memory_order_release );
+	statistics_.total_slot_cnt_.fetch_add( slot_conf_.num_of_pieces_ );
+	statistics_.free_slot_cnt_.fetch_add( slot_conf_.num_of_pieces_ );
 
-	statistics_consum_cnt_.store( 0, std::memory_order_release );
+	status_.store( chunk_control_status::NORMAL, std::memory_order_release );
 
 	return true;
 }
@@ -806,11 +832,11 @@ void* chunk_header_multi_slot::allocate_mem_slot_impl(
 
 	if ( status_.load( std::memory_order_acquire ) != chunk_control_status::NORMAL ) return nullptr;
 
-	statistics_alloc_req_cnt_++;
+	statistics_.alloc_req_cnt_++;
 
 	int read_idx = free_slot_idx_mgr_.pop();
 	if ( read_idx == -1 ) {
-		statistics_alloc_req_err_cnt_++;
+		statistics_.alloc_req_err_cnt_++;
 		return nullptr;
 	}
 
@@ -873,6 +899,8 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 	if ( idx >= slot_conf_.num_of_pieces_ ) return false;
 	if ( adt != 0 ) return false;
 
+	statistics_.dealloc_req_cnt_++;
+
 	slot_header* p_sh            = reinterpret_cast<slot_header*>( p_slot_addr );
 	bool         expect_not_free = false;
 	bool         result          = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, true );
@@ -891,7 +919,7 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 			caller_src_fname, caller_lineno, caller_func_name );
 #endif
 		//		fflush( NULL );
-		statistics_dealloc_req_err_cnt_++;
+		statistics_.dealloc_req_err_cnt_++;
 		return true;
 	}
 
@@ -901,7 +929,6 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 #endif
 
 	free_slot_idx_mgr_.push( idx );
-	statistics_dealloc_req_cnt_++;
 
 	return true;
 }
@@ -935,6 +962,9 @@ bool chunk_header_multi_slot::exec_deletion( void )
 	delete[] p_free_slot_mark_;
 	p_free_slot_mark_ = nullptr;
 
+	statistics_.total_slot_cnt_.fetch_sub( slot_conf_.num_of_pieces_ );
+	statistics_.free_slot_cnt_.fetch_sub( slot_conf_.num_of_pieces_ );
+
 	status_.store( chunk_control_status::EMPTY, std::memory_order_release );
 
 	return true;
@@ -965,21 +995,9 @@ chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
 {
 	chunk_statistics ans;
 
-	ans.alloc_conf_     = slot_conf_;
-	ans.chunk_num_      = 1;
-	ans.total_slot_cnt_ = slot_conf_.num_of_pieces_;
-	ans.free_slot_cnt_  = 0;
-	for ( std::size_t i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
-		if ( p_free_slot_mark_[i].load( std::memory_order_acquire ) ) ans.free_slot_cnt_++;
-	}
-	ans.max_consum_cnt_        = statistics_max_consum_cnt_.load( std::memory_order_acquire );
-	ans.alloc_req_cnt_         = statistics_alloc_req_cnt_.load( std::memory_order_acquire );
-	ans.error_alloc_req_cnt_   = statistics_alloc_req_err_cnt_.load( std::memory_order_acquire );
-	ans.dealloc_req_cnt_       = statistics_dealloc_req_cnt_.load( std::memory_order_acquire );
-	ans.error_dealloc_req_cnt_ = statistics_dealloc_req_err_cnt_.load( std::memory_order_acquire );
+	ans = statistics_.get_statistics();
 
-	ans.alloc_collision_cnt_   = free_slot_idx_mgr_.get_collision_cnt_valid_storage();
-	ans.dealloc_collision_cnt_ = free_slot_idx_mgr_.get_collision_cnt_invalid_storage();
+	ans.alloc_conf_ = slot_conf_;
 
 	return ans;
 }
@@ -1048,13 +1066,14 @@ chunk_list::chunk_list(
   , p_top_chunk_( nullptr )
 #endif
   , tls_p_hint_chunk()
+  , statistics_()
 {
 #ifdef EXPERIMENTAL_ENABLE_THREAD_LOCAL_CHUNK_LIST
-	chunk_header_multi_slot* p_new_chms = tls_p_top_chunk_.get_tls_instance_pred( [&ch_param_arg]( chunk_header_multi_slot*& p_chms ) {
-		p_chms = new chunk_header_multi_slot( ch_param_arg );
+	chunk_header_multi_slot* p_new_chms = tls_p_top_chunk_.get_tls_instance_pred( [this, &ch_param_arg]( chunk_header_multi_slot*& p_chms ) {
+		p_chms = new chunk_header_multi_slot( ch_param_arg, &statistics_ );
 	} );
 #else
-	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( ch_param_arg );
+	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( ch_param_arg, &statistics_ );
 
 	p_top_chunk_.store( p_new_chms, std::memory_order_release );
 #endif
@@ -1096,8 +1115,8 @@ void* chunk_list::allocate_mem_slot(
 	chunk_header_multi_slot* p_start_chms;
 	{
 		param_chunk_allocation   cur_alloc_conf { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
-		chunk_header_multi_slot* p_tmp_head = tls_p_top_chunk_.get_tls_instance_pred( [&cur_alloc_conf]( chunk_header_multi_slot*& p_chms ) {
-			p_chms = new chunk_header_multi_slot( cur_alloc_conf );
+		chunk_header_multi_slot* p_tmp_head = tls_p_top_chunk_.get_tls_instance_pred( [this, &cur_alloc_conf]( chunk_header_multi_slot*& p_chms ) {
+			p_chms = new chunk_header_multi_slot( cur_alloc_conf, &statistics_ );
 		} );
 		p_start_chms                        = tls_p_hint_chunk.get_tls_instance( p_tmp_head );
 	}
@@ -1227,7 +1246,7 @@ void* chunk_list::allocate_mem_slot(
 
 	// 既存のchunkの再利用に失敗したので、新しいchunkを確保する。
 	// new演算子を使用するため、ここでロックが発生する可能性がある。
-	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( cur_alloc_conf );
+	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( cur_alloc_conf, &statistics_ );
 	p_ans                               = p_new_chms->allocate_mem_slot(
 #ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 		caller_src_fname, caller_lineno, caller_func_name
@@ -1273,8 +1292,8 @@ bool chunk_list::recycle_mem_slot(
 	chunk_header_multi_slot* p_cur_chms;
 	{
 		param_chunk_allocation cur_alloc_conf { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
-		p_cur_chms = tls_p_top_chunk_.get_tls_instance_pred( [&cur_alloc_conf]( chunk_header_multi_slot*& p_chms ) {
-			p_chms = new chunk_header_multi_slot( cur_alloc_conf );
+		p_cur_chms = tls_p_top_chunk_.get_tls_instance_pred( [this, &cur_alloc_conf]( chunk_header_multi_slot*& p_chms ) {
+			p_chms = new chunk_header_multi_slot( cur_alloc_conf, &statistics_ );
 		} );
 	}
 #else
@@ -1303,42 +1322,9 @@ bool chunk_list::recycle_mem_slot(
  */
 chunk_statistics chunk_list::get_statistics( void ) const
 {
-	chunk_statistics ans;
+	chunk_statistics ans = statistics_.get_statistics();
 
-	ans.alloc_conf_            = param_chunk_allocation { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
-	ans.chunk_num_             = 0;
-	ans.total_slot_cnt_        = 0;
-	ans.free_slot_cnt_         = 0;
-	ans.max_consum_cnt_        = 0;
-	ans.alloc_req_cnt_         = 0;
-	ans.error_alloc_req_cnt_   = 0;
-	ans.dealloc_req_cnt_       = 0;
-	ans.error_dealloc_req_cnt_ = 0;
-	ans.alloc_collision_cnt_   = 0;
-	ans.dealloc_collision_cnt_ = 0;
-
-#ifdef EXPERIMENTAL_ENABLE_THREAD_LOCAL_CHUNK_LIST
-	// pthreadはスレッドローカルメモリのトラバースが出来ないため、スレッドをまたいだ統計情報の収集は諦める。
-#else
-	chunk_header_multi_slot* p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
-	while ( p_cur_chms != nullptr ) {
-		chunk_statistics one_chms_statistics = p_cur_chms->get_statistics();
-		ans.alloc_conf_ = param_chunk_allocation { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
-		ans.chunk_num_ += one_chms_statistics.chunk_num_;
-		ans.total_slot_cnt_ += one_chms_statistics.total_slot_cnt_;
-		ans.free_slot_cnt_ += one_chms_statistics.free_slot_cnt_;
-		ans.max_consum_cnt_ += one_chms_statistics.max_consum_cnt_;
-		ans.alloc_req_cnt_ += one_chms_statistics.alloc_req_cnt_;
-		ans.error_alloc_req_cnt_ += one_chms_statistics.error_alloc_req_cnt_;
-		ans.dealloc_req_cnt_ += one_chms_statistics.dealloc_req_cnt_;
-		ans.error_dealloc_req_cnt_ += one_chms_statistics.error_dealloc_req_cnt_;
-		ans.alloc_collision_cnt_ += one_chms_statistics.alloc_collision_cnt_;
-		ans.dealloc_collision_cnt_ += one_chms_statistics.dealloc_collision_cnt_;
-
-		chunk_header_multi_slot* p_nxt_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
-		p_cur_chms = p_nxt_chms;
-	}
-#endif
+	ans.alloc_conf_ = param_chunk_allocation { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
 
 	return ans;
 }
@@ -1505,12 +1491,13 @@ std::string chunk_statistics::print( void )
 {
 	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
-	          "chunk conf.size=%d, .num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, max consum cnt=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_collision=%d, dealloc_collision=%d",
+	          "chunk conf.size=%d, .num=%d, chunk_num: %d, total_slot=%d, free_slot=%d, consum cnt=%d, max consum cnt=%d, alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_colli=%d, dealloc_colli=%d",
 	          (int)alloc_conf_.size_of_one_piece_,
 	          (int)alloc_conf_.num_of_pieces_,
 	          (int)chunk_num_,
 	          (int)total_slot_cnt_,
 	          (int)free_slot_cnt_,
+	          (int)consum_cnt_,
 	          (int)max_consum_cnt_,
 	          (int)alloc_req_cnt_,
 	          (int)error_alloc_req_cnt_,

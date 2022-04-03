@@ -41,6 +41,45 @@ enum class chunk_control_status {
 };
 
 /*!
+ * @brief statistics information of alloc/dealloc
+ *
+ */
+struct chms_statistics {
+	chms_statistics( void )
+	  : chunk_num_( 0 )
+	  , total_slot_cnt_( 0 )
+	  , free_slot_cnt_( 0 )
+	  , consum_cnt_( 0 )
+	  , max_consum_cnt_( 0 )
+	  , alloc_req_cnt_( 0 )
+	  , alloc_req_err_cnt_( 0 )
+	  , dealloc_req_cnt_( 0 )
+	  , dealloc_req_err_cnt_( 0 )
+	  , alloc_collision_cnt_( 0 )
+	  , dealloc_collision_cnt_( 0 )
+	{
+	}
+	chms_statistics( const chms_statistics& ) = default;
+	chms_statistics( chms_statistics&& )      = default;
+	chms_statistics& operator=( const chms_statistics& ) = default;
+	chms_statistics& operator=( chms_statistics&& ) = default;
+
+	chunk_statistics get_statistics( void ) const;
+
+	std::atomic<unsigned int> chunk_num_;               //!< number of chunks
+	std::atomic<unsigned int> total_slot_cnt_;          //!< total slot count
+	std::atomic<unsigned int> free_slot_cnt_;           //!< free slot count
+	std::atomic<unsigned int> consum_cnt_;              //!< current count of allocated slots
+	std::atomic<unsigned int> max_consum_cnt_;          //!< max count of allocated slots
+	std::atomic<unsigned int> alloc_req_cnt_;           //!< allocation request count
+	std::atomic<unsigned int> alloc_req_err_cnt_;       //!< fail count for allocation request
+	std::atomic<unsigned int> dealloc_req_cnt_;         //!< deallocation request count
+	std::atomic<unsigned int> dealloc_req_err_cnt_;     //!< fail count for deallocation request
+	std::atomic<unsigned int> alloc_collision_cnt_;     //!< count of a collision of allocation in lock-free algorithm
+	std::atomic<unsigned int> dealloc_collision_cnt_;   //!< count of a collision of deallocation in lock-free algorithm
+};
+
+/*!
  * @breif	使用可能なインデックス番号を管理する配列で使用する各要素のデータ構造
  *
  * 下記のスタック構造、あるいはリスト構造で管理される。
@@ -87,7 +126,8 @@ public:
 	 * @breif	コンストラクタ
 	 */
 	idx_element_storage_mgr(
-		std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_arg   //!< [in] nextポインタを保持しているメンバ変数へのメンバ変数ポインタ
+		std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_arg,   //!< [in] nextポインタを保持しているメンバ変数へのメンバ変数ポインタ
+		std::atomic<unsigned int>*                      p_collition_counter      //!< [in] 衝突が発生した回数を記録するアトミック変数へのポインタ
 	);
 
 	/*!
@@ -110,7 +150,7 @@ public:
 	 */
 	int get_collision_cnt( void ) const
 	{
-		return collision_cnt_.load();
+		return p_collision_cnt_->load();
 	}
 
 private:
@@ -136,19 +176,6 @@ private:
 		idx_element_storage_mgr* p_elst_;
 	};
 
-	dynamic_tls<waiting_element_list, rcv_el_by_thread_terminating> tls_waiting_list_;   //!< 滞留要素を管理するスレッドローカルリスト
-	hazard_ptr<idx_mgr_element, hzrd_max_slot_>                     hzrd_element_;       //!< ハザードポインタを管理する構造体。
-
-	std::atomic<idx_mgr_element*> head_;                                  //!< リスト構造のヘッドへのポインタ
-	std::atomic<idx_mgr_element*> tail_;                                  //!< リスト構造の終端要素へのポインタ
-	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_;   //!< リスト構造の次のノードへのポインタを格納したメンバ変数へのメンバ変数ポインタ
-
-	std::mutex           mtx_rcv_wait_element_list_;   //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取るメンバ変数rcv_wait_element_list_の排他制御用Mutex
-	waiting_element_list rcv_wait_element_list_;       //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取る
-
-	// statistics
-	std::atomic<int> collision_cnt_;   //!< ロックフリーアルゴリズム内で発生した衝突回数
-
 	/*!
 	 * @breif	ストレージから１つの要素を取り出す
 	 *
@@ -171,6 +198,18 @@ private:
 	 * スレッドセーフではあるが、ロックによる排他制御が行われる。
 	 */
 	void rcv_wait_element_by_thread_terminating( waiting_element_list* p_el_list );
+
+	dynamic_tls<waiting_element_list, rcv_el_by_thread_terminating> tls_waiting_list_;   //!< 滞留要素を管理するスレッドローカルリスト
+	hazard_ptr<idx_mgr_element, hzrd_max_slot_>                     hzrd_element_;       //!< ハザードポインタを管理する構造体。
+
+	std::atomic<idx_mgr_element*> head_;                                  //!< リスト構造のヘッドへのポインタ
+	std::atomic<idx_mgr_element*> tail_;                                  //!< リスト構造の終端要素へのポインタ
+	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_;   //!< リスト構造の次のノードへのポインタを格納したメンバ変数へのメンバ変数ポインタ
+
+	std::mutex           mtx_rcv_wait_element_list_;   //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取るメンバ変数rcv_wait_element_list_の排他制御用Mutex
+	waiting_element_list rcv_wait_element_list_;       //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取る
+
+	std::atomic<unsigned int>* p_collision_cnt_;   //!< ロックフリーアルゴリズム内で発生した衝突回数を記録する変数への参照
 };
 
 /*!
@@ -208,7 +247,9 @@ struct idx_mgr {
 	 * @breif	コンストラクタ
 	 */
 	idx_mgr(
-		const int idx_size_arg = -1   //!< [in] 用意するインデックス番号の数。-1の場合、割り当てを保留する。
+		const int                  idx_size_arg,                 //!< [in] 用意するインデックス番号の数。-1の場合、割り当てを保留する。
+		std::atomic<unsigned int>* p_alloc_collision_cnt_arg,    //!< [in] 衝突回数をカウントする変数へのポインタ。ポインタ先のインスタンスは、このインスタンス以上のライフタイムを持つこと
+		std::atomic<unsigned int>* p_dealloc_collision_cnt_arg   //!< [in] 衝突回数をカウントする変数へのポインタ。ポインタ先のインスタンスは、このインスタンス以上のライフタイムを持つこと
 	);
 
 	/*!
@@ -285,8 +326,11 @@ private:
 	 */
 	void rcv_wait_idx_by_thread_terminating( waiting_idx_list* p_idx_list );
 
-	int                                                          idx_size_;                  //!< 割り当てられたインデックス番号の数
-	int                                                          idx_size_ver_;              //!< 割り当てられたインデックス番号の数の情報のバージョン番号
+	int idx_size_;       //!< 割り当てられたインデックス番号の数
+	int idx_size_ver_;   //!< 割り当てられたインデックス番号の数の情報のバージョン番号
+
+	std::atomic<unsigned int>*                                   p_alloc_collision_cnt_;     //!< idxをpopする時に発生した衝突回数をカウントする変数へのポインタ
+	std::atomic<unsigned int>*                                   p_dealloc_collision_cnt_;   //!< idxをpushする時に発生した衝突回数をカウントする変数へのポインタ
 	idx_mgr_element*                                             p_idx_mgr_element_array_;   //!< インデックス番号を管理情報を保持する配列
 	idx_element_storage_mgr                                      invalid_element_storage_;   //!< インデックス番号を所持しない要素を管理するストレージ
 	idx_element_storage_mgr                                      valid_element_storage_;     //!< インデックス番号を所持する要素を管理するストレージ
@@ -311,7 +355,8 @@ public:
 	 * @breif	constructor
 	 */
 	chunk_header_multi_slot(
-		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
+		const param_chunk_allocation& ch_param_arg,               //!< [in] chunk allocation paramter
+		chms_statistics*              p_chms_stat_arg = nullptr   //!< [in] pointer to statistics inforation to store activity
 	);
 
 	/*!
@@ -342,10 +387,11 @@ public:
 #endif
 		);
 		if ( p_ans != nullptr ) {
-			auto cur     = statistics_consum_cnt_.fetch_add( 1 ) + 1;
-			auto cur_max = statistics_max_consum_cnt_.load( std::memory_order_acquire );
+			statistics_.free_slot_cnt_--;
+			auto cur     = statistics_.consum_cnt_.fetch_add( 1 ) + 1;
+			auto cur_max = statistics_.max_consum_cnt_.load( std::memory_order_acquire );
 			if ( cur > cur_max ) {
-				statistics_max_consum_cnt_.compare_exchange_strong( cur_max, cur );
+				statistics_.max_consum_cnt_.compare_exchange_strong( cur_max, cur );
 			}
 		}
 		return p_ans;
@@ -375,7 +421,8 @@ public:
 #endif
 		);
 		if ( ans ) {
-			statistics_consum_cnt_--;
+			statistics_.free_slot_cnt_++;
+			statistics_.consum_cnt_--;
 		}
 		return ans;
 	}
@@ -453,22 +500,16 @@ private:
 #endif
 	);
 
+	chms_statistics  statistics_imp_;   //!< statistics
+	chms_statistics& statistics_;       //!< reference to store statistics information
+
 	param_chunk_allocation slot_conf_;       //!< allocation configuration paramter. value is corrected internally.
 	std::size_t            size_of_chunk_;   //!< size of a chunk
 
-	std::atomic_bool* p_free_slot_mark_;   //!< if slot is free, this is marked as true. This is prior information than free slot idx stack.
-
 	idx_mgr free_slot_idx_mgr_;   //<! manager of free slot index
 
-	void* p_chunk_;   //!< pointer to an allocated memory as a chunk
-
-	// statistics
-	std::atomic<unsigned int> statistics_alloc_req_cnt_;         //!< allocation request count
-	std::atomic<unsigned int> statistics_alloc_req_err_cnt_;     //!< fail count for allocation request
-	std::atomic<unsigned int> statistics_dealloc_req_cnt_;       //!< deallocation request count
-	std::atomic<unsigned int> statistics_dealloc_req_err_cnt_;   //!< fail count for deallocation request
-	std::atomic<unsigned int> statistics_consum_cnt_;            //!< current count of allocated slots
-	std::atomic<unsigned int> statistics_max_consum_cnt_;        //!< max count of allocated slots
+	std::atomic_bool* p_free_slot_mark_;   //!< if slot is free, this is marked as true. This is prior information than free slot idx stack.
+	void*             p_chunk_;            //!< pointer to an allocated memory as a chunk
 };
 
 struct slot_chk_result {
@@ -571,6 +612,8 @@ private:
 	std::atomic<chunk_header_multi_slot*> p_top_chunk_;   //!< pointer to chunk_header that is top of list.
 #endif
 	dynamic_tls<chunk_header_multi_slot*> tls_p_hint_chunk;   //!< thread loacal pointer to chunk_header that is success to allocate recently for a thread.
+
+	chms_statistics statistics_;   //!< statistics
 };
 
 }   // namespace internal
