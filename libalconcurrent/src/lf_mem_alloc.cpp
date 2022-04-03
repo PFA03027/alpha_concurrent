@@ -1042,12 +1042,22 @@ chunk_list::chunk_list(
 	)
   : size_of_one_piece_( ch_param_arg.size_of_one_piece_ )
   , num_of_pieces_( ch_param_arg.num_of_pieces_ )
+#ifdef EXPERIMENTAL_ENABLE_THREAD_LOCAL_CHUNK_LIST
+  , tls_p_top_chunk_()
+#else
   , p_top_chunk_( nullptr )
+#endif
   , tls_p_hint_chunk()
 {
+#ifdef EXPERIMENTAL_ENABLE_THREAD_LOCAL_CHUNK_LIST
+	chunk_header_multi_slot* p_new_chms = tls_p_top_chunk_.get_tls_instance_pred( [&ch_param_arg]( chunk_header_multi_slot*& p_chms ) {
+		p_chms = new chunk_header_multi_slot( ch_param_arg );
+	} );
+#else
 	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( ch_param_arg );
 
 	p_top_chunk_.store( p_new_chms, std::memory_order_release );
+#endif
 	tls_p_hint_chunk.get_tls_instance( p_new_chms ) = p_new_chms;
 
 	return;
@@ -1055,7 +1065,11 @@ chunk_list::chunk_list(
 
 chunk_list::~chunk_list()
 {
+#ifdef EXPERIMENTAL_ENABLE_THREAD_LOCAL_CHUNK_LIST
+	chunk_header_multi_slot* p_chms = tls_p_top_chunk_.get_tls_instance( nullptr );
+#else
 	chunk_header_multi_slot* p_chms = p_top_chunk_.load();
+#endif
 	while ( p_chms != nullptr ) {
 		chunk_header_multi_slot* p_next_chms = p_chms->p_next_chunk_.load();
 		delete p_chms;
@@ -1078,7 +1092,18 @@ void* chunk_list::allocate_mem_slot(
 	void* p_ans = nullptr;
 
 	// hintに登録されたchunkから空きスロット検索を開始する。
+#ifdef EXPERIMENTAL_ENABLE_THREAD_LOCAL_CHUNK_LIST
+	chunk_header_multi_slot* p_start_chms;
+	{
+		param_chunk_allocation   cur_alloc_conf { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
+		chunk_header_multi_slot* p_tmp_head = tls_p_top_chunk_.get_tls_instance_pred( [&cur_alloc_conf]( chunk_header_multi_slot*& p_chms ) {
+			p_chms = new chunk_header_multi_slot( cur_alloc_conf );
+		} );
+		p_start_chms                        = tls_p_hint_chunk.get_tls_instance( p_tmp_head );
+	}
+#else
 	chunk_header_multi_slot* p_start_chms = tls_p_hint_chunk.get_tls_instance( p_top_chunk_.load( std::memory_order_acquire ) );
+#endif
 
 	chunk_header_multi_slot* p_cur_chms         = p_start_chms;
 	chunk_header_multi_slot* p_1st_rsv_del_chms = nullptr;
@@ -1111,7 +1136,11 @@ void* chunk_list::allocate_mem_slot(
 		// 検索を開始したchunkに到着したら、空きスロットが見つからなかったことを示すので、検索を終了する。
 		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
 		if ( p_next_chms == nullptr ) {
+#ifdef EXPERIMENTAL_ENABLE_THREAD_LOCAL_CHUNK_LIST
+			p_next_chms = tls_p_top_chunk_.get_tls_instance( nullptr );
+#else
 			p_next_chms = p_top_chunk_.load( std::memory_order_acquire );
+#endif
 		}
 		if ( p_next_chms == p_start_chms ) {
 			p_cur_chms = nullptr;
@@ -1210,10 +1239,16 @@ void* chunk_list::allocate_mem_slot(
 	}
 
 	// 新たに確保したchunkを、chunkリストの先頭に追加する。
+#ifdef EXPERIMENTAL_ENABLE_THREAD_LOCAL_CHUNK_LIST
+	chunk_header_multi_slot* p_cur_top = tls_p_top_chunk_.get_tls_instance( nullptr );
+	p_new_chms->p_next_chunk_.store( p_cur_top, std::memory_order_release );
+	tls_p_top_chunk_.get_tls_instance( p_new_chms ) = p_new_chms;
+#else
 	chunk_header_multi_slot* p_cur_top = p_top_chunk_.load( std::memory_order_acquire );
 	do {
 		p_new_chms->p_next_chunk_.store( p_cur_top, std::memory_order_release );
 	} while ( !p_top_chunk_.compare_exchange_weak( p_cur_top, p_new_chms ) );
+#endif
 
 	tls_p_hint_chunk.get_tls_instance( p_new_chms ) = p_new_chms;
 
@@ -1233,7 +1268,18 @@ bool chunk_list::recycle_mem_slot(
 #endif
 )
 {
+#ifdef EXPERIMENTAL_ENABLE_THREAD_LOCAL_CHUNK_LIST
+	// pthreadはスレッドローカルメモリのトラバースが出来ないため、chunkのスロットのヘッダ破壊時の別スレッドのchunkリストのメモリ開放は諦める。
+	chunk_header_multi_slot* p_cur_chms;
+	{
+		param_chunk_allocation cur_alloc_conf { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
+		p_cur_chms = tls_p_top_chunk_.get_tls_instance_pred( [&cur_alloc_conf]( chunk_header_multi_slot*& p_chms ) {
+			p_chms = new chunk_header_multi_slot( cur_alloc_conf );
+		} );
+	}
+#else
 	chunk_header_multi_slot* p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
+#endif
 	while ( p_cur_chms != nullptr ) {
 		bool ret = p_cur_chms->recycle_mem_slot(
 			p_recycle_slot
@@ -1271,10 +1317,13 @@ chunk_statistics chunk_list::get_statistics( void ) const
 	ans.alloc_collision_cnt_   = 0;
 	ans.dealloc_collision_cnt_ = 0;
 
+#ifdef EXPERIMENTAL_ENABLE_THREAD_LOCAL_CHUNK_LIST
+	// pthreadはスレッドローカルメモリのトラバースが出来ないため、スレッドをまたいだ統計情報の収集は諦める。
+#else
 	chunk_header_multi_slot* p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
 	while ( p_cur_chms != nullptr ) {
 		chunk_statistics one_chms_statistics = p_cur_chms->get_statistics();
-		ans.alloc_conf_                      = param_chunk_allocation { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
+		ans.alloc_conf_ = param_chunk_allocation { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
 		ans.chunk_num_ += one_chms_statistics.chunk_num_;
 		ans.total_slot_cnt_ += one_chms_statistics.total_slot_cnt_;
 		ans.free_slot_cnt_ += one_chms_statistics.free_slot_cnt_;
@@ -1287,8 +1336,9 @@ chunk_statistics chunk_list::get_statistics( void ) const
 		ans.dealloc_collision_cnt_ += one_chms_statistics.dealloc_collision_cnt_;
 
 		chunk_header_multi_slot* p_nxt_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
-		p_cur_chms                          = p_nxt_chms;
+		p_cur_chms = p_nxt_chms;
 	}
+#endif
 
 	return ans;
 }
@@ -1366,6 +1416,8 @@ void general_mem_allocator::deallocate(
 #endif
 )
 {
+	if ( p_mem == nullptr ) return;
+
 	internal::slot_chk_result chk_ret = internal::chunk_header_multi_slot::get_chunk( p_mem );
 
 	if ( chk_ret.correct_ ) {

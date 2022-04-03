@@ -22,6 +22,8 @@
 
 #include "lf_mem_alloc_type.hpp"
 
+#define EXPERIMENTAL_ENABLE_THREAD_LOCAL_CHUNK_LIST
+
 namespace alpha {
 namespace concurrent {
 
@@ -563,7 +565,11 @@ private:
 	unsigned int              size_of_one_piece_;   //!< size of one piece in a chunk
 	std::atomic<unsigned int> num_of_pieces_;       //!< number of pieces in a chunk
 
-	std::atomic<chunk_header_multi_slot*> p_top_chunk_;       //!< pointer to chunk_header that is top of list.
+#ifdef EXPERIMENTAL_ENABLE_THREAD_LOCAL_CHUNK_LIST
+	dynamic_tls<chunk_header_multi_slot*> tls_p_top_chunk_;   //!< thread loacal pointer to chunk_header that is top of list.
+#else
+	std::atomic<chunk_header_multi_slot*> p_top_chunk_;   //!< pointer to chunk_header that is top of list.
+#endif
 	dynamic_tls<chunk_header_multi_slot*> tls_p_hint_chunk;   //!< thread loacal pointer to chunk_header that is success to allocate recently for a thread.
 };
 
