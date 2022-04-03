@@ -51,12 +51,14 @@ struct chms_statistics {
 	  , free_slot_cnt_( 0 )
 	  , consum_cnt_( 0 )
 	  , max_consum_cnt_( 0 )
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 	  , alloc_req_cnt_( 0 )
 	  , alloc_req_err_cnt_( 0 )
 	  , dealloc_req_cnt_( 0 )
 	  , dealloc_req_err_cnt_( 0 )
 	  , alloc_collision_cnt_( 0 )
 	  , dealloc_collision_cnt_( 0 )
+#endif
 	{
 	}
 	chms_statistics( const chms_statistics& ) = default;
@@ -66,17 +68,19 @@ struct chms_statistics {
 
 	chunk_statistics get_statistics( void ) const;
 
-	std::atomic<unsigned int> chunk_num_;               //!< number of chunks
-	std::atomic<unsigned int> total_slot_cnt_;          //!< total slot count
-	std::atomic<unsigned int> free_slot_cnt_;           //!< free slot count
-	std::atomic<unsigned int> consum_cnt_;              //!< current count of allocated slots
-	std::atomic<unsigned int> max_consum_cnt_;          //!< max count of allocated slots
+	std::atomic<unsigned int> chunk_num_;        //!< number of chunks
+	std::atomic<unsigned int> total_slot_cnt_;   //!< total slot count
+	std::atomic<unsigned int> free_slot_cnt_;    //!< free slot count
+	std::atomic<unsigned int> consum_cnt_;       //!< current count of allocated slots
+	std::atomic<unsigned int> max_consum_cnt_;   //!< max count of allocated slots
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 	std::atomic<unsigned int> alloc_req_cnt_;           //!< allocation request count
 	std::atomic<unsigned int> alloc_req_err_cnt_;       //!< fail count for allocation request
 	std::atomic<unsigned int> dealloc_req_cnt_;         //!< deallocation request count
 	std::atomic<unsigned int> dealloc_req_err_cnt_;     //!< fail count for deallocation request
 	std::atomic<unsigned int> alloc_collision_cnt_;     //!< count of a collision of allocation in lock-free algorithm
 	std::atomic<unsigned int> dealloc_collision_cnt_;   //!< count of a collision of deallocation in lock-free algorithm
+#endif
 };
 
 /*!
@@ -126,8 +130,11 @@ public:
 	 * @breif	コンストラクタ
 	 */
 	idx_element_storage_mgr(
-		std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_arg,   //!< [in] nextポインタを保持しているメンバ変数へのメンバ変数ポインタ
-		std::atomic<unsigned int>*                      p_collition_counter      //!< [in] 衝突が発生した回数を記録するアトミック変数へのポインタ
+		std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_arg   //!< [in] nextポインタを保持しているメンバ変数へのメンバ変数ポインタ
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+		,
+		std::atomic<unsigned int>* p_collition_counter   //!< [in] 衝突が発生した回数を記録するアトミック変数へのポインタ
+#endif
 	);
 
 	/*!
@@ -145,6 +152,7 @@ public:
 		idx_mgr_element* p_push_element   //!< [in] pointer of element to push
 	);
 
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 	/*!
 	 * @breif	リスト操作時の衝突回数を取得する。
 	 */
@@ -152,6 +160,7 @@ public:
 	{
 		return p_collision_cnt_->load();
 	}
+#endif
 
 private:
 	static constexpr int hzrd_max_slot_ = 3;
@@ -209,7 +218,9 @@ private:
 	std::mutex           mtx_rcv_wait_element_list_;   //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取るメンバ変数rcv_wait_element_list_の排他制御用Mutex
 	waiting_element_list rcv_wait_element_list_;       //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取る
 
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 	std::atomic<unsigned int>* p_collision_cnt_;   //!< ロックフリーアルゴリズム内で発生した衝突回数を記録する変数への参照
+#endif
 };
 
 /*!
@@ -247,9 +258,12 @@ struct idx_mgr {
 	 * @breif	コンストラクタ
 	 */
 	idx_mgr(
-		const int                  idx_size_arg,                 //!< [in] 用意するインデックス番号の数。-1の場合、割り当てを保留する。
+		const int idx_size_arg   //!< [in] 用意するインデックス番号の数。-1の場合、割り当てを保留する。
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+		,
 		std::atomic<unsigned int>* p_alloc_collision_cnt_arg,    //!< [in] 衝突回数をカウントする変数へのポインタ。ポインタ先のインスタンスは、このインスタンス以上のライフタイムを持つこと
 		std::atomic<unsigned int>* p_dealloc_collision_cnt_arg   //!< [in] 衝突回数をカウントする変数へのポインタ。ポインタ先のインスタンスは、このインスタンス以上のライフタイムを持つこと
+#endif
 	);
 
 	/*!
@@ -294,6 +308,7 @@ struct idx_mgr {
 	 */
 	void dump( void );
 
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 	int get_collision_cnt_invalid_storage( void ) const
 	{
 		return invalid_element_storage_.get_collision_cnt();
@@ -302,6 +317,7 @@ struct idx_mgr {
 	{
 		return valid_element_storage_.get_collision_cnt();
 	}
+#endif
 
 private:
 	struct rcv_idx_by_thread_terminating {
@@ -329,8 +345,10 @@ private:
 	int idx_size_;       //!< 割り当てられたインデックス番号の数
 	int idx_size_ver_;   //!< 割り当てられたインデックス番号の数の情報のバージョン番号
 
-	std::atomic<unsigned int>*                                   p_alloc_collision_cnt_;     //!< idxをpopする時に発生した衝突回数をカウントする変数へのポインタ
-	std::atomic<unsigned int>*                                   p_dealloc_collision_cnt_;   //!< idxをpushする時に発生した衝突回数をカウントする変数へのポインタ
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+	std::atomic<unsigned int>* p_alloc_collision_cnt_;     //!< idxをpopする時に発生した衝突回数をカウントする変数へのポインタ
+	std::atomic<unsigned int>* p_dealloc_collision_cnt_;   //!< idxをpushする時に発生した衝突回数をカウントする変数へのポインタ
+#endif
 	idx_mgr_element*                                             p_idx_mgr_element_array_;   //!< インデックス番号を管理情報を保持する配列
 	idx_element_storage_mgr                                      invalid_element_storage_;   //!< インデックス番号を所持しない要素を管理するストレージ
 	idx_element_storage_mgr                                      valid_element_storage_;     //!< インデックス番号を所持する要素を管理するストレージ

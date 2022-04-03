@@ -27,9 +27,9 @@ pthread_barrier_t barrier;
 
 // example
 static alpha::concurrent::param_chunk_allocation param[] = {
-	{ 32, 100000 },
-	{ 64, 100000 },
-	{ 128, 100000 },
+	{ 32, 100 },
+	{ 64, 100 },
+	{ 128, 100 },
 };
 
 class lfStackTest : public ::testing::Test {

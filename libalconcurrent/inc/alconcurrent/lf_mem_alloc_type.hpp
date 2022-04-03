@@ -31,12 +31,14 @@ struct chunk_statistics {
 	std::size_t            free_slot_cnt_;
 	std::size_t            consum_cnt_;
 	std::size_t            max_consum_cnt_;
-	std::size_t            alloc_req_cnt_;
-	std::size_t            error_alloc_req_cnt_;
-	std::size_t            dealloc_req_cnt_;
-	std::size_t            error_dealloc_req_cnt_;
-	unsigned int           alloc_collision_cnt_;
-	unsigned int           dealloc_collision_cnt_;
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+	std::size_t  alloc_req_cnt_;
+	std::size_t  error_alloc_req_cnt_;
+	std::size_t  dealloc_req_cnt_;
+	std::size_t  error_dealloc_req_cnt_;
+	unsigned int alloc_collision_cnt_;
+	unsigned int dealloc_collision_cnt_;
+#endif
 
 	std::string print( void );
 };

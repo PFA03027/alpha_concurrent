@@ -162,7 +162,7 @@ After Build step, please execute below commands
         $ cmake --build . --target test  
 
 # Configuration MACRO
-Please refer common.mk
+Please refer libalconcurrent/CMakeLists.txt
 
 ### ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 general_mem_allocator uses the thread local chunk list.
@@ -173,6 +173,10 @@ This expects to minimize the allocation slots.
 
 ### ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 If comiple with NOT_USE_LOCK_FREE_MEM_ALLOC, lock free algorithms uses malloc/free instead of general_mem_allocator.
+
+### ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DEBUG, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP
+Configuration for log output type.
+Error log is alway enable to output.
 
 # Patent
 ## Hazard pointer algorithm

@@ -62,10 +62,10 @@ extern logger_if_abst* p_concrete_logger_if;
  * @breif	filter for logging
  *
  * Default configuration allows to pass ERR and WARN.
- * @li If compiled with CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO definition, this I/F allows to path INFO.
- * @li If compiled with CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DEBUG definition, this I/F allows to path DEBUG.
- * @li If compiled with CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST definition, this I/F allows to path TEST.
- * @li If compiled with CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP definition, this I/F allows to path DUMP.
+ * @li If compiled with ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO definition, this I/F allows to path INFO.
+ * @li If compiled with ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DEBUG definition, this I/F allows to path DEBUG.
+ * @li If compiled with ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST definition, this I/F allows to path TEST.
+ * @li If compiled with ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP definition, this I/F allows to path DUMP.
  */
 bool is_allowed_to_output(
 	const log_type lt   //!< [in]	log type to check

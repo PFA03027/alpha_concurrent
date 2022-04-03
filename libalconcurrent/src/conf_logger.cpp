@@ -52,22 +52,22 @@ bool is_allowed_to_output(
 			warn_log_count++;
 			break;
 		case log_type::INFO:
-#ifdef CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO
+#ifdef ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO
 			ans = true;
 #endif
 			break;
 		case log_type::DEBUG:
-#ifdef CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DEBUG
+#ifdef ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DEBUG
 			ans = true;
 #endif
 			break;
 		case log_type::TEST:
-#ifdef CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST
+#ifdef ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST
 			ans = true;
 #endif
 			break;
 		case log_type::DUMP:
-#ifdef CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP
+#ifdef ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP
 			ans = true;
 #endif
 			break;
