@@ -21,16 +21,23 @@ if [ $# -eq 0 ]; then
 else
 	if [ "$1" = "clean" ]; then
 		rm -fr build
+	elif [ "$1" = "test" ]; then
+		mkdir -p build
+		cd build
+		cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -G "Eclipse CDT4 - Unix Makefiles" ../
+		cmake --build . -j 8 -v --target build-test
+		cmake --build . -j 8 -v --target test
+	elif [ "$1" = "full" ]; then
+		rm -fr build
+		mkdir -p build
+		cd build
+		cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -G "Eclipse CDT4 - Unix Makefiles" ../
+		cmake --build . --clean-first -j 8 -v build-test
 	else
 		mkdir -p build
 		cd build
-		#cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -DSANITIZER_TYPE=1 -G "Eclipse CDT4 - Unix Makefiles" ../
 		cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -G "Eclipse CDT4 - Unix Makefiles" ../
-		if [ "$1" = "full" ]; then
-			cmake --build . --clean-first -j 8 -v
-		else
-			cmake --build . -j 8 -v --target $1
-		fi
+		cmake --build . -j 8 -v --target $1
 	fi
 fi
 
