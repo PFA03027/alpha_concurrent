@@ -16,7 +16,7 @@
 #include <mutex>
 
 #include "hazard_ptr.hpp"
-#ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
+#ifndef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 #include "lf_mem_alloc.hpp"
 #endif
 
@@ -70,7 +70,7 @@ struct node_of_list {
 	virtual void release_ownership( void );
 	virtual void teardown_by_recycle( void );
 
-#ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
+#ifndef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 	void* operator new( std::size_t n );             // usual new...(1)
 	void  operator delete( void* p_mem ) noexcept;   // usual new...(2)
 
@@ -345,7 +345,7 @@ private:
 
 }   // namespace internal
 
-#ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
+#ifndef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 /*!
  * @breif	Set parameters in the lock-free memory allocator to enable the function.
  *

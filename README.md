@@ -161,6 +161,19 @@ After Build step, please execute below commands
         $ cmake --build . --target build-test  
         $ cmake --build . --target test  
 
+# Configuration MACRO
+Please refer common.mk
+
+### ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
+general_mem_allocator uses the thread local chunk list.
+Thread local chunk list expects better performace, because each thread has own memory chunk list and it reduces the collision chances.
+
+If compile with ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST, general_mem_allocator uses the shared chunk list.
+This expects to minimize the allocation slots.
+
+### ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
+If comiple with NOT_USE_LOCK_FREE_MEM_ALLOC, lock free algorithms uses malloc/free instead of general_mem_allocator.
+
 # Patent
 ## Hazard pointer algorithm
 This software uses Hazard pointer algorithm to solve ABA problem.  
