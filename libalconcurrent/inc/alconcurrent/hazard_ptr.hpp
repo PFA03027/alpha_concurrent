@@ -388,9 +388,15 @@ private:
 	struct threadlocal_destructor_functor {
 		using value_type      = node_for_hazard_ptr*;
 		using value_reference = value_type&;
-		void operator()( value_reference data )
+		
+		bool release( value_reference data )
 		{
 			data->release_owner();
+			return true;
+		}
+
+		void destruct( value_reference data )
+		{
 			return;
 		}
 	};

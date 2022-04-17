@@ -15,22 +15,34 @@ BUILDTARGET=common
 BUILDTYPE=Debug
 #BUILDTYPE=Release
 
-for i in {1..14}
-do
+# 1st: BUILDTYPE
+# 2nd: BUILDTARGET
+# 3rd: SANITIZER type number. please see common.cmake
+function exec_sanitizer () {
 	rm -fr build
 	mkdir -p build
 	cd build
-	echo cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -DSANITIZER_TYPE=${i} -G "Unix Makefiles" ../
-	cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -DSANITIZER_TYPE=${i} -G "Unix Makefiles" ../
+	echo cmake -DCMAKE_BUILD_TYPE=$1 -DBUILD_TARGET=$2 -DSANITIZER_TYPE=$3 -G "Unix Makefiles" ../
+	cmake -DCMAKE_BUILD_TYPE=$1 -DBUILD_TARGET=$2 -DSANITIZER_TYPE=$3 -G "Unix Makefiles" ../
 	cmake --build . -j 8 -v --target build-test
-	echo $i / 14.
+	echo $3 / 14.
 	cmake --build . -j 8 -v --target test
 	result=$?
 	if [ "$result" = "0" ]; then
-		echo $i is OK. result=$result
+		echo $3 is OK. result=$result
 	else
-		echo $i is FAIL. result=$result
+		echo $3 is FAIL. result=$result
+		cd ..
 		exit $result
 	fi
 	cd ..
-done
+}
+
+if [ "$#" = "0" ]; then
+	for i in {1..14}
+	do
+		exec_sanitizer ${BUILDTYPE} ${BUILDTARGET} ${i}
+	done
+else
+	exec_sanitizer ${BUILDTYPE} ${BUILDTARGET} $1
+fi

@@ -13,7 +13,7 @@ if("${SANITIZER_TYPE}" EQUAL "1")
 elseif("${SANITIZER_TYPE}" EQUAL "2")
  set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fstack-protector-strong")	# for test purpose
 elseif("${SANITIZER_TYPE}" EQUAL "3")
- set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fsanitize=leak")	# for test purpose
+ set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fsanitize=leak")	# for test purpose. Should NOT set ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 elseif("${SANITIZER_TYPE}" EQUAL "4")
  set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -fsanitize=undefined -fsanitize=shift -fsanitize=shift-exponent")	# for test purpose
 elseif("${SANITIZER_TYPE}" EQUAL "5")

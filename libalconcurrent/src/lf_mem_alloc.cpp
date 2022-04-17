@@ -1130,14 +1130,13 @@ chunk_list::~chunk_list()
 {
 #ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 	chunk_header_multi_slot* p_chms = p_top_chunk_.load();
-#else
-	chunk_header_multi_slot* p_chms = tls_p_top_chunk_.get_tls_instance( nullptr );
-#endif
 	while ( p_chms != nullptr ) {
 		chunk_header_multi_slot* p_next_chms = p_chms->p_next_chunk_.load();
 		delete p_chms;
 		p_chms = p_next_chms;
 	}
+#else
+#endif
 
 	return;
 }

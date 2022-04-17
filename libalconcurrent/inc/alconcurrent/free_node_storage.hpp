@@ -304,9 +304,15 @@ private:
 		{
 		}
 
-		void operator()( thread_local_fifo_list& destructing_tls )
+		bool release( thread_local_fifo_list& destructing_tls )
 		{
 			p_fns_->rcv_thread_local_fifo_list( &destructing_tls );
+			return true;
+		}
+
+		void destruct( thread_local_fifo_list& destructing_tls )
+		{
+			return;
 		}
 
 		free_nd_storage* p_fns_;

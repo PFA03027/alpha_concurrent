@@ -135,13 +135,27 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 	delete[] threads;
 }
 
-TEST( lfmemAlloc, TestAllocFreeBwMultThread )
+TEST( lfmemAlloc, TestAllocFreeBwMultThread1 )
 {
 	alpha::concurrent::general_mem_allocator test1_gma( nullptr, 0 );
-	alpha::concurrent::general_mem_allocator test2_gma( param, 7 );
 
 	err_flag.store( false );
 	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread( num_thread, &test1_gma ) );
+
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
+}
+
+TEST( lfmemAlloc, TestAllocFreeBwMultThread2 )
+{
+	alpha::concurrent::general_mem_allocator test2_gma( param, 7 );
 
 	err_flag.store( false );
 	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread( num_thread, &test2_gma ) );

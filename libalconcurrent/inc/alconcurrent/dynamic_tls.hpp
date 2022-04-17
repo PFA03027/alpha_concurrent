@@ -81,10 +81,9 @@ public:
 
 	enum class ocupied_status {
 		UNUSED,
+		UNUSED_INITIALIZED,
 		USING
 	};
-
-	value_pointer_type p_value;
 
 	tls_data_container( TL_PRE_DESTRUCTOR& df )
 	  : p_value( nullptr )
@@ -100,6 +99,7 @@ public:
 		internal::LogOutput( log_type::DEBUG, "tls_data_container::destructor is called  - %p, p_value - %p", this, p_value );
 
 		if ( p_value != nullptr ) {
+			pre_exec_.destruct( *p_value );
 			p_value->~T();
 			std::free( p_value );
 
@@ -115,14 +115,20 @@ public:
 	void release_owner( void )
 	{
 		if ( p_value != nullptr ) {
-			pre_exec_( *p_value );
+			bool ret = pre_exec_.release( *p_value );
 
-			p_value->~T();
-			std::free( p_value );
+			if ( ret ) {
+				p_value->~T();
+				std::free( p_value );
 
-			p_value = nullptr;
+				p_value = nullptr;
+			}
 		}
-		status_.store( ocupied_status::UNUSED, std::memory_order_release );
+		if( p_value != nullptr ) {
+			status_.store( ocupied_status::UNUSED_INITIALIZED, std::memory_order_release );
+		} else {
+			status_.store( ocupied_status::UNUSED, std::memory_order_release );
+		}
 		return;
 	}
 
@@ -130,7 +136,7 @@ public:
 	{
 		ocupied_status cur;
 		cur = get_status();
-		if ( cur != ocupied_status::UNUSED ) {
+		if ( cur == ocupied_status::USING ) {
 			return false;
 		}
 
@@ -158,6 +164,8 @@ public:
 		return next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
 	}
 
+	value_pointer_type p_value;
+
 private:
 	std::atomic<ocupied_status>      status_;
 	std::atomic<tls_data_container*> next_;
@@ -172,7 +180,7 @@ private:
  * @param [in]	T	ファンクタに引数として渡される型。実際の引数は、この型の参照T&となる。
  *
  * このファンクタ自身は、何もしないというファンクタとして動作する。
- *
+ * 
  *
  * @breif A functor called before freeing thread-local storage at the end of a thread
  *
@@ -183,13 +191,31 @@ private:
 template <typename T>
 struct threadlocal_destructor_functor {
 	using value_reference = T&;
-	void operator()(
+
+	/*!
+	 * @brief スレッド終了時に呼び出されるI/F
+	 *
+	 * @retval true 呼び出し元に対し、引数のリファレンスの実態が存在するメモリ領域を解放するように指示する。
+	 * @retval false 呼び出し元に対し、引数のリファレンスの実態が存在するメモリ領域を保持するように指示する。
+	 */
+	bool release(
+		value_reference data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
+	)
+	{
+		return true;
+	}
+
+	/*!
+	 * @brief インスタンス削除時に呼び出されるI/F
+	 */
+	void destruct(
 		value_reference data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
 	)
 	{
 		return;
 	}
 };
+
 
 /*!
  * @breif	動的スレッドローカルストレージを実現するクラス
@@ -198,7 +224,7 @@ struct threadlocal_destructor_functor {
  * このクラスのインスタンス変数自体がdestructされる場合は、呼び出されない。
  *
  * @param [in]	T	スレッドローカルストレージとして確保する型
- * @param [in]	TL_PRE_DESTRUCTOR	スレッド終了時にスレッドローカルストレージを解放(delete)する前に呼び出されるファンクタ
+ * @param [in]	TL_PRE_DESTRUCTOR	スレッド終了時、およびインスタンス自身がdestructされる時に、呼び出されるファンクタ。例えばTが何らかのクラスへのポインタ型である場合、その解放処理制御に使用する。
  *
  * @warn
  * デストラクタ処理と、スレッド終了処理によるdestr_fn()の同時呼び出しは、不定動作とする。　@n
@@ -211,14 +237,13 @@ struct threadlocal_destructor_functor {
  * lf_mem_allocクラスで使用するため、
  * コンポーネントの上下関係から、メモリの確保にはnewを使用せず、malloc/freeと配置newのみを使用する。
  *
- *
  * @breif Class that realizes dynamic thread local storage
  *
  * At the end of the thread, the instance of TL_PRE_DESTRUCTOR specified in the constructor is called before destructing the thread local storage.
  * If the instance variable of this class itself is destroyed, it will not be called.
  *
  * @tparam [in] T Type reserved as thread local storage
- * @tparam [in] TL_PRE_DESTRUCTOR A functor called before freeing(delete) thread-local storage at the end of a thread
+ * @tparam [in] TL_PRE_DESTRUCTOR A functor that is called at the end of a thread and when the instance itself is destroyed
  *
  * @warn
  * Simultaneous call of destr_fn () by destructor processing and thread termination processing is an indefinite operation. @n
@@ -270,8 +295,13 @@ public:
 		head_.store( nullptr, std::memory_order_release );
 		while ( p_cur != nullptr ) {
 			tls_cont_pointer p_nxt = p_cur->get_next();
+	
+			// ノード自身のデストラクタ処理を行う。
 			p_cur->~tls_cont();
+
+			// ノードのメモリ領域を解放する。
 			std::free( p_cur );
+
 			p_cur = p_nxt;
 		}
 	}
@@ -300,16 +330,20 @@ public:
 	/**
 	 * @brief gets a reference of thread local data with a procedure functor and the constructor paramters for first call of a thread
 	 *
-	 * If a call of this I/F by a thread is first, this I/F will do below steps to construct initial value.
-	 * @li Step#1 Allocates a thread local memory for T by malloc.
-	 * @li Step#2 call T's constructor with Args and args.
-	 * @li Step#3 call pred with a reference of a instace of T.
-	 *
 	 * @tparam TFUNC	functor to get an inialized value of T
 	 * TFUNC should have a operator(): void operator()(T& v) @n
 	 * v is a reference that is constructed with Args and args.
 	 *
 	 * @return a reference of thread local data
+	 *
+	 * If a call of this I/F by a thread is first, this I/F will do below steps to construct initial value.
+	 * @li Step#1 Allocates a thread local memory for T by malloc.
+	 * @li Step#2 call T's constructor with Args and args.
+	 * @li Step#3 call pred with a reference of a instace of T.
+	 * 
+	 * @note
+	 * If TL_PRE_DESTRUCTOR does not release thread local data area of T, there is a possibility that thread local data area has some value by re-using.
+	 * In this case, pred is not called.
 	 */
 	template <typename TFUNC, typename... Args>
 	value_reference get_tls_instance_pred(
@@ -329,6 +363,33 @@ private:
 	using tls_cont         = internal::tls_data_container<T, TL_PRE_DESTRUCTOR>;
 	using tls_cont_pointer = tls_cont*;
 
+	tls_cont_pointer allocate_free_tls_container( void )
+	{
+		// 空きノードを探す。
+		tls_cont_pointer p_ans = head_.load( std::memory_order_acquire );
+		while ( p_ans != nullptr ) {
+			if ( p_ans->get_status() != tls_cont::ocupied_status::USING ) {
+				if ( p_ans->try_to_get_owner() ) {
+					internal::LogOutput( log_type::DEBUG, "node is allocated." );
+					return p_ans;
+				}
+			}
+			p_ans = p_ans->get_next();
+		}
+
+		void* p_tmp = std::malloc( sizeof( tls_cont ) );
+		p_ans       = new ( p_tmp ) tls_cont( pre_exec_of_cleanup_ );
+
+		// リストの先頭に追加
+		tls_cont_pointer p_cur_head = head_.load( std::memory_order_acquire );
+		do {
+			p_ans->set_next( p_cur_head );
+		} while ( !head_.compare_exchange_strong( p_cur_head, p_ans ) );
+
+		internal::LogOutput( log_type::DEBUG, "glist is added." );
+		return p_ans;
+	}
+
 	template <typename TFUNC>
 	value_reference get_tls_instance_pred_impl( TFUNC pred )
 	{
@@ -336,7 +397,9 @@ private:
 		tls_cont_pointer p_tls = reinterpret_cast<tls_cont_pointer>( pthread_getspecific( tls_key ) );
 		if ( p_tls == nullptr ) {
 			p_tls          = allocate_free_tls_container();
-			p_tls->p_value = pred();
+			if(p_tls->p_value == nullptr) {	// 確保済みの領域の場合は、pred()を呼び出さず、そのまま再利用する。
+				p_tls->p_value = pred();
+			}
 
 			int status;
 			status = pthread_setspecific( tls_key, (void*)p_tls );
@@ -360,33 +423,6 @@ private:
 		p_target_node->release_owner();
 
 		return;
-	}
-
-	tls_cont_pointer allocate_free_tls_container( void )
-	{
-		// 空きノードを探す。
-		tls_cont_pointer p_ans = head_.load( std::memory_order_acquire );
-		while ( p_ans != nullptr ) {
-			if ( p_ans->get_status() == tls_cont::ocupied_status::UNUSED ) {
-				if ( p_ans->try_to_get_owner() ) {
-					internal::LogOutput( log_type::DEBUG, "node is allocated." );
-					return p_ans;
-				}
-			}
-			p_ans = p_ans->get_next();
-		}
-
-		void* p_tmp = std::malloc( sizeof( tls_cont ) );
-		p_ans       = new ( p_tmp ) tls_cont( pre_exec_of_cleanup_ );
-
-		// リストの先頭に追加
-		tls_cont_pointer p_cur_head = head_.load( std::memory_order_acquire );
-		do {
-			p_ans->set_next( p_cur_head );
-		} while ( !head_.compare_exchange_strong( p_cur_head, p_ans ) );
-
-		internal::LogOutput( log_type::DEBUG, "glist is added." );
-		return p_ans;
 	}
 
 	pthread_key_t tls_key;   //!<	key for thread local storage of POSIX.
