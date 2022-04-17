@@ -1390,7 +1390,9 @@ general_mem_allocator::general_mem_allocator(
   : pr_ch_size_( 0 )
   , up_param_ch_array_()
 {
+#ifndef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 	set_param( p_param_array, num );
+#endif
 	return;
 }
 

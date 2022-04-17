@@ -8,7 +8,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 #set(CMAKE_CXX_STANDARD 17)	# for test purpose
 
 if("${SANITIZER_TYPE}" EQUAL "1")
- set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fsanitize=address")	# for test purpose
+ set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fsanitize=address -DALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER")	# for test purpose
  set(CMAKE_EXE_LINKER_FLAGS_INIT "${CMAKE_EXE_LINKER_FLAGS_INIT} -fsanitize=address")	# for test purpose
 elseif("${SANITIZER_TYPE}" EQUAL "2")
  set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fstack-protector-strong")	# for test purpose
@@ -31,10 +31,11 @@ elseif("${SANITIZER_TYPE}" EQUAL "10")
 elseif("${SANITIZER_TYPE}" EQUAL "11")
  set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -fsanitize=undefined -fsanitize=bounds")	# for test purpose
 elseif("${SANITIZER_TYPE}" EQUAL "12")
- set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fsanitize-address-use-after-scope")	# for test purpose
+ set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fsanitize-address-use-after-scope -DALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER")	# for test purpose
 elseif("${SANITIZER_TYPE}" EQUAL "13")
- set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -DENABLE_THREADSANITIZER -O2 -fno-omit-frame-pointer -fsanitize=thread")	# for test purpose. thread sanitizer needs -O1/-O2. Unfortunately this finds false positive.
+ set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -DENABLE_THREADSANITIZER -O2 -fno-omit-frame-pointer -fsanitize=thread -DALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER")	# for test purpose. thread sanitizer needs -O1/-O2. Unfortunately this finds false positive.
 else()
+ set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -DALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER")	# for test purpose. thread sanitizer needs -O1/-O2. Unfortunately this finds false positive.
  # no sanitizer
 endif()
 

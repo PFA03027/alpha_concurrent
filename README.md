@@ -1,4 +1,6 @@
 # libalconcurrent is Semi lock-free concurrent software asset
+The purpose of libalconcurrent library provides semi lock-free algorithms and semi lock-free memory allocator.
+If you are possible to design the necessary memory size, semi lock-free algorithms are mostly same behavior of lock-free.
 
 # Pre-requirement
 * C++11 standard and standard C++ library are required.
@@ -93,11 +95,11 @@ When allocating dynamic allocatable thread local storage for a thread, it is not
 After allocation, this class may be lock free. This depends whether pthread_getspecific() is lock free or not.
 
 # general memory allocator class that is semi lock-free in lf_mem_alloc.hpp
-This is general memory allocator.
-The current implementation needs the small overhead than malloc/free.
-Configured size of memory is kept to re-use.
-If the required size is over the max size of configuration paramter, it allocates from malloc directry and free it also.
+This is general memory allocator to get lock-free behavior and to avoid memory fragmentation.
+The current implementation requires a small additional overhead compared to malloc()/free().
 
+Configured of memory is kept to re-use.
+If the required size is over the max size of configuration paramter, it allocates directly from malloc() and free it by free() also.
 
 # Important points
 Whether the provided class is lock-free depends on whether the POSIX API for thread-local storage is lock-free.
@@ -166,10 +168,12 @@ Please refer libalconcurrent/CMakeLists.txt
 
 ### ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 general_mem_allocator uses the thread local chunk list.
-Thread local chunk list expects better performace, because each thread has own memory chunk list and it reduces the collision chances.
+Thread local chunk list expects better performace, because each thread has own memory chunk list and it reduces the collision chances of lock-free algorithm.
 
 If compile with ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST, general_mem_allocator uses the shared chunk list.
-This expects to minimize the allocation slots.
+Although the collision chance is higher, this expects to minimize the allocation slots.
+
+If you would like to know the number of collisions, please consider to use the macro ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT.
 
 ### ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 If comiple with NOT_USE_LOCK_FREE_MEM_ALLOC, lock free algorithms uses malloc/free instead of general_mem_allocator.
@@ -177,6 +181,14 @@ If comiple with NOT_USE_LOCK_FREE_MEM_ALLOC, lock free algorithms uses malloc/fr
 ### ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DEBUG, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP
 Configuration for log output type.
 Error log is alway enable to output.
+
+### ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+If define this macro, it enables to measure the additional statistics that is the internal information to debug lock-free algorithm.
+
+### ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+If you would like to pass through a memory allocation request to malloc() always, please define this macro.
+
+This macro loses the lock-free nature of the memory allocation process and is prone to memory fragmentation. Instead, the compiler sanitizer has the benefit of working effectively.
 
 # Patent
 ## Hazard pointer algorithm
