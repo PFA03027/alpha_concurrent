@@ -210,7 +210,7 @@ void* func_test_fifo2( void* data )
 		pointer_strage_local.emplace_back( p_node );
 		p_test_obj->push( p_node );
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = p_test_obj->pop();
+		auto [p_poped_node, vv] = p_test_obj->pop();
 #else
 		auto local_ret = p_test_obj->pop();
 		auto p_poped_node = std::get<0>( local_ret );

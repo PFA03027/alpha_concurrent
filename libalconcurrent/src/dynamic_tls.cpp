@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include <atomic>
+#include <cerrno>
 
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/dynamic_tls.hpp"

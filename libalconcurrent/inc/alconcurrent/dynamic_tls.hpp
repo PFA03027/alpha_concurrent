@@ -26,6 +26,7 @@
 #include <memory>
 #include <type_traits>
 #include <utility>
+#include <cerrno>
 
 #include "conf_logger.hpp"
 
