@@ -24,9 +24,9 @@ function exec_sanitizer () {
 	cd build
 	echo cmake -DCMAKE_BUILD_TYPE=$1 -DBUILD_TARGET=$2 -DSANITIZER_TYPE=$3 -G "Unix Makefiles" ../
 	cmake -DCMAKE_BUILD_TYPE=$1 -DBUILD_TARGET=$2 -DSANITIZER_TYPE=$3 -G "Unix Makefiles" ../
-	cmake --build . -j 8 -v --target build-test
+	cmake --build . -j ${JOBS} -v --target build-test
 	echo $3 / 14.
-	cmake --build . -j 8 -v --target test
+	cmake --build . -j ${JOBS} -v --target test
 	result=$?
 	if [ "$result" = "0" ]; then
 		echo $3 is OK. result=$result
@@ -37,6 +37,8 @@ function exec_sanitizer () {
 	fi
 	cd ..
 }
+
+JOBS=$[$(grep cpu.cores /proc/cpuinfo | sort -u | sed 's/[^0-9]//g') + 1]
 
 if [ "$#" = "0" ]; then
 	for i in {1..14}

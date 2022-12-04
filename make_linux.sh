@@ -13,11 +13,14 @@ BUILDTARGET=common
 #BUILDTYPE=Debug
 BUILDTYPE=Release
 
+JOBS=$[$(grep cpu.cores /proc/cpuinfo | sort -u | sed 's/[^0-9]//g') + 1]
+echo JOBS: ${JOBS}
+
 if [ $# -eq 0 ]; then
 	mkdir -p build
 	cd build
 	cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -D BUILD_TARGET=${BUILDTARGET} -G "Unix Makefiles" ../
-	cmake --build . -j 8 -v
+	cmake --build . -j ${JOBS} -v
 else
 	if [ "$1" = "clean" ]; then
 		rm -fr build
@@ -25,19 +28,19 @@ else
 		mkdir -p build
 		cd build
 		cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -G "Unix Makefiles" ../
-		cmake --build . -j 8 -v --target build-test
-		cmake --build . -j 8 -v --target test
+		cmake --build . -j ${JOBS} -v --target build-test
+		cmake --build . -j ${JOBS} -v --target test
 	elif [ "$1" = "full" ]; then
 		rm -fr build
 		mkdir -p build
 		cd build
 		cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -D BUILD_TARGET=${BUILDTARGET} -G "Unix Makefiles" ../
-		cmake --build . --clean-first -j 8 -v build-test
+		cmake --build . --clean-first -j ${JOBS} -v build-test
 	else
 		mkdir -p build
 		cd build
 		cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -D BUILD_TARGET=${BUILDTARGET} -G "Unix Makefiles" ../
-		cmake --build . -j 8 -v --target $1
+		cmake --build . -j ${JOBS} -v --target $1
 	fi
 fi
 
