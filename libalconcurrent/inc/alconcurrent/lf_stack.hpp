@@ -25,7 +25,7 @@ namespace concurrent {
 namespace internal {
 
 /*!
- * @breif	リスト型のFIFOキューの基本要素となるFIFOキュークラス
+ * @brief	リスト型のFIFOキューの基本要素となるFIFOキュークラス
  *
  * Tは、copy assignableでなければならい。
  *
@@ -68,7 +68,7 @@ public:
 	}
 
 	/*!
-	 * @breif	FIFOキューへノードをPushする。
+	 * @brief	FIFOキューへノードをPushする。
 	 *
 	 * @warning
 	 * 引数の管理ノードは、事前にcheck_hazard_list()を使用してハザードポインタに登録されていないことを確認していること。
@@ -98,7 +98,7 @@ public:
 	}
 
 	/*!
-	 * @breif	FIFOキューからポインタを取り出す。
+	 * @brief	FIFOキューからポインタを取り出す。
 	 *
 	 * 返り値の管理ノードに保管されている。
 	 *
@@ -139,7 +139,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Check whether a pointer is in this hazard list
+	 * @brief	Check whether a pointer is in this hazard list
 	 *
 	 * @retval	true	p_chk_ptr is in this hazard list.
 	 * @retval	false	p_chk_ptr is not in this hazard list.
@@ -177,7 +177,7 @@ private:
 }   // namespace internal
 
 /*!
- * @breif	semi-lock free Stack type queue
+ * @brief	semi-lock free Stack type queue
  *
  * Type T should be copy assignable.
  *
@@ -205,7 +205,7 @@ public:
 	using value_type = typename lifo_type::value_type;
 
 	/*!
-	 * @breif	Constructor
+	 * @brief	Constructor
 	 *
 	 * In case that ALLOW_TO_ALLOCATE is false, argument pre_alloc_nodes must be equal or than 1.
 	 * This value should be at least the number of CPUs.
@@ -225,7 +225,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Push a value to this LIFO stack
+	 * @brief	Push a value to this LIFO stack
 	 *
 	 * @note
 	 * In case that template parameter ALLOW_TO_ALLOCATE is true, this I/F is valid.
@@ -248,7 +248,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Push a value to this LIFO stack
+	 * @brief	Push a value to this LIFO stack
 	 *
 	 * @return	success or fail to push
 	 * @retval	true	success to push copy value of cont_arg to LIFO
@@ -274,7 +274,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Pop a value from this FIFO queue
+	 * @brief	Pop a value from this FIFO queue
 	 *
 	 * @return	1st element: true=success to pop a value, false=no value to pop
 	 * @return	2nd element: a value that is pop. In case that 1st element is true, 2nd element is valid.
@@ -295,7 +295,7 @@ public:
 	}
 
 	/*!
-	 * @breif	number of the queued values in FIFO
+	 * @brief	number of the queued values in FIFO
 	 *
 	 * @warning
 	 * This FIFO will be access by several thread concurrently. So, true number of this FIFO queue may be changed when caller uses the returned value.
@@ -306,7 +306,7 @@ public:
 	}
 
 	/*!
-	 * @breif	get the total number of the allocated internal nodes
+	 * @brief	get the total number of the allocated internal nodes
 	 *
 	 * @warning
 	 * This FIFO will be access by several thread concurrently. So, true number of this FIFO queue may be changed when caller uses the returned value.

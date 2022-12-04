@@ -145,7 +145,7 @@ void fifo_free_nd_list::push( fifo_free_nd_list::node_pointer const p_push_node 
 }
 
 /*!
-	 * @breif	FIFOキューからノードを取り出す。
+	 * @brief	FIFOキューからノードを取り出す。
 	 *
 	 * @return	取り出された管理ノードへのポインタ。nullptrの場合、FIFOキューが空だったことを示す。管理対象ポインタは、
 	 */
@@ -341,7 +341,7 @@ void node_of_list::teardown_by_recycle( void )
 
 #ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
 /*!
- * @breif	Set parameters in the lock-free memory allocator to enable the function.
+ * @brief	Set parameters in the lock-free memory allocator to enable the function.
  *
  * ロックフリーメモリアロケータに、パラメータを設定し機能を有効化する。
  *

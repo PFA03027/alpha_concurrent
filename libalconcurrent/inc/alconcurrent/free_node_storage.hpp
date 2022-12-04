@@ -28,7 +28,7 @@ namespace internal {
 class free_nd_storage;
 
 /*!
- * @breif	lock freeで使用するノードの基本クラス
+ * @brief	lock freeで使用するノードの基本クラス
  *
  * このヘッダファイルで提供する free_node_storage を使用する場合、
  * 利用者側が使用するクラスでのノードクラスをこのクラスから派生させること。
@@ -93,7 +93,7 @@ private:
 };
 
 /*!
- * @breif	フリーノードを管理するクラスで使用するスレッドローカルストレージのリスト型のFIFOキュークラス
+ * @brief	フリーノードを管理するクラスで使用するスレッドローカルストレージのリスト型のFIFOキュークラス
  */
 class thread_local_fifo_list {
 public:
@@ -126,7 +126,7 @@ private:
 };
 
 /*!
- * @breif	フリーノードを管理するクラスの基本となるリスト型のFIFOキュークラス
+ * @brief	フリーノードを管理するクラスの基本となるリスト型のFIFOキュークラス
  *
  * @note
  * https://www.slideshare.net/kumagi/lock-free-safe?next_slideshow=1 @n
@@ -147,7 +147,7 @@ public:
 	void push( node_pointer const p_push_node );
 
 	/*!
-	 * @breif	FIFOキューからノードを取り出す。
+	 * @brief	FIFOキューからノードを取り出す。
 	 *
 	 * @return	取り出された管理ノードへのポインタ。nullptrの場合、FIFOキューが空だったことを示す。管理対象ポインタは、
 	 */
@@ -180,7 +180,7 @@ private:
 };
 
 /*!
- * @breif	フリーノードを管理するクラス
+ * @brief	フリーノードを管理するクラス
  */
 class free_nd_storage {
 public:
@@ -192,7 +192,7 @@ public:
 	~free_nd_storage();
 
 	/*!
-	 * @breif	使用済みノードのリサイクル処理を行う。
+	 * @brief	使用済みノードのリサイクル処理を行う。
 	 *
 	 * まず、スレッドローカルストレージへノードを一時登録した後、ハザードポインタをチェックする。
 	 * ハザードポインタに登録されていなければ、teardown_by_recycle()を呼び出した後、共通フリーノードリストへの登録処理を行う。
@@ -204,7 +204,7 @@ public:
 	bool recycle( node_pointer p_retire_node );
 
 	/*!
-	 * @breif	フリーノードを取り出す。
+	 * @brief	フリーノードを取り出す。
 	 *
 	 * フリーノードリストからallocate()する場合は、setup_by_alloc()を呼び出す。
 	 *
@@ -353,7 +353,7 @@ private:
 
 #ifndef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 /*!
- * @breif	Set parameters in the lock-free memory allocator to enable the function.
+ * @brief	Set parameters in the lock-free memory allocator to enable the function.
  *
  * ロックフリーメモリアロケータに、パラメータを設定し機能を有効化する。
  *

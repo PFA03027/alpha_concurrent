@@ -30,7 +30,7 @@ namespace concurrent {
 namespace internal {
 
 /*!
- * @breif	chunk control status
+ * @brief	chunk control status
  */
 enum class chunk_control_status {
 	EMPTY,                 //!< chunk header has no allocated chunk memory.
@@ -84,7 +84,7 @@ struct chms_statistics {
 };
 
 /*!
- * @breif	使用可能なインデックス番号を管理する配列で使用する各要素のデータ構造
+ * @brief	使用可能なインデックス番号を管理する配列で使用する各要素のデータ構造
  *
  * 下記のスタック構造、あるいはリスト構造で管理される。
  * @li インデックスを持たない要素
@@ -102,7 +102,7 @@ struct idx_mgr_element {
 };
 
 /*!
- * @breif	ハーザードポインタ登録中で滞留している要素を管理するリスト
+ * @brief	ハーザードポインタ登録中で滞留している要素を管理するリスト
  *
  * スレッドローカルデータとして管理されるため、排他制御は不要なクラス
  */
@@ -122,12 +122,12 @@ private:
 };
 
 /*!
- * @breif	インデックス管理スロットのロックフリーストレージクラス
+ * @brief	インデックス管理スロットのロックフリーストレージクラス
  */
 class idx_element_storage_mgr {
 public:
 	/*!
-	 * @breif	コンストラクタ
+	 * @brief	コンストラクタ
 	 */
 	idx_element_storage_mgr(
 		std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_arg   //!< [in] nextポインタを保持しているメンバ変数へのメンバ変数ポインタ
@@ -138,7 +138,7 @@ public:
 	);
 
 	/*!
-	 * @breif	ストレージから１つの要素を取り出す
+	 * @brief	ストレージから１つの要素を取り出す
 	 *
 	 * @return	pointer to the poped element
 	 * @retval	nullptr	no available element
@@ -146,7 +146,7 @@ public:
 	idx_mgr_element* pop_element( void );
 
 	/*!
-	 * @breif	ストレージへ１つの要素を戻す
+	 * @brief	ストレージへ１つの要素を戻す
 	 */
 	void push_element(
 		idx_mgr_element* p_push_element   //!< [in] pointer of element to push
@@ -154,7 +154,7 @@ public:
 
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 	/*!
-	 * @breif	リスト操作時の衝突回数を取得する。
+	 * @brief	リスト操作時の衝突回数を取得する。
 	 */
 	int get_collision_cnt( void ) const
 	{
@@ -192,7 +192,7 @@ private:
 	};
 
 	/*!
-	 * @breif	ストレージから１つの要素を取り出す
+	 * @brief	ストレージから１つの要素を取り出す
 	 *
 	 * @return	pointer to the poped element
 	 * @retval	nullptr	no available element
@@ -200,14 +200,14 @@ private:
 	idx_mgr_element* pop_element_from_list( void );
 
 	/*!
-	 * @breif	ストレージへ１つの要素を戻す
+	 * @brief	ストレージへ１つの要素を戻す
 	 */
 	void push_element_to_list(
 		idx_mgr_element* p_push_element   //!< [in] pointer of element to push
 	);
 
 	/*!
-	 * @breif	tls_waiting_list_のスレッドローカルストレージが破棄される際(=スレッドが終了する場合)に滞留中の要素を受け取る
+	 * @brief	tls_waiting_list_のスレッドローカルストレージが破棄される際(=スレッドが終了する場合)に滞留中の要素を受け取る
 	 *
 	 * @note
 	 * スレッドセーフではあるが、ロックによる排他制御が行われる。
@@ -230,7 +230,7 @@ private:
 };
 
 /*!
- * @breif	ハーザードポインタ登録中でindexを登録するフリーの要素がない場合に、滞留している要素を管理するリスト
+ * @brief	ハーザードポインタ登録中でindexを登録するフリーの要素がない場合に、滞留している要素を管理するリスト
  *
  * スレッドローカルデータとして管理されることを想定しているクラスであるため、排他制御を行わないクラス。
  *
@@ -257,11 +257,11 @@ private:
 };
 
 /*!
- * @breif	使用可能なインデックス番号を管理する準ロックフリークラス
+ * @brief	使用可能なインデックス番号を管理する準ロックフリークラス
  */
 struct idx_mgr {
 	/*!
-	 * @breif	コンストラクタ
+	 * @brief	コンストラクタ
 	 */
 	idx_mgr(
 		const int idx_size_arg   //!< [in] 用意するインデックス番号の数。-1の場合、割り当てを保留する。
@@ -273,12 +273,12 @@ struct idx_mgr {
 	);
 
 	/*!
-	 * @breif	デストラクタ
+	 * @brief	デストラクタ
 	 */
 	~idx_mgr();
 
 	/*!
-	 * @breif	用意するインデックス番号の数を設定する。
+	 * @brief	用意するインデックス番号の数を設定する。
 	 *
 	 * 指定された数のインデックス番号を構築する。 @n
 	 * 既に設定済みの場合、現時点までの状態を破棄し、指定された数のインデックス番号を再度構築し直す。
@@ -289,7 +289,7 @@ struct idx_mgr {
 	void set_idx_size( const int idx_size_arg );
 
 	/*!
-	 * @breif	利用可能なインデックス番号を取り出す。
+	 * @brief	利用可能なインデックス番号を取り出す。
 	 *
 	 * @return	利用可能なインデックス番号
 	 * @retval	-1	利用可能なインデックス番号がない
@@ -300,7 +300,7 @@ struct idx_mgr {
 	int pop( void );
 
 	/*!
-	 * @breif	使用が完了したインデックス番号を返却する
+	 * @brief	使用が完了したインデックス番号を返却する
 	 *
 	 * @note
 	 * このI/Fはスレッドセーフで、ロックフリーです。
@@ -310,7 +310,7 @@ struct idx_mgr {
 	);
 
 	/*!
-	 * @breif	dump for debug
+	 * @brief	dump for debug
 	 */
 	void dump( void );
 
@@ -347,7 +347,7 @@ private:
 	};
 
 	/*!
-	 * @breif	tls_waiting_idx_list_のスレッドローカルストレージが破棄される際(=スレッドが終了する場合)に滞留中の要素を受け取る
+	 * @brief	tls_waiting_idx_list_のスレッドローカルストレージが破棄される際(=スレッドが終了する場合)に滞留中の要素を受け取る
 	 *
 	 * @note
 	 * スレッドセーフではあるが、ロックによる排他制御が行われる。
@@ -373,7 +373,7 @@ private:
 struct slot_chk_result;
 
 /*!
- * @breif	management information of a chunk
+ * @brief	management information of a chunk
  */
 class chunk_header_multi_slot {
 public:
@@ -382,7 +382,7 @@ public:
 	std::atomic<int>                            num_of_accesser_;   //!< number of accesser
 
 	/*!
-	 * @breif	constructor
+	 * @brief	constructor
 	 */
 	chunk_header_multi_slot(
 		const param_chunk_allocation& ch_param_arg,               //!< [in] chunk allocation paramter
@@ -390,12 +390,12 @@ public:
 	);
 
 	/*!
-	 * @breif	destructor
+	 * @brief	destructor
 	 */
 	~chunk_header_multi_slot();
 
 	/*!
-	 * @breif	allocate new memory slot
+	 * @brief	allocate new memory slot
 	 *
 	 * @return	pointer to an allocated memory slot
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
@@ -428,7 +428,7 @@ public:
 	}
 
 	/*!
-	 * @breif	recycle memory slot
+	 * @brief	recycle memory slot
 	 *
 	 * @retval	true	success to recycle.
 	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
@@ -463,14 +463,14 @@ public:
 	bool exec_allocation( void );
 
 	/*!
-	 * @breif	allocate new chunk
+	 * @brief	allocate new chunk
 	 */
 	bool alloc_new_chunk(
 		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
 	);
 
 	/*!
-	 * @breif	get chunk_header_multi_slot address from void* address that allocate_mem_slot() returns.
+	 * @brief	get chunk_header_multi_slot address from void* address that allocate_mem_slot() returns.
 	 *
 	 * @return	check result and pointer to chunk
 	 */
@@ -479,12 +479,12 @@ public:
 	);
 
 	/*!
-	 * @breif	get statistics
+	 * @brief	get statistics
 	 */
 	chunk_statistics get_statistics( void ) const;
 
 	/*!
-	 * @breif	dump for debug
+	 * @brief	dump for debug
 	 */
 	void dump( void );
 
@@ -498,7 +498,7 @@ private:
 	);
 
 	/*!
-	 * @breif	allocate new memory slot
+	 * @brief	allocate new memory slot
 	 *
 	 * @return	pointer to an allocated memory slot
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
@@ -515,7 +515,7 @@ private:
 	);
 
 	/*!
-	 * @breif	recycle memory slot
+	 * @brief	recycle memory slot
 	 *
 	 * @retval	true	success to recycle.
 	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
@@ -578,24 +578,24 @@ struct slot_header {
 };
 
 /*!
- * @breif	chunk list that has same allocation parameter
+ * @brief	chunk list that has same allocation parameter
  */
 class chunk_list {
 public:
 	/*!
-	 * @breif	constructor
+	 * @brief	constructor
 	 */
 	chunk_list(
 		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
 	);
 
 	/*!
-	 * @breif	destructor
+	 * @brief	destructor
 	 */
 	~chunk_list();
 
 	/*!
-	 * @breif	allocate new memory slot
+	 * @brief	allocate new memory slot
 	 *
 	 * @return	pointer to an allocated memory slot
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
@@ -612,7 +612,7 @@ public:
 	);
 
 	/*!
-	 * @breif	recycle memory slot
+	 * @brief	recycle memory slot
 	 *
 	 * @retval	true	success to recycle.
 	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
@@ -628,7 +628,7 @@ public:
 	);
 
 	/*!
-	 * @breif	get statistics
+	 * @brief	get statistics
 	 */
 	chunk_statistics get_statistics( void ) const;
 

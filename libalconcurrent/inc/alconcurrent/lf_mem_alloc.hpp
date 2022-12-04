@@ -28,19 +28,19 @@ extern const unsigned int           num_of_default_param_array;   //!< array siz
 extern const param_chunk_allocation default_param_array[];        //!< pointer to default parameter array
 
 /*!
- * @breif	semi lock-free memory allocator based on multi chunk size list
+ * @brief	semi lock-free memory allocator based on multi chunk size list
  *
  * If requested size is over max size that parameter has, just call malloc()
  */
 class general_mem_allocator {
 public:
 	/*!
-	 * @breif	constructor
+	 * @brief	constructor
 	 */
 	general_mem_allocator( void );
 
 	/*!
-	 * @breif	constructor
+	 * @brief	constructor
 	 */
 	general_mem_allocator(
 		const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
@@ -48,7 +48,7 @@ public:
 	);
 
 	/*!
-	 * @breif	allocate memory
+	 * @brief	allocate memory
 	 */
 	void* allocate(
 		std::size_t n   //!< [in] memory size to allocate
@@ -67,7 +67,7 @@ public:
 	);
 
 	/*!
-	 * @breif	deallocate memory
+	 * @brief	deallocate memory
 	 */
 	void deallocate(
 		void* p_mem   //!< [in] pointer to allocated memory by allocate()
@@ -86,7 +86,7 @@ public:
 	);
 
 	/*!
-	 * @breif	set parameter
+	 * @brief	set parameter
 	 *
 	 * If already set paramter by constructor or this I/F, this call is ignored.
 	 *
@@ -100,7 +100,7 @@ public:
 	);
 
 	/*!
-	 * @breif	get statistics
+	 * @brief	get statistics
 	 */
 	std::list<chunk_statistics> get_statistics( void ) const;
 
@@ -115,7 +115,7 @@ private:
 };
 
 /*!
- * @breif	allocate memory
+ * @brief	allocate memory
  *
  * This I/F allocates a memory from a global general_mem_allocator instance. @n
  * The allocated memory must free by gmem_deallocate().
@@ -140,7 +140,7 @@ void* gmem_allocate(
 );
 
 /*!
- * @breif	deallocate memory
+ * @brief	deallocate memory
  *
  * This I/F free a memory area that is allocated by gmem_allocate().
  *

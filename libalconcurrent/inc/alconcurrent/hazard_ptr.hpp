@@ -31,7 +31,7 @@ namespace alpha {
 namespace concurrent {
 
 /*!
- * @breif	hazard pointer support class
+ * @brief	hazard pointer support class
  *
  * 削除権が、１つのインスタンスのみに制約できる場合に使用できるハザードポインタ。
  * 参照権に対しては、制限なし。ただし、参照が終了した場合は、ハザードポインタをクリアしなければならない。
@@ -59,7 +59,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Make a reservation to acquire the reference right.
+	 * @brief	Make a reservation to acquire the reference right.
 	 *
 	 * 参照権を獲得予約をするために、ハザードポインタに登録する。
 	 *
@@ -84,7 +84,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Release a reservation to acquire the reference right or the reference right itself.
+	 * @brief	Release a reservation to acquire the reference right or the reference right itself.
 	 *
 	 * @note
 	 * 確実なclear_hazard_ptr()呼び出しをサポートするクラスとして、 hazard_ptr_scoped_ref<T> を用意している。
@@ -96,7 +96,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Release a reservation to acquire the reference right or the reference right itself.
+	 * @brief	Release a reservation to acquire the reference right or the reference right itself.
 	 *
 	 * @note
 	 * 確実なclear_hazard_ptr()呼び出しをサポートするクラスとして、 hazard_ptr_scoped_ref<T> を用意している。
@@ -108,7 +108,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Check whether a pointer is in this hazard list
+	 * @brief	Check whether a pointer is in this hazard list
 	 *
 	 * @retval	true	p_chk_ptr is in this hazard list.
 	 * @retval	false	p_chk_ptr is not in this hazard list.
@@ -130,7 +130,7 @@ private:
 	};
 
 	/*!
-	 * @breif	ハザードポインタとしてキープするためのノード。
+	 * @brief	ハザードポインタとしてキープするためのノード。
 	 *
 	 * スレッド毎に確保され、使用権が占有される。
 	 *
@@ -189,7 +189,7 @@ private:
 		}
 
 		/*!
-		 * @breif	Check whether a pointer is in this hazard
+		 * @brief	Check whether a pointer is in this hazard
 		 *
 		 * @retval	true	p_chk_ptr is in this hazard.
 		 * @retval	false	p_chk_ptr is not in this hazard.
@@ -312,7 +312,7 @@ private:
 		}
 
 		/*!
-		 * @breif	Check whether a pointer is in this hazard list
+		 * @brief	Check whether a pointer is in this hazard list
 		 *
 		 * @retval	true	p_chk_ptr is in this hazard list.
 		 * @retval	false	p_chk_ptr is not in this hazard list.
@@ -338,7 +338,7 @@ private:
 
 	private:
 		/*!
-		 * @breif	新しいノードを用意し、リストに追加する。
+		 * @brief	新しいノードを用意し、リストに追加する。
 		 *
 		 * 追加したノードは、USING状態で返される。
 		 *
@@ -405,7 +405,7 @@ private:
 };
 
 /*!
- * @breif	scoped reference control support class for hazard_ptr
+ * @brief	scoped reference control support class for hazard_ptr
  *
  * スコープベースでの、参照権の解放制御をサポートするクラスのI/Fクラス
  */
@@ -425,7 +425,7 @@ private:
 };
 
 /*!
- * @breif	scoped reference control support class for hazard_ptr
+ * @brief	scoped reference control support class for hazard_ptr
  *
  * スコープベースでの、参照権の解放制御をサポートするクラスの実体定義クラス
  */
@@ -455,7 +455,7 @@ private:
 
 #if 0
 /*!
- * @breif	推論補助
+ * @brief	推論補助
  */
 template <class HZD_PTR>
 hazard_ptr_scoped_ref( HZD_PTR&, int ) -> hazard_ptr_scoped_ref<typename HZD_PTR::hzrd_type, HZD_PTR::hzrd_max_slot>;

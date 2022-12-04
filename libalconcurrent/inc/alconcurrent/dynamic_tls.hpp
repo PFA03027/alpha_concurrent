@@ -36,7 +36,7 @@ namespace concurrent {
 namespace internal {
 
 /*!
- * @breif	call pthread_key_create() and count up the number of dynamic thread local memory
+ * @brief	call pthread_key_create() and count up the number of dynamic thread local memory
  *
  *　pthread_key_create()での割り当て数を１つ増やす。pthread_key_create()を呼び出すときに併せて呼び出す。
  *　不具合解析など使用する。
@@ -44,7 +44,7 @@ namespace internal {
 void dynamic_tls_pthread_key_create( pthread_key_t* p_key, void ( *destructor )( void* ) );
 
 /*!
- * @breif	call pthread_key_delete() and count down the number of dynamic thread local memory
+ * @brief	call pthread_key_delete() and count down the number of dynamic thread local memory
  *
  *　pthread_key_create()での割り当て数を１つ減らす。pthread_key_delete()を呼び出すときに併せて呼び出す。
  *　不具合解析など使用する。
@@ -52,7 +52,7 @@ void dynamic_tls_pthread_key_create( pthread_key_t* p_key, void ( *destructor )(
 void dynamic_tls_pthread_key_delete( pthread_key_t key );
 
 /*!
- * @breif	get the number of dynamic thread local memory
+ * @brief	get the number of dynamic thread local memory
  *
  *　pthread_key_create()での割り当て数を取得する。
  *　不具合解析など使用する。
@@ -60,7 +60,7 @@ void dynamic_tls_pthread_key_delete( pthread_key_t key );
 int get_num_of_tls_key( void );
 
 /*!
- * @breif	get the max number of dynamic thread local memory
+ * @brief	get the max number of dynamic thread local memory
  *
  *　pthread_key_create()での割り当て数を取得する。
  *　不具合解析など使用する。
@@ -68,7 +68,7 @@ int get_num_of_tls_key( void );
 int get_max_num_of_tls_key( void );
 
 /*!
- * @breif	動的スレッドローカルストレージで使用する内部処理用クラス
+ * @brief	動的スレッドローカルストレージで使用する内部処理用クラス
  *
  * @note
  * lf_mem_allocクラスで使用するため、
@@ -111,7 +111,7 @@ public:
 	}
 
 	/*!
-	 * @breif	スレッド終了時に管理しているスレッドローカルストレージを解放する。
+	 * @brief	スレッド終了時に管理しているスレッドローカルストレージを解放する。
 	 */
 	void release_owner( void )
 	{
@@ -176,14 +176,14 @@ private:
 }   // namespace internal
 
 /*!
- * @breif	スレッド終了時にスレッドローカルストレージを解放する前に呼び出されるファンクタ
+ * @brief	スレッド終了時にスレッドローカルストレージを解放する前に呼び出されるファンクタ
  *
  * @param [in]	T	ファンクタに引数として渡される型。実際の引数は、この型の参照T&となる。
  *
  * このファンクタ自身は、何もしないというファンクタとして動作する。
  * 
  *
- * @breif A functor called before freeing thread-local storage at the end of a thread
+ * @brief A functor called before freeing thread-local storage at the end of a thread
  *
  * @param [in] T The type passed as an argument to the functor. The actual argument is a reference T & of this type.
  *
@@ -219,7 +219,7 @@ struct threadlocal_destructor_functor {
 
 
 /*!
- * @breif	動的スレッドローカルストレージを実現するクラス
+ * @brief	動的スレッドローカルストレージを実現するクラス
  *
  * スレッド終了時にスレッドローカルストレージをdestructする前に、コンストラクタで指定されたTL_PRE_DESTRUCTORのインスタンスが呼び出される。
  * このクラスのインスタンス変数自体がdestructされる場合は、呼び出されない。
@@ -238,7 +238,7 @@ struct threadlocal_destructor_functor {
  * lf_mem_allocクラスで使用するため、
  * コンポーネントの上下関係から、メモリの確保にはnewを使用せず、malloc/freeと配置newのみを使用する。
  *
- * @breif Class that realizes dynamic thread local storage
+ * @brief Class that realizes dynamic thread local storage
  *
  * At the end of the thread, the instance of TL_PRE_DESTRUCTOR specified in the constructor is called before destructing the thread local storage.
  * If the instance variable of this class itself is destroyed, it will not be called.

@@ -22,7 +22,7 @@ namespace alpha {
 namespace concurrent {
 
 /*!
- * @breif	semi-lock free one side deque
+ * @brief	semi-lock free one side deque
  *
  * Type T should be copy assignable.
  *
@@ -51,7 +51,7 @@ public:
 	using value_type = typename head_stack_t::value_type;
 
 	/*!
-	 * @breif	Constructor
+	 * @brief	Constructor
 	 *
 	 * In case that ALLOW_TO_ALLOCATE is false, argument pre_alloc_nodes must be equal or than 1.
 	 * This value should be at least the number of CPUs.
@@ -66,7 +66,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Push a value to back side of this one side deque
+	 * @brief	Push a value to back side of this one side deque
 	 *
 	 * cont_arg will copy to one side deque.
 	 *
@@ -91,7 +91,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Push a value to back side of this one side deque
+	 * @brief	Push a value to back side of this one side deque
 	 *
 	 * cont_arg will copy to one side deque.
 	 *
@@ -119,7 +119,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Push a value to front side of this one side deque
+	 * @brief	Push a value to front side of this one side deque
 	 *
 	 * cont_arg will copy to one side deque.
 	 *
@@ -144,7 +144,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Push a value to front side of this one side deque
+	 * @brief	Push a value to front side of this one side deque
 	 *
 	 * cont_arg will copy to one side deque.
 	 *
@@ -172,7 +172,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Pop a value from front side of this one side deque
+	 * @brief	Pop a value from front side of this one side deque
 	 *
 	 * @return	1st element: true=success to pop a value, false=no value to pop
 	 * @return	2nd element: a value that is pop. In case that 1st element is true, 2nd element is valid.
@@ -190,7 +190,7 @@ public:
 	}
 
 	/*!
-	 * @breif	number of the queued values in one side deque
+	 * @brief	number of the queued values in one side deque
 	 *
 	 * @warning
 	 * This one side deque will be access by several thread concurrently. So, true number of this one side deque may be changed when caller uses the returned value.
@@ -201,7 +201,7 @@ public:
 	}
 
 	/*!
-	 * @breif	get the total number of the allocated internal nodes
+	 * @brief	get the total number of the allocated internal nodes
 	 *
 	 * @warning
 	 * This one side deque will be access by several thread concurrently. So, true number of this one side deque may be changed when caller uses the returned value.

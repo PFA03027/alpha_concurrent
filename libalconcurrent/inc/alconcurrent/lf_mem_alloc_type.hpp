@@ -17,7 +17,7 @@ namespace alpha {
 namespace concurrent {
 
 /*!
- * @breif	configuration paramters when allocate chunk
+ * @brief	configuration paramters when allocate chunk
  */
 struct param_chunk_allocation {
 	unsigned int size_of_one_piece_ = 0;   //!< size of one piece in a chunk

@@ -22,7 +22,7 @@ namespace alpha {
 namespace concurrent {
 
 /*!
- * @breif	log type that is used by this library
+ * @brief	log type that is used by this library
  */
 enum class log_type {
 	ERR,     //!< Log type is Error
@@ -34,12 +34,12 @@ enum class log_type {
 };
 
 /*!
- * @breif	log output I/F class to configure the logging.
+ * @brief	log output I/F class to configure the logging.
  */
 class logger_if_abst {
 public:
 	/*!
-	 * @breif	Output a log to logger
+	 * @brief	Output a log to logger
 	 *
 	 *
 	 */
@@ -59,7 +59,7 @@ namespace internal {
 extern logger_if_abst* p_concrete_logger_if;
 
 /*!
- * @breif	filter for logging
+ * @brief	filter for logging
  *
  * Default configuration allows to pass ERR and WARN.
  * @li If compiled with ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO definition, this I/F allows to path INFO.
@@ -101,7 +101,7 @@ inline void LogOutput( const log_type lt, const char* p_str )
 }   // namespace internal
 
 /*!
- * @breif	Set new logger I/F
+ * @brief	Set new logger I/F
  *
  * @warning
  * This I/F is not lock-free and not thread-safe. @n
@@ -114,7 +114,7 @@ inline void LogOutput( const log_type lt, const char* p_str )
 void SetLoggerIf( std::unique_ptr<logger_if_abst> up_logger_if_inst );
 
 /*!
- * @breif	Get the number of ERR type and WARN type log output
+ * @brief	Get the number of ERR type and WARN type log output
  *
  * This is test/debug purpose.
  */
@@ -124,7 +124,7 @@ void GetErrorWarningLogCount(
 );
 
 /*!
- * @breif	Get the number of ERR type and WARN type log output, then reset those numbers.
+ * @brief	Get the number of ERR type and WARN type log output, then reset those numbers.
  *
  * This is test/debug purpose.
  */

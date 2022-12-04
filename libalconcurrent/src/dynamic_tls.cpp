@@ -77,7 +77,7 @@ void error_log_output( int errno_arg, const char* p_func_name )
 }
 
 /*!
- * @breif	call pthread_key_create() and count up the number of dynamic thread local memory
+ * @brief	call pthread_key_create() and count up the number of dynamic thread local memory
  *
  *　pthread_key_create()での割り当て数を１つ増やす。pthread_key_create()を呼び出すときに併せて呼び出す。
  *　不具合解析など使用する。
@@ -99,7 +99,7 @@ void dynamic_tls_pthread_key_create( pthread_key_t* p_key, void ( *destructor )(
 }
 
 /*!
- * @breif	call pthread_key_delete() and count down the number of dynamic thread local memory
+ * @brief	call pthread_key_delete() and count down the number of dynamic thread local memory
  *
  *　pthread_key_create()での割り当て数を１つ減らす。pthread_key_delete()を呼び出すときに併せて呼び出す。
  *　不具合解析など使用する。
@@ -116,7 +116,7 @@ void dynamic_tls_pthread_key_delete( pthread_key_t key )
 }
 
 /*!
- * @breif	get the number of dynamic thread local memory
+ * @brief	get the number of dynamic thread local memory
  *
  *　pthread_key_create()での割り当て数を取得する。
  *　不具合解析など使用する。
@@ -127,7 +127,7 @@ int get_num_of_tls_key( void )
 }
 
 /*!
- * @breif	get the max number of dynamic thread local memory
+ * @brief	get the max number of dynamic thread local memory
  *
  *　pthread_key_create()での割り当て数を取得する。
  *　不具合解析など使用する。

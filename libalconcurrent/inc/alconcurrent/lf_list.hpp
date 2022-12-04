@@ -26,7 +26,7 @@ namespace concurrent {
 namespace internal {
 
 /*!
- * @breif	ロックフリー方式用の単方向型リスト
+ * @brief	ロックフリー方式用の単方向型リスト
  *
  * Tは、copyable、あるいはmovableでなければならい。
  *
@@ -75,7 +75,7 @@ public:
 	}
 
 	/*!
-	 * @breif	条件に合致する最初のノードとその直前のノードを見つける。
+	 * @brief	条件に合致する最初のノードとその直前のノードを見つける。
 	 *
 	 * 検索で、predが真を返した場合
 	 * @retval	1st-value	直前のノードへのポインタ
@@ -168,7 +168,7 @@ public:
 	}
 
 	/*!
-	 * @breif	prevとcurrの間にノードを挿入する
+	 * @brief	prevとcurrの間にノードを挿入する
 	 *
 	 * @retval	true	挿入に成功
 	 * @retval	false	挿入に失敗
@@ -195,7 +195,7 @@ public:
 	}
 
 	/*!
-	 * @breif	currのノードを削除する
+	 * @brief	currのノードを削除する
 	 *
 	 * @retval	true	削除に成功
 	 * @retval	false	削除に失敗
@@ -250,7 +250,7 @@ public:
 	}
 
 	/*!
-	 * @breif	currのノードを削除する
+	 * @brief	currのノードを削除する
 	 *
 	 * @retval	true	削除に成功
 	 * @retval	false	削除に失敗
@@ -268,7 +268,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Applies the specified function to all elements.
+	 * @brief	Applies the specified function to all elements.
 	 *
 	 * @pre
 	 * The Function must meet the MoveConstructible requirement, but not the CopyConstructible requirement.
@@ -319,7 +319,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Check whether a pointer is in this hazard list
+	 * @brief	Check whether a pointer is in this hazard list
 	 *
 	 * @retval	true	p_chk_ptr is in this hazard list.
 	 * @retval	false	p_chk_ptr is not in this hazard list.
@@ -330,7 +330,7 @@ public:
 	}
 
 	/*!
-	 * @breif	現在、リスト内に存在するノード数を得る
+	 * @brief	現在、リスト内に存在するノード数を得る
 	 *
 	 * @warning
 	 * 必ずしも取得した瞬間の状態を正確に反映するわけではないので、参考程度の使用にとどめること。
@@ -341,7 +341,7 @@ public:
 	}
 
 	/*!
-	 * @breif	ヘッドノードかどうかを調べる。
+	 * @brief	ヘッドノードかどうかを調べる。
 	 *
 	 * @retval	true	p_chk_ptr is same to termination node.
 	 * @retval	false	p_chk_ptr is not same to termination node.
@@ -352,7 +352,7 @@ public:
 	}
 
 	/*!
-	 * @breif	終端ノード（番兵ノード）かどうかを調べる。
+	 * @brief	終端ノード（番兵ノード）かどうかを調べる。
 	 *
 	 * @retval	true	p_chk_ptr is same to termination node.
 	 * @retval	false	p_chk_ptr is not same to termination node.
@@ -394,7 +394,7 @@ private:
 }   // namespace internal
 
 /*!
- * @breif	semi-lock free list
+ * @brief	semi-lock free list
  *
  * Type T should be trivially copyable.
  *
@@ -424,7 +424,7 @@ public:
 	using for_each_func_t = std::function<void( value_type& )>;
 
 	/*!
-	 * @breif	Constructor
+	 * @brief	Constructor
 	 *
 	 * In case that ALLOW_TO_ALLOCATE is false, argument pre_alloc_nodes must be equal or than 1.
 	 * This value should be at least the number of CPUs.
@@ -444,7 +444,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Constructor
+	 * @brief	Constructor
 	 *
 	 * In case that ALLOW_TO_ALLOCATE is false, argument pre_alloc_nodes must be equal or than 1.
 	 * This value should be at least the number of CPUs.
@@ -457,7 +457,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Insert a value to this list
+	 * @brief	Insert a value to this list
 	 *
 	 * cont_arg will copy to list.
 	 *
@@ -519,7 +519,7 @@ public:
 	}
 
 	/*!
-	 * @breif	remove all of nodes that pred return true from this list
+	 * @brief	remove all of nodes that pred return true from this list
 	 */
 	int remove_all_if(
 		predicate_t& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
@@ -550,7 +550,7 @@ public:
 	}
 
 	/*!
-	 * @breif	remove a first node that pred return true from this list
+	 * @brief	remove a first node that pred return true from this list
 	 */
 	bool remove_one_if(
 		predicate_t& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
@@ -585,7 +585,7 @@ public:
 	}
 
 	/*!
-	 * @breif	push a value to the front of this list
+	 * @brief	push a value to the front of this list
 	 *
 	 * cont_arg will copy to list.
 	 *
@@ -615,7 +615,7 @@ public:
 	}
 
 	/*!
-	 * @breif	pop a value from the front of this list
+	 * @brief	pop a value from the front of this list
 	 *
 	 * @return	1st return value. Success or fail to pop
 	 * @retval	true	success to pop a value
@@ -664,7 +664,7 @@ public:
 	}
 
 	/*!
-	 * @breif	append a value to the end of this list
+	 * @brief	append a value to the end of this list
 	 *
 	 * cont_arg will copy to list.
 	 *
@@ -694,7 +694,7 @@ public:
 	}
 
 	/*!
-	 * @breif	pop a value from the end of this list
+	 * @brief	pop a value from the end of this list
 	 *
 	 * @return	1st return value. Success or fail to pop
 	 * @retval	true	success to pop a value
@@ -761,7 +761,7 @@ public:
 	}
 
 	/*!
-	 * @breif	Applies the specified function to all elements.
+	 * @brief	Applies the specified function to all elements.
 	 *
 	 * @pre
 	 * The Function must meet the MoveConstructible requirement, but not the CopyConstructible requirement.
@@ -783,7 +783,7 @@ public:
 	}
 
 	/*!
-	 * @breif	number of the queued values in FIFO
+	 * @brief	number of the queued values in FIFO
 	 *
 	 * @warning
 	 * This list will be access by several thread concurrently. So, true number of node in this list may be changed when caller uses the returned value.
@@ -794,7 +794,7 @@ public:
 	}
 
 	/*!
-	 * @breif	get the total number of the allocated internal nodes
+	 * @brief	get the total number of the allocated internal nodes
 	 *
 	 * @warning
 	 * This FIFO will be access by several thread concurrently. So, true number of this FIFO queue may be changed when caller uses the returned value.
@@ -827,7 +827,7 @@ private:
 	};
 
 	/*!
-	 * @breif	append a value to the end of this list
+	 * @brief	append a value to the end of this list
 	 *
 	 * cont_arg will copy to list.
 	 *

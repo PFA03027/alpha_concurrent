@@ -56,7 +56,7 @@ idx_mgr_element::idx_mgr_element( void )
 }
 
 /*!
- * @breif	dump for debug
+ * @brief	dump for debug
  */
 void idx_mgr_element::dump( void ) const
 {
@@ -175,7 +175,7 @@ void waiting_element_list::dump( void ) const
 
 ////////////////////////////////////////////////////////////////////////////////
 /*!
- * @breif	インデックス管理スロットのロックフリーストレージクラス
+ * @brief	インデックス管理スロットのロックフリーストレージクラス
  */
 idx_element_storage_mgr::idx_element_storage_mgr(
 	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_arg   //!< [in] nextポインタを保持しているメンバ変数へのメンバ変数ポインタ
@@ -197,7 +197,7 @@ idx_element_storage_mgr::idx_element_storage_mgr(
 }
 
 /*!
- * @breif	ストレージから１つの要素を取り出す
+ * @brief	ストレージから１つの要素を取り出す
  *
  * @return	pointer to the poped element
  * @retval	nullptr	no available element
@@ -237,7 +237,7 @@ idx_mgr_element* idx_element_storage_mgr::pop_element( void )
 }
 
 /*!
- * @breif	ストレージへ１つの要素を戻す
+ * @brief	ストレージへ１つの要素を戻す
  */
 void idx_element_storage_mgr::push_element(
 	idx_mgr_element* p_push_element   //!< [in] pointer of element to push
@@ -311,7 +311,7 @@ idx_mgr_element* idx_element_storage_mgr::pop_element_from_list( void )
 }
 
 /*!
- * @breif	ストレージへ１つの要素を戻す
+ * @brief	ストレージへ１つの要素を戻す
  */
 void idx_element_storage_mgr::push_element_to_list(
 	idx_mgr_element* p_push_element   //!< [in] pointer of element to push
@@ -477,7 +477,7 @@ void waiting_idx_list::dump( void ) const
 
 ////////////////////////////////////////////////////////////////////////////////
 /*!
- * @breif	コンストラクタ
+ * @brief	コンストラクタ
  */
 idx_mgr::idx_mgr(
 	const int idx_size_arg   //!< [in] 用意するインデックス番号の数。-1の場合、割り当てを保留する。
@@ -1047,7 +1047,7 @@ chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
 }
 
 /*!
- * @breif	dump for debug
+ * @brief	dump for debug
  */
 void chunk_header_multi_slot::dump( void )
 {
@@ -1361,7 +1361,7 @@ bool chunk_list::recycle_mem_slot(
 }
 
 /*!
- * @breif	get statistics
+ * @brief	get statistics
  */
 chunk_statistics chunk_list::get_statistics( void ) const
 {
@@ -1518,7 +1518,7 @@ void general_mem_allocator::set_param(
 }
 
 /*!
- * @breif	get statistics
+ * @brief	get statistics
  */
 std::list<chunk_statistics> general_mem_allocator::get_statistics( void ) const
 {
