@@ -163,6 +163,32 @@ void gmem_deallocate(
 #endif
 );
 
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+/*!
+ * @brief get backtrace information
+ * 
+ * this is for debug purpose.
+ * 
+ * @return backtrace information
+ * @return 1st element: backtrace when this memory is allocated.
+ * @return 2nd element: backtrace when this memory is free.
+ */
+std::tuple<alpha::concurrent::internal::slot_chk_result,
+		   alpha::concurrent::internal::slot_header::bt_info,
+		   alpha::concurrent::internal::slot_header::bt_info> get_backtrace_info(
+	void* p_mem   //!< [in] pointer to allocated memory by allocate()
+);
+
+/*!
+ * @brief output backtrace information to log output
+ */
+void output_backtrace_info(
+	const log_type lt, //!< [in] log type
+	void* p_mem   //!< [in] pointer to allocated memory by allocate()
+);
+#endif
+
+
 }   // namespace concurrent
 }   // namespace alpha
 

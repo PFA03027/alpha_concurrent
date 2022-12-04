@@ -555,6 +555,17 @@ struct slot_header {
 	int         caller_lineno_;        //!< caller side line number
 	const char* p_caller_func_name_;   //!< function name calling this I/F
 #endif
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#define ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE	(100)
+	struct bt_info {
+		int count_;	//!< backtrace data size. Zero: no data, Plus value: call stack information is valid, Minus value: information of previous allocation
+		void* bt_[ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE];	//!< call stack of backtrace
+
+		void dump_to_log(log_type lt, int id);
+	};
+	bt_info alloc_bt_info_;	//!< backtrace information when is allocated
+	bt_info free_bt_info_;	//!< backtrace information when is free
+#endif
 
 	void set_addr_of_chunk_header_multi_slot(
 		chunk_header_multi_slot* p_chms_arg   //!< [in] pointer to a parent "chunk_header_multi_slot"

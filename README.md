@@ -176,7 +176,7 @@ Although the collision chance is higher, this expects to minimize the allocation
 If you would like to know the number of collisions, please consider to use the macro ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT.
 
 ### ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
-If comiple with NOT_USE_LOCK_FREE_MEM_ALLOC, lock free algorithms uses malloc/free instead of general_mem_allocator.
+If comiple with ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC, lock free algorithms uses malloc/free instead of general_mem_allocator.
 
 ### ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DEBUG, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP
 Configuration for log output type.
@@ -189,6 +189,10 @@ If define this macro, it enables to measure the additional statistics that is th
 If you would like to pass through a memory allocation request to malloc() always, please define this macro.
 
 This macro loses the lock-free nature of the memory allocation process and is prone to memory fragmentation. Instead, the compiler sanitizer has the benefit of working effectively.
+
+### ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+If you would like to record the backtrace of allcation and free for debugging, please define this macro.
+If you define this macro, the compilation also needs -g(debug symbol)
 
 # Patent
 ## Hazard pointer algorithm

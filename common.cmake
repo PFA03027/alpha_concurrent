@@ -35,7 +35,7 @@ elseif("${SANITIZER_TYPE}" EQUAL "12")
 elseif("${SANITIZER_TYPE}" EQUAL "13")
  set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -DENABLE_THREADSANITIZER -O2 -fno-omit-frame-pointer -fsanitize=thread -DALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER")	# for test purpose. thread sanitizer needs -O1/-O2. Unfortunately this finds false positive.
 else()
- set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -DALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER")	# for test purpose. thread sanitizer needs -O1/-O2. Unfortunately this finds false positive.
+ # set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -DALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER")	# for test purpose. thread sanitizer needs -O1/-O2. Unfortunately this finds false positive.
  # no sanitizer
 endif()
 

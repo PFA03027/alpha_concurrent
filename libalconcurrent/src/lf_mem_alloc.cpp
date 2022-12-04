@@ -8,6 +8,8 @@
  * Copyright (C) 2021 by alpha Teruaki Ata <PFA03027@nifty.com>
  */
 
+#include <execinfo.h>
+
 #include <algorithm>
 #include <atomic>
 #include <cstddef>
@@ -691,6 +693,30 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
+#ifdef	ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#define RECORD_BACKTRACE_GET_BACKTRACE(BT_INFO_N)	do { BT_INFO_N.count_ = backtrace(BT_INFO_N.bt_, ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE); } while(0)
+#define RECORD_BACKTRACE_INVALIDATE_BACKTRACE(BT_INFO_N)	do { BT_INFO_N.count_ = -(BT_INFO_N.count_); } while(0)
+
+void slot_header::bt_info::dump_to_log(log_type lt, int id)
+{
+	if(count_ == 0) {
+		internal::LogOutput(lt, "[%d] no back trace. this slot has not allocated yet.", id );
+		return;
+	}
+
+	internal::LogOutput(lt, "[%d] backtrace count value = %d", id, count_ );
+
+	int actual_count = (count_ < 0) ? -count_ : count_;
+	char** bt_strings = backtrace_symbols( bt_, actual_count );
+	for(int i=0; i < actual_count;i++) {
+		internal::LogOutput(lt, "[%d] [%d] %s", id, i, bt_strings[i] );
+	}
+	free(bt_strings);
+
+	return;
+}
+#endif
+
 void slot_header::set_addr_of_chunk_header_multi_slot(
 	chunk_header_multi_slot* p_chms_arg
 #ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
@@ -703,6 +729,15 @@ void slot_header::set_addr_of_chunk_header_multi_slot(
 {
 #ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 	set_caller_context_info( caller_src_fname, caller_lineno, caller_func_name );
+#endif
+#ifdef	ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	RECORD_BACKTRACE_GET_BACKTRACE(alloc_bt_info_);
+	if( p_chms_arg != nullptr ) {
+		RECORD_BACKTRACE_INVALIDATE_BACKTRACE(free_bt_info_);
+	} else {
+		// mallocで確保された領域なので、free_bt_info_側の情報は、クリアする。
+		free_bt_info_ = {0};
+	}
 #endif
 
 	// 今は簡単な仕組みで実装する
@@ -769,6 +804,9 @@ chunk_header_multi_slot::~chunk_header_multi_slot()
 {
 	delete[] p_free_slot_mark_;
 	std::free( p_chunk_ );
+
+	p_free_slot_mark_ = nullptr;
+	p_chunk_ = nullptr;
 
 	statistics_.chunk_num_--;
 
@@ -881,8 +919,12 @@ void* chunk_header_multi_slot::allocate_mem_slot_impl(
 		return nullptr;
 	}
 
+	// フリースロットからスロットを確保したので、使用中のマークを付ける。
+	// Since we got a slot from a free slot, mark it as in use.
 	p_free_slot_mark_[read_idx].store( false );
 
+	// 得たスロットに対応する実際のメモリ領域のアドレス情報を生成する。
+	// Generate the address information of the actual memory area corresponding to the obtained slot.
 	std::uintptr_t p_ans_addr = reinterpret_cast<std::uintptr_t>( p_chunk_ );
 	p_ans_addr += read_idx * slot_conf_.size_of_one_piece_;
 
@@ -961,6 +1003,21 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 			"current free call is: %s, line no %d, function=%s",
 			caller_src_fname, caller_lineno, caller_func_name );
 #endif
+#ifdef	ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+		static std::atomic_int	double_free_counter(0);
+		int id_count = double_free_counter.fetch_add(1);
+
+		internal::LogOutput( log_type::ERR, "[%d] backtrace of previous free call", id_count );
+		p_sh->free_bt_info_.dump_to_log(log_type::ERR, id_count);
+
+		slot_header::bt_info	cur_bt;
+		RECORD_BACKTRACE_GET_BACKTRACE(cur_bt);
+		internal::LogOutput( log_type::ERR, "[%d] backtrace of current free call", id_count );
+		cur_bt.dump_to_log(log_type::ERR, id_count);
+
+		internal::LogOutput( log_type::ERR, "[%d] backtrace of allocation call", id_count );
+		p_sh->alloc_bt_info_.dump_to_log(log_type::ERR, id_count);
+#endif
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 		statistics_.dealloc_req_err_cnt_++;
 #endif
@@ -970,6 +1027,10 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 	// OK. correct address
 #ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 	p_sh->set_caller_context_info( caller_src_fname, caller_lineno, caller_func_name );
+#endif
+#ifdef	ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	RECORD_BACKTRACE_GET_BACKTRACE(p_sh->free_bt_info_);
+	RECORD_BACKTRACE_INVALIDATE_BACKTRACE(p_sh->alloc_bt_info_);
 #endif
 
 	free_slot_idx_mgr_.push( idx );
@@ -1420,6 +1481,7 @@ void* general_mem_allocator::allocate(
 		}
 	}
 
+	// 対応するサイズのメモリスロットが見つからなかったので、mallocでメモリ領域を確保する。
 	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( std::malloc( n + internal::get_slot_header_size() ) );
 
 	p_sh->set_addr_of_chunk_header_multi_slot(
@@ -1463,10 +1525,15 @@ void general_mem_allocator::deallocate(
 		} else {
 			std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
 			tmp_addr -= internal::get_slot_header_size();
-			std::free( reinterpret_cast<void*>( tmp_addr ) );
+			internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( tmp_addr );
+#ifdef	ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+			RECORD_BACKTRACE_GET_BACKTRACE(p_sh->free_bt_info_);
+			RECORD_BACKTRACE_INVALIDATE_BACKTRACE(p_sh->alloc_bt_info_);
+#endif
+			std::free( reinterpret_cast<void*>( p_sh ) );
 		}
 	} else {
-
+		internal::LogOutput( log_type::WARN, "Header is corrupted. full search correct chunk and try free" );
 		for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
 			bool ret = up_param_ch_array_[i].up_chunk_lst_->recycle_mem_slot(
 				p_mem
@@ -1475,10 +1542,14 @@ void general_mem_allocator::deallocate(
 				caller_src_fname, caller_lineno, caller_func_name
 #endif
 			);
-			if ( ret ) return;
+			if ( ret ) {
+				internal::LogOutput( log_type::WARN, "Header is corrupted, but luckily success to find and free" );
+				return;
+			}
 		}
 
 		// header is corrupted and unknown memory slot deallocation is requested. try to call free()
+		internal::LogOutput( log_type::WARN, "header is corrupted and unknown memory slot deallocation is requested. try to free by calling free()" );
 		std::free( p_mem );   // TODO should not do this ?
 	}
 
@@ -1561,6 +1632,56 @@ std::string chunk_statistics::print( void )
 
 	return std::string( buf );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+std::tuple<alpha::concurrent::internal::slot_chk_result,
+		   alpha::concurrent::internal::slot_header::bt_info,
+		   alpha::concurrent::internal::slot_header::bt_info> get_backtrace_info(
+	void* p_mem   //!< [in] pointer to allocated memory by allocate()
+)
+{
+	std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
+	tmp_addr -= internal::get_slot_header_size();
+	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( tmp_addr );
+
+	return std::tuple<alpha::concurrent::internal::slot_chk_result,
+					  alpha::concurrent::internal::slot_header::bt_info,
+					  alpha::concurrent::internal::slot_header::bt_info>(
+		p_sh->chk_header_data(),
+		p_sh->alloc_bt_info_,
+		p_sh->free_bt_info_);
+}
+
+void output_backtrace_info(
+	const log_type lt, //!< [in] log type
+	void* p_mem   //!< [in] pointer to allocated memory by allocate()
+)
+{
+	static std::atomic_int	counter(0);
+	int id_count = counter.fetch_add(1);
+
+	std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
+	tmp_addr -= internal::get_slot_header_size();
+	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( tmp_addr );
+
+	auto chk_ret = p_sh->chk_header_data();
+	internal::LogOutput(
+		lt,
+		"[%d] header check result of %p: correct_=%s, p_chms_=%p",
+		id_count, p_mem, chk_ret.correct_ ? "true" : "false", chk_ret.p_chms_ );
+
+	internal::LogOutput(lt, "[%d] alloc_bt_info_ of %p", id_count, p_mem );
+	p_sh->alloc_bt_info_.dump_to_log(lt, id_count);
+	internal::LogOutput(lt, "[%d] free_bt_info_ of %p", id_count, p_mem );
+	p_sh->free_bt_info_.dump_to_log(lt, id_count);
+
+	return;
+}
+
+#endif
+
+
 
 }   // namespace concurrent
 }   // namespace alpha
