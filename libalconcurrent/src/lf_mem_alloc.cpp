@@ -861,9 +861,9 @@ bool chunk_header_multi_slot::alloc_new_chunk(
 	}
 
 	if ( p_free_slot_mark_ == nullptr ) {
-		p_free_slot_mark_ = new std::atomic_bool[slot_conf_.num_of_pieces_];
+		p_free_slot_mark_ = new std::atomic<slot_status_mark>[slot_conf_.num_of_pieces_];
 		for ( unsigned int i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
-			p_free_slot_mark_[i].store( true );
+			p_free_slot_mark_[i].store( slot_status_mark::FREE );
 		}
 	}
 
@@ -909,7 +909,7 @@ void* chunk_header_multi_slot::allocate_mem_slot_impl(
 
 	// フリースロットからスロットを確保したので、使用中のマークを付ける。
 	// Since we got a slot from a free slot, mark it as in use.
-	p_free_slot_mark_[read_idx].store( false );
+	p_free_slot_mark_[read_idx].store( slot_status_mark::INUSE );
 
 	// 得たスロットに対応する実際のメモリ領域のアドレス情報を生成する。
 	// Generate the address information of the actual memory area corresponding to the obtained slot.
@@ -973,10 +973,10 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 	statistics_.dealloc_req_cnt_++;
 #endif
-
+ 
 	slot_header* p_sh            = reinterpret_cast<slot_header*>( p_slot_addr );
-	bool         expect_not_free = false;
-	bool         result          = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, true );
+	slot_status_mark         expect_not_free = slot_status_mark::INUSE;
+	bool         result          = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, slot_status_mark::FREE );
 
 	if ( !result ) {
 		// double free has occured.
@@ -1109,9 +1109,24 @@ void chunk_header_multi_slot::dump( void )
 		          p_free_slot_mark_, p_free_slot_mark_ );
 
 		for ( std::size_t i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
+			const char* p_value_str = nullptr;
+			switch(p_free_slot_mark_[i].load()) {
+				case slot_status_mark::FREE: {
+					p_value_str = "slot_status_mark::FREE";
+				} break;
+				case slot_status_mark::INUSE: {
+					p_value_str = "slot_status_mark::INUSE";
+				} break;
+				case slot_status_mark::DISCARED: {
+					p_value_str = "slot_status_mark::DISCARED";
+				} break;
+				default: {
+					p_value_str = "slot_status_mark::unknown";
+				} break;
+			}
 			internal::LogOutput( log_type::DUMP,
 			          "%zu = %s \n",
-			          i, p_free_slot_mark_[i].load() ? "true" : "false" );
+			          i, p_value_str );
 		}
 		internal::LogOutput( log_type::DUMP, "}\n" );
 	}

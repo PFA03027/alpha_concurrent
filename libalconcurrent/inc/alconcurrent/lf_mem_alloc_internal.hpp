@@ -489,6 +489,12 @@ public:
 	void dump( void );
 
 private:
+	enum class slot_status_mark : int {
+		FREE,		//!< slot is free status(not used)
+		INUSE,		//!< slot is used
+		DISCARED	//!< slot is allocated, then free already. This is used for debuging double free bug
+	};
+
 	static std::size_t get_size_of_one_slot(
 		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
 	);
@@ -538,7 +544,7 @@ private:
 
 	idx_mgr free_slot_idx_mgr_;   //<! manager of free slot index
 
-	std::atomic_bool* p_free_slot_mark_;   //!< if slot is free, this is marked as true. This is prior information than free slot idx stack.
+	std::atomic<slot_status_mark>* p_free_slot_mark_;   //!< if slot is free, this is marked as true. This is prior information than free slot idx stack.
 	void*             p_chunk_;            //!< pointer to an allocated memory as a chunk
 };
 
