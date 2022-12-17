@@ -543,8 +543,8 @@ private:
 };
 
 struct slot_chk_result {
-	bool                     correct_;   //!< slot header result
-	chunk_header_multi_slot* p_chms_;    //!< pointer to chunk_header_multi_slot. if correct is true and this pointer value is nullptr, it is allocated by malloc with slot_header
+	bool                     correct_;   //!< slot header check result. true: check result is valid.
+	chunk_header_multi_slot* p_chms_;    //!< pointer to chunk_header_multi_slot. if correct_ is true and this pointer value is nullptr, it is allocated by malloc with slot_header
 };
 
 struct slot_header {

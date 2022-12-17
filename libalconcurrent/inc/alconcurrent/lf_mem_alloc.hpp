@@ -170,8 +170,9 @@ void gmem_deallocate(
  * this is for debug purpose.
  * 
  * @return backtrace information
- * @return 1st element: backtrace when this memory is allocated.
- * @return 2nd element: backtrace when this memory is free.
+ * @return 1st element: check result. if success, slot_chk_result::correct_ is true
+ * @return 2nd element: backtrace when this memory is allocated.
+ * @return 3rd element: backtrace when this memory is free.
  */
 std::tuple<alpha::concurrent::internal::slot_chk_result,
 		   alpha::concurrent::internal::slot_header::bt_info,
@@ -188,6 +189,7 @@ void output_backtrace_info(
 );
 #endif
 
+bool test_platform_std_atomic_lockfree_condition(void);
 
 }   // namespace concurrent
 }   // namespace alpha

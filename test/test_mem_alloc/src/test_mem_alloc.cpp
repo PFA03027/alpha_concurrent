@@ -327,6 +327,12 @@ TEST( lfmemAlloc, TestGMemAllocator )
 	}
 }
 
+TEST( lfmemAlloc, PlatformCheck )
+{
+	EXPECT_TRUE(alpha::concurrent::test_platform_std_atomic_lockfree_condition());
+	return;
+}
+
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 TEST( lfmemAlloc, TestBacktrace )
 {
