@@ -860,17 +860,21 @@ bool chunk_header_multi_slot::alloc_new_chunk(
 		return false;
 	}
 
-	p_chunk_ = std::malloc( tmp_size );
-	if ( p_chunk_ == nullptr ) {
+	p_free_slot_mark_ = new std::atomic<slot_status_mark>[slot_conf_.num_of_pieces_];
+	if ( p_free_slot_mark_ == nullptr ) {
 		status_.store( chunk_control_status::EMPTY, std::memory_order_release );
 		return false;
 	}
+	for ( unsigned int i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
+		p_free_slot_mark_[i].store( slot_status_mark::FREE );
+	}
 
-	if ( p_free_slot_mark_ == nullptr ) {
-		p_free_slot_mark_ = new std::atomic<slot_status_mark>[slot_conf_.num_of_pieces_];
-		for ( unsigned int i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
-			p_free_slot_mark_[i].store( slot_status_mark::FREE );
-		}
+	p_chunk_ = std::malloc( tmp_size );
+	if ( p_chunk_ == nullptr ) {
+		delete[] p_free_slot_mark_;
+		p_free_slot_mark_ = nullptr;
+		status_.store( chunk_control_status::EMPTY, std::memory_order_release );
+		return false;
 	}
 
 	size_of_chunk_ = tmp_size;
@@ -1339,6 +1343,8 @@ void* chunk_list::allocate_mem_slot(
 
 				// chunkの登録が終わったので、スロット数の2倍化された値を登録する。
 				num_of_pieces_.compare_exchange_strong( cur_slot_num, new_slot_num );
+				// 2倍化chunkが登録されたので、それまでのchunkは削除候補に変更にする。
+				p_start_chms->set_delete_reservation();
 
 				return p_ans;
 			}
@@ -1388,6 +1394,8 @@ void* chunk_list::allocate_mem_slot(
 
 	// chunkの登録が終わったので、スロット数の2倍化された値を登録する。
 	num_of_pieces_.compare_exchange_strong( cur_slot_num, new_slot_num );
+	// 2倍化chunkが登録されたので、それまでのchunkは削除候補に変更にする。
+	p_start_chms->set_delete_reservation();
 
 	return p_ans;
 }

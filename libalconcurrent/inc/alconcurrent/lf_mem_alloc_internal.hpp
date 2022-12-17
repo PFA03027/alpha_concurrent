@@ -377,9 +377,9 @@ struct slot_chk_result;
  */
 class chunk_header_multi_slot {
 public:
-	std::atomic<chunk_header_multi_slot*>       p_next_chunk_;      //!< pointer to next chunk header. chunk header does not free. therefore we don't need to consider ABA.
-	std::atomic<internal::chunk_control_status> status_;            //!< chunk status for GC
-	std::atomic<int>                            num_of_accesser_;   //!< number of accesser
+	std::atomic<chunk_header_multi_slot*> p_next_chunk_;      //!< pointer to next chunk header. chunk header does not free. therefore we don't need to consider ABA.
+	std::atomic<chunk_control_status>     status_;            //!< chunk status for GC
+	std::atomic<int>                      num_of_accesser_;   //!< number of accesser to slot buffer
 
 	/*!
 	 * @brief	constructor
@@ -457,17 +457,19 @@ public:
 		return ans;
 	}
 
-	bool set_delete_reservation( void );
-	bool unset_delete_reservation( void );
-	bool exec_deletion( void );
-	bool exec_allocation( void );
-
 	/*!
 	 * @brief	allocate new chunk
+	 *
+	 * @retval true success to allocate a chunk memory
+	 * @retval false fail to allocate a chunk memory
 	 */
 	bool alloc_new_chunk(
 		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
 	);
+
+	bool set_delete_reservation( void );
+	bool unset_delete_reservation( void );
+	bool exec_deletion( void );
 
 	/*!
 	 * @brief	get chunk_header_multi_slot address from void* address that allocate_mem_slot() returns.
