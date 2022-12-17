@@ -22,7 +22,7 @@
 
 #include "lf_mem_alloc_type.hpp"
 
-//#define ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
+// #define ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 
 namespace alpha {
 namespace concurrent {
@@ -61,10 +61,10 @@ struct chms_statistics {
 #endif
 	{
 	}
-	chms_statistics( const chms_statistics& ) = default;
-	chms_statistics( chms_statistics&& )      = default;
+	chms_statistics( const chms_statistics& )            = default;
+	chms_statistics( chms_statistics&& )                 = default;
 	chms_statistics& operator=( const chms_statistics& ) = default;
-	chms_statistics& operator=( chms_statistics&& ) = default;
+	chms_statistics& operator=( chms_statistics&& )      = default;
 
 	chunk_statistics get_statistics( void ) const;
 
@@ -490,9 +490,9 @@ public:
 
 private:
 	enum class slot_status_mark : int {
-		FREE,		//!< slot is free status(not used)
-		INUSE,		//!< slot is used
-		DISCARED	//!< slot is allocated, then free already. This is used for debuging double free bug
+		FREE,      //!< slot is free status(not used)
+		INUSE,     //!< slot is used
+		DISCARED   //!< slot is allocated, then free already. This is used for debuging double free bug
 	};
 
 	static std::size_t get_size_of_one_slot(
@@ -545,7 +545,7 @@ private:
 	idx_mgr free_slot_idx_mgr_;   //<! manager of free slot index
 
 	std::atomic<slot_status_mark>* p_free_slot_mark_;   //!< if slot is free, this is marked as true. This is prior information than free slot idx stack.
-	void*             p_chunk_;            //!< pointer to an allocated memory as a chunk
+	void*                          p_chunk_;            //!< pointer to an allocated memory as a chunk
 };
 
 struct slot_chk_result {
@@ -562,15 +562,15 @@ struct slot_header {
 	const char* p_caller_func_name_;   //!< function name calling this I/F
 #endif
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-#define ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE	(100)
+#define ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE ( 100 )
 	struct bt_info {
-		int count_;	//!< backtrace data size. Zero: no data, Plus value: call stack information is valid, Minus value: information of previous allocation
-		void* bt_[ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE];	//!< call stack of backtrace
+		int   count_;                                             //!< backtrace data size. Zero: no data, Plus value: call stack information is valid, Minus value: information of previous allocation
+		void* bt_[ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE];   //!< call stack of backtrace
 
-		void dump_to_log(log_type lt, int id);
+		void dump_to_log( log_type lt, int id );
 	};
-	bt_info alloc_bt_info_;	//!< backtrace information when is allocated
-	bt_info free_bt_info_;	//!< backtrace information when is free
+	bt_info alloc_bt_info_;   //!< backtrace information when is allocated
+	bt_info free_bt_info_;    //!< backtrace information when is free
 #endif
 
 	void set_addr_of_chunk_header_multi_slot(

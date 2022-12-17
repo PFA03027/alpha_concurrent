@@ -25,14 +25,14 @@
 namespace alpha {
 namespace concurrent {
 
-bool test_platform_std_atomic_lockfree_condition(void)
+bool test_platform_std_atomic_lockfree_condition( void )
 {
-	bool	ans;
+	bool ans;
 
-	ans = std::atomic_bool{true}.is_lock_free();
-	ans = ans && std::atomic<internal::chunk_control_status>{internal::chunk_control_status::EMPTY}.is_lock_free();
-	ans = ans && std::atomic<internal::chunk_header_multi_slot*>{nullptr}.is_lock_free();
-	ans = ans && std::atomic<int>{0}.is_lock_free();
+	ans = std::atomic_bool { true }.is_lock_free();
+	ans = ans && std::atomic<internal::chunk_control_status> { internal::chunk_control_status::EMPTY }.is_lock_free();
+	ans = ans && std::atomic<internal::chunk_header_multi_slot*> { nullptr }.is_lock_free();
+	ans = ans && std::atomic<int> { 0 }.is_lock_free();
 
 	return ans;
 }
@@ -75,34 +75,34 @@ idx_mgr_element::idx_mgr_element( void )
 void idx_mgr_element::dump( void ) const
 {
 	internal::LogOutput( log_type::DUMP,
-	          "object idx_mgr_element_%p as %p {\n"
-	          "\t idx_ = %d\n"
-	          "\t p_invalid_idx_next_element_ = %p\n"
-	          "\t p_valid_idx_next_element_ = %p\n"
-	          "\t p_waiting_next_element_ = %p\n"
-	          "}\n",
-	          this, this,
-	          idx_,
-	          p_invalid_idx_next_element_.load(),
-	          p_valid_idx_next_element_.load(),
-	          p_waiting_next_element_ );
+	                     "object idx_mgr_element_%p as %p {\n"
+	                     "\t idx_ = %d\n"
+	                     "\t p_invalid_idx_next_element_ = %p\n"
+	                     "\t p_valid_idx_next_element_ = %p\n"
+	                     "\t p_waiting_next_element_ = %p\n"
+	                     "}\n",
+	                     this, this,
+	                     idx_,
+	                     p_invalid_idx_next_element_.load(),
+	                     p_valid_idx_next_element_.load(),
+	                     p_waiting_next_element_ );
 
 	if ( p_invalid_idx_next_element_.load() != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		          "%p --> %p : invalid\n",
-		          this, p_invalid_idx_next_element_.load() );
+		                     "%p --> %p : invalid\n",
+		                     this, p_invalid_idx_next_element_.load() );
 	}
 
 	if ( p_valid_idx_next_element_.load() != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		          "%p --> %p : valid\n",
-		          this, p_valid_idx_next_element_.load() );
+		                     "%p --> %p : valid\n",
+		                     this, p_valid_idx_next_element_.load() );
 	}
 
 	if ( p_waiting_next_element_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		          "%p --> %p : waiting\n",
-		          this, p_waiting_next_element_ );
+		                     "%p --> %p : waiting\n",
+		                     this, p_waiting_next_element_ );
 	}
 
 	return;
@@ -154,24 +154,24 @@ void waiting_element_list::push(
 void waiting_element_list::dump( void ) const
 {
 	internal::LogOutput( log_type::DUMP,
-	          "object waiting_element_list_%p as %p {\n"
-	          "\t head_ = %p\n"
-	          "\t tail_ = %p\n"
-	          "}\n",
-	          this, this,
-	          head_,
-	          tail_ );
+	                     "object waiting_element_list_%p as %p {\n"
+	                     "\t head_ = %p\n"
+	                     "\t tail_ = %p\n"
+	                     "}\n",
+	                     this, this,
+	                     head_,
+	                     tail_ );
 
 	if ( head_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		          "%p --> %p\n",
-		          this, head_ );
+		                     "%p --> %p\n",
+		                     this, head_ );
 	}
 
 	if ( tail_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		          "%p --> %p\n",
-		          this, tail_ );
+		                     "%p --> %p\n",
+		                     this, tail_ );
 	}
 
 	return;
@@ -445,25 +445,25 @@ void waiting_idx_list::push_to_tls( const int valid_idx, const int idx_buff_size
 void waiting_idx_list::dump( void ) const
 {
 	internal::LogOutput( log_type::DUMP,
-	          "object waiting_idx_list_%p as %p {\n"
-	          "\t idx_buff_size_ = %d\n"
-	          "\t idx_top_idx_ = %d\n"
-	          "\t p_idx_buff_ = %p\n"
-	          "}\n",
-	          this, this,
-	          idx_buff_size_,
-	          idx_top_idx_,
-	          p_idx_buff_ );
+	                     "object waiting_idx_list_%p as %p {\n"
+	                     "\t idx_buff_size_ = %d\n"
+	                     "\t idx_top_idx_ = %d\n"
+	                     "\t p_idx_buff_ = %p\n"
+	                     "}\n",
+	                     this, this,
+	                     idx_buff_size_,
+	                     idx_top_idx_,
+	                     p_idx_buff_ );
 
 	if ( p_idx_buff_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		          "object p_idx_buff_%p as %p {\n",
-		          this, this );
+		                     "object p_idx_buff_%p as %p {\n",
+		                     this, this );
 
 		for ( int i = 0; i < idx_buff_size_; i++ ) {
 			internal::LogOutput( log_type::DUMP,
-			          "\t %d => %d\n",
-			          i, p_idx_buff_[i] );
+			                     "\t %d => %d\n",
+			                     i, p_idx_buff_[i] );
 		}
 
 		internal::LogOutput( log_type::DUMP, "}\n" );
@@ -614,39 +614,39 @@ void idx_mgr::dump( void )
 	const waiting_idx_list& tmp_wel = tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
 
 	internal::LogOutput( log_type::DUMP,
-	          "object idx_mgr_%p as %p {\n"
-	          "\t idx_size_ = %d\n"
-	          "\t idx_size_ver_ = %d\n"
-	          "\t p_idx_mgr_element_array_ = %p\n"
-	          "\t invalid_element_stack_head_ = %p\n"
-	          "\t valid_element_stack_head_ = %p\n"
-	          "\t waiting_element_list = %p\n"
-	          "}\n",
-	          this, this,
-	          idx_size_,
-	          idx_size_ver_,
-	          p_idx_mgr_element_array_,
-	          &invalid_element_storage_,
-	          &valid_element_storage_,
-	          &tmp_wel );
+	                     "object idx_mgr_%p as %p {\n"
+	                     "\t idx_size_ = %d\n"
+	                     "\t idx_size_ver_ = %d\n"
+	                     "\t p_idx_mgr_element_array_ = %p\n"
+	                     "\t invalid_element_stack_head_ = %p\n"
+	                     "\t valid_element_stack_head_ = %p\n"
+	                     "\t waiting_element_list = %p\n"
+	                     "}\n",
+	                     this, this,
+	                     idx_size_,
+	                     idx_size_ver_,
+	                     p_idx_mgr_element_array_,
+	                     &invalid_element_storage_,
+	                     &valid_element_storage_,
+	                     &tmp_wel );
 
 	if ( p_idx_mgr_element_array_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		          "%p --> %p \n",
-		          this, p_idx_mgr_element_array_ );
+		                     "%p --> %p \n",
+		                     this, p_idx_mgr_element_array_ );
 	}
 
 	internal::LogOutput( log_type::DUMP,
-	          "%p --> %p \n",
-	          this, &invalid_element_storage_ );
+	                     "%p --> %p \n",
+	                     this, &invalid_element_storage_ );
 
 	internal::LogOutput( log_type::DUMP,
-	          "%p --> %p \n",
-	          this, &valid_element_storage_ );
+	                     "%p --> %p \n",
+	                     this, &valid_element_storage_ );
 
 	internal::LogOutput( log_type::DUMP,
-	          "%p --> %p \n",
-	          this, &tmp_wel );
+	                     "%p --> %p \n",
+	                     this, &tmp_wel );
 
 	if ( p_idx_mgr_element_array_ != nullptr ) {
 		for ( int i = 0; i < idx_size_; i++ ) {
@@ -681,25 +681,31 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifdef	ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-#define RECORD_BACKTRACE_GET_BACKTRACE(BT_INFO_N)	do { BT_INFO_N.count_ = backtrace(BT_INFO_N.bt_, ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE); } while(0)
-#define RECORD_BACKTRACE_INVALIDATE_BACKTRACE(BT_INFO_N)	do { BT_INFO_N.count_ = -(BT_INFO_N.count_); } while(0)
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#define RECORD_BACKTRACE_GET_BACKTRACE( BT_INFO_N )                                                 \
+	do {                                                                                            \
+		BT_INFO_N.count_ = backtrace( BT_INFO_N.bt_, ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE ); \
+	} while ( 0 )
+#define RECORD_BACKTRACE_INVALIDATE_BACKTRACE( BT_INFO_N ) \
+	do {                                                   \
+		BT_INFO_N.count_ = -( BT_INFO_N.count_ );          \
+	} while ( 0 )
 
-void slot_header::bt_info::dump_to_log(log_type lt, int id)
+void slot_header::bt_info::dump_to_log( log_type lt, int id )
 {
-	if(count_ == 0) {
-		internal::LogOutput(lt, "[%d] no back trace. this slot has not allocated yet.", id );
+	if ( count_ == 0 ) {
+		internal::LogOutput( lt, "[%d] no back trace. this slot has not allocated yet.", id );
 		return;
 	}
 
-	internal::LogOutput(lt, "[%d] backtrace count value = %d", id, count_ );
+	internal::LogOutput( lt, "[%d] backtrace count value = %d", id, count_ );
 
-	int actual_count = (count_ < 0) ? -count_ : count_;
-	char** bt_strings = backtrace_symbols( bt_, actual_count );
-	for(int i=0; i < actual_count;i++) {
-		internal::LogOutput(lt, "[%d] [%d] %s", id, i, bt_strings[i] );
+	int    actual_count = ( count_ < 0 ) ? -count_ : count_;
+	char** bt_strings   = backtrace_symbols( bt_, actual_count );
+	for ( int i = 0; i < actual_count; i++ ) {
+		internal::LogOutput( lt, "[%d] [%d] %s", id, i, bt_strings[i] );
 	}
-	free(bt_strings);
+	free( bt_strings );
 
 	return;
 }
@@ -718,13 +724,13 @@ void slot_header::set_addr_of_chunk_header_multi_slot(
 #ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 	set_caller_context_info( caller_src_fname, caller_lineno, caller_func_name );
 #endif
-#ifdef	ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-	RECORD_BACKTRACE_GET_BACKTRACE(alloc_bt_info_);
-	if( p_chms_arg != nullptr ) {
-		RECORD_BACKTRACE_INVALIDATE_BACKTRACE(free_bt_info_);
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	RECORD_BACKTRACE_GET_BACKTRACE( alloc_bt_info_ );
+	if ( p_chms_arg != nullptr ) {
+		RECORD_BACKTRACE_INVALIDATE_BACKTRACE( free_bt_info_ );
 	} else {
 		// mallocで確保された領域なので、free_bt_info_側の情報は、クリアする。
-		free_bt_info_ = {0};
+		free_bt_info_ = { 0 };
 	}
 #endif
 
@@ -794,7 +800,7 @@ chunk_header_multi_slot::~chunk_header_multi_slot()
 	std::free( p_chunk_ );
 
 	p_free_slot_mark_ = nullptr;
-	p_chunk_ = nullptr;
+	p_chunk_          = nullptr;
 
 	statistics_.chunk_num_--;
 
@@ -973,10 +979,10 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 	statistics_.dealloc_req_cnt_++;
 #endif
- 
-	slot_header* p_sh            = reinterpret_cast<slot_header*>( p_slot_addr );
-	slot_status_mark         expect_not_free = slot_status_mark::INUSE;
-	bool         result          = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, slot_status_mark::FREE );
+
+	slot_header*     p_sh            = reinterpret_cast<slot_header*>( p_slot_addr );
+	slot_status_mark expect_not_free = slot_status_mark::INUSE;
+	bool             result          = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, slot_status_mark::FREE );
 
 	if ( !result ) {
 		// double free has occured.
@@ -991,20 +997,20 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 			"current free call is: %s, line no %d, function=%s",
 			caller_src_fname, caller_lineno, caller_func_name );
 #endif
-#ifdef	ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-		static std::atomic_int	double_free_counter(0);
-		int id_count = double_free_counter.fetch_add(1);
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+		static std::atomic_int double_free_counter( 0 );
+		int                    id_count = double_free_counter.fetch_add( 1 );
 
 		internal::LogOutput( log_type::ERR, "[%d] backtrace of previous free call", id_count );
-		p_sh->free_bt_info_.dump_to_log(log_type::ERR, id_count);
+		p_sh->free_bt_info_.dump_to_log( log_type::ERR, id_count );
 
-		slot_header::bt_info	cur_bt;
-		RECORD_BACKTRACE_GET_BACKTRACE(cur_bt);
+		slot_header::bt_info cur_bt;
+		RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
 		internal::LogOutput( log_type::ERR, "[%d] backtrace of current free call", id_count );
-		cur_bt.dump_to_log(log_type::ERR, id_count);
+		cur_bt.dump_to_log( log_type::ERR, id_count );
 
 		internal::LogOutput( log_type::ERR, "[%d] backtrace of allocation call", id_count );
-		p_sh->alloc_bt_info_.dump_to_log(log_type::ERR, id_count);
+		p_sh->alloc_bt_info_.dump_to_log( log_type::ERR, id_count );
 #endif
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 		statistics_.dealloc_req_err_cnt_++;
@@ -1016,9 +1022,9 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 #ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 	p_sh->set_caller_context_info( caller_src_fname, caller_lineno, caller_func_name );
 #endif
-#ifdef	ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-	RECORD_BACKTRACE_GET_BACKTRACE(p_sh->free_bt_info_);
-	RECORD_BACKTRACE_INVALIDATE_BACKTRACE(p_sh->alloc_bt_info_);
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	RECORD_BACKTRACE_GET_BACKTRACE( p_sh->free_bt_info_ );
+	RECORD_BACKTRACE_INVALIDATE_BACKTRACE( p_sh->alloc_bt_info_ );
 #endif
 
 	free_slot_idx_mgr_.push( idx );
@@ -1074,8 +1080,8 @@ slot_chk_result chunk_header_multi_slot::get_chunk(
 	slot_chk_result ret = p_slot_addr->chk_header_data();
 	if ( !( ret.correct_ ) ) {
 		internal::LogOutput( log_type::ERR,
-		          "a header of slot_header is corrupted %p\n",
-		          p_addr );
+		                     "a header of slot_header is corrupted %p\n",
+		                     p_addr );
 	}
 
 	return ret;
@@ -1099,18 +1105,18 @@ void chunk_header_multi_slot::dump( void )
 {
 	if ( p_chunk_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		          "object chunk_%p as %p \n",
-		          p_chunk_, p_chunk_ );
+		                     "object chunk_%p as %p \n",
+		                     p_chunk_, p_chunk_ );
 	}
 
 	if ( p_free_slot_mark_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		          "object p_free_slot_mark_%p as %p {\n",
-		          p_free_slot_mark_, p_free_slot_mark_ );
+		                     "object p_free_slot_mark_%p as %p {\n",
+		                     p_free_slot_mark_, p_free_slot_mark_ );
 
 		for ( std::size_t i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
 			const char* p_value_str = nullptr;
-			switch(p_free_slot_mark_[i].load()) {
+			switch ( p_free_slot_mark_[i].load() ) {
 				case slot_status_mark::FREE: {
 					p_value_str = "slot_status_mark::FREE";
 				} break;
@@ -1125,28 +1131,28 @@ void chunk_header_multi_slot::dump( void )
 				} break;
 			}
 			internal::LogOutput( log_type::DUMP,
-			          "%zu = %s \n",
-			          i, p_value_str );
+			                     "%zu = %s \n",
+			                     i, p_value_str );
 		}
 		internal::LogOutput( log_type::DUMP, "}\n" );
 	}
 
-		internal::LogOutput( log_type::DUMP,
-	          "object chunk_header_multi_slot_%p as %p {\n"
-	          "\t alloc_conf_.size_of_one_piece_ = %u \n"
-	          "\t alloc_conf_.num_of_pieces_ = %u \n"
-	          "\t size_of_chunk_ = %zu \n"
-	          "\t p_free_slot_mark_ = %p \n"
-	          "\t p_chunk_ = %p \n"
-	          "\t free_slot_idx_mgr_ = %p \n"
-	          "}\n",
-	          this, this,
-	          slot_conf_.size_of_one_piece_,
-	          slot_conf_.num_of_pieces_,
-	          size_of_chunk_,
-	          p_free_slot_mark_,
-	          p_chunk_,
-	          &free_slot_idx_mgr_ );
+	internal::LogOutput( log_type::DUMP,
+	                     "object chunk_header_multi_slot_%p as %p {\n"
+	                     "\t alloc_conf_.size_of_one_piece_ = %u \n"
+	                     "\t alloc_conf_.num_of_pieces_ = %u \n"
+	                     "\t size_of_chunk_ = %zu \n"
+	                     "\t p_free_slot_mark_ = %p \n"
+	                     "\t p_chunk_ = %p \n"
+	                     "\t free_slot_idx_mgr_ = %p \n"
+	                     "}\n",
+	                     this, this,
+	                     slot_conf_.size_of_one_piece_,
+	                     slot_conf_.num_of_pieces_,
+	                     size_of_chunk_,
+	                     p_free_slot_mark_,
+	                     p_chunk_,
+	                     &free_slot_idx_mgr_ );
 
 	free_slot_idx_mgr_.dump();
 
@@ -1328,7 +1334,7 @@ void* chunk_list::allocate_mem_slot(
 		} else {
 			// 再割り当て失敗
 			if ( p_1st_empty_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
-				//　自身による再割り当てに失敗はしたが、既に別のスレッドで再割り当て完了済みだった
+				// 　自身による再割り当てに失敗はしたが、既に別のスレッドで再割り当て完了済みだった
 				p_ans = p_1st_empty_chms->allocate_mem_slot(
 #ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 					caller_src_fname, caller_lineno, caller_func_name
@@ -1520,9 +1526,9 @@ void general_mem_allocator::deallocate(
 			std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
 			tmp_addr -= internal::get_slot_header_size();
 			internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( tmp_addr );
-#ifdef	ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-			RECORD_BACKTRACE_GET_BACKTRACE(p_sh->free_bt_info_);
-			RECORD_BACKTRACE_INVALIDATE_BACKTRACE(p_sh->alloc_bt_info_);
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+			RECORD_BACKTRACE_GET_BACKTRACE( p_sh->free_bt_info_ );
+			RECORD_BACKTRACE_INVALIDATE_BACKTRACE( p_sh->alloc_bt_info_ );
 #endif
 			std::free( reinterpret_cast<void*>( p_sh ) );
 		}
@@ -1630,8 +1636,9 @@ std::string chunk_statistics::print( void )
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 std::tuple<alpha::concurrent::internal::slot_chk_result,
-		   alpha::concurrent::internal::slot_header::bt_info,
-		   alpha::concurrent::internal::slot_header::bt_info> get_backtrace_info(
+           alpha::concurrent::internal::slot_header::bt_info,
+           alpha::concurrent::internal::slot_header::bt_info>
+get_backtrace_info(
 	void* p_mem   //!< [in] pointer to allocated memory by allocate()
 )
 {
@@ -1640,20 +1647,20 @@ std::tuple<alpha::concurrent::internal::slot_chk_result,
 	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( tmp_addr );
 
 	return std::tuple<alpha::concurrent::internal::slot_chk_result,
-					  alpha::concurrent::internal::slot_header::bt_info,
-					  alpha::concurrent::internal::slot_header::bt_info>(
+	                  alpha::concurrent::internal::slot_header::bt_info,
+	                  alpha::concurrent::internal::slot_header::bt_info>(
 		p_sh->chk_header_data(),
 		p_sh->alloc_bt_info_,
-		p_sh->free_bt_info_);
+		p_sh->free_bt_info_ );
 }
 
 void output_backtrace_info(
-	const log_type lt, //!< [in] log type
-	void* p_mem   //!< [in] pointer to allocated memory by allocate()
+	const log_type lt,     //!< [in] log type
+	void*          p_mem   //!< [in] pointer to allocated memory by allocate()
 )
 {
-	static std::atomic_int	counter(0);
-	int id_count = counter.fetch_add(1);
+	static std::atomic_int counter( 0 );
+	int                    id_count = counter.fetch_add( 1 );
 
 	std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
 	tmp_addr -= internal::get_slot_header_size();
@@ -1665,17 +1672,15 @@ void output_backtrace_info(
 		"[%d] header check result of %p: correct_=%s, p_chms_=%p",
 		id_count, p_mem, chk_ret.correct_ ? "true" : "false", chk_ret.p_chms_ );
 
-	internal::LogOutput(lt, "[%d] alloc_bt_info_ of %p", id_count, p_mem );
-	p_sh->alloc_bt_info_.dump_to_log(lt, id_count);
-	internal::LogOutput(lt, "[%d] free_bt_info_ of %p", id_count, p_mem );
-	p_sh->free_bt_info_.dump_to_log(lt, id_count);
+	internal::LogOutput( lt, "[%d] alloc_bt_info_ of %p", id_count, p_mem );
+	p_sh->alloc_bt_info_.dump_to_log( lt, id_count );
+	internal::LogOutput( lt, "[%d] free_bt_info_ of %p", id_count, p_mem );
+	p_sh->free_bt_info_.dump_to_log( lt, id_count );
 
 	return;
 }
 
 #endif
-
-
 
 }   // namespace concurrent
 }   // namespace alpha
