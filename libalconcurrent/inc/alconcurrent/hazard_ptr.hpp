@@ -124,7 +124,7 @@ public:
 	}
 
 private:
-	enum class ocupied_status {
+	enum class ocupied_status : int {
 		UNUSED,
 		USING
 	};
@@ -359,10 +359,10 @@ private:
 			return p_ans;
 		}
 
-		hazard_node_head( const hazard_node_head& ) = delete;
-		hazard_node_head( hazard_node_head&& )      = delete;
+		hazard_node_head( const hazard_node_head& )            = delete;
+		hazard_node_head( hazard_node_head&& )                 = delete;
 		hazard_node_head& operator=( const hazard_node_head& ) = delete;
-		hazard_node_head& operator=( hazard_node_head&& ) = delete;
+		hazard_node_head& operator=( hazard_node_head&& )      = delete;
 
 		std::atomic<node_for_hazard_ptr*> head_;
 		std::atomic<int>                  node_count_;
@@ -388,7 +388,7 @@ private:
 	struct threadlocal_destructor_functor {
 		using value_type      = node_for_hazard_ptr*;
 		using value_reference = value_type&;
-		
+
 		bool release( value_reference data )
 		{
 			data->release_owner();
@@ -418,10 +418,10 @@ public:
 	virtual ~hazard_ptr_scoped_ref_if() = default;
 
 private:
-	hazard_ptr_scoped_ref_if( const hazard_ptr_scoped_ref_if& ) = delete;
-	hazard_ptr_scoped_ref_if( hazard_ptr_scoped_ref_if&& )      = delete;
+	hazard_ptr_scoped_ref_if( const hazard_ptr_scoped_ref_if& )            = delete;
+	hazard_ptr_scoped_ref_if( hazard_ptr_scoped_ref_if&& )                 = delete;
 	hazard_ptr_scoped_ref_if& operator=( const hazard_ptr_scoped_ref_if& ) = delete;
-	hazard_ptr_scoped_ref_if& operator=( hazard_ptr_scoped_ref_if&& ) = delete;
+	hazard_ptr_scoped_ref_if& operator=( hazard_ptr_scoped_ref_if&& )      = delete;
 };
 
 /*!

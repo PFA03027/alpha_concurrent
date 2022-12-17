@@ -22,11 +22,11 @@
 #include <pthread.h>
 
 #include <atomic>
+#include <cerrno>
 #include <cstdlib>
 #include <memory>
 #include <type_traits>
 #include <utility>
-#include <cerrno>
 
 #include "conf_logger.hpp"
 
@@ -80,7 +80,7 @@ public:
 	using value_type         = T;
 	using value_pointer_type = value_type*;
 
-	enum class ocupied_status {
+	enum class ocupied_status : int {
 		UNUSED,
 		UNUSED_INITIALIZED,
 		USING
@@ -125,7 +125,7 @@ public:
 				p_value = nullptr;
 			}
 		}
-		if( p_value != nullptr ) {
+		if ( p_value != nullptr ) {
 			status_.store( ocupied_status::UNUSED_INITIALIZED, std::memory_order_release );
 		} else {
 			status_.store( ocupied_status::UNUSED, std::memory_order_release );
@@ -181,7 +181,7 @@ private:
  * @param [in]	T	ファンクタに引数として渡される型。実際の引数は、この型の参照T&となる。
  *
  * このファンクタ自身は、何もしないというファンクタとして動作する。
- * 
+ *
  *
  * @brief A functor called before freeing thread-local storage at the end of a thread
  *
@@ -216,7 +216,6 @@ struct threadlocal_destructor_functor {
 		return;
 	}
 };
-
 
 /*!
  * @brief	動的スレッドローカルストレージを実現するクラス
@@ -296,7 +295,7 @@ public:
 		head_.store( nullptr, std::memory_order_release );
 		while ( p_cur != nullptr ) {
 			tls_cont_pointer p_nxt = p_cur->get_next();
-	
+
 			// ノード自身のデストラクタ処理を行う。
 			p_cur->~tls_cont();
 
@@ -341,7 +340,7 @@ public:
 	 * @li Step#1 Allocates a thread local memory for T by malloc.
 	 * @li Step#2 call T's constructor with Args and args.
 	 * @li Step#3 call pred with a reference of a instace of T.
-	 * 
+	 *
 	 * @note
 	 * If TL_PRE_DESTRUCTOR does not release thread local data area of T, there is a possibility that thread local data area has some value by re-using.
 	 * In this case, pred is not called.
@@ -397,8 +396,8 @@ private:
 		// pthread_getspecific()が、ロックフリーであることを祈る。
 		tls_cont_pointer p_tls = reinterpret_cast<tls_cont_pointer>( pthread_getspecific( tls_key ) );
 		if ( p_tls == nullptr ) {
-			p_tls          = allocate_free_tls_container();
-			if(p_tls->p_value == nullptr) {	// 確保済みの領域の場合は、pred()を呼び出さず、そのまま再利用する。
+			p_tls = allocate_free_tls_container();
+			if ( p_tls->p_value == nullptr ) {   // 確保済みの領域の場合は、pred()を呼び出さず、そのまま再利用する。
 				p_tls->p_value = pred();
 			}
 
