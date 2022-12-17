@@ -194,6 +194,11 @@ This macro loses the lock-free nature of the memory allocation process and is pr
 If you would like to record the backtrace of allcation and free for debugging, please define this macro.
 If you define this macro, the compilation also needs -g(debug symbol)
 
+### ALCONCURRENT_CONF_ENABLE_NON_REUSE_MEMORY_SLOT
+Even if an allocated memory via general_mem_allocator is free, it just marks as discared and not re-use it.
+This will makes memory leak. On the other hand, it is effective to analyze double free bug.
+If you use this option, it is recommened to enable ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE also.
+
 # Patent
 ## Hazard pointer algorithm
 This software uses Hazard pointer algorithm to solve ABA problem.  

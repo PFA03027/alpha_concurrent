@@ -982,7 +982,11 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 
 	slot_header*     p_sh            = reinterpret_cast<slot_header*>( p_slot_addr );
 	slot_status_mark expect_not_free = slot_status_mark::INUSE;
-	bool             result          = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, slot_status_mark::FREE );
+#ifdef ALCONCURRENT_CONF_ENABLE_NON_REUSE_MEMORY_SLOT
+	bool result = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, slot_status_mark::DISCARED );
+#else
+	bool result = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, slot_status_mark::FREE );
+#endif
 
 	if ( !result ) {
 		// double free has occured.
@@ -1022,12 +1026,19 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 #ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 	p_sh->set_caller_context_info( caller_src_fname, caller_lineno, caller_func_name );
 #endif
+
+#ifdef ALCONCURRENT_CONF_ENABLE_NON_REUSE_MEMORY_SLOT
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	RECORD_BACKTRACE_GET_BACKTRACE( p_sh->free_bt_info_ );
+#endif
+#else
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 	RECORD_BACKTRACE_GET_BACKTRACE( p_sh->free_bt_info_ );
 	RECORD_BACKTRACE_INVALIDATE_BACKTRACE( p_sh->alloc_bt_info_ );
 #endif
 
 	free_slot_idx_mgr_.push( idx );
+#endif
 
 	return true;
 }
