@@ -24,24 +24,30 @@ TEST( lfmemAlloc, TestChunkHeaderMultiSlot )
 	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new alpha::concurrent::internal::chunk_header_multi_slot( param );
 
 	void* test_ptr1 = p_chms->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
 #else
 		nullptr, 0, nullptr
+#endif
 #endif
 	);
 	void* test_ptr2 = p_chms->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
 #else
 		nullptr, 0, nullptr
 #endif
+#endif
 	);
 	void* test_ptr3 = p_chms->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
 #else
 		nullptr, 0, nullptr
+#endif
 #endif
 	);
 
@@ -50,6 +56,7 @@ TEST( lfmemAlloc, TestChunkHeaderMultiSlot )
 	EXPECT_EQ( nullptr, test_ptr3 );
 
 	EXPECT_FALSE( p_chms->recycle_mem_slot( test_ptr3
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 	                                        ,
 	                                        __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
@@ -57,18 +64,22 @@ TEST( lfmemAlloc, TestChunkHeaderMultiSlot )
 	                                        ,
 	                                        nullptr, 0, nullptr
 #endif
+#endif
 	                                            ) );
 	EXPECT_FALSE( p_chms->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 )
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 	                                            ,
 	                                        __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
 #else
 	                                            ,
 	                                        nullptr, 0, nullptr
+#endif
 #endif
 	                                            ) );
 
 	EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr1
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 	                                       ,
 	                                       __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
@@ -76,14 +87,17 @@ TEST( lfmemAlloc, TestChunkHeaderMultiSlot )
 	                                       ,
 	                                       nullptr, 0, nullptr
 #endif
+#endif
 	                                           ) );
 	EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr2
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 	                                       ,
 	                                       __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
 #else
 	                                       ,
 	                                       nullptr, 0, nullptr
+#endif
 #endif
 	                                           ) );
 
@@ -110,24 +124,30 @@ TEST( lfmemAlloc, TestChunkList_AdditionalAlloc )
 	alpha::concurrent::internal::chunk_list* p_ch_lst = new alpha::concurrent::internal::chunk_list( param );
 
 	void* test_ptr1 = p_ch_lst->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
 #else
 		nullptr, 0, nullptr
+#endif
 #endif
 	);
 	void* test_ptr2 = p_ch_lst->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
 #else
 		nullptr, 0, nullptr
 #endif
+#endif
 	);
 	void* test_ptr3 = p_ch_lst->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
 #else
 		nullptr, 0, nullptr
+#endif
 #endif
 	);
 
@@ -136,15 +156,18 @@ TEST( lfmemAlloc, TestChunkList_AdditionalAlloc )
 	EXPECT_NE( nullptr, test_ptr3 );
 
 	EXPECT_TRUE( p_ch_lst->recycle_mem_slot( test_ptr3
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 	                                         ,
 	                                         __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
 #else
 	                                         ,
 	                                         nullptr, 0, nullptr
+#endif
 #endif
 	                                             ) );
 	EXPECT_TRUE( p_ch_lst->recycle_mem_slot( test_ptr1
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 	                                         ,
 	                                         __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
@@ -152,14 +175,17 @@ TEST( lfmemAlloc, TestChunkList_AdditionalAlloc )
 	                                         ,
 	                                         nullptr, 0, nullptr
 #endif
+#endif
 	                                             ) );
 	EXPECT_TRUE( p_ch_lst->recycle_mem_slot( test_ptr2
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 	                                         ,
 	                                         __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
 #else
 	                                         ,
 	                                         nullptr, 0, nullptr
+#endif
 #endif
 	                                             ) );
 
@@ -186,24 +212,30 @@ TEST( lfmemAlloc, TestChunkList_IllegalAddressFree )
 	alpha::concurrent::internal::chunk_list* p_ch_lst = new alpha::concurrent::internal::chunk_list( param );
 
 	void* test_ptr1 = p_ch_lst->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
 #else
 		nullptr, 0, nullptr
+#endif
 #endif
 	);
 	void* test_ptr2 = p_ch_lst->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
 #else
 		nullptr, 0, nullptr
 #endif
+#endif
 	);
 	void* test_ptr3 = p_ch_lst->allocate_mem_slot(
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
 #else
 		nullptr, 0, nullptr
+#endif
 #endif
 	);
 
@@ -212,6 +244,7 @@ TEST( lfmemAlloc, TestChunkList_IllegalAddressFree )
 	EXPECT_NE( nullptr, test_ptr3 );
 
 	EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr3 + 1 )
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 	                                              ,
 	                                          __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
@@ -219,24 +252,29 @@ TEST( lfmemAlloc, TestChunkList_IllegalAddressFree )
 	                                              ,
 	                                          nullptr, 0, nullptr
 #endif
+#endif
 	                                              ) );
 	EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 )
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 	                                              ,
 	                                          __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
 #else
 	                                              ,
 	                                          nullptr, 0, nullptr
+#endif
 #endif
 	                                              ) );
 
 	EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr2 + 1 )
+#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
 #ifdef __GNUC__
 	                                              ,
 	                                          __builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION()
 #else
 	                                              ,
 	                                          nullptr, 0, nullptr
+#endif
 #endif
 	                                              ) );
 
@@ -329,20 +367,20 @@ TEST( lfmemAlloc, TestGMemAllocator )
 
 TEST( lfmemAlloc, PlatformCheck )
 {
-	EXPECT_TRUE(alpha::concurrent::test_platform_std_atomic_lockfree_condition());
+	EXPECT_TRUE( alpha::concurrent::test_platform_std_atomic_lockfree_condition() );
 	return;
 }
 
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 TEST( lfmemAlloc, TestBacktrace )
 {
-	std::size_t rq_size = RQ_SIZE;
-	void* test_ptr1 = alpha::concurrent::gmem_allocate( rq_size );
+	std::size_t rq_size   = RQ_SIZE;
+	void*       test_ptr1 = alpha::concurrent::gmem_allocate( rq_size );
 	ASSERT_NE( nullptr, test_ptr1 );
 
 	auto bt_info1 = alpha::concurrent::get_backtrace_info( test_ptr1 );
-	ASSERT_TRUE( std::get<0>(bt_info1).correct_ );
-	EXPECT_NE( 0, std::get<1>(bt_info1).count_ );
+	ASSERT_TRUE( std::get<0>( bt_info1 ).correct_ );
+	EXPECT_NE( 0, std::get<1>( bt_info1 ).count_ );
 
 	alpha::concurrent::output_backtrace_info( alpha::concurrent::log_type::ERR, test_ptr1 );
 
@@ -352,13 +390,12 @@ TEST( lfmemAlloc, TestBacktrace )
 	ASSERT_NE( nullptr, test_ptr2 );
 
 	auto bt_info2 = alpha::concurrent::get_backtrace_info( test_ptr2 );
-	ASSERT_TRUE( std::get<0>(bt_info2).correct_ );
-	EXPECT_NE( 0, std::get<1>(bt_info2).count_ );
-	if( (test_ptr1 == test_ptr2) &&
-	    (std::get<0>(bt_info1).p_chms_ != nullptr) &&
-	    (std::get<0>(bt_info2).p_chms_ != nullptr)
-		) {
-		EXPECT_NE( 0, std::get<2>(bt_info2).count_ );
+	ASSERT_TRUE( std::get<0>( bt_info2 ).correct_ );
+	EXPECT_NE( 0, std::get<1>( bt_info2 ).count_ );
+	if ( ( test_ptr1 == test_ptr2 ) &&
+	     ( std::get<0>( bt_info1 ).p_chms_ != nullptr ) &&
+	     ( std::get<0>( bt_info2 ).p_chms_ != nullptr ) ) {
+		EXPECT_NE( 0, std::get<2>( bt_info2 ).count_ );
 	}
 
 	alpha::concurrent::output_backtrace_info( alpha::concurrent::log_type::ERR, test_ptr2 );
