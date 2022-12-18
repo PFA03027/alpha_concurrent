@@ -51,38 +51,16 @@ public:
 	 * @brief	allocate memory
 	 */
 	void* allocate(
-		std::size_t n   //!< [in] memory size to allocate
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-		,
-#ifdef __GNUC__
-		const char* caller_src_fname = __builtin_FILE(),      //!< [in] caller side source file name
-		const int   caller_lineno    = __builtin_LINE(),      //!< [in] caller side line number
-		const char* caller_func_name = __builtin_FUNCTION()   //!< [in] function name calling this I/F
-#else
-		const char* caller_src_fname = nullptr,   //!< [in] caller side source file name
-		const int   caller_lineno    = 0,         //!< [in] caller side line number
-		const char* caller_func_name = nullptr    //!< [in] function name calling this I/F
-#endif
-#endif
+		std::size_t      n,                                                         //!< [in] memory size to allocate
+		caller_context&& caller_ctx_arg = ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG   //!< [in] caller context information
 	);
 
 	/*!
 	 * @brief	deallocate memory
 	 */
 	void deallocate(
-		void* p_mem   //!< [in] pointer to allocated memory by allocate()
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-		,
-#ifdef __GNUC__
-		const char* caller_src_fname = __builtin_FILE(),      //!< [in] caller side source file name
-		const int   caller_lineno    = __builtin_LINE(),      //!< [in] caller side line number
-		const char* caller_func_name = __builtin_FUNCTION()   //!< [in] function name calling this I/F
-#else
-		const char* caller_src_fname = nullptr,   //!< [in] caller side source file name
-		const int   caller_lineno    = 0,         //!< [in] caller side line number
-		const char* caller_func_name = nullptr    //!< [in] function name calling this I/F
-#endif
-#endif
+		void*            p_mem,                                                     //!< [in] pointer to allocated memory by allocate()
+		caller_context&& caller_ctx_arg = ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG   //!< [in] caller context information
 	);
 
 	/*!
@@ -124,19 +102,8 @@ private:
  * This uses default_param_array and num_of_default_param_array as initial allocation parameter
  */
 void* gmem_allocate(
-	std::size_t n   //!< [in] memory size to allocate
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-	,
-#ifdef __GNUC__
-	const char* caller_src_fname = __builtin_FILE(),      //!< [in] caller side source file name
-	const int   caller_lineno    = __builtin_LINE(),      //!< [in] caller side line number
-	const char* caller_func_name = __builtin_FUNCTION()   //!< [in] function name calling this I/F
-#else
-	const char* caller_src_fname = nullptr,   //!< [in] caller side source file name
-	const int caller_lineno = 0,              //!< [in] caller side line number
-	const char* caller_func_name = nullptr    //!< [in] function name calling this I/F
-#endif
-#endif
+	std::size_t      n,                                                         //!< [in] memory size to allocate
+	caller_context&& caller_ctx_arg = ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG   //!< [in] caller context information
 );
 
 /*!
@@ -148,35 +115,25 @@ void* gmem_allocate(
  * If p_mem is not a memory that is not allocated by gmem_allocate(), this I/F will try to free by calling free().
  */
 void gmem_deallocate(
-	void* p_mem   //!< [in] pointer to free.
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-	,
-#ifdef __GNUC__
-	const char* caller_src_fname = __builtin_FILE(),      //!< [in] caller side source file name
-	const int   caller_lineno    = __builtin_LINE(),      //!< [in] caller side line number
-	const char* caller_func_name = __builtin_FUNCTION()   //!< [in] function name calling this I/F
-#else
-	const char* caller_src_fname = nullptr,   //!< [in] caller side source file name
-	const int caller_lineno = 0,              //!< [in] caller side line number
-	const char* caller_func_name = nullptr    //!< [in] function name calling this I/F
-#endif
-#endif
+	void*            p_mem,                                                     //!< [in] pointer to free.
+	caller_context&& caller_ctx_arg = ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG   //!< [in] caller context information
 );
 
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 /*!
  * @brief get backtrace information
- * 
+ *
  * this is for debug purpose.
- * 
+ *
  * @return backtrace information
  * @return 1st element: check result. if success, slot_chk_result::correct_ is true
  * @return 2nd element: backtrace when this memory is allocated.
  * @return 3rd element: backtrace when this memory is free.
  */
 std::tuple<alpha::concurrent::internal::slot_chk_result,
-		   alpha::concurrent::internal::slot_header::bt_info,
-		   alpha::concurrent::internal::slot_header::bt_info> get_backtrace_info(
+           alpha::concurrent::internal::slot_header::bt_info,
+           alpha::concurrent::internal::slot_header::bt_info>
+get_backtrace_info(
 	void* p_mem   //!< [in] pointer to allocated memory by allocate()
 );
 
@@ -184,12 +141,12 @@ std::tuple<alpha::concurrent::internal::slot_chk_result,
  * @brief output backtrace information to log output
  */
 void output_backtrace_info(
-	const log_type lt, //!< [in] log type
-	void* p_mem   //!< [in] pointer to allocated memory by allocate()
+	const log_type lt,     //!< [in] log type
+	void*          p_mem   //!< [in] pointer to allocated memory by allocate()
 );
 #endif
 
-bool test_platform_std_atomic_lockfree_condition(void);
+bool test_platform_std_atomic_lockfree_condition( void );
 
 }   // namespace concurrent
 }   // namespace alpha

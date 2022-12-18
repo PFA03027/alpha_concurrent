@@ -41,6 +41,26 @@ struct chunk_statistics {
 	std::string print( void );
 };
 
+struct caller_context {
+	const char* p_caller_src_fname_;   //!< caller side source file name
+	int         caller_lineno_;        //!< caller side line number
+	const char* p_caller_func_name_;   //!< function name calling this I/F
+};
+
+#ifdef __GNUC__
+#define ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG                  \
+	alpha::concurrent::caller_context                            \
+	{                                                            \
+		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION() \
+	}
+#else
+#define ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG \
+	alpha::concurrent::caller_context           \
+	{                                           \
+		nullptr, 0, nullptr                     \
+	}
+#endif
+
 }   // namespace concurrent
 }   // namespace alpha
 

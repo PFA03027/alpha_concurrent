@@ -26,41 +26,19 @@ inline general_mem_allocator& get_g_gm_mem_instance( void )
 }   // namespace internal
 
 void* gmem_allocate(
-	std::size_t n   //!< [in] memory size to allocate
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-	,
-	const char* caller_src_fname,   //!< [in] caller side source file name
-	const int   caller_lineno,      //!< [in] caller side line number
-	const char* caller_func_name    //!< [in] function name calling this I/F
-#endif
+	std::size_t      n,               //!< [in] memory size to allocate
+	caller_context&& caller_ctx_arg   //!< [in] caller context information
 )
 {
-	return internal::get_g_gm_mem_instance().allocate(
-		n
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-		,
-		caller_src_fname, caller_lineno, caller_func_name
-#endif
-	);
+	return internal::get_g_gm_mem_instance().allocate( n, std::move( caller_ctx_arg ) );
 }
 
 void gmem_deallocate(
-	void* p_mem   //!< [in] pointer to free.
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-	,
-	const char* caller_src_fname,   //!< [in] caller side source file name
-	const int   caller_lineno,      //!< [in] caller side line number
-	const char* caller_func_name    //!< [in] function name calling this I/F
-#endif
+	void*            p_mem,           //!< [in] pointer to free.
+	caller_context&& caller_ctx_arg   //!< [in] caller context information
 )
 {
-	internal::get_g_gm_mem_instance().deallocate(
-		p_mem
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-		,
-		caller_src_fname, caller_lineno, caller_func_name
-#endif
-	);
+	internal::get_g_gm_mem_instance().deallocate( p_mem, std::move( caller_ctx_arg ) );
 	return;
 }
 

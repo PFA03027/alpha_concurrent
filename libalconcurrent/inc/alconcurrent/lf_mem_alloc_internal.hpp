@@ -385,20 +385,10 @@ public:
 	 * @retval	nullptr		fail to allocate
 	 */
 	inline void* allocate_mem_slot(
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-		const char* caller_src_fname,   //!< [in] caller side source file name
-		const int   caller_lineno,      //!< [in] caller side line number
-		const char* caller_func_name    //!< [in] function name calling this I/F
-#else
-		void
-#endif
+		caller_context&& caller_ctx_arg   //!< [in] caller context information
 	)
 	{
-		void* p_ans = allocate_mem_slot_impl(
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-			caller_src_fname, caller_lineno, caller_func_name
-#endif
-		);
+		void* p_ans = allocate_mem_slot_impl( std::move( caller_ctx_arg ) );
 		if ( p_ans != nullptr ) {
 			statistics_.free_slot_cnt_--;
 			auto cur     = statistics_.consum_cnt_.fetch_add( 1 ) + 1;
@@ -417,22 +407,11 @@ public:
 	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
 	 */
 	inline bool recycle_mem_slot(
-		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-		,
-		const char* caller_src_fname,   //!< [in] caller side source file name
-		const int   caller_lineno,      //!< [in] caller side line number
-		const char* caller_func_name    //!< [in] function name calling this I/F
-#endif
+		void*            p_recycle_slot,   //!< [in] pointer to the memory slot to recycle.
+		caller_context&& caller_ctx_arg    //!< [in] caller context information
 	)
 	{
-		bool ans = recycle_mem_slot_impl(
-			p_recycle_slot
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-			,
-			caller_src_fname, caller_lineno, caller_func_name
-#endif
-		);
+		bool ans = recycle_mem_slot_impl( p_recycle_slot, std::move( caller_ctx_arg ) );
 		if ( ans ) {
 			statistics_.free_slot_cnt_++;
 			statistics_.consum_cnt_--;
@@ -496,13 +475,7 @@ private:
 	 * @retval	nullptr		fail to allocate
 	 */
 	void* allocate_mem_slot_impl(
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-		const char* caller_src_fname,   //!< [in] caller side source file name
-		const int   caller_lineno,      //!< [in] caller side line number
-		const char* caller_func_name    //!< [in] function name calling this I/F
-#else
-		void
-#endif
+		caller_context&& caller_ctx_arg   //!< [in] caller context information
 	);
 
 	/*!
@@ -512,13 +485,8 @@ private:
 	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
 	 */
 	bool recycle_mem_slot_impl(
-		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-		,
-		const char* caller_src_fname,   //!< [in] caller side source file name
-		const int   caller_lineno,      //!< [in] caller side line number
-		const char* caller_func_name    //!< [in] function name calling this I/F
-#endif
+		void*            p_recycle_slot,   //!< [in] pointer to the memory slot to recycle.
+		caller_context&& caller_ctx_arg    //!< [in] caller context information
 	);
 
 	chms_statistics  statistics_imp_;   //!< statistics
@@ -539,13 +507,9 @@ struct slot_chk_result {
 };
 
 struct slot_header {
-	std::atomic<chunk_header_multi_slot*> at_p_chms_;   //!< pointer to chunk_header_multi_slot that is an owner of this slot
-	std::atomic<std::uintptr_t>           at_mark_;     //!< checker mark
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-	const char* p_caller_src_fname_;   //!< caller side source file name
-	int         caller_lineno_;        //!< caller side line number
-	const char* p_caller_func_name_;   //!< function name calling this I/F
-#endif
+	std::atomic<chunk_header_multi_slot*> at_p_chms_;    //!< pointer to chunk_header_multi_slot that is an owner of this slot
+	std::atomic<std::uintptr_t>           at_mark_;      //!< checker mark
+	caller_context                        caller_ctx_;   //!< caller context information
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 #define ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE ( 100 )
 	struct bt_info {
@@ -559,22 +523,9 @@ struct slot_header {
 #endif
 
 	void set_addr_of_chunk_header_multi_slot(
-		chunk_header_multi_slot* p_chms_arg   //!< [in] pointer to a parent "chunk_header_multi_slot"
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-		,
-		const char* caller_src_fname,   //!< [in] caller side source file name
-		const int   caller_lineno,      //!< [in] caller side line number
-		const char* caller_func_name    //!< [in] function name calling this I/F
-#endif
+		chunk_header_multi_slot* p_chms_arg,      //!< [in] pointer to a parent "chunk_header_multi_slot"
+		caller_context&&         caller_ctx_arg   //!< [in] caller context information
 	);
-
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-	void set_caller_context_info(
-		const char* caller_src_fname,   //!< [in] caller side source file name
-		const int   caller_lineno,      //!< [in] caller side line number
-		const char* caller_func_name    //!< [in] function name calling this I/F
-	);
-#endif
 
 	slot_chk_result chk_header_data( void ) const;
 };
@@ -604,13 +555,7 @@ public:
 	 * @retval	nullptr		fail to allocate
 	 */
 	void* allocate_mem_slot(
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-		const char* caller_src_fname,   //!< [in] caller side source file name
-		const int   caller_lineno,      //!< [in] caller side line number
-		const char* caller_func_name    //!< [in] function name calling this I/F
-#else
-		void
-#endif
+		caller_context&& caller_ctx_arg   //!< [in] caller context information
 	);
 
 	/*!
@@ -620,13 +565,8 @@ public:
 	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
 	 */
 	bool recycle_mem_slot(
-		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
-#ifndef LF_MEM_ALLOC_NO_CALLER_CONTEXT_INFO
-		,
-		const char* caller_src_fname,   //!< [in] caller side source file name
-		const int   caller_lineno,      //!< [in] caller side line number
-		const char* caller_func_name    //!< [in] function name calling this I/F
-#endif
+		void*            p_recycle_slot,   //!< [in] pointer to the memory slot to recycle.
+		caller_context&& caller_ctx_arg    //!< [in] caller context information
 	);
 
 	/*!
