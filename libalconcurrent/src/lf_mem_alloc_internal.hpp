@@ -16,11 +16,11 @@
 #include <list>
 #include <memory>
 
-#include "conf_logger.hpp"
-#include "dynamic_tls.hpp"
-#include "hazard_ptr.hpp"
+#include "alconcurrent/conf_logger.hpp"
+#include "alconcurrent/dynamic_tls.hpp"
+#include "alconcurrent/hazard_ptr.hpp"
 
-#include "lf_mem_alloc_type.hpp"
+#include "alconcurrent/lf_mem_alloc_type.hpp"
 
 // #define ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 

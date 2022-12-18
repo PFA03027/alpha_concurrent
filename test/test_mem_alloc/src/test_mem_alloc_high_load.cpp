@@ -16,6 +16,7 @@
 
 #include "gtest/gtest.h"
 
+#include "../src/lf_mem_alloc_internal.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
 
 // #define TEST_WITH_SLEEP

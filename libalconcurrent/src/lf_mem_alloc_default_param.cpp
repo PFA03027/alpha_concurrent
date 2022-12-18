@@ -14,7 +14,7 @@
 #include <cstddef>
 
 #include "alconcurrent/lf_mem_alloc.hpp"
-#include "alconcurrent/lf_mem_alloc_internal.hpp"
+#include "lf_mem_alloc_internal.hpp"
 
 namespace alpha {
 namespace concurrent {

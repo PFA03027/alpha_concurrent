@@ -12,9 +12,11 @@
 #include <atomic>
 #include <cstdint>
 #include <iostream>
+#include <thread>
 
 #include "gtest/gtest.h"
 
+#include "alconcurrent/dynamic_tls.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
 
 alpha::concurrent::param_chunk_allocation param = { 27, 2 };

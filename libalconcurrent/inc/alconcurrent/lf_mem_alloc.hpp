@@ -18,7 +18,6 @@
 
 #include "conf_logger.hpp"
 
-#include "lf_mem_alloc_internal.hpp"
 #include "lf_mem_alloc_type.hpp"
 
 namespace alpha {
@@ -26,6 +25,10 @@ namespace concurrent {
 
 extern const unsigned int           num_of_default_param_array;   //!< array size of default parameter array
 extern const param_chunk_allocation default_param_array[];        //!< pointer to default parameter array
+
+namespace internal {
+class chunk_list;
+}
 
 /*!
  * @brief	semi lock-free memory allocator based on multi chunk size list
@@ -46,6 +49,11 @@ public:
 		const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
 		unsigned int                  num              //!< [in] array size
 	);
+
+	/*!
+	 * @brief	destructor
+	 */
+	~general_mem_allocator();
 
 	/*!
 	 * @brief	allocate memory

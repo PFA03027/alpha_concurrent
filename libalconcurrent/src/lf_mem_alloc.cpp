@@ -20,7 +20,7 @@
 
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
-#include "alconcurrent/lf_mem_alloc_internal.hpp"
+#include "lf_mem_alloc_internal.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -1363,6 +1363,11 @@ general_mem_allocator::general_mem_allocator(
 #ifndef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 	set_param( p_param_array, num );
 #endif
+	return;
+}
+
+general_mem_allocator::~general_mem_allocator()
+{
 	return;
 }
 

@@ -15,6 +15,7 @@
 
 #include "gtest/gtest.h"
 
+#include "../src/lf_mem_alloc_internal.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
