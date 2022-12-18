@@ -292,7 +292,12 @@ public:
 		// メモリリークが無いように、スレッドローカルストレージを削除する
 		// この処理と、スレッド終了処理によるdestr_fn()の同時呼び出しは、未定義動作とする。
 		tls_cont_pointer p_cur = head_.load( std::memory_order_acquire );
-		head_.store( nullptr, std::memory_order_release );
+		bool             ret   = head_.compare_exchange_strong( p_cur, nullptr );
+		if ( !ret ) {
+			internal::LogOutput( log_type::WARN, "dynamic_tls::destructor is called in race condition" );
+			return;
+		}
+
 		while ( p_cur != nullptr ) {
 			tls_cont_pointer p_nxt = p_cur->get_next();
 
@@ -412,13 +417,13 @@ private:
 		return *( p_tls->p_value );
 	}
 
-	static void destr_fn( void* parm )
+	static void destr_fn( void* param )
 	{
-		internal::LogOutput( log_type::DEBUG, "dynamic_tls::destr_fn is called              - %p", parm );
+		internal::LogOutput( log_type::DEBUG, "dynamic_tls::destr_fn is called              - %p", param );
 
-		if ( parm == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。どうしようもないので、諦める。
+		if ( param == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。どうしようもないので、諦める。
 
-		tls_cont_pointer p_target_node = reinterpret_cast<tls_cont_pointer>( parm );
+		tls_cont_pointer p_target_node = reinterpret_cast<tls_cont_pointer>( param );
 
 		p_target_node->release_owner();
 

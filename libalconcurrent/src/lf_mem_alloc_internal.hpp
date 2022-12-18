@@ -47,6 +47,7 @@ enum class chunk_control_status : int {
 struct chms_statistics {
 	chms_statistics( void )
 	  : chunk_num_( 0 )
+	  , valid_chunk_num_( 0 )
 	  , total_slot_cnt_( 0 )
 	  , free_slot_cnt_( 0 )
 	  , consum_cnt_( 0 )
@@ -67,6 +68,7 @@ struct chms_statistics {
 	chunk_statistics get_statistics( void ) const;
 
 	std::atomic<unsigned int> chunk_num_;               //!< number of chunks
+	std::atomic<unsigned int> valid_chunk_num_;         //!< number of valid chunks
 	std::atomic<unsigned int> total_slot_cnt_;          //!< total slot count
 	std::atomic<unsigned int> free_slot_cnt_;           //!< free slot count
 	std::atomic<unsigned int> consum_cnt_;              //!< current count of allocated slots
@@ -144,6 +146,11 @@ public:
 	void push_element(
 		idx_mgr_element* p_push_element   //!< [in] pointer of element to push
 	);
+
+	/*!
+	 * @brief	リスト操作時の衝突回数を取得する。
+	 */
+	void clear( void );
 
 	/*!
 	 * @brief	リスト操作時の衝突回数を取得する。
@@ -253,7 +260,7 @@ struct idx_mgr {
 	 * @brief	コンストラクタ
 	 */
 	idx_mgr(
-		const int                  idx_size_arg,                 //!< [in] 用意するインデックス番号の数。-1の場合、割り当てを保留する。
+		const int                  idx_size_arg,                 //!< [in] 用意するインデックス番号の数。0以下の場合、割り当てを保留する。
 		std::atomic<unsigned int>* p_alloc_collision_cnt_arg,    //!< [in] 衝突回数をカウントする変数へのポインタ。ポインタ先のインスタンスは、このインスタンス以上のライフタイムを持つこと
 		std::atomic<unsigned int>* p_dealloc_collision_cnt_arg   //!< [in] 衝突回数をカウントする変数へのポインタ。ポインタ先のインスタンスは、このインスタンス以上のライフタイムを持つこと
 	);
@@ -272,7 +279,9 @@ struct idx_mgr {
 	 * @note
 	 * このI/Fはスレッドセーフではありません。
 	 */
-	void set_idx_size( const int idx_size_arg );
+	void set_idx_size(
+		const int idx_size_arg   //!< [in] 用意するインデックス番号の数。0以下の場合、現在のバッファを解放の上、バッファの再確保を保留する。
+	);
 
 	/*!
 	 * @brief	利用可能なインデックス番号を取り出す。
@@ -337,6 +346,11 @@ private:
 	 * スレッドセーフではあるが、ロックによる排他制御が行われる。
 	 */
 	void rcv_wait_idx_by_thread_terminating( waiting_idx_list* p_idx_list );
+
+	/*!
+	 * @brief	clear
+	 */
+	void clear( void );
 
 	int idx_size_;       //!< 割り当てられたインデックス番号の数
 	int idx_size_ver_;   //!< 割り当てられたインデックス番号の数の情報のバージョン番号
@@ -489,11 +503,10 @@ private:
 		caller_context&& caller_ctx_arg    //!< [in] caller context information
 	);
 
-	chms_statistics  statistics_imp_;   //!< statistics
-	chms_statistics& statistics_;       //!< reference to store statistics information
+	chms_statistics statistics_;   //!< statistics
 
 	param_chunk_allocation slot_conf_;       //!< allocation configuration paramter. value is corrected internally.
-	std::size_t            size_of_chunk_;   //!< size of a chunk
+	std::size_t            size_of_chunk_;   //!< allocated memory size of this chunk
 
 	idx_mgr free_slot_idx_mgr_;   //<! manager of free slot index
 
@@ -563,6 +576,11 @@ public:
 	);
 
 	/*!
+	 * @brief	free the deletable buffers
+	 */
+	void prune( void );
+
+	/*!
 	 * @brief	get statistics
 	 */
 	chunk_statistics get_statistics( void ) const;
@@ -572,26 +590,14 @@ private:
 #else
 	struct threadlocal_chunk_header_multi_slot_list_free {
 		bool release(
-			chunk_header_multi_slot*& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
-		)
-		{
-			// 他のスレッドが割り当てたメモリを使用中であるため、スレッド終了時には領域を解放しない。
-			return false;
-		}
+			chunk_header_multi_slot*& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照。破棄されるスレッドに属するチャンクリストの先頭ポインタ。
+		);
 		void destruct(
 			chunk_header_multi_slot*& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
-		)
-		{
-			// インスタンスが削除されるため、リンクリストを削除する。
-			chunk_header_multi_slot* p_chms = data;
-			while ( p_chms != nullptr ) {
-				chunk_header_multi_slot* p_next_chms = p_chms->p_next_chunk_.load();
-				delete p_chms;
-				p_chms = p_next_chms;
-			}
-			data = nullptr;
-			return;
-		}
+		);
+
+		std::mutex*               p_mtx_;                // pointer to mutex
+		chunk_header_multi_slot** pp_top_taken_chunk_;   // pointer to shared chunk list for thread discard
 	};
 #endif
 
@@ -601,7 +607,10 @@ private:
 #ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 	std::atomic<chunk_header_multi_slot*> p_top_chunk_;   //!< pointer to chunk_header that is top of list.
 #else
-	dynamic_tls<chunk_header_multi_slot*, threadlocal_chunk_header_multi_slot_list_free> tls_p_top_chunk_;   //!< thread loacal pointer to chunk_header that is top of list.
+	dynamic_tls<chunk_header_multi_slot*, threadlocal_chunk_header_multi_slot_list_free> tls_p_top_chunk_;   //!< thread local pointer to chunk_header that is top of list.
+
+	std::mutex               mtx_p_top_taken_chunk_;   // mutex for p_top_taken_chunk_
+	chunk_header_multi_slot* p_top_taken_chunk_;       //!< the head pointer of the chunk list that was taken
 #endif
 	dynamic_tls<chunk_header_multi_slot*> tls_p_hint_chunk;   //!< thread loacal pointer to chunk_header that is success to allocate recently for a thread.
 

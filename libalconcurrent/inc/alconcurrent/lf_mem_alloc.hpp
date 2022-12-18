@@ -72,6 +72,11 @@ public:
 	);
 
 	/*!
+	 * @brief	free the deletable buffers
+	 */
+	void prune( void );
+
+	/*!
 	 * @brief	set parameter
 	 *
 	 * If already set paramter by constructor or this I/F, this call is ignored.
@@ -87,6 +92,9 @@ public:
 
 	/*!
 	 * @brief	get statistics
+	 *
+	 * @note
+	 * This I/F does not lock allocat/deallocate itself, but this I/F execution is not lock free.
 	 */
 	std::list<chunk_statistics> get_statistics( void ) const;
 
@@ -96,8 +104,10 @@ private:
 		std::unique_ptr<internal::chunk_list> up_chunk_lst_;   //!< unique pointer to chunk list
 	};
 
-	unsigned int                        pr_ch_size_;          // array size of chunk and param array
+	unsigned int                        pr_ch_size_;          //!< array size of chunk and param array
 	std::unique_ptr<param_chunk_comb[]> up_param_ch_array_;   //!< unique pointer to chunk and param array
+
+	std::atomic_bool exclusive_ctl_of_prune_;   //!< exclusive control for prune()
 };
 
 /*!
@@ -126,6 +136,11 @@ void gmem_deallocate(
 	void*            p_mem,                                                     //!< [in] pointer to free.
 	caller_context&& caller_ctx_arg = ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG   //!< [in] caller context information
 );
+
+/*!
+ * @brief	free the deletable buffers
+ */
+void gmem_prune( void );
 
 /*!
  * @brief get backtrace information

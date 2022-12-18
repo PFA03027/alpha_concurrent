@@ -42,5 +42,11 @@ void gmem_deallocate(
 	return;
 }
 
+void gmem_prune( void )
+{
+	internal::get_g_gm_mem_instance().prune();
+	return;
+}
+
 }   // namespace concurrent
 }   // namespace alpha

@@ -34,6 +34,7 @@ struct param_chunk_allocation {
 struct chunk_statistics {
 	param_chunk_allocation alloc_conf_;              //!< chunk configuration
 	std::size_t            chunk_num_;               //!< number of current allocated chunks
+	std::size_t            valid_chunk_num_;         //!< number of valid chunks
 	std::size_t            total_slot_cnt_;          //!< total number of slots
 	std::size_t            free_slot_cnt_;           //!< total number of free slots
 	std::size_t            consum_cnt_;              //!< total number of used slots
