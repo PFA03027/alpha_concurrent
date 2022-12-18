@@ -223,7 +223,6 @@ TEST( lfmemAlloc, caller_context )
 	return;
 }
 
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 TEST( lfmemAlloc, TestBacktrace )
 {
 	std::size_t rq_size   = RQ_SIZE;
@@ -231,32 +230,81 @@ TEST( lfmemAlloc, TestBacktrace )
 	ASSERT_NE( nullptr, test_ptr1 );
 
 	auto bt_info1 = alpha::concurrent::get_backtrace_info( test_ptr1 );
-	ASSERT_TRUE( std::get<0>( bt_info1 ).correct_ );
+	ASSERT_TRUE( std::get<0>( bt_info1 ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 	EXPECT_NE( 0, std::get<1>( bt_info1 ).count_ );
-
+#else
+	EXPECT_EQ( 0, std::get<1>( bt_info1 ).count_ );
+#endif
 	alpha::concurrent::output_backtrace_info( alpha::concurrent::log_type::ERR, test_ptr1 );
 
 	alpha::concurrent::gmem_deallocate( test_ptr1 );
+	bt_info1 = alpha::concurrent::get_backtrace_info( test_ptr1 );
+	ASSERT_TRUE( std::get<0>( bt_info1 ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	EXPECT_NE( 0, std::get<1>( bt_info1 ).count_ );
+	EXPECT_NE( 0, std::get<2>( bt_info1 ).count_ );
+#else
+	EXPECT_EQ( 0, std::get<1>( bt_info1 ).count_ );
+	EXPECT_EQ( 0, std::get<2>( bt_info1 ).count_ );
+#endif
 
 	void* test_ptr2 = alpha::concurrent::gmem_allocate( rq_size );
 	ASSERT_NE( nullptr, test_ptr2 );
 
 	auto bt_info2 = alpha::concurrent::get_backtrace_info( test_ptr2 );
-	ASSERT_TRUE( std::get<0>( bt_info2 ).correct_ );
+	ASSERT_TRUE( std::get<0>( bt_info2 ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 	EXPECT_NE( 0, std::get<1>( bt_info2 ).count_ );
-	if ( ( test_ptr1 == test_ptr2 ) &&
-	     ( std::get<0>( bt_info1 ).p_chms_ != nullptr ) &&
-	     ( std::get<0>( bt_info2 ).p_chms_ != nullptr ) ) {
-		EXPECT_NE( 0, std::get<2>( bt_info2 ).count_ );
-	}
+#else
+	EXPECT_EQ( 0, std::get<1>( bt_info2 ).count_ );
+#endif
 
 	alpha::concurrent::output_backtrace_info( alpha::concurrent::log_type::ERR, test_ptr2 );
 
 	alpha::concurrent::gmem_deallocate( test_ptr2 );
+	bt_info2 = alpha::concurrent::get_backtrace_info( test_ptr2 );
+	ASSERT_TRUE( std::get<0>( bt_info2 ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	EXPECT_NE( 0, std::get<1>( bt_info2 ).count_ );
+	EXPECT_NE( 0, std::get<2>( bt_info2 ).count_ );
+#else
+	EXPECT_EQ( 0, std::get<1>( bt_info2 ).count_ );
+	EXPECT_EQ( 0, std::get<2>( bt_info2 ).count_ );
+#endif
 
 	int err_cnt, warn_cnt;
 	alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 	return;
 }
 
+TEST( lfmemAlloc, TestBacktrace2 )
+{
+	std::size_t rq_size   = RQ_SIZE;
+	void*       test_ptr1 = std::malloc( rq_size );
+	ASSERT_NE( nullptr, test_ptr1 );
+
+	auto bt_info1 = alpha::concurrent::get_backtrace_info( test_ptr1 );
+	std::free( test_ptr1 );
+	ASSERT_FALSE( std::get<0>( bt_info1 ) );
+
+	return;
+}
+
+TEST( lfmemAlloc, TestBacktrace3 )
+{
+	std::size_t rq_size   = 10000000;   // over size of max allocation slot size of default configuration
+	void*       test_ptr1 = alpha::concurrent::gmem_allocate( rq_size );
+	ASSERT_NE( nullptr, test_ptr1 );
+
+	auto bt_info1 = alpha::concurrent::get_backtrace_info( test_ptr1 );
+	alpha::concurrent::gmem_deallocate( test_ptr1 );
+	ASSERT_TRUE( std::get<0>( bt_info1 ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	EXPECT_NE( 0, std::get<1>( bt_info1 ).count_ );
+#else
+	EXPECT_EQ( 0, std::get<1>( bt_info1 ).count_ );
 #endif
+
+	return;
+}

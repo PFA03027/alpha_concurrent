@@ -511,13 +511,6 @@ struct slot_header {
 	std::atomic<std::uintptr_t>           at_mark_;      //!< checker mark
 	caller_context                        caller_ctx_;   //!< caller context information
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-#define ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE ( 100 )
-	struct bt_info {
-		int   count_;                                             //!< backtrace data size. Zero: no data, Plus value: call stack information is valid, Minus value: information of previous allocation
-		void* bt_[ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE];   //!< call stack of backtrace
-
-		void dump_to_log( log_type lt, int id );
-	};
 	bt_info alloc_bt_info_;   //!< backtrace information when is allocated
 	bt_info free_bt_info_;    //!< backtrace information when is free
 #endif

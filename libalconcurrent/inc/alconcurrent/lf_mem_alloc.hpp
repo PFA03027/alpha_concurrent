@@ -127,7 +127,6 @@ void gmem_deallocate(
 	caller_context&& caller_ctx_arg = ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG   //!< [in] caller context information
 );
 
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 /*!
  * @brief get backtrace information
  *
@@ -138,9 +137,9 @@ void gmem_deallocate(
  * @return 2nd element: backtrace when this memory is allocated.
  * @return 3rd element: backtrace when this memory is free.
  */
-std::tuple<alpha::concurrent::internal::slot_chk_result,
-           alpha::concurrent::internal::slot_header::bt_info,
-           alpha::concurrent::internal::slot_header::bt_info>
+std::tuple<bool,
+           alpha::concurrent::bt_info,
+           alpha::concurrent::bt_info>
 get_backtrace_info(
 	void* p_mem   //!< [in] pointer to allocated memory by allocate()
 );
@@ -152,7 +151,6 @@ void output_backtrace_info(
 	const log_type lt,     //!< [in] log type
 	void*          p_mem   //!< [in] pointer to allocated memory by allocate()
 );
-#endif
 
 bool test_platform_std_atomic_lockfree_condition( void );
 

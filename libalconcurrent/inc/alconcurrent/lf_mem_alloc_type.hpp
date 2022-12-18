@@ -13,6 +13,8 @@
 
 #include <cstdlib>
 
+#include "alconcurrent/conf_logger.hpp"
+
 namespace alpha {
 namespace concurrent {
 
@@ -24,23 +26,34 @@ struct param_chunk_allocation {
 	unsigned int num_of_pieces_     = 0;   //!< number of pieces in a chunk
 };
 
+/*!
+ * @brief	chunk statistics information
+ *
+ * This is used for optimization for a paramters
+ */
 struct chunk_statistics {
-	param_chunk_allocation alloc_conf_;
-	std::size_t            chunk_num_;
-	std::size_t            total_slot_cnt_;
-	std::size_t            free_slot_cnt_;
-	std::size_t            consum_cnt_;
-	std::size_t            max_consum_cnt_;
-	std::size_t            alloc_req_cnt_;
-	std::size_t            error_alloc_req_cnt_;
-	std::size_t            dealloc_req_cnt_;
-	std::size_t            error_dealloc_req_cnt_;
-	unsigned int           alloc_collision_cnt_;
-	unsigned int           dealloc_collision_cnt_;
+	param_chunk_allocation alloc_conf_;              //!< chunk configuration
+	std::size_t            chunk_num_;               //!< number of current allocated chunks
+	std::size_t            total_slot_cnt_;          //!< total number of slots
+	std::size_t            free_slot_cnt_;           //!< total number of free slots
+	std::size_t            consum_cnt_;              //!< total number of used slots
+	std::size_t            max_consum_cnt_;          //!< maximum number of used slots
+	std::size_t            alloc_req_cnt_;           //!< number of allocation requests
+	std::size_t            error_alloc_req_cnt_;     //!< number of allocation failure
+	std::size_t            dealloc_req_cnt_;         //!< number of deallocation requests
+	std::size_t            error_dealloc_req_cnt_;   //!< number of deallocation failure
+	unsigned int           alloc_collision_cnt_;     //!< number of allocation collision
+	unsigned int           dealloc_collision_cnt_;   //!< number of deallocation collision
 
+	/*!
+	 * @brief	make std::string of statistics information
+	 */
 	std::string print( void );
 };
 
+/*!
+ * @brief	caller context
+ */
 struct caller_context {
 	const char* p_caller_src_fname_;   //!< caller side source file name
 	int         caller_lineno_;        //!< caller side line number
@@ -60,6 +73,29 @@ struct caller_context {
 		nullptr, 0, nullptr                     \
 	}
 #endif
+
+#define ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE ( 100 )   //!< size of backtrace buffer size
+
+/*!
+ * @brief	caller context
+ */
+struct bt_info {
+	int   count_;                                             //!< backtrace data size. Zero: no data, Plus value: call stack information is valid, Minus value: information of previous allocation
+	void* bt_[ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE];   //!< call stack of backtrace
+
+	bt_info( void )
+	  : count_( 0 )
+	{
+	}
+
+	~bt_info()                           = default;
+	bt_info( const bt_info& )            = default;
+	bt_info( bt_info&& )                 = default;
+	bt_info& operator=( const bt_info& ) = default;
+	bt_info& operator=( bt_info&& )      = default;
+
+	void dump_to_log( log_type lt, int id );
+};
 
 }   // namespace concurrent
 }   // namespace alpha

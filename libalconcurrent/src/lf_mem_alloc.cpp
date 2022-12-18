@@ -37,6 +37,36 @@ bool test_platform_std_atomic_lockfree_condition( void )
 	return ans;
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+#define RECORD_BACKTRACE_GET_BACKTRACE( BT_INFO_N )                                                 \
+	do {                                                                                            \
+		BT_INFO_N.count_ = backtrace( BT_INFO_N.bt_, ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE ); \
+	} while ( 0 )
+#define RECORD_BACKTRACE_INVALIDATE_BACKTRACE( BT_INFO_N ) \
+	do {                                                   \
+		BT_INFO_N.count_ = -( BT_INFO_N.count_ );          \
+	} while ( 0 )
+
+void bt_info::dump_to_log( log_type lt, int id )
+{
+	if ( count_ == 0 ) {
+		internal::LogOutput( lt, "[%d] no back trace. this slot has not allocated yet.", id );
+		return;
+	}
+
+	internal::LogOutput( lt, "[%d] backtrace count value = %d", id, count_ );
+
+	int    actual_count = ( count_ < 0 ) ? -count_ : count_;
+	char** bt_strings   = backtrace_symbols( bt_, actual_count );
+	for ( int i = 0; i < actual_count; i++ ) {
+		internal::LogOutput( lt, "[%d] [%d] %s", id, i, bt_strings[i] );
+	}
+	free( bt_strings );
+
+	return;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
 namespace internal {
 
 chunk_statistics chms_statistics::get_statistics( void ) const
@@ -661,36 +691,6 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-#define RECORD_BACKTRACE_GET_BACKTRACE( BT_INFO_N )                                                 \
-	do {                                                                                            \
-		BT_INFO_N.count_ = backtrace( BT_INFO_N.bt_, ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE ); \
-	} while ( 0 )
-#define RECORD_BACKTRACE_INVALIDATE_BACKTRACE( BT_INFO_N ) \
-	do {                                                   \
-		BT_INFO_N.count_ = -( BT_INFO_N.count_ );          \
-	} while ( 0 )
-
-void slot_header::bt_info::dump_to_log( log_type lt, int id )
-{
-	if ( count_ == 0 ) {
-		internal::LogOutput( lt, "[%d] no back trace. this slot has not allocated yet.", id );
-		return;
-	}
-
-	internal::LogOutput( lt, "[%d] backtrace count value = %d", id, count_ );
-
-	int    actual_count = ( count_ < 0 ) ? -count_ : count_;
-	char** bt_strings   = backtrace_symbols( bt_, actual_count );
-	for ( int i = 0; i < actual_count; i++ ) {
-		internal::LogOutput( lt, "[%d] [%d] %s", id, i, bt_strings[i] );
-	}
-	free( bt_strings );
-
-	return;
-}
-#endif
-
 void slot_header::set_addr_of_chunk_header_multi_slot(
 	chunk_header_multi_slot* p_chms_arg,
 	caller_context&&         caller_ctx_arg   //!< [in] caller context information
@@ -703,7 +703,7 @@ void slot_header::set_addr_of_chunk_header_multi_slot(
 		RECORD_BACKTRACE_INVALIDATE_BACKTRACE( free_bt_info_ );
 	} else {
 		// mallocで確保された領域なので、free_bt_info_側の情報は、クリアする。
-		free_bt_info_ = { 0 };
+		free_bt_info_ = bt_info {};
 	}
 #endif
 
@@ -948,7 +948,7 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 		internal::LogOutput( log_type::ERR, "[%d] backtrace of previous free call", id_count );
 		p_sh->free_bt_info_.dump_to_log( log_type::ERR, id_count );
 
-		slot_header::bt_info cur_bt;
+		bt_info cur_bt;
 		RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
 		internal::LogOutput( log_type::ERR, "[%d] backtrace of current free call", id_count );
 		cur_bt.dump_to_log( log_type::ERR, id_count );
@@ -1517,10 +1517,9 @@ std::string chunk_statistics::print( void )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-std::tuple<alpha::concurrent::internal::slot_chk_result,
-           alpha::concurrent::internal::slot_header::bt_info,
-           alpha::concurrent::internal::slot_header::bt_info>
+std::tuple<bool,
+           alpha::concurrent::bt_info,
+           alpha::concurrent::bt_info>
 get_backtrace_info(
 	void* p_mem   //!< [in] pointer to allocated memory by allocate()
 )
@@ -1529,12 +1528,21 @@ get_backtrace_info(
 	tmp_addr -= internal::get_slot_header_size();
 	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( tmp_addr );
 
-	return std::tuple<alpha::concurrent::internal::slot_chk_result,
-	                  alpha::concurrent::internal::slot_header::bt_info,
-	                  alpha::concurrent::internal::slot_header::bt_info>(
-		p_sh->chk_header_data(),
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	return std::tuple<bool,
+	                  alpha::concurrent::bt_info,
+	                  alpha::concurrent::bt_info>(
+		p_sh->chk_header_data().correct_,
 		p_sh->alloc_bt_info_,
 		p_sh->free_bt_info_ );
+#else
+	return std::tuple<bool,
+	                  alpha::concurrent::bt_info,
+	                  alpha::concurrent::bt_info>(
+		p_sh->chk_header_data().correct_,
+		bt_info(),
+		bt_info() );
+#endif
 }
 
 void output_backtrace_info(
@@ -1555,15 +1563,17 @@ void output_backtrace_info(
 		"[%d] header check result of %p: correct_=%s, p_chms_=%p",
 		id_count, p_mem, chk_ret.correct_ ? "true" : "false", chk_ret.p_chms_ );
 
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 	internal::LogOutput( lt, "[%d] alloc_bt_info_ of %p", id_count, p_mem );
 	p_sh->alloc_bt_info_.dump_to_log( lt, id_count );
 	internal::LogOutput( lt, "[%d] free_bt_info_ of %p", id_count, p_mem );
 	p_sh->free_bt_info_.dump_to_log( lt, id_count );
+#else
+	internal::LogOutput( lt, "[%d] no backtrace information, because the library is not compiled with ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE", id_count );
+#endif
 
 	return;
 }
-
-#endif
 
 }   // namespace concurrent
 }   // namespace alpha
