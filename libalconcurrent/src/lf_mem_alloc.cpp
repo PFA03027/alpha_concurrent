@@ -29,10 +29,10 @@ bool test_platform_std_atomic_lockfree_condition( void )
 {
 	bool ans;
 
-	ans = std::atomic_bool { true }.is_lock_free();
+	ans = ( ATOMIC_BOOL_LOCK_FREE == 2 );
 	ans = ans && std::atomic<internal::chunk_control_status> { internal::chunk_control_status::EMPTY }.is_lock_free();
 	ans = ans && std::atomic<internal::chunk_header_multi_slot*> { nullptr }.is_lock_free();
-	ans = ans && std::atomic<int> { 0 }.is_lock_free();
+	ans = ans && ( ATOMIC_INT_LOCK_FREE == 2 );
 
 	return ans;
 }
