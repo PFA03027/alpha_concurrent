@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cassert>
 #include <cstddef>
 #include <exception>
 #include <mutex>
@@ -69,7 +70,7 @@ void bt_info::dump_to_log( log_type lt, int id )
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 namespace internal {
 
-chunk_statistics chms_statistics::get_statistics( void ) const
+chunk_statistics chunk_list_statistics::get_statistics( void ) const
 {
 	chunk_statistics ans;
 
@@ -740,18 +741,20 @@ slot_chk_result slot_header::chk_header_data( void ) const
 ////////////////////////////////////////////////////////////////////////////////
 chunk_header_multi_slot::chunk_header_multi_slot(
 	const param_chunk_allocation& ch_param_arg,     //!< [in] chunk allocation paramter
-	chms_statistics*              p_chms_stat_arg   //!< [in] pointer to statistics inforation to store activity
+	chunk_list_statistics*        p_chms_stat_arg   //!< [in] pointer to statistics inforation to store activity
 	)
   : p_next_chunk_( nullptr )
   , status_( chunk_control_status::EMPTY )
   , num_of_accesser_( 0 )
-  , statistics_()
+  , p_statistics_( p_chms_stat_arg )
   , slot_conf_ {}
-  , free_slot_idx_mgr_( -1, &statistics_.alloc_collision_cnt_, &statistics_.dealloc_collision_cnt_ )
+  , free_slot_idx_mgr_( -1, &( p_statistics_->alloc_collision_cnt_ ), &( p_statistics_->dealloc_collision_cnt_ ) )
   , p_free_slot_mark_( nullptr )
   , p_chunk_( nullptr )
 {
-	statistics_.chunk_num_++;
+	assert( p_statistics_ != nullptr );
+
+	p_statistics_->chunk_num_++;
 
 	alloc_new_chunk( ch_param_arg );
 
@@ -766,7 +769,7 @@ chunk_header_multi_slot::~chunk_header_multi_slot()
 	p_free_slot_mark_ = nullptr;
 	p_chunk_          = nullptr;
 
-	statistics_.chunk_num_--;
+	p_statistics_->chunk_num_--;
 
 	return;
 }
@@ -848,9 +851,9 @@ bool chunk_header_multi_slot::alloc_new_chunk(
 
 	free_slot_idx_mgr_.set_idx_size( slot_conf_.num_of_pieces_ );
 
-	statistics_.valid_chunk_num_.fetch_add( 1 );
-	statistics_.total_slot_cnt_.fetch_add( slot_conf_.num_of_pieces_ );
-	statistics_.free_slot_cnt_.fetch_add( slot_conf_.num_of_pieces_ );
+	p_statistics_->valid_chunk_num_.fetch_add( 1 );
+	p_statistics_->total_slot_cnt_.fetch_add( slot_conf_.num_of_pieces_ );
+	p_statistics_->free_slot_cnt_.fetch_add( slot_conf_.num_of_pieces_ );
 
 	status_.store( chunk_control_status::NORMAL, std::memory_order_release );
 
@@ -871,13 +874,13 @@ void* chunk_header_multi_slot::allocate_mem_slot_impl(
 	if ( status_.load( std::memory_order_acquire ) != chunk_control_status::NORMAL ) return nullptr;
 
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-	statistics_.alloc_req_cnt_++;
+	p_statistics_->alloc_req_cnt_++;
 #endif
 
 	int read_idx = free_slot_idx_mgr_.pop();
 	if ( read_idx == -1 ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-		statistics_.alloc_req_err_cnt_++;
+		p_statistics_->alloc_req_err_cnt_++;
 #endif
 		return nullptr;
 	}
@@ -951,7 +954,7 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 	if ( adt != 0 ) return false;
 
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-	statistics_.dealloc_req_cnt_++;
+	p_statistics_->dealloc_req_cnt_++;
 #endif
 
 	slot_header*     p_sh            = reinterpret_cast<slot_header*>( p_slot_addr );
@@ -989,7 +992,7 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 		p_sh->alloc_bt_info_.dump_to_log( log_type::ERR, id_count );
 #endif
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-		statistics_.dealloc_req_err_cnt_++;
+		p_statistics_->dealloc_req_err_cnt_++;
 #endif
 		return true;
 	}
@@ -1060,9 +1063,9 @@ bool chunk_header_multi_slot::exec_deletion( void )
 
 	free_slot_idx_mgr_.set_idx_size( 0 );
 
-	statistics_.valid_chunk_num_.fetch_sub( 1 );
-	statistics_.total_slot_cnt_.fetch_sub( slot_conf_.num_of_pieces_ );
-	statistics_.free_slot_cnt_.fetch_sub( slot_conf_.num_of_pieces_ );
+	p_statistics_->valid_chunk_num_.fetch_sub( 1 );
+	p_statistics_->total_slot_cnt_.fetch_sub( slot_conf_.num_of_pieces_ );
+	p_statistics_->free_slot_cnt_.fetch_sub( slot_conf_.num_of_pieces_ );
 
 	status_.store( chunk_control_status::EMPTY, std::memory_order_release );
 
@@ -1091,7 +1094,7 @@ chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
 {
 	chunk_statistics ans;
 
-	ans = statistics_.get_statistics();
+	ans = p_statistics_->get_statistics();
 
 	ans.alloc_conf_ = slot_conf_;
 
@@ -1697,7 +1700,7 @@ std::string chunk_statistics::print( void )
 {
 	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
-	          "chunk conf.size=%d, .num=%d, chunk_num: %d, valid chunk_num: %d, total_slot=%d, free_slot=%d, consum cnt=%d, max consum cnt=%d"
+	          "chunk conf{.size=%d, .num=%d}, chunk_num: %d, valid chunk_num: %d, total_slot=%d, free_slot=%d, consum cnt=%d, max consum cnt=%d"
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 	          ", alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_colli=%d, dealloc_colli=%d"
 #endif

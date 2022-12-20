@@ -44,8 +44,8 @@ enum class chunk_control_status : int {
  * @brief statistics information of alloc/dealloc
  *
  */
-struct chms_statistics {
-	chms_statistics( void )
+struct chunk_list_statistics {
+	chunk_list_statistics( void )
 	  : chunk_num_( 0 )
 	  , valid_chunk_num_( 0 )
 	  , total_slot_cnt_( 0 )
@@ -60,10 +60,10 @@ struct chms_statistics {
 	  , dealloc_collision_cnt_( 0 )
 	{
 	}
-	chms_statistics( const chms_statistics& )            = default;
-	chms_statistics( chms_statistics&& )                 = default;
-	chms_statistics& operator=( const chms_statistics& ) = default;
-	chms_statistics& operator=( chms_statistics&& )      = default;
+	chunk_list_statistics( const chunk_list_statistics& )            = default;
+	chunk_list_statistics( chunk_list_statistics&& )                 = default;
+	chunk_list_statistics& operator=( const chunk_list_statistics& ) = default;
+	chunk_list_statistics& operator=( chunk_list_statistics&& )      = default;
 
 	chunk_statistics get_statistics( void ) const;
 
@@ -382,8 +382,8 @@ public:
 	 * @brief	constructor
 	 */
 	chunk_header_multi_slot(
-		const param_chunk_allocation& ch_param_arg,               //!< [in] chunk allocation paramter
-		chms_statistics*              p_chms_stat_arg = nullptr   //!< [in] pointer to statistics inforation to store activity
+		const param_chunk_allocation& ch_param_arg,     //!< [in] chunk allocation paramter
+		chunk_list_statistics*        p_chms_stat_arg   //!< [in] pointer to statistics inforation to store activity
 	);
 
 	/*!
@@ -404,11 +404,11 @@ public:
 	{
 		void* p_ans = allocate_mem_slot_impl( std::move( caller_ctx_arg ) );
 		if ( p_ans != nullptr ) {
-			statistics_.free_slot_cnt_--;
-			auto cur     = statistics_.consum_cnt_.fetch_add( 1 ) + 1;
-			auto cur_max = statistics_.max_consum_cnt_.load( std::memory_order_acquire );
+			p_statistics_->free_slot_cnt_--;
+			auto cur     = p_statistics_->consum_cnt_.fetch_add( 1 ) + 1;
+			auto cur_max = p_statistics_->max_consum_cnt_.load( std::memory_order_acquire );
 			if ( cur > cur_max ) {
-				statistics_.max_consum_cnt_.compare_exchange_strong( cur_max, cur );
+				p_statistics_->max_consum_cnt_.compare_exchange_strong( cur_max, cur );
 			}
 		}
 		return p_ans;
@@ -427,8 +427,8 @@ public:
 	{
 		bool ans = recycle_mem_slot_impl( p_recycle_slot, std::move( caller_ctx_arg ) );
 		if ( ans ) {
-			statistics_.free_slot_cnt_++;
-			statistics_.consum_cnt_--;
+			p_statistics_->free_slot_cnt_++;
+			p_statistics_->consum_cnt_--;
 		}
 		return ans;
 	}
@@ -503,7 +503,7 @@ private:
 		caller_context&& caller_ctx_arg    //!< [in] caller context information
 	);
 
-	chms_statistics statistics_;   //!< statistics
+	chunk_list_statistics* p_statistics_;   //!< statistics
 
 	param_chunk_allocation slot_conf_;       //!< allocation configuration paramter. value is corrected internally.
 	std::size_t            size_of_chunk_;   //!< allocated memory size of this chunk
@@ -614,7 +614,7 @@ private:
 #endif
 	dynamic_tls<chunk_header_multi_slot*> tls_p_hint_chunk;   //!< thread loacal pointer to chunk_header that is success to allocate recently for a thread.
 
-	chms_statistics statistics_;   //!< statistics
+	chunk_list_statistics statistics_;   //!< statistics
 };
 
 }   // namespace internal

@@ -46,13 +46,15 @@ void write_task( char* p_write )
 // chunk_header_multi_slot単体のCPU負荷測定
 TEST( lfmemAlloc, OneChunkLoad )
 {
+	alpha::concurrent::internal::chunk_list_statistics test_st;
+
 	fflush( NULL );
 
 	void* alloc_addr[max_slot_size];
 
 	static alpha::concurrent::param_chunk_allocation param = { 256, 20 };
 
-	alpha::concurrent::internal::chunk_header_multi_slot chms( param );
+	alpha::concurrent::internal::chunk_header_multi_slot chms( param, &test_st );
 
 	//	pthread_barrier_wait( &barrier );
 
