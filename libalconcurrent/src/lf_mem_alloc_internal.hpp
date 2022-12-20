@@ -609,7 +609,7 @@ private:
 #else
 	dynamic_tls<chunk_header_multi_slot*, threadlocal_chunk_header_multi_slot_list_free> tls_p_top_chunk_;   //!< thread local pointer to chunk_header that is top of list.
 
-	std::mutex               mtx_p_top_taken_chunk_;   // mutex for p_top_taken_chunk_
+	mutable std::mutex       mtx_p_top_taken_chunk_;   //!< mutex for p_top_taken_chunk_
 	chunk_header_multi_slot* p_top_taken_chunk_;       //!< the head pointer of the chunk list that was taken
 #endif
 	dynamic_tls<chunk_header_multi_slot*> tls_p_hint_chunk;   //!< thread loacal pointer to chunk_header that is success to allocate recently for a thread.

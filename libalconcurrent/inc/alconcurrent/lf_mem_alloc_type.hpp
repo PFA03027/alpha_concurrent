@@ -32,19 +32,23 @@ struct param_chunk_allocation {
  * This is used for optimization for a paramters
  */
 struct chunk_statistics {
-	param_chunk_allocation alloc_conf_;              //!< chunk configuration
-	std::size_t            chunk_num_;               //!< number of current allocated chunks
-	std::size_t            valid_chunk_num_;         //!< number of valid chunks
-	std::size_t            total_slot_cnt_;          //!< total number of slots
-	std::size_t            free_slot_cnt_;           //!< total number of free slots
-	std::size_t            consum_cnt_;              //!< total number of used slots
-	std::size_t            max_consum_cnt_;          //!< maximum number of used slots
-	std::size_t            alloc_req_cnt_;           //!< number of allocation requests
-	std::size_t            error_alloc_req_cnt_;     //!< number of allocation failure
-	std::size_t            dealloc_req_cnt_;         //!< number of deallocation requests
-	std::size_t            error_dealloc_req_cnt_;   //!< number of deallocation failure
-	unsigned int           alloc_collision_cnt_;     //!< number of allocation collision
-	unsigned int           dealloc_collision_cnt_;   //!< number of deallocation collision
+	param_chunk_allocation alloc_conf_;        //!< chunk configuration
+	std::size_t            chunk_num_;         //!< number of current allocated chunks
+	std::size_t            valid_chunk_num_;   //!< number of valid chunks
+#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
+#else
+	std::size_t taken_chunk_num_;   //!< number of taken valid chunks
+#endif
+	std::size_t  total_slot_cnt_;          //!< total number of slots
+	std::size_t  free_slot_cnt_;           //!< total number of free slots
+	std::size_t  consum_cnt_;              //!< total number of used slots
+	std::size_t  max_consum_cnt_;          //!< maximum number of used slots
+	std::size_t  alloc_req_cnt_;           //!< number of allocation requests
+	std::size_t  error_alloc_req_cnt_;     //!< number of allocation failure
+	std::size_t  dealloc_req_cnt_;         //!< number of deallocation requests
+	std::size_t  error_dealloc_req_cnt_;   //!< number of deallocation failure
+	unsigned int alloc_collision_cnt_;     //!< number of allocation collision
+	unsigned int dealloc_collision_cnt_;   //!< number of deallocation collision
 
 	/*!
 	 * @brief	make std::string of statistics information

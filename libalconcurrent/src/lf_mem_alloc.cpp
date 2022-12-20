@@ -72,7 +72,7 @@ namespace internal {
 
 chunk_statistics chunk_list_statistics::get_statistics( void ) const
 {
-	chunk_statistics ans;
+	chunk_statistics ans { 0 };
 
 	ans.chunk_num_       = chunk_num_.load( std::memory_order_acquire );
 	ans.valid_chunk_num_ = valid_chunk_num_.load( std::memory_order_acquire );
@@ -1092,7 +1092,7 @@ slot_chk_result chunk_header_multi_slot::get_chunk(
 
 chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
 {
-	chunk_statistics ans;
+	chunk_statistics ans { 0 };
 
 	ans = p_statistics_->get_statistics();
 
@@ -1485,6 +1485,19 @@ chunk_statistics chunk_list::get_statistics( void ) const
 
 	ans.alloc_conf_ = param_chunk_allocation { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
 
+#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
+#else
+	{
+		std::lock_guard<std::mutex> lk( mtx_p_top_taken_chunk_ );
+		ans.taken_chunk_num_ = 0;
+		chunk_header_multi_slot* p_cur = p_top_taken_chunk_;
+		while ( p_cur != nullptr ) {
+			ans.taken_chunk_num_++;
+			p_cur = p_cur->p_next_chunk_.load( std::memory_order_acquire );
+		}
+	}
+#endif
+
 	return ans;
 }
 
@@ -1700,7 +1713,12 @@ std::string chunk_statistics::print( void )
 {
 	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
-	          "chunk conf{.size=%d, .num=%d}, chunk_num: %d, valid chunk_num: %d, total_slot=%d, free_slot=%d, consum cnt=%d, max consum cnt=%d"
+	          "chunk conf{.size=%d, .num=%d}, chunk_num: %d, valid chunk_num: %d"
+#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
+#else
+	          ", taken chunk_num=%d"
+#endif
+	          ", total_slot=%d, free_slot=%d, consum cnt=%d, max consum cnt=%d"
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 	          ", alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_colli=%d, dealloc_colli=%d"
 #endif
@@ -1709,6 +1727,10 @@ std::string chunk_statistics::print( void )
 	          (int)alloc_conf_.num_of_pieces_,
 	          (int)chunk_num_,
 	          (int)valid_chunk_num_,
+#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
+#else
+	          (int)taken_chunk_num_,
+#endif
 	          (int)total_slot_cnt_,
 	          (int)free_slot_cnt_,
 	          (int)consum_cnt_,
