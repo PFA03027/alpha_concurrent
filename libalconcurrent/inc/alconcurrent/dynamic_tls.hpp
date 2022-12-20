@@ -22,6 +22,7 @@
 #include <pthread.h>
 
 #include <atomic>
+#include <cassert>
 #include <cerrno>
 #include <cstdlib>
 #include <memory>
@@ -67,6 +68,39 @@ int get_num_of_tls_key( void );
  */
 int get_max_num_of_tls_key( void );
 
+/**
+ * @brief thread count information container for dynamic thread local variable class
+ *
+ */
+struct dynamic_tls_thread_cnt {
+	dynamic_tls_thread_cnt( void )
+	  : cur_thread_count_( 0 )
+	  , max_thread_count_( 0 )
+	{
+	}
+	dynamic_tls_thread_cnt( const dynamic_tls_thread_cnt& )            = default;
+	dynamic_tls_thread_cnt( dynamic_tls_thread_cnt&& )                 = default;
+	dynamic_tls_thread_cnt& operator=( const dynamic_tls_thread_cnt& ) = default;
+	dynamic_tls_thread_cnt& operator=( dynamic_tls_thread_cnt&& )      = default;
+
+	void count_up( void )
+	{
+		auto cur     = cur_thread_count_.fetch_add( 1 ) + 1;
+		auto cur_max = max_thread_count_.load( std::memory_order_acquire );
+		if ( cur > cur_max ) {
+			max_thread_count_.compare_exchange_strong( cur_max, cur );
+		}
+	}
+
+	void count_down( void )
+	{
+		cur_thread_count_.fetch_sub( 1 );
+	}
+
+	std::atomic_int cur_thread_count_;   //!< current thread count
+	std::atomic_int max_thread_count_;   //!< max thread count
+};
+
 /*!
  * @brief	動的スレッドローカルストレージで使用する内部処理用クラス
  *
@@ -86,13 +120,15 @@ public:
 		USING
 	};
 
-	tls_data_container( TL_PRE_DESTRUCTOR& df )
+	tls_data_container( dynamic_tls_thread_cnt* p_th_cnt_arg, TL_PRE_DESTRUCTOR& df )
 	  : p_value( nullptr )
+	  , p_th_cnt_( p_th_cnt_arg )
 	  , status_( ocupied_status::USING )
 	  , next_( nullptr )
 	  , pre_exec_( df )
 	{
 		internal::LogOutput( log_type::DEBUG, "tls_data_container::constructor is called - %p", this );
+		assert( p_th_cnt_ != nullptr );
 	}
 
 	~tls_data_container()
@@ -141,7 +177,9 @@ public:
 			return false;
 		}
 
-		return status_.compare_exchange_strong( cur, ocupied_status::USING );
+		bool ans = status_.compare_exchange_strong( cur, ocupied_status::USING );
+
+		return ans;
 	}
 
 	ocupied_status get_status( void )
@@ -166,6 +204,8 @@ public:
 	}
 
 	value_pointer_type p_value;
+
+	dynamic_tls_thread_cnt* const p_th_cnt_;
 
 private:
 	std::atomic<ocupied_status>      status_;
@@ -364,6 +404,19 @@ public:
 		} );
 	}
 
+	/**
+	 * @brief get thread count information
+	 *
+	 * @return 1st: current thread count
+	 * @return 2nd: max thread count
+	 */
+	std::pair<int, int> get_thread_count_info( void ) const
+	{
+		return std::pair<int, int>(
+			th_cnt_.cur_thread_count_.load( std::memory_order_acquire ),
+			th_cnt_.max_thread_count_.load( std::memory_order_acquire ) );
+	}
+
 private:
 	using tls_cont         = internal::tls_data_container<T, TL_PRE_DESTRUCTOR>;
 	using tls_cont_pointer = tls_cont*;
@@ -383,7 +436,7 @@ private:
 		}
 
 		void* p_tmp = std::malloc( sizeof( tls_cont ) );
-		p_ans       = new ( p_tmp ) tls_cont( pre_exec_of_cleanup_ );
+		p_ans       = new ( p_tmp ) tls_cont( &th_cnt_, pre_exec_of_cleanup_ );
 
 		// リストの先頭に追加
 		tls_cont_pointer p_cur_head = head_.load( std::memory_order_acquire );
@@ -406,10 +459,18 @@ private:
 				p_tls->p_value = pred();
 			}
 
+			// 新しいスレッド用のスレッドローカルストレージの割り当てが行われたため、スレッド数のカウントをアップする。
+			th_cnt_.count_up();
+
 			int status;
 			status = pthread_setspecific( tls_key, (void*)p_tls );
 			if ( status < 0 ) {
-				internal::LogOutput( log_type::ERR, "pthread_setspecific failed, errno %d", errno );
+				internal::LogOutput(
+					log_type::ERR,
+					"pthread_setspecific failed, errno %d, cur_thread_count_=%d, max_thread_count_=%d",
+					errno,
+					th_cnt_.cur_thread_count_.load( std::memory_order_acquire ),
+					th_cnt_.max_thread_count_.load( std::memory_order_acquire ) );
 				pthread_exit( (void*)1 );
 			}
 		}
@@ -427,6 +488,8 @@ private:
 
 		p_target_node->release_owner();
 
+		p_target_node->p_th_cnt_->count_down();
+
 		return;
 	}
 
@@ -434,6 +497,8 @@ private:
 
 	TL_PRE_DESTRUCTOR             pre_exec_of_cleanup_;   //!< functor to clean-up the resources when thread is terminated.
 	std::atomic<tls_cont_pointer> head_;                  //!< head of thread local data container list
+
+	internal::dynamic_tls_thread_cnt th_cnt_;   //!< thread count information
 };
 
 // this class is possible to set a value to inialize, but requires that T needs to have a default constructor and copy constructor.

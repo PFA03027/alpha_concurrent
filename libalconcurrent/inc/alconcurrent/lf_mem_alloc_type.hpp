@@ -38,6 +38,8 @@ struct chunk_statistics {
 #ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 #else
 	std::size_t taken_chunk_num_;   //!< number of taken valid chunks
+	std::size_t cur_thread_num_;    //!< current number of thread
+	std::size_t max_thread_num_;    //!< max number of thread
 #endif
 	std::size_t  total_slot_cnt_;          //!< total number of slots
 	std::size_t  free_slot_cnt_;           //!< total number of free slots

@@ -1496,6 +1496,9 @@ chunk_statistics chunk_list::get_statistics( void ) const
 			p_cur = p_cur->p_next_chunk_.load( std::memory_order_acquire );
 		}
 	}
+	auto th_nums = tls_p_top_chunk_.get_thread_count_info();
+	ans.cur_thread_num_ = std::get<0>( th_nums );
+	ans.max_thread_num_ = std::get<1>( th_nums );
 #endif
 
 	return ans;
@@ -1716,7 +1719,7 @@ std::string chunk_statistics::print( void )
 	          "chunk conf{.size=%d, .num=%d}, chunk_num: %d, valid chunk_num: %d"
 #ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 #else
-	          ", taken chunk_num=%d"
+	          ", taken chunk_num=%d, cur thread num=%d, max thread num=%d"
 #endif
 	          ", total_slot=%d, free_slot=%d, consum cnt=%d, max consum cnt=%d"
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
@@ -1730,6 +1733,8 @@ std::string chunk_statistics::print( void )
 #ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 #else
 	          (int)taken_chunk_num_,
+	          (int)cur_thread_num_,
+	          (int)max_thread_num_,
 #endif
 	          (int)total_slot_cnt_,
 	          (int)free_slot_cnt_,
