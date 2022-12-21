@@ -11,7 +11,7 @@
             "program": "${workspaceFolder}/build/test/test_mem_alloc/test_mem_alloc",
             "args": [
                 "--gtest_catch_exceptions=0",
-                "--gtest_repeat=100",
+                // "--gtest_repeat=100",
                 "--gtest_filter=lfmemAlloc_prune.TestAllocFreeBwMultThread1"
             ],
             "stopAtEntry": false,

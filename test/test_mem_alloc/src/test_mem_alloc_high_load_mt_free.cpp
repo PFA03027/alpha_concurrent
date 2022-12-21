@@ -53,6 +53,7 @@ using test_fifo_type = alpha::concurrent::fifo_list<void*, true, false>;
 struct test_params {
 	test_fifo_type*                           p_test_obj;
 	alpha::concurrent::general_mem_allocator* p_tmg;
+	int                                       num_loop;
 };
 
 /**
@@ -76,7 +77,7 @@ void* func_test_fifo( void* p_data )
 
 	pthread_barrier_wait( &barrier );
 
-	for ( int i = 0; i < num_loop; i++ ) {
+	for ( int i = 0; i < p_test_param->num_loop; i++ ) {
 		int cur_alloc_num = num_dist( engine );
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
 			void* p_tmp_alloc_to_push = p_tmg->allocate( size_dist( engine ) );
@@ -113,6 +114,7 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 	test_params tda;
 	tda.p_test_obj = &fifo;
 	tda.p_tmg      = p_tmg_arg;
+	tda.num_loop   = num_loop;
 
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
@@ -149,6 +151,51 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 	delete[] threads;
 }
 
+void load_test_lockfree_bw_mult_thread_startstop( int num_of_thd, alpha::concurrent::general_mem_allocator* p_tmg_arg )
+{
+	int            start_stop_reqeat = 100;
+	test_fifo_type fifo;
+
+	test_params tda;
+	tda.p_test_obj = &fifo;
+	tda.p_tmg      = p_tmg_arg;
+	tda.num_loop   = num_loop / start_stop_reqeat;
+
+	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
+
+	for ( int j = 0; j < start_stop_reqeat; j++ ) {
+		pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+		pthread_t* threads = new pthread_t[num_of_thd];
+
+		for ( int i = 0; i < num_of_thd; i++ ) {
+			pthread_create( &threads[i], NULL, func_test_fifo, &tda );
+		}
+		pthread_barrier_wait( &barrier );
+
+		for ( int i = 0; i < num_of_thd; i++ ) {
+			pthread_join( threads[i], nullptr );
+		}
+		delete[] threads;
+	}
+
+	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
+
+	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
+	std::cout << "thread is " << num_of_thd
+			  << " func_test_fifo() Exec time: " << diff.count() << " msec" << std::endl;
+
+	EXPECT_FALSE( err_flag.load() );
+
+	std::list<alpha::concurrent::chunk_statistics> statistics = p_tmg_arg->get_statistics();
+
+	printf( "Statistics is;\n" );
+	for ( auto& e : statistics ) {
+		printf( "%s\n", e.print().c_str() );
+	}
+
+	return;
+}
+
 void prune_thread( std::atomic_bool* p_loop, alpha::concurrent::general_mem_allocator* p_gma_for_prune )
 {
 	while ( p_loop->load( std::memory_order_acquire ) ) {
@@ -165,7 +212,7 @@ TEST( lfmemAlloc_prune, TestAllocFreeBwMultThread1 )
 	std::thread prune_th( prune_thread, &prune_loop, &test1_gma );
 
 	err_flag.store( false );
-	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread( num_thread, &test1_gma ) );
+	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread_startstop( num_thread, &test1_gma ) );
 
 	prune_loop.store( false, std::memory_order_release );
 	prune_th.join();
