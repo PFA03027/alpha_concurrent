@@ -10,7 +10,7 @@ echo $@
 BUILDTARGET=common
 
 # Debug or Release or ...
-#BUILDTYPE=Debug
+# BUILDTYPE=Debug
 BUILDTYPE=Release
 
 JOBS=$[$(grep cpu.cores /proc/cpuinfo | sort -u | sed 's/[^0-9]//g') + 1]

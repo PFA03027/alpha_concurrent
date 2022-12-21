@@ -1,0 +1,47 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "make clean",
+            "type": "shell",
+            "command": "bash make_linux.sh clean",
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "make all",
+            "type": "shell",
+            "command": "bash make_linux.sh",
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "make all and build test",
+            "type": "shell",
+            "command": "bash make_linux.sh build-test",
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "make all and exec test",
+            "type": "shell",
+            "command": "bash make_linux.sh test",
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "full test with sanitizer",
+            "type": "shell",
+            "command": "bash make_linux_full_sanitizer.sh",
+            "problemMatcher": [
+                "$gcc"
+            ]
+        }
+    ]
+}

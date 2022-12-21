@@ -437,10 +437,15 @@ void waiting_idx_list::chk_reset_and_set_size( const int idx_buff_size_arg, cons
 	if ( ver_ == ver_arg ) return;
 
 	delete[] p_idx_buff_;
+	p_idx_buff_    = nullptr;
 	idx_buff_size_ = idx_buff_size_arg;
-	p_idx_buff_    = new int[idx_buff_size_];
 	idx_top_idx_   = 0;
 	ver_           = ver_arg;
+
+	if ( idx_buff_size_ > 0 ) {
+		p_idx_buff_ = new int[idx_buff_size_];
+	}
+
 	return;
 }
 

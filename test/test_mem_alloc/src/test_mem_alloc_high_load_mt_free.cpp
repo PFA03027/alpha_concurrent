@@ -29,6 +29,16 @@ static alpha::concurrent::param_chunk_allocation param[] = {
 	{ 1024, 2800 },
 };
 
+static alpha::concurrent::param_chunk_allocation param2[] = {
+	{ 16, 2 },
+	{ 32, 2 },
+	{ 64, 2 },
+	{ 128, 2 },
+	{ 256, 2 },
+	{ 512, 2 },
+	{ 1024, 2 },
+};
+
 std::atomic<bool> err_flag( false );
 
 static pthread_barrier_t barrier;
@@ -36,7 +46,7 @@ static pthread_barrier_t barrier;
 constexpr int max_slot_size  = 1000;
 constexpr int max_alloc_size = 900;
 constexpr int num_loop       = 1200;
-constexpr int num_thread     = 5;
+constexpr int num_thread     = 10;
 
 using test_fifo_type = alpha::concurrent::fifo_list<void*, true, false>;
 
@@ -72,6 +82,9 @@ void* func_test_fifo( void* p_data )
 			void* p_tmp_alloc_to_push = p_tmg->allocate( size_dist( engine ) );
 
 			p_test_obj->push( p_tmp_alloc_to_push );
+
+			// std::this_thread::sleep_for( std::chrono::milliseconds( num_sleep( engine ) ) );
+
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [pop_flag, p_tmp_alloc] = p_test_obj->pop();
 #else
@@ -128,11 +141,44 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 
 	std::list<alpha::concurrent::chunk_statistics> statistics = p_tmg_arg->get_statistics();
 
+	printf( "Statistics is;\n" );
 	for ( auto& e : statistics ) {
 		printf( "%s\n", e.print().c_str() );
 	}
 
 	delete[] threads;
+}
+
+void prune_thread( std::atomic_bool* p_loop, alpha::concurrent::general_mem_allocator* p_gma_for_prune )
+{
+	while ( p_loop->load( std::memory_order_acquire ) ) {
+		std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
+		p_gma_for_prune->prune();
+	}
+}
+
+TEST( lfmemAlloc_prune, TestAllocFreeBwMultThread1 )
+{
+	alpha::concurrent::general_mem_allocator test1_gma( param2, 7 );
+	std::atomic_bool                         prune_loop( true );
+
+	std::thread prune_th( prune_thread, &prune_loop, &test1_gma );
+
+	err_flag.store( false );
+	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread( num_thread, &test1_gma ) );
+
+	prune_loop.store( false, std::memory_order_release );
+	prune_th.join();
+
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
 }
 
 TEST( lfmemAlloc, TestAllocFreeBwMultThread1 )
