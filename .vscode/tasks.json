@@ -9,7 +9,10 @@
             "command": "bash make_linux.sh clean",
             "problemMatcher": [
                 "$gcc"
-            ]
+            ],
+            "group": {
+                "kind": "build",
+            }
         },
         {
             "label": "make all",
@@ -17,7 +20,10 @@
             "command": "bash make_linux.sh",
             "problemMatcher": [
                 "$gcc"
-            ]
+            ],
+            "group": {
+                "kind": "build",
+            }
         },
         {
             "label": "make all and build test",
@@ -25,7 +31,11 @@
             "command": "bash make_linux.sh build-test",
             "problemMatcher": [
                 "$gcc"
-            ]
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         },
         {
             "label": "make all and exec test",
@@ -33,7 +43,10 @@
             "command": "bash make_linux.sh test",
             "problemMatcher": [
                 "$gcc"
-            ]
+            ],
+            "group": {
+                "kind": "build",
+            }
         },
         {
             "label": "full test with sanitizer",
