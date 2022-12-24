@@ -166,15 +166,6 @@ After Build step, please execute below commands
 # Configuration MACRO
 Please refer libalconcurrent/CMakeLists.txt
 
-### ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
-general_mem_allocator uses the thread local chunk list.
-Thread local chunk list expects better performace, because each thread has own memory chunk list and it reduces the collision chances of lock-free algorithm.
-
-If compile with ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST, general_mem_allocator uses the shared chunk list.
-Although the collision chance is higher, this expects to minimize the allocation slots.
-
-If you would like to know the number of collisions, please consider to use the macro ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT.
-
 ### ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 If comiple with ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC, lock free algorithms uses malloc/free instead of general_mem_allocator.
 

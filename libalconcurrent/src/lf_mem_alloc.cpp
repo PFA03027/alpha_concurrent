@@ -1173,25 +1173,13 @@ chunk_list::chunk_list(
 	)
   : size_of_one_piece_( ch_param_arg.size_of_one_piece_ )
   , num_of_pieces_( ch_param_arg.num_of_pieces_ )
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
   , p_top_chunk_( nullptr )
-#else
-  , tls_p_top_chunk_()
-  , mtx_p_top_taken_chunk_()
-  , p_top_taken_chunk_( nullptr )
-#endif
   , tls_p_hint_chunk()
   , statistics_()
 {
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( ch_param_arg, &statistics_ );
 
 	p_top_chunk_.store( p_new_chms, std::memory_order_release );
-#else
-	chunk_header_multi_slot* p_new_chms = tls_p_top_chunk_.get_tls_instance_pred( [this, &ch_param_arg]( chunk_header_multi_slot*& p_chms ) {
-		p_chms = new chunk_header_multi_slot( ch_param_arg, &statistics_ );
-	} );
-#endif
 	tls_p_hint_chunk.get_tls_instance( p_new_chms ) = p_new_chms;
 
 	return;
@@ -1199,21 +1187,12 @@ chunk_list::chunk_list(
 
 chunk_list::~chunk_list()
 {
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 	chunk_header_multi_slot* p_chms = p_top_chunk_.load();
 	while ( p_chms != nullptr ) {
 		chunk_header_multi_slot* p_next_chms = p_chms->p_next_chunk_.load();
 		delete p_chms;
 		p_chms = p_next_chms;
 	}
-#else
-	chunk_header_multi_slot* p_cur_chms = p_top_taken_chunk_;
-	while ( p_cur_chms != nullptr ) {
-		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
-		delete p_cur_chms;
-		p_cur_chms = p_next_chms;
-	}
-#endif
 
 	return;
 }
@@ -1225,18 +1204,7 @@ void* chunk_list::allocate_mem_slot(
 	void* p_ans = nullptr;
 
 	// hintに登録されたchunkから空きスロット検索を開始する。
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 	chunk_header_multi_slot* p_start_chms = tls_p_hint_chunk.get_tls_instance( p_top_chunk_.load( std::memory_order_acquire ) );
-#else
-	chunk_header_multi_slot* p_start_chms;
-	{
-		param_chunk_allocation cur_alloc_conf { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
-		chunk_header_multi_slot* p_tmp_head = tls_p_top_chunk_.get_tls_instance_pred( [this, &cur_alloc_conf]( chunk_header_multi_slot*& p_chms ) {
-			p_chms = new chunk_header_multi_slot( cur_alloc_conf, &statistics_ );
-		} );
-		p_start_chms = tls_p_hint_chunk.get_tls_instance( p_tmp_head );
-	}
-#endif
 
 	chunk_header_multi_slot* p_cur_chms         = p_start_chms;
 	chunk_header_multi_slot* p_1st_rsv_del_chms = nullptr;
@@ -1265,11 +1233,7 @@ void* chunk_list::allocate_mem_slot(
 		// 検索を開始したchunkに到着したら、空きスロットが見つからなかったことを示すので、検索を終了する。
 		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
 		if ( p_next_chms == nullptr ) {
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 			p_next_chms = p_top_chunk_.load( std::memory_order_acquire );
-#else
-			p_next_chms = tls_p_top_chunk_.get_tls_instance( nullptr );
-#endif
 		}
 		if ( p_next_chms == p_start_chms ) {
 			p_cur_chms = nullptr;
@@ -1324,11 +1288,7 @@ void* chunk_list::allocate_mem_slot(
 				num_of_pieces_.compare_exchange_strong( cur_slot_num, new_slot_num );
 
 				// 2倍化chunkが登録されたので、それまでのchunkは削除候補に変更にする。
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 				p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
-#else
-				p_cur_chms = tls_p_top_chunk_.get_tls_instance( nullptr );
-#endif
 				while ( p_cur_chms != nullptr ) {
 					if ( p_cur_chms != p_1st_empty_chms ) {
 						p_cur_chms->set_delete_reservation();
@@ -1355,35 +1315,6 @@ void* chunk_list::allocate_mem_slot(
 	chunk_header_multi_slot* p_new_chms = nullptr;
 	p_ans                               = nullptr;
 	bool does_reused                    = false;
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
-#else
-	{
-		std::unique_lock<std::mutex> ul( mtx_p_top_taken_chunk_, std::try_to_lock );
-		if ( ul.owns_lock() ) {
-			chunk_header_multi_slot* p_pre_chms = nullptr;
-			chunk_header_multi_slot* p_cur_chms = nullptr;
-			p_cur_chms = p_top_taken_chunk_;
-			while ( p_cur_chms != nullptr ) {
-				chunk_header_multi_slot* p_nxt_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
-				caller_context cur_caller_ctx = caller_ctx_arg;
-				p_ans = p_cur_chms->allocate_mem_slot( std::move( cur_caller_ctx ) );
-				if ( p_ans != nullptr ) {
-					if ( p_pre_chms == nullptr ) {
-						p_top_taken_chunk_ = p_nxt_chms;
-					} else {
-						p_pre_chms->p_next_chunk_.store( p_nxt_chms, std::memory_order_release );
-					}
-					p_cur_chms->p_next_chunk_.store( nullptr, std::memory_order_release );
-					p_new_chms = p_cur_chms;
-					does_reused = true;
-					break;
-				}
-				p_pre_chms = p_cur_chms;
-				p_cur_chms = p_nxt_chms;
-			}
-		}
-	}
-#endif
 	if ( p_ans == nullptr ) {
 		// 既存のchunkの再利用に失敗したので、新しいchunkを確保する。
 		// new演算子を使用するため、ここでロックが発生する可能性がある。
@@ -1396,16 +1327,10 @@ void* chunk_list::allocate_mem_slot(
 	}
 
 	// 新たに確保したchunkを、chunkリストの先頭に追加する。
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 	chunk_header_multi_slot* p_cur_top = p_top_chunk_.load( std::memory_order_acquire );
 	do {
 		p_new_chms->p_next_chunk_.store( p_cur_top, std::memory_order_release );
 	} while ( !p_top_chunk_.compare_exchange_weak( p_cur_top, p_new_chms ) );
-#else
-	chunk_header_multi_slot* p_cur_top = tls_p_top_chunk_.get_tls_instance( nullptr );
-	p_new_chms->p_next_chunk_.store( p_cur_top, std::memory_order_release );
-	tls_p_top_chunk_.get_tls_instance( p_new_chms ) = p_new_chms;
-#endif
 
 	tls_p_hint_chunk.get_tls_instance( p_new_chms ) = p_new_chms;
 
@@ -1414,11 +1339,7 @@ void* chunk_list::allocate_mem_slot(
 		num_of_pieces_.compare_exchange_strong( cur_slot_num, new_slot_num );
 
 		// 2倍化chunkが登録されたので、それまでのchunkは削除候補に変更にする。
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 		p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
-#else
-		p_cur_chms = tls_p_top_chunk_.get_tls_instance( nullptr );
-#endif
 		while ( p_cur_chms != nullptr ) {
 			if ( p_cur_chms != p_new_chms ) {
 				p_cur_chms->set_delete_reservation();
@@ -1436,18 +1357,7 @@ bool chunk_list::recycle_mem_slot(
 	caller_context&& caller_ctx_arg    //!< [in] caller context information
 )
 {
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 	chunk_header_multi_slot* p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
-#else
-	// pthreadはスレッドローカルメモリのトラバースが出来ないため、chunkのスロットのヘッダ破壊時の別スレッドのchunkリストのメモリ開放は諦める。
-	chunk_header_multi_slot* p_cur_chms;
-	{
-		param_chunk_allocation cur_alloc_conf { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
-		p_cur_chms = tls_p_top_chunk_.get_tls_instance_pred( [this, &cur_alloc_conf]( chunk_header_multi_slot*& p_chms ) {
-			p_chms = new chunk_header_multi_slot( cur_alloc_conf, &statistics_ );
-		} );
-	}
-#endif
 	while ( p_cur_chms != nullptr ) {
 		bool ret = p_cur_chms->recycle_mem_slot( p_recycle_slot, std::move( caller_ctx_arg ) );
 		if ( ret ) return true;
@@ -1461,16 +1371,7 @@ bool chunk_list::recycle_mem_slot(
 void chunk_list::prune( void )
 {
 	chunk_header_multi_slot* p_cur_chms;
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
 	p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
-#else
-	{
-		param_chunk_allocation cur_alloc_conf { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
-		p_cur_chms = tls_p_top_chunk_.get_tls_instance_pred( [this, &cur_alloc_conf]( chunk_header_multi_slot*& p_chms ) {
-			p_chms = new chunk_header_multi_slot( cur_alloc_conf, &statistics_ );
-		} );
-	}
-#endif
 
 	while ( p_cur_chms != nullptr ) {
 		p_cur_chms->exec_deletion();
@@ -1490,72 +1391,8 @@ chunk_statistics chunk_list::get_statistics( void ) const
 
 	ans.alloc_conf_ = param_chunk_allocation { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
 
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
-#else
-	{
-		std::lock_guard<std::mutex> lk( mtx_p_top_taken_chunk_ );
-		ans.taken_chunk_num_ = 0;
-		chunk_header_multi_slot* p_cur = p_top_taken_chunk_;
-		while ( p_cur != nullptr ) {
-			ans.taken_chunk_num_++;
-			p_cur = p_cur->p_next_chunk_.load( std::memory_order_acquire );
-		}
-	}
-	auto th_nums = tls_p_top_chunk_.get_thread_count_info();
-	ans.cur_thread_num_ = std::get<0>( th_nums );
-	ans.max_thread_num_ = std::get<1>( th_nums );
-#endif
-
 	return ans;
 }
-
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
-#else
-bool chunk_list::threadlocal_chunk_header_multi_slot_list_free::release(
-	chunk_header_multi_slot*& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照。破棄されるスレッドに属するチャンクリストの先頭ポインタ。
-)
-{
-	// 回収するものがない場合は、そのまま終了。
-	if ( data == nullptr ) return true;
-
-	// 回収先が指定されていないのは、不具合。使用中のバッファ開放を避けるため、そのまま放置するようにする。
-	if ( p_mtx_ == nullptr ) return false;
-	if ( pp_top_taken_chunk_ == nullptr ) return false;
-
-	std::lock_guard<std::mutex> lk( *p_mtx_ );
-	// 共通の引き取り用chunkリストへリストを移す。
-
-	chunk_header_multi_slot* p_cur_chms = data;
-	while ( p_cur_chms != nullptr ) {
-		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
-		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::EMPTY ) {
-			delete p_cur_chms;
-		} else {
-			p_cur_chms->p_next_chunk_.store( *pp_top_taken_chunk_, std::memory_order_release );
-			*pp_top_taken_chunk_ = p_cur_chms;
-		}
-		p_cur_chms = p_next_chms;
-	}
-
-	return true;
-}
-
-void chunk_list::threadlocal_chunk_header_multi_slot_list_free::destruct(
-	chunk_header_multi_slot*& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
-)
-{
-	// インスタンスが削除されるため、リンクリストを削除する。
-	chunk_header_multi_slot* p_chms = data;
-	while ( p_chms != nullptr ) {
-		chunk_header_multi_slot* p_next_chms = p_chms->p_next_chunk_.load();
-		delete p_chms;
-		p_chms = p_next_chms;
-	}
-	data = nullptr;
-	return;
-}
-
-#endif
 
 }   // namespace internal
 
@@ -1722,10 +1559,6 @@ std::string chunk_statistics::print( void )
 	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
 	          "chunk conf{.size=%d, .num=%d}, chunk_num: %d, valid chunk_num: %d"
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
-#else
-	          ", taken chunk_num=%d, cur thread num=%d, max thread num=%d"
-#endif
 	          ", total_slot=%d, free_slot=%d, consum cnt=%d, max consum cnt=%d"
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 	          ", alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_colli=%d, dealloc_colli=%d"
@@ -1735,12 +1568,6 @@ std::string chunk_statistics::print( void )
 	          (int)alloc_conf_.num_of_pieces_,
 	          (int)chunk_num_,
 	          (int)valid_chunk_num_,
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
-#else
-	          (int)taken_chunk_num_,
-	          (int)cur_thread_num_,
-	          (int)max_thread_num_,
-#endif
 	          (int)total_slot_cnt_,
 	          (int)free_slot_cnt_,
 	          (int)consum_cnt_,

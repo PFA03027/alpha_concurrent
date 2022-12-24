@@ -22,8 +22,6 @@
 
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
-// #define ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
-
 namespace alpha {
 namespace concurrent {
 
@@ -586,32 +584,10 @@ public:
 	chunk_statistics get_statistics( void ) const;
 
 private:
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
-#else
-	struct threadlocal_chunk_header_multi_slot_list_free {
-		bool release(
-			chunk_header_multi_slot*& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照。破棄されるスレッドに属するチャンクリストの先頭ポインタ。
-		);
-		void destruct(
-			chunk_header_multi_slot*& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
-		);
-
-		std::mutex*               p_mtx_;                // pointer to mutex
-		chunk_header_multi_slot** pp_top_taken_chunk_;   // pointer to shared chunk list for thread discard
-	};
-#endif
-
 	unsigned int              size_of_one_piece_;   //!< size of one piece in a chunk
 	std::atomic<unsigned int> num_of_pieces_;       //!< number of pieces in a chunk
 
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
-	std::atomic<chunk_header_multi_slot*> p_top_chunk_;   //!< pointer to chunk_header that is top of list.
-#else
-	dynamic_tls<chunk_header_multi_slot*, threadlocal_chunk_header_multi_slot_list_free> tls_p_top_chunk_;   //!< thread local pointer to chunk_header that is top of list.
-
-	mutable std::mutex       mtx_p_top_taken_chunk_;   //!< mutex for p_top_taken_chunk_
-	chunk_header_multi_slot* p_top_taken_chunk_;       //!< the head pointer of the chunk list that was taken
-#endif
+	std::atomic<chunk_header_multi_slot*> p_top_chunk_;       //!< pointer to chunk_header that is top of list.
 	dynamic_tls<chunk_header_multi_slot*> tls_p_hint_chunk;   //!< thread loacal pointer to chunk_header that is success to allocate recently for a thread.
 
 	chunk_list_statistics statistics_;   //!< statistics
