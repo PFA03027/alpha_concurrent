@@ -97,7 +97,7 @@ struct bt_info {
 	bt_info& operator=( const bt_info& ) = default;
 	bt_info& operator=( bt_info&& )      = default;
 
-	void dump_to_log( log_type lt, int id );
+	void dump_to_log( log_type lt, char c, int id );
 };
 
 }   // namespace concurrent

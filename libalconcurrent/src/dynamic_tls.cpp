@@ -8,11 +8,13 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
+#include <limits.h>
 #include <pthread.h>
 #include <string.h>
 
 #include <atomic>
 #include <cerrno>
+#include <cstdlib>
 
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/dynamic_tls.hpp"
@@ -38,13 +40,13 @@ void error_log_output( int errno_arg, const char* p_func_name )
 	if ( tr_ret == 0 ) {
 		internal::LogOutput(
 			log_type::ERR,
-			"%s failed, num of tls key: %d, errno=%d, %s",
-			p_func_name, cur_count_of_tls_keys.load(), errno_arg, buff );
+			"%s failed, num of used tls key: %d, max num of used tls key: %d, errno=%d, %s",
+			p_func_name, get_num_of_tls_key(), get_max_num_of_tls_key(), errno_arg, buff );
 	} else {
 		internal::LogOutput(
 			log_type::ERR,
-			"%s failed, num of tls key: %d, errno=%d, and strerror_r() also fail %d",
-			p_func_name, cur_count_of_tls_keys.load(), errno_arg, tr_ret );
+			"%s failed, num of used tls key: %d, max num of used tls key: %d, errno=%d, and strerror_r() also fail %d",
+			p_func_name, get_num_of_tls_key(), get_max_num_of_tls_key(), errno_arg, tr_ret );
 	}
 #else
 #if ( _POSIX_C_SOURCE >= 200112L ) && !_GNU_SOURCE
@@ -54,13 +56,13 @@ void error_log_output( int errno_arg, const char* p_func_name )
 	if ( tr_ret == 0 ) {
 		internal::LogOutput(
 			log_type::ERR,
-			"%s failed, num of tls key: %d, errno=%d, %s",
-			p_func_name, cur_count_of_tls_keys.load(), errno_arg, buff );
+			"%s failed, num of used tls key: %d, max num of used tls key: %d, errno=%d, %s",
+			p_func_name, get_num_of_tls_key(), get_max_num_of_tls_key(), errno_arg, buff );
 	} else {
 		internal::LogOutput(
 			log_type::ERR,
-			"%s failed, num of tls key: %d, errno=%d, and strerror_r() also fail %d",
-			p_func_name, cur_count_of_tls_keys.load(), errno_arg, tr_ret );
+			"%s failed, num of used tls key: %d, max num of used tls key: %d, errno=%d, and strerror_r() also fail %d",
+			p_func_name, get_num_of_tls_key(), get_max_num_of_tls_key(), errno_arg, tr_ret );
 	}
 #else
 	char* errstr                 = strerror_r( errno_arg, buff, STRERROR_BUFF_SIZE - 1 );
@@ -68,8 +70,8 @@ void error_log_output( int errno_arg, const char* p_func_name )
 
 	internal::LogOutput(
 		log_type::ERR,
-		"%s failed, num of tls key: %d, errno=%d, %s",
-		p_func_name, cur_count_of_tls_keys.load(), errno_arg, errstr );
+		"%s failed, num of used tls key: %d, max num of used tls key: %d, errno=%d, %s",
+		p_func_name, get_num_of_tls_key(), get_max_num_of_tls_key(), errno_arg, errstr );
 #endif
 #endif
 
@@ -85,9 +87,10 @@ void error_log_output( int errno_arg, const char* p_func_name )
 void dynamic_tls_pthread_key_create( pthread_key_t* p_key, void ( *destructor )( void* ) )
 {
 	int status = pthread_key_create( p_key, destructor );
-	if ( status < 0 ) {
-		error_log_output( errno, "pthread_key_create()" );
-		exit( 1 );   // because of the critical error, let's exit. TODO: should throw std::runtime_error ?
+	if ( status != 0 ) {
+		error_log_output( status, "pthread_key_create()" );
+		internal::LogOutput( log_type::ERR, "PTHREAD_KEYS_MAX: %d", PTHREAD_KEYS_MAX );
+		std::abort();   // because of the critical error, let's exit. TODO: should throw std::runtime_error ?
 	}
 
 	cur_count_of_tls_keys++;
@@ -107,9 +110,9 @@ void dynamic_tls_pthread_key_create( pthread_key_t* p_key, void ( *destructor )(
 void dynamic_tls_pthread_key_delete( pthread_key_t key )
 {
 	int status = pthread_key_delete( key );
-	if ( status < 0 ) {
-		error_log_output( errno, "pthread_key_delete()" );
-		exit( 1 );   // because of the critical error, let's exit. TODO: should throw std::runtime_error ?
+	if ( status != 0 ) {
+		error_log_output( status, "pthread_key_delete()" );
+		std::abort();   // because of the critical error, let's exit. TODO: should throw std::runtime_error ?
 	}
 
 	cur_count_of_tls_keys--;

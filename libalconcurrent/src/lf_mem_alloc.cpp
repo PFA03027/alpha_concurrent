@@ -48,19 +48,19 @@ bool test_platform_std_atomic_lockfree_condition( void )
 		BT_INFO_N.count_ = -( BT_INFO_N.count_ );          \
 	} while ( 0 )
 
-void bt_info::dump_to_log( log_type lt, int id )
+void bt_info::dump_to_log( log_type lt, char c, int id )
 {
 	if ( count_ == 0 ) {
-		internal::LogOutput( lt, "[%d] no back trace. this slot has not allocated yet.", id );
+		internal::LogOutput( lt, "[%d-%c] no back trace. this slot has not allocated yet.", id, c );
 		return;
 	}
 
-	internal::LogOutput( lt, "[%d] backtrace count value = %d", id, count_ );
+	internal::LogOutput( lt, "[%d-%c] backtrace count value = %d", id, c, count_ );
 
 	int    actual_count = ( count_ < 0 ) ? -count_ : count_;
 	char** bt_strings   = backtrace_symbols( bt_, actual_count );
 	for ( int i = 0; i < actual_count; i++ ) {
-		internal::LogOutput( lt, "[%d] [%d] %s", id, i, bt_strings[i] );
+		internal::LogOutput( lt, "[%d-%c] [%d] %s", id, c, i, bt_strings[i] );
 	}
 	free( bt_strings );
 
@@ -149,6 +149,8 @@ waiting_element_list::waiting_element_list( void )
 
 waiting_element_list::~waiting_element_list()
 {
+	head_ = nullptr;
+	tail_ = nullptr;
 }
 
 idx_mgr_element* waiting_element_list::pop( void )
@@ -430,6 +432,7 @@ waiting_idx_list::~waiting_idx_list()
 #endif
 
 	delete[] p_idx_buff_;
+	p_idx_buff_ = nullptr;
 }
 
 void waiting_idx_list::chk_reset_and_set_size( const int idx_buff_size_arg, const int ver_arg )
@@ -745,11 +748,13 @@ slot_chk_result slot_header::chk_header_data( void ) const
 
 ////////////////////////////////////////////////////////////////////////////////
 chunk_header_multi_slot::chunk_header_multi_slot(
-	const param_chunk_allocation& ch_param_arg,     //!< [in] chunk allocation paramter
-	chunk_list_statistics*        p_chms_stat_arg   //!< [in] pointer to statistics inforation to store activity
+	const param_chunk_allocation& ch_param_arg,      //!< [in] chunk allocation paramter
+	const unsigned int            owner_tl_id_arg,   //!< [in] owner tl_id_
+	chunk_list_statistics*        p_chms_stat_arg    //!< [in] pointer to statistics inforation to store activity
 	)
   : p_next_chunk_( nullptr )
   , status_( chunk_control_status::EMPTY )
+  , owner_tl_id_( owner_tl_id_arg )
   , num_of_accesser_( 0 )
   , p_statistics_( p_chms_stat_arg )
   , slot_conf_ {}
@@ -985,16 +990,16 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 		static std::atomic_int double_free_counter( 0 );
 		int                    id_count = double_free_counter.fetch_add( 1 );
 
-		internal::LogOutput( log_type::ERR, "[%d] backtrace of previous free call", id_count );
-		p_sh->free_bt_info_.dump_to_log( log_type::ERR, id_count );
+		internal::LogOutput( log_type::ERR, "[%d-f] backtrace of previous free call", id_count );
+		p_sh->free_bt_info_.dump_to_log( log_type::ERR, 'f', id_count );
 
 		bt_info cur_bt;
 		RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
-		internal::LogOutput( log_type::ERR, "[%d] backtrace of current free call", id_count );
-		cur_bt.dump_to_log( log_type::ERR, id_count );
+		internal::LogOutput( log_type::ERR, "[%d-h] backtrace of current free call", id_count );
+		cur_bt.dump_to_log( log_type::ERR, 'h', id_count );
 
-		internal::LogOutput( log_type::ERR, "[%d] backtrace of allocation call", id_count );
-		p_sh->alloc_bt_info_.dump_to_log( log_type::ERR, id_count );
+		internal::LogOutput( log_type::ERR, "[%d-a] backtrace of allocation call", id_count );
+		p_sh->alloc_bt_info_.dump_to_log( log_type::ERR, 'a', id_count );
 #endif
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 		p_statistics_->dealloc_req_err_cnt_++;
@@ -1168,19 +1173,48 @@ void chunk_header_multi_slot::dump( void )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+std::atomic<unsigned int> chunk_list::tl_chunk_param::tl_id_counter_( 1 );
+
+chunk_list::tl_chunk_param::tl_chunk_param(
+	chunk_list*  p_owner_chunk_list_arg,   //!< [in] pointer to onwer chunk_list
+	unsigned int init_num_of_pieces_arg    //!< [in] initiall number of slots for allocation
+	)
+  : p_owner_chunk_list_( p_owner_chunk_list_arg )
+  , tl_id_( tl_id_counter_.fetch_add( 1 ) )
+  , num_of_pieces_( init_num_of_pieces_arg )
+  , tls_p_hint_chunk( nullptr )
+{
+	return;
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+bool chunk_list::tl_chunk_param_destructor::release(
+	tl_chunk_param& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
+)
+{
+
+	return true;
+}
+
+void chunk_list::tl_chunk_param_destructor::destruct(
+	tl_chunk_param& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
+)
+{
+	return;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 chunk_list::chunk_list(
 	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
 	)
-  : size_of_one_piece_( ch_param_arg.size_of_one_piece_ )
-  , num_of_pieces_( ch_param_arg.num_of_pieces_ )
+  : chunk_param_( ch_param_arg )
   , p_top_chunk_( nullptr )
-  , tls_p_hint_chunk()
+  , tls_hint_()
   , statistics_()
 {
-	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( ch_param_arg, &statistics_ );
+	unsigned int cur_tl_id = tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tl_id_;
 
+	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( ch_param_arg, cur_tl_id, &statistics_ );
 	p_top_chunk_.store( p_new_chms, std::memory_order_release );
-	tls_p_hint_chunk.get_tls_instance( p_new_chms ) = p_new_chms;
 
 	return;
 }
@@ -1204,7 +1238,7 @@ void* chunk_list::allocate_mem_slot(
 	void* p_ans = nullptr;
 
 	// hintに登録されたchunkから空きスロット検索を開始する。
-	chunk_header_multi_slot* p_start_chms = tls_p_hint_chunk.get_tls_instance( p_top_chunk_.load( std::memory_order_acquire ) );
+	chunk_header_multi_slot* p_start_chms = tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tls_p_hint_chunk;
 
 	chunk_header_multi_slot* p_cur_chms         = p_start_chms;
 	chunk_header_multi_slot* p_1st_rsv_del_chms = nullptr;
@@ -1213,7 +1247,7 @@ void* chunk_list::allocate_mem_slot(
 		// 空きスロットが見つかれば終了
 		p_ans = p_cur_chms->allocate_mem_slot( std::move( caller_ctx_arg ) );
 		if ( p_ans != nullptr ) {
-			tls_p_hint_chunk.get_tls_instance( p_cur_chms ) = p_cur_chms;
+			tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tls_p_hint_chunk = p_cur_chms;
 			return p_ans;
 		}
 		// 削除予約されたchunkがあれば、記録する。
@@ -1249,7 +1283,7 @@ void* chunk_list::allocate_mem_slot(
 			// 再利用成功
 			p_ans = p_1st_rsv_del_chms->allocate_mem_slot( std::move( caller_ctx_arg ) );
 			if ( p_ans != nullptr ) {
-				tls_p_hint_chunk.get_tls_instance( p_1st_rsv_del_chms ) = p_1st_rsv_del_chms;
+				tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tls_p_hint_chunk = p_1st_rsv_del_chms;
 				return p_ans;
 			}
 		} else {
@@ -1257,7 +1291,7 @@ void* chunk_list::allocate_mem_slot(
 				// すでに、再利用可能な状態になっていた
 				p_ans = p_1st_rsv_del_chms->allocate_mem_slot( std::move( caller_ctx_arg ) );
 				if ( p_ans != nullptr ) {
-					tls_p_hint_chunk.get_tls_instance( p_1st_rsv_del_chms ) = p_1st_rsv_del_chms;
+					tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tls_p_hint_chunk = p_1st_rsv_del_chms;
 					return p_ans;
 				}
 			}
@@ -1267,13 +1301,13 @@ void* chunk_list::allocate_mem_slot(
 	// 確保するスロットサイズを増やす。
 	// ここで、即座にメンバ変数の値を２倍にすると、メモリの追加確保が並行して実行された場合に、並行処理分の累乗が行われて、即座にオーバーフローしてしまう。
 	// よって、メンバ変数の値の2倍化は、chunkのリスト登録が完了してから行う。
-	unsigned int cur_slot_num = num_of_pieces_.load( std::memory_order_acquire );
+	unsigned int cur_slot_num = tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).num_of_pieces_;
 	unsigned int new_slot_num = cur_slot_num * 2;
 	if ( cur_slot_num > new_slot_num ) {
 		// オーバーフローしてしまったら、2倍化を取りやめる。
 		new_slot_num = cur_slot_num;
 	}
-	param_chunk_allocation cur_alloc_conf { size_of_one_piece_, new_slot_num };
+	param_chunk_allocation cur_alloc_conf { chunk_param_.size_of_one_piece_, new_slot_num };
 
 	// 空きスロットがなく、削除予約chunkの再利用にも失敗したため、
 	// 空chunkにメモリ割り当てを行い、再利用を試みる。
@@ -1282,10 +1316,10 @@ void* chunk_list::allocate_mem_slot(
 			// 再割り当て成功
 			p_ans = p_1st_empty_chms->allocate_mem_slot( std::move( caller_ctx_arg ) );
 			if ( p_ans != nullptr ) {
-				tls_p_hint_chunk.get_tls_instance( p_1st_empty_chms ) = p_1st_empty_chms;
+				tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tls_p_hint_chunk = p_1st_empty_chms;
 
 				// chunkの登録が終わったので、スロット数の2倍化された値を登録する。
-				num_of_pieces_.compare_exchange_strong( cur_slot_num, new_slot_num );
+				tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).num_of_pieces_ = new_slot_num;
 
 				// 2倍化chunkが登録されたので、それまでのchunkは削除候補に変更にする。
 				p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
@@ -1305,7 +1339,7 @@ void* chunk_list::allocate_mem_slot(
 				// 　自身による再割り当てに失敗はしたが、既に別のスレッドで再割り当て完了済みだった
 				p_ans = p_1st_empty_chms->allocate_mem_slot( std::move( caller_ctx_arg ) );
 				if ( p_ans != nullptr ) {
-					tls_p_hint_chunk.get_tls_instance( p_1st_empty_chms ) = p_1st_empty_chms;
+					tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tls_p_hint_chunk = p_1st_empty_chms;
 					return p_ans;
 				}
 			}
@@ -1318,7 +1352,7 @@ void* chunk_list::allocate_mem_slot(
 	if ( p_ans == nullptr ) {
 		// 既存のchunkの再利用に失敗したので、新しいchunkを確保する。
 		// new演算子を使用するため、ここでロックが発生する可能性がある。
-		p_new_chms = new chunk_header_multi_slot( cur_alloc_conf, &statistics_ );
+		p_new_chms = new chunk_header_multi_slot( cur_alloc_conf, tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tl_id_, &statistics_ );
 		p_ans      = p_new_chms->allocate_mem_slot( std::move( caller_ctx_arg ) );
 		if ( p_ans == nullptr ) {
 			delete p_new_chms;
@@ -1332,11 +1366,11 @@ void* chunk_list::allocate_mem_slot(
 		p_new_chms->p_next_chunk_.store( p_cur_top, std::memory_order_release );
 	} while ( !p_top_chunk_.compare_exchange_weak( p_cur_top, p_new_chms ) );
 
-	tls_p_hint_chunk.get_tls_instance( p_new_chms ) = p_new_chms;
+	tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tls_p_hint_chunk = p_new_chms;
 
 	if ( !does_reused ) {
 		// スロット数の2倍化されたchunkの登録が終わったので、スロット数の2倍化された値を登録する。
-		num_of_pieces_.compare_exchange_strong( cur_slot_num, new_slot_num );
+		tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).num_of_pieces_ = new_slot_num;
 
 		// 2倍化chunkが登録されたので、それまでのchunkは削除候補に変更にする。
 		p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
@@ -1389,7 +1423,7 @@ chunk_statistics chunk_list::get_statistics( void ) const
 {
 	chunk_statistics ans = statistics_.get_statistics();
 
-	ans.alloc_conf_ = param_chunk_allocation { size_of_one_piece_, num_of_pieces_.load( std::memory_order_acquire ) };
+	ans.alloc_conf_ = param_chunk_allocation { chunk_param_.size_of_one_piece_, 0 };
 
 	return ans;
 }
@@ -1634,10 +1668,10 @@ void output_backtrace_info(
 		id_count, p_mem, chk_ret.correct_ ? "true" : "false", chk_ret.p_chms_ );
 
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-	internal::LogOutput( lt, "[%d] alloc_bt_info_ of %p", id_count, p_mem );
-	p_sh->alloc_bt_info_.dump_to_log( lt, id_count );
-	internal::LogOutput( lt, "[%d] free_bt_info_ of %p", id_count, p_mem );
-	p_sh->free_bt_info_.dump_to_log( lt, id_count );
+	internal::LogOutput( lt, "[%d-a] alloc_bt_info_ of %p", id_count, p_mem );
+	p_sh->alloc_bt_info_.dump_to_log( lt, 'a', id_count );
+	internal::LogOutput( lt, "[%d-f] free_bt_info_ of %p", id_count, p_mem );
+	p_sh->free_bt_info_.dump_to_log( lt, 'f', id_count );
 #else
 	internal::LogOutput( lt, "[%d] no backtrace information, because the library is not compiled with ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE", id_count );
 #endif

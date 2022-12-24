@@ -24,7 +24,7 @@ alpha::concurrent::param_chunk_allocation param = { 27, 2 };
 TEST( lfmemAlloc, TestChunkHeaderMultiSlot )
 {
 	alpha::concurrent::internal::chunk_list_statistics    test_st;
-	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new alpha::concurrent::internal::chunk_header_multi_slot( param, &test_st );
+	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new alpha::concurrent::internal::chunk_header_multi_slot( param, 0, &test_st );
 
 	void* test_ptr1 = p_chms->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
 	void* test_ptr2 = p_chms->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );

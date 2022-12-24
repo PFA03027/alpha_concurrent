@@ -362,7 +362,7 @@ private:
 	dynamic_tls<waiting_idx_list, rcv_idx_by_thread_terminating> tls_waiting_idx_list_;      //!< 滞留インデックスを管理するスレッドローカルリスト
 
 	std::mutex       mtx_rcv_waiting_idx_list_;   //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ(rcv_waiting_idx_list_)の排他制御を行う
-	waiting_idx_list rcv_waiting_idx_list_;
+	waiting_idx_list rcv_waiting_idx_list_;       //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ
 };
 
 struct slot_chk_result;
@@ -374,14 +374,16 @@ class chunk_header_multi_slot {
 public:
 	std::atomic<chunk_header_multi_slot*> p_next_chunk_;      //!< pointer to next chunk header. chunk header does not free. therefore we don't need to consider ABA.
 	std::atomic<chunk_control_status>     status_;            //!< chunk status for GC
+	std::atomic<unsigned int>             owner_tl_id_;       //!< owner tl_id_
 	std::atomic<int>                      num_of_accesser_;   //!< number of accesser to slot buffer
 
 	/*!
 	 * @brief	constructor
 	 */
 	chunk_header_multi_slot(
-		const param_chunk_allocation& ch_param_arg,     //!< [in] chunk allocation paramter
-		chunk_list_statistics*        p_chms_stat_arg   //!< [in] pointer to statistics inforation to store activity
+		const param_chunk_allocation& ch_param_arg,      //!< [in] chunk allocation paramter
+		const unsigned int            owner_tl_id_arg,   //!< [in] owner tl_id_
+		chunk_list_statistics*        p_chms_stat_arg    //!< [in] pointer to statistics inforation to store activity
 	);
 
 	/*!
@@ -584,11 +586,51 @@ public:
 	chunk_statistics get_statistics( void ) const;
 
 private:
-	unsigned int              size_of_one_piece_;   //!< size of one piece in a chunk
-	std::atomic<unsigned int> num_of_pieces_;       //!< number of pieces in a chunk
+	/**
+	 * @brief スレッド毎のチャンク操作のためのヒント情報、および所有者となるchunk_listへの情報を保持する構造体
+	 */
+	struct tl_chunk_param {
+		chunk_list* const        p_owner_chunk_list_;   //!< 所有者となるchunk_listへのポインタ
+		const unsigned int       tl_id_;                //!< スレッド毎に構造体を区別するためおID
+		unsigned int             num_of_pieces_;        //!< 現在のメモリ領域割り当てに使用したスロット数
+		chunk_header_multi_slot* tls_p_hint_chunk;      //!< 所有者のスレッドが最初に参照するべきchunk_header_multi_slotへのポインタ。
 
-	std::atomic<chunk_header_multi_slot*> p_top_chunk_;       //!< pointer to chunk_header that is top of list.
-	dynamic_tls<chunk_header_multi_slot*> tls_p_hint_chunk;   //!< thread loacal pointer to chunk_header that is success to allocate recently for a thread.
+		tl_chunk_param(
+			chunk_list*  p_owner_chunk_list_arg,   //!< [in] pointer to onwer chunk_list
+			unsigned int init_num_of_pieces_arg    //!< [in] initiall number of slots for allocation
+		);
+
+	private:
+		static std::atomic<unsigned int> tl_id_counter_;   //!< 各スレッド毎に生成されるIDをIDジェネレータ
+	};
+	/**
+	 * @brief それぞれのスレッド終了時に実行する処理を担うfunctor
+	 */
+	struct tl_chunk_param_destructor {
+		/*!
+		 * @brief スレッド終了時に呼び出されるI/F
+		 *
+		 * @retval true 呼び出し元に対し、引数のリファレンスの実態が存在するメモリ領域を解放するように指示する。
+		 * @retval false 呼び出し元に対し、引数のリファレンスの実態が存在するメモリ領域を保持するように指示する。
+		 */
+		bool release(
+			tl_chunk_param& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
+		);
+
+		/*!
+		 * @brief インスタンス削除時に呼び出されるI/F
+		 */
+		void destruct(
+			tl_chunk_param& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
+		);
+	};
+
+	const param_chunk_allocation chunk_param_;
+	// unsigned int              size_of_one_piece_;   //!< size of one piece in a chunk
+	// std::atomic<unsigned int> num_of_pieces_;       //!< number of pieces in a chunk
+
+	std::atomic<chunk_header_multi_slot*>                  p_top_chunk_;   //!< pointer to chunk_header that is top of list.
+	dynamic_tls<tl_chunk_param, tl_chunk_param_destructor> tls_hint_;      //!< thread loacal pointer to chunk_header that is success to allocate recently for a thread.
 
 	chunk_list_statistics statistics_;   //!< statistics
 };
