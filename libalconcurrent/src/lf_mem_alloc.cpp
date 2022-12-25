@@ -1235,19 +1235,21 @@ void* chunk_list::allocate_mem_slot(
 	caller_context&& caller_ctx_arg   //!< [in] caller context information
 )
 {
-	void* p_ans = nullptr;
+	void*          p_ans  = nullptr;
+	caller_context cur_cc = std::move( caller_ctx_arg );
 
 	// hintに登録されたchunkから空きスロット検索を開始する。
-	chunk_header_multi_slot* p_start_chms = tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tls_p_hint_chunk;
+	tl_chunk_param& hint_params = tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ );
 
-	chunk_header_multi_slot* p_cur_chms         = p_start_chms;
-	chunk_header_multi_slot* p_1st_rsv_del_chms = nullptr;
-	chunk_header_multi_slot* p_1st_empty_chms   = nullptr;
+	chunk_header_multi_slot* const p_start_chms       = hint_params.tls_p_hint_chunk;
+	chunk_header_multi_slot*       p_cur_chms         = p_start_chms;
+	chunk_header_multi_slot*       p_1st_rsv_del_chms = nullptr;
+	chunk_header_multi_slot*       p_1st_empty_chms   = nullptr;
 	while ( p_cur_chms != nullptr ) {
 		// 空きスロットが見つかれば終了
-		p_ans = p_cur_chms->allocate_mem_slot( std::move( caller_ctx_arg ) );
+		p_ans = p_cur_chms->allocate_mem_slot( caller_context( cur_cc ) );
 		if ( p_ans != nullptr ) {
-			tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tls_p_hint_chunk = p_cur_chms;
+			hint_params.tls_p_hint_chunk = p_cur_chms;
 			return p_ans;
 		}
 		// 削除予約されたchunkがあれば、記録する。
@@ -1281,17 +1283,17 @@ void* chunk_list::allocate_mem_slot(
 	if ( p_1st_rsv_del_chms != nullptr ) {
 		if ( p_1st_rsv_del_chms->unset_delete_reservation() ) {
 			// 再利用成功
-			p_ans = p_1st_rsv_del_chms->allocate_mem_slot( std::move( caller_ctx_arg ) );
+			p_ans = p_1st_rsv_del_chms->allocate_mem_slot( caller_context( cur_cc ) );
 			if ( p_ans != nullptr ) {
-				tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tls_p_hint_chunk = p_1st_rsv_del_chms;
+				hint_params.tls_p_hint_chunk = p_1st_rsv_del_chms;
 				return p_ans;
 			}
 		} else {
 			if ( p_1st_rsv_del_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
 				// すでに、再利用可能な状態になっていた
-				p_ans = p_1st_rsv_del_chms->allocate_mem_slot( std::move( caller_ctx_arg ) );
+				p_ans = p_1st_rsv_del_chms->allocate_mem_slot( caller_context( cur_cc ) );
 				if ( p_ans != nullptr ) {
-					tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tls_p_hint_chunk = p_1st_rsv_del_chms;
+					hint_params.tls_p_hint_chunk = p_1st_rsv_del_chms;
 					return p_ans;
 				}
 			}
@@ -1301,7 +1303,7 @@ void* chunk_list::allocate_mem_slot(
 	// 確保するスロットサイズを増やす。
 	// ここで、即座にメンバ変数の値を２倍にすると、メモリの追加確保が並行して実行された場合に、並行処理分の累乗が行われて、即座にオーバーフローしてしまう。
 	// よって、メンバ変数の値の2倍化は、chunkのリスト登録が完了してから行う。
-	unsigned int cur_slot_num = tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).num_of_pieces_;
+	unsigned int cur_slot_num = hint_params.num_of_pieces_;
 	unsigned int new_slot_num = cur_slot_num * 2;
 	if ( cur_slot_num > new_slot_num ) {
 		// オーバーフローしてしまったら、2倍化を取りやめる。
@@ -1314,12 +1316,12 @@ void* chunk_list::allocate_mem_slot(
 	if ( p_1st_empty_chms != nullptr ) {
 		if ( p_1st_empty_chms->alloc_new_chunk( cur_alloc_conf ) ) {
 			// 再割り当て成功
-			p_ans = p_1st_empty_chms->allocate_mem_slot( std::move( caller_ctx_arg ) );
+			p_ans = p_1st_empty_chms->allocate_mem_slot( caller_context( cur_cc ) );
 			if ( p_ans != nullptr ) {
-				tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tls_p_hint_chunk = p_1st_empty_chms;
+				hint_params.tls_p_hint_chunk = p_1st_empty_chms;
 
 				// chunkの登録が終わったので、スロット数の2倍化された値を登録する。
-				tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).num_of_pieces_ = new_slot_num;
+				hint_params.num_of_pieces_ = new_slot_num;
 
 				// 2倍化chunkが登録されたので、それまでのchunkは削除候補に変更にする。
 				p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
@@ -1337,9 +1339,9 @@ void* chunk_list::allocate_mem_slot(
 			// 再割り当て失敗
 			if ( p_1st_empty_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
 				// 　自身による再割り当てに失敗はしたが、既に別のスレッドで再割り当て完了済みだった
-				p_ans = p_1st_empty_chms->allocate_mem_slot( std::move( caller_ctx_arg ) );
+				p_ans = p_1st_empty_chms->allocate_mem_slot( caller_context( cur_cc ) );
 				if ( p_ans != nullptr ) {
-					tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tls_p_hint_chunk = p_1st_empty_chms;
+					hint_params.tls_p_hint_chunk = p_1st_empty_chms;
 					return p_ans;
 				}
 			}
@@ -1353,7 +1355,7 @@ void* chunk_list::allocate_mem_slot(
 		// 既存のchunkの再利用に失敗したので、新しいchunkを確保する。
 		// new演算子を使用するため、ここでロックが発生する可能性がある。
 		p_new_chms = new chunk_header_multi_slot( cur_alloc_conf, tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tl_id_, &statistics_ );
-		p_ans      = p_new_chms->allocate_mem_slot( std::move( caller_ctx_arg ) );
+		p_ans      = p_new_chms->allocate_mem_slot( caller_context( cur_cc ) );
 		if ( p_ans == nullptr ) {
 			delete p_new_chms;
 			return nullptr;   // TODO: should throw exception ?
