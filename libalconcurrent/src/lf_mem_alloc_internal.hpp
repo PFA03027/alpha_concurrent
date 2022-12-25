@@ -27,6 +27,8 @@ namespace concurrent {
 
 namespace internal {
 
+#define NON_OWNERED_TL_ID ( 0 )
+
 /*!
  * @brief	chunk control status
  */
@@ -394,6 +396,8 @@ public:
 	/*!
 	 * @brief	allocate new memory slot
 	 *
+	 * @pre status_ must be chunk_control_status::NORMAL
+	 *
 	 * @return	pointer to an allocated memory slot
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
@@ -436,12 +440,54 @@ public:
 	/*!
 	 * @brief	allocate new chunk
 	 *
+	 * @pre status_ must be chunk_control_status::EMPTY
+	 *
 	 * @retval true success to allocate a chunk memory
 	 * @retval false fail to allocate a chunk memory
+	 *
+	 * @post owner_tl_id_ is owner_tl_id_arg, and status_ is chunk_control_status::NORMAL
 	 */
 	bool alloc_new_chunk(
-		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
+		const param_chunk_allocation& ch_param_arg,     //!< [in] chunk allocation paramter
+		const unsigned int            owner_tl_id_arg   //!< [in] owner tl_id_
 	);
+
+	/*!
+	 * @brief	try to get ownership of this chunk
+	 *
+	 * @pre owner_tl_id_ is owner_tl_id_arg, and status_ is chunk_control_status::NORMAL or chunk_control_status::RESERVED_DELETION
+	 *
+	 * @retval non-nullptr success to get ownership and allocate a memory slot
+	 * @retval false fail to get ownership or fail to allocate a memory slot
+	 *
+	 * @post status_ is chunk_control_status::NORMAL
+	 */
+	inline void* try_allocate_mem_slot_from_reserved_deletion(
+		const unsigned int owner_tl_id_arg,   //!< [in] owner tl_id_
+		caller_context&&   caller_ctx_arg     //!< [in] caller context information
+	)
+	{
+		unsigned int cur_tl_id = owner_tl_id_.load( std::memory_order_acquire );
+		return try_allocate_mem_slot_impl( cur_tl_id, owner_tl_id_arg, std::move( caller_ctx_arg ) );
+	}
+
+	/*!
+	 * @brief	try to get ownership of this chunk
+	 *
+	 * @pre owner_tl_id_ is NON_OWNERED_TL_ID, and status_ is chunk_control_status::NORMAL or chunk_control_status::RESERVED_DELETION
+	 *
+	 * @retval non-nullptr success to get ownership and allocate a memory slot
+	 * @retval false fail to get ownership or fail to allocate a memory slot
+	 *
+	 * @post owner_tl_id_ is owner_tl_id_arg, and status_ is chunk_control_status::NORMAL
+	 */
+	inline void* try_get_ownership_allocate_mem_slot(
+		const unsigned int owner_tl_id_arg,   //!< [in] owner tl_id_
+		caller_context&&   caller_ctx_arg     //!< [in] caller context information
+	)
+	{
+		return try_allocate_mem_slot_impl( NON_OWNERED_TL_ID, owner_tl_id_arg, std::move( caller_ctx_arg ) );
+	}
 
 	bool set_delete_reservation( void );
 	bool unset_delete_reservation( void );
@@ -501,6 +547,22 @@ private:
 	bool recycle_mem_slot_impl(
 		void*            p_recycle_slot,   //!< [in] pointer to the memory slot to recycle.
 		caller_context&& caller_ctx_arg    //!< [in] caller context information
+	);
+
+	/*!
+	 * @brief	try to get ownership of this chunk
+	 *
+	 * @pre owner_tl_id_ is expect_tl_id_arg, and status_ is chunk_control_status::NORMAL or chunk_control_status::RESERVED_DELETION
+	 *
+	 * @retval non-nullptr success to get ownership and allocate a memory slot
+	 * @retval false fail to get ownership or fail to allocate a memory slot
+	 *
+	 * @post owner_tl_id_ is owner_tl_id_arg, and status_ is chunk_control_status::NORMAL
+	 */
+	void* try_allocate_mem_slot_impl(
+		const unsigned int expect_tl_id_arg,   //!< [in] owner tl_id_
+		const unsigned int owner_tl_id_arg,    //!< [in] owner tl_id_
+		caller_context&&   caller_ctx_arg      //!< [in] caller context information
 	);
 
 	chunk_list_statistics* p_statistics_;   //!< statistics
@@ -601,6 +663,7 @@ private:
 		);
 
 	private:
+		static unsigned int              get_new_tl_id( void );
 		static std::atomic<unsigned int> tl_id_counter_;   //!< 各スレッド毎に生成されるIDをIDジェネレータ
 	};
 	/**
@@ -625,9 +688,16 @@ private:
 		);
 	};
 
+	void mark_as_reserved_deletion(
+		unsigned int             target_tl_id_arg,    //!< [in] 削除予約対象に変更するtl_id_
+		chunk_header_multi_slot* p_non_deletion_arg   //!< [in] 削除予約対象としないchunk_header_multi_slotへのポインタ
+	);
+
+	void release_all_of_ownership(
+		unsigned int target_tl_id_arg   //!< [in] オーナー権を開放する対象のtl_id_
+	);
+
 	const param_chunk_allocation chunk_param_;
-	// unsigned int              size_of_one_piece_;   //!< size of one piece in a chunk
-	// std::atomic<unsigned int> num_of_pieces_;       //!< number of pieces in a chunk
 
 	std::atomic<chunk_header_multi_slot*>                  p_top_chunk_;   //!< pointer to chunk_header that is top of list.
 	dynamic_tls<tl_chunk_param, tl_chunk_param_destructor> tls_hint_;      //!< thread loacal pointer to chunk_header that is success to allocate recently for a thread.

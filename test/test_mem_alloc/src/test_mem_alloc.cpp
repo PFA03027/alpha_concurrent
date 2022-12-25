@@ -118,6 +118,8 @@ TEST( lfmemAlloc, TestChunkHeaderMultiSlot_MT_at_same_time )
 			EXPECT_NE( nullptr, test_ptr1 );
 			EXPECT_NE( nullptr, test_ptr2 );
 
+			std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+
 			EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr1, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
 			EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr2, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
 		} );

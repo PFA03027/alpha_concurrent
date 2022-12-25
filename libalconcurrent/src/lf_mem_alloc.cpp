@@ -766,7 +766,7 @@ chunk_header_multi_slot::chunk_header_multi_slot(
 
 	p_statistics_->chunk_num_++;
 
-	alloc_new_chunk( ch_param_arg );
+	alloc_new_chunk( ch_param_arg, owner_tl_id_ );
 
 	return;
 }
@@ -818,7 +818,8 @@ void chunk_header_multi_slot::set_slot_allocation_conf(
 }
 
 bool chunk_header_multi_slot::alloc_new_chunk(
-	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
+	const param_chunk_allocation& ch_param_arg,     //!< [in] chunk allocation paramter
+	const unsigned int            owner_tl_id_arg   //!< [in] owner tl_id_
 )
 {
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
@@ -860,6 +861,7 @@ bool chunk_header_multi_slot::alloc_new_chunk(
 	size_of_chunk_ = tmp_size;
 
 	free_slot_idx_mgr_.set_idx_size( slot_conf_.num_of_pieces_ );
+	owner_tl_id_.store( owner_tl_id_arg, std::memory_order_release );
 
 	p_statistics_->valid_chunk_num_.fetch_add( 1 );
 	p_statistics_->total_slot_cnt_.fetch_add( slot_conf_.num_of_pieces_ );
@@ -1026,6 +1028,61 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 	return true;
 }
 
+void* chunk_header_multi_slot::try_allocate_mem_slot_impl(
+	const unsigned int expect_tl_id_arg,   //!< [in] owner tl_id_
+	const unsigned int owner_tl_id_arg,    //!< [in] owner tl_id_
+	caller_context&&   caller_ctx_arg      //!< [in] caller context information
+)
+{
+	// access可能状態かどうかを事前チェック
+	switch ( status_.load( std::memory_order_acquire ) ) {
+		default:
+		case chunk_control_status::EMPTY:
+		case chunk_control_status::RESERVED_ALLOCATION:
+		case chunk_control_status::DELETION:
+			return nullptr;
+			break;
+
+		case chunk_control_status::NORMAL:
+		case chunk_control_status::RESERVED_DELETION:
+			break;
+	}
+
+	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
+	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+
+	// access権を取得を試みる
+	chunk_control_status cur_as_st = status_.load( std::memory_order_acquire );
+	switch ( cur_as_st ) {
+		default:
+		case chunk_control_status::EMPTY:
+		case chunk_control_status::RESERVED_ALLOCATION:
+		case chunk_control_status::DELETION:
+			return nullptr;
+			break;
+
+		case chunk_control_status::NORMAL:
+		case chunk_control_status::RESERVED_DELETION:
+			break;
+	}
+
+	// オーナー権の確認 or 確保を試みる
+	unsigned int expect_tl_id = expect_tl_id_arg;
+	if ( !owner_tl_id_.compare_exchange_strong( expect_tl_id, owner_tl_id_arg ) ) {
+		return nullptr;
+	}
+
+	// NORMAL状態へ復帰を試みる
+	if ( cur_as_st == chunk_control_status::RESERVED_DELETION ) {
+		if ( !unset_delete_reservation() ) {
+			return nullptr;
+		}
+	}
+
+	// オーナー権の確保と、NORMAL状態への復帰に成功したので、メモリスロットの確保を試みる
+	return allocate_mem_slot( std::move( caller_ctx_arg ) );
+}
+
 bool chunk_header_multi_slot::set_delete_reservation( void )
 {
 	chunk_control_status expect = chunk_control_status::NORMAL;
@@ -1066,11 +1123,11 @@ bool chunk_header_multi_slot::exec_deletion( void )
 	}
 
 	std::free( p_chunk_ );
-	p_chunk_ = nullptr;
-
 	delete[] p_free_slot_mark_;
-	p_free_slot_mark_ = nullptr;
 
+	p_chunk_          = nullptr;
+	p_free_slot_mark_ = nullptr;
+	owner_tl_id_.store( 0, std::memory_order_release );
 	free_slot_idx_mgr_.set_idx_size( 0 );
 
 	p_statistics_->valid_chunk_num_.fetch_sub( 1 );
@@ -1175,12 +1232,21 @@ void chunk_header_multi_slot::dump( void )
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 std::atomic<unsigned int> chunk_list::tl_chunk_param::tl_id_counter_( 1 );
 
+unsigned int chunk_list::tl_chunk_param::get_new_tl_id( void )
+{
+	unsigned int ans = tl_id_counter_.fetch_add( 1 );
+	if ( ans == NON_OWNERED_TL_ID ) {
+		ans = tl_id_counter_.fetch_add( 1 );
+	}
+	return ans;
+}
+
 chunk_list::tl_chunk_param::tl_chunk_param(
 	chunk_list*  p_owner_chunk_list_arg,   //!< [in] pointer to onwer chunk_list
 	unsigned int init_num_of_pieces_arg    //!< [in] initiall number of slots for allocation
 	)
   : p_owner_chunk_list_( p_owner_chunk_list_arg )
-  , tl_id_( tl_id_counter_.fetch_add( 1 ) )
+  , tl_id_( get_new_tl_id() )
   , num_of_pieces_( init_num_of_pieces_arg )
   , tls_p_hint_chunk( nullptr )
 {
@@ -1191,7 +1257,7 @@ bool chunk_list::tl_chunk_param_destructor::release(
 	tl_chunk_param& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
 )
 {
-
+	data.p_owner_chunk_list_->release_all_of_ownership( data.tl_id_ );
 	return true;
 }
 
@@ -1199,6 +1265,7 @@ void chunk_list::tl_chunk_param_destructor::destruct(
 	tl_chunk_param& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
 )
 {
+	// data.p_owner_chunk_list_->release_all_of_ownership( data.tl_id_ );
 	return;
 }
 
@@ -1231,6 +1298,41 @@ chunk_list::~chunk_list()
 	return;
 }
 
+void chunk_list::mark_as_reserved_deletion(
+	unsigned int             target_tl_id_arg,    //!< [in] 削除予約対象に変更するtl_id_
+	chunk_header_multi_slot* p_non_deletion_arg   //!< [in] 削除予約対象としないchunk_header_multi_slotへのポインタ
+)
+{
+	chunk_header_multi_slot* p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
+	while ( p_cur_chms != nullptr ) {
+		if ( p_cur_chms->owner_tl_id_.load( std::memory_order_acquire ) == target_tl_id_arg ) {
+			if ( p_cur_chms != p_non_deletion_arg ) {
+				p_cur_chms->set_delete_reservation();
+			}
+		}
+		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
+		p_cur_chms                           = p_next_chms;
+	}
+
+	return;
+}
+
+void chunk_list::release_all_of_ownership(
+	unsigned int target_tl_id_arg   //!< [in] オーナー権を開放する対象のtl_id_
+)
+{
+	chunk_header_multi_slot* p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
+	while ( p_cur_chms != nullptr ) {
+		if ( p_cur_chms->owner_tl_id_.load( std::memory_order_acquire ) == target_tl_id_arg ) {
+			p_cur_chms->owner_tl_id_.store( NON_OWNERED_TL_ID, std::memory_order_release );
+		}
+		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
+		p_cur_chms                           = p_next_chms;
+	}
+
+	return;
+}
+
 void* chunk_list::allocate_mem_slot(
 	caller_context&& caller_ctx_arg   //!< [in] caller context information
 )
@@ -1241,68 +1343,67 @@ void* chunk_list::allocate_mem_slot(
 	// hintに登録されたchunkから空きスロット検索を開始する。
 	tl_chunk_param& hint_params = tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ );
 
-	chunk_header_multi_slot* const p_start_chms       = hint_params.tls_p_hint_chunk;
-	chunk_header_multi_slot*       p_cur_chms         = p_start_chms;
-	chunk_header_multi_slot*       p_1st_rsv_del_chms = nullptr;
-	chunk_header_multi_slot*       p_1st_empty_chms   = nullptr;
-	while ( p_cur_chms != nullptr ) {
-		// 空きスロットが見つかれば終了
-		p_ans = p_cur_chms->allocate_mem_slot( caller_context( cur_cc ) );
-		if ( p_ans != nullptr ) {
-			hint_params.tls_p_hint_chunk = p_cur_chms;
-			return p_ans;
-		}
-		// 削除予約されたchunkがあれば、記録する。
-		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::RESERVED_DELETION ) {
-			if ( p_1st_rsv_del_chms == nullptr ) {
-				p_1st_rsv_del_chms = p_cur_chms;
-			}
-		}
-		// メモリスロットが割り当てられていないchunkがあれば、記録する。
-		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::EMPTY ) {
-			if ( p_1st_empty_chms == nullptr ) {
-				p_1st_empty_chms = p_cur_chms;
-			}
-		}
-
-		// リンクリストをたどって、次に検索するchunkを取り出す。
-		// 検索を開始したchunkに到着したら、空きスロットが見つからなかったことを示すので、検索を終了する。
-		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
-		if ( p_next_chms == nullptr ) {
-			p_next_chms = p_top_chunk_.load( std::memory_order_acquire );
-		}
-		if ( p_next_chms == p_start_chms ) {
-			p_cur_chms = nullptr;
-			break;
-		}
-		p_cur_chms = p_next_chms;
-	}
-
-	// 空きスロットが見つからなかったため、削除予約chunkの再利用を試みる。
-	// ただし、すでに削除されてしまっているかもしれない。
-	if ( p_1st_rsv_del_chms != nullptr ) {
-		if ( p_1st_rsv_del_chms->unset_delete_reservation() ) {
-			// 再利用成功
-			p_ans = p_1st_rsv_del_chms->allocate_mem_slot( caller_context( cur_cc ) );
-			if ( p_ans != nullptr ) {
-				hint_params.tls_p_hint_chunk = p_1st_rsv_del_chms;
-				return p_ans;
-			}
-		} else {
-			if ( p_1st_rsv_del_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
-				// すでに、再利用可能な状態になっていた
-				p_ans = p_1st_rsv_del_chms->allocate_mem_slot( caller_context( cur_cc ) );
+	chunk_header_multi_slot* const p_start_chms = hint_params.tls_p_hint_chunk;
+	chunk_header_multi_slot*       p_cur_chms   = nullptr;
+	if ( p_start_chms != nullptr ) {
+		// 自スレッド用の割り当てが終わっている場合、自スレッド用のchunk_header_multi_slotからの割り当てを試みる
+		p_cur_chms = p_start_chms;
+		while ( p_cur_chms != nullptr ) {
+			if ( p_cur_chms->owner_tl_id_.load( std::memory_order_acquire ) == hint_params.tl_id_ ) {
+				// tl_id_が一致する場合は、自スレッドの持ち物となる。自スレッドの持ち物のchunk_header_multi_slotからメモリを割り当てる。
+				p_ans = p_cur_chms->allocate_mem_slot( caller_context( cur_cc ) );
 				if ( p_ans != nullptr ) {
-					hint_params.tls_p_hint_chunk = p_1st_rsv_del_chms;
+					// 空きスロットが見つかれば終了
+					hint_params.tls_p_hint_chunk = p_cur_chms;
 					return p_ans;
 				}
 			}
+
+			// リンクリストをたどって、次に検索するchunkを取り出す。
+			// 検索を開始したchunkに到着したら、空きスロットが見つからなかったことを示すので、検索を終了する。
+			chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
+			if ( p_next_chms == nullptr ) {
+				p_next_chms = p_top_chunk_.load( std::memory_order_acquire );
+			}
+			if ( p_next_chms == p_start_chms ) {
+				p_cur_chms = nullptr;
+				break;
+			}
+			p_cur_chms = p_next_chms;
+		}
+
+		// 自スレッドの持ち物で、削除予約されたchunkからの再使用を試みる。
+		// ただし、すでに削除されてしまっているかもしれない。
+		// なお、自スレッドの持ち物だったとしても、処理を行っている最中に、削除ー＞別スレッドに再割り当てー＞削除予約状態となっている可能性もある。
+		// たとえ別スレッドの物になっていても、新たにメモリを割り当てるよりは性能観点でましな可能性が高いため、そのまま割り当てを試みる。
+		p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
+		while ( p_cur_chms != nullptr ) {
+			p_ans = p_cur_chms->try_allocate_mem_slot_from_reserved_deletion( hint_params.tl_id_, caller_context( cur_cc ) );
+			if ( p_ans != nullptr ) {
+				// スロット確保成功
+				hint_params.tls_p_hint_chunk = p_cur_chms;   // 別スレッドのものかもしれないが、hintを更新する。次の呼び出しで、是正される。
+				return p_ans;
+			}
+			chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
+			p_cur_chms                           = p_next_chms;
 		}
 	}
 
-	// 確保するスロットサイズを増やす。
-	// ここで、即座にメンバ変数の値を２倍にすると、メモリの追加確保が並行して実行された場合に、並行処理分の累乗が行われて、即座にオーバーフローしてしまう。
-	// よって、メンバ変数の値の2倍化は、chunkのリスト登録が完了してから行う。
+	// オーナーなしchunk_header_multi_slotからの割り当てを試みる
+	p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
+	while ( p_cur_chms != nullptr ) {
+		p_ans = p_cur_chms->try_get_ownership_allocate_mem_slot( hint_params.tl_id_, caller_context( cur_cc ) );
+		if ( p_ans != nullptr ) {
+			// オーナー権とスロット確保成功
+			hint_params.tls_p_hint_chunk = p_cur_chms;   // 別スレッドのものかもしれないが、hintを更新する。次の呼び出しで、是正される。
+			return p_ans;
+		}
+		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
+		p_cur_chms                           = p_next_chms;
+	}
+
+	// 以降は、新しいメモリ領域をmallocで確保することになる。
+	// 確保するスロットサイズを決める。既存のスロット数では足りなかったので、スロット数を2倍化する。
 	unsigned int cur_slot_num = hint_params.num_of_pieces_;
 	unsigned int new_slot_num = cur_slot_num * 2;
 	if ( cur_slot_num > new_slot_num ) {
@@ -1311,55 +1412,55 @@ void* chunk_list::allocate_mem_slot(
 	}
 	param_chunk_allocation cur_alloc_conf { chunk_param_.size_of_one_piece_, new_slot_num };
 
-	// 空きスロットがなく、削除予約chunkの再利用にも失敗したため、
-	// 空chunkにメモリ割り当てを行い、再利用を試みる。
-	if ( p_1st_empty_chms != nullptr ) {
-		if ( p_1st_empty_chms->alloc_new_chunk( cur_alloc_conf ) ) {
-			// 再割り当て成功
-			p_ans = p_1st_empty_chms->allocate_mem_slot( caller_context( cur_cc ) );
-			if ( p_ans != nullptr ) {
-				hint_params.tls_p_hint_chunk = p_1st_empty_chms;
-
-				// chunkの登録が終わったので、スロット数の2倍化された値を登録する。
-				hint_params.num_of_pieces_ = new_slot_num;
-
-				// 2倍化chunkが登録されたので、それまでのchunkは削除候補に変更にする。
-				p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
-				while ( p_cur_chms != nullptr ) {
-					if ( p_cur_chms != p_1st_empty_chms ) {
-						p_cur_chms->set_delete_reservation();
-					}
-					chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
-					p_cur_chms                           = p_next_chms;
-				}
-
-				return p_ans;
-			}
-		} else {
-			// 再割り当て失敗
-			if ( p_1st_empty_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
-				// 　自身による再割り当てに失敗はしたが、既に別のスレッドで再割り当て完了済みだった
-				p_ans = p_1st_empty_chms->allocate_mem_slot( caller_context( cur_cc ) );
+	// 空きchunk_header_multi_slotに対して、再利用を試みる。
+	p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
+	while ( p_cur_chms != nullptr ) {
+		if ( p_cur_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::EMPTY ) {
+			// 空きchunk_header_multi_slotに対して、メモリ割り当てを試みる。ここでロックが発生する可能性がある。
+			if ( p_cur_chms->alloc_new_chunk( cur_alloc_conf, hint_params.tl_id_ ) ) {
+				// 再割り当て成功
+				p_ans = p_cur_chms->allocate_mem_slot( caller_context( cur_cc ) );
 				if ( p_ans != nullptr ) {
-					hint_params.tls_p_hint_chunk = p_1st_empty_chms;
+					hint_params.tls_p_hint_chunk = p_cur_chms;
+
+					// chunkの登録が終わったので、スロット数の2倍化された値を登録する。
+					hint_params.num_of_pieces_ = new_slot_num;
+
+					// 2倍化chunkが登録されたので、それまでのchunkは削除候補に変更にする。
+					mark_as_reserved_deletion( hint_params.tl_id_, p_cur_chms );
+
 					return p_ans;
 				}
+			} else {
+				// 再割り当て失敗
+				if ( p_cur_chms->status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
+					// 自身による再割り当てに失敗はしたが、既に別のスレッドで再割り当て完了済みだった。
+					// たとえ別スレッドの物になっていても、新たにメモリを割り当てるよりは性能観点でましな可能性が高いため、そのまま割り当てを試みる。
+					p_ans = p_cur_chms->allocate_mem_slot( caller_context( cur_cc ) );
+					if ( p_ans != nullptr ) {
+						hint_params.tls_p_hint_chunk = p_cur_chms;
+						return p_ans;
+					}
+				}
 			}
 		}
+
+		// リンクリストをたどって、次に検索するchunkを取り出す。
+		// 検索を開始したchunkに到着したら、空きスロットが見つからなかったことを示すので、検索を終了する。
+		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
+		p_cur_chms                           = p_next_chms;
 	}
 
-	chunk_header_multi_slot* p_new_chms = nullptr;
-	p_ans                               = nullptr;
-	bool does_reused                    = false;
+	// 既存のchunkの再利用に失敗したので、新しいchunkを確保する。
+	// new演算子を使用するため、ここでもロックが発生する可能性がある。
+	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( cur_alloc_conf, hint_params.tl_id_, &statistics_ );
+	if ( p_new_chms == nullptr ) {
+		return nullptr;   // TODO: should throw exception ?
+	}
+	p_ans = p_new_chms->allocate_mem_slot( caller_context( cur_cc ) );
 	if ( p_ans == nullptr ) {
-		// 既存のchunkの再利用に失敗したので、新しいchunkを確保する。
-		// new演算子を使用するため、ここでロックが発生する可能性がある。
-		p_new_chms = new chunk_header_multi_slot( cur_alloc_conf, tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tl_id_, &statistics_ );
-		p_ans      = p_new_chms->allocate_mem_slot( caller_context( cur_cc ) );
-		if ( p_ans == nullptr ) {
-			delete p_new_chms;
-			return nullptr;   // TODO: should throw exception ?
-		}
+		delete p_new_chms;
+		return nullptr;   // TODO: should throw exception ?
 	}
 
 	// 新たに確保したchunkを、chunkリストの先頭に追加する。
@@ -1368,22 +1469,13 @@ void* chunk_list::allocate_mem_slot(
 		p_new_chms->p_next_chunk_.store( p_cur_top, std::memory_order_release );
 	} while ( !p_top_chunk_.compare_exchange_weak( p_cur_top, p_new_chms ) );
 
-	tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).tls_p_hint_chunk = p_new_chms;
+	hint_params.tls_p_hint_chunk = p_new_chms;
 
-	if ( !does_reused ) {
-		// スロット数の2倍化されたchunkの登録が終わったので、スロット数の2倍化された値を登録する。
-		tls_hint_.get_tls_instance( this, chunk_param_.num_of_pieces_ ).num_of_pieces_ = new_slot_num;
+	// スロット数の2倍化されたchunkの登録が終わったので、スロット数の2倍化された値を登録する。
+	hint_params.num_of_pieces_ = new_slot_num;
 
-		// 2倍化chunkが登録されたので、それまでのchunkは削除候補に変更にする。
-		p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
-		while ( p_cur_chms != nullptr ) {
-			if ( p_cur_chms != p_new_chms ) {
-				p_cur_chms->set_delete_reservation();
-			}
-			chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
-			p_cur_chms                           = p_next_chms;
-		}
-	}
+	// 2倍化chunkが登録されたので、それまでのchunkは削除候補に変更にする。
+	mark_as_reserved_deletion( hint_params.tl_id_, p_new_chms );
 
 	return p_ans;
 }
