@@ -44,7 +44,97 @@ TEST( lfmemAlloc, TestChunkHeaderMultiSlot )
 
 	printf( "%s\n", e.print().c_str() );
 
+	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	delete p_chms;
+	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
+}
+
+TEST( lfmemAlloc, TestChunkHeaderMultiSlot_MT_one_by_one )
+{
+	unsigned int                                          test_threads = 100;
+	alpha::concurrent::param_chunk_allocation             param        = { 27, 2 * test_threads };
+	alpha::concurrent::internal::chunk_list_statistics    test_st;
+	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new alpha::concurrent::internal::chunk_header_multi_slot( param, 0, &test_st );
+
+	for ( unsigned int i = 0; i < test_threads; i++ ) {
+		std::thread tt( [p_chms]() {
+			void* test_ptr1 = p_chms->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
+			void* test_ptr2 = p_chms->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
+
+			EXPECT_NE( nullptr, test_ptr1 );
+			EXPECT_NE( nullptr, test_ptr2 );
+
+			EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr1, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
+			EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr2, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
+		} );
+		tt.join();
+	}
+
+	alpha::concurrent::chunk_statistics e = p_chms->get_statistics();
+
+	printf( "%s\n", e.print().c_str() );
+
+	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+	delete p_chms;
+	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
+}
+
+TEST( lfmemAlloc, TestChunkHeaderMultiSlot_MT_at_same_time )
+{
+	unsigned int                                          test_threads = 100;
+	alpha::concurrent::param_chunk_allocation             param        = { 27, 2 * test_threads };
+	alpha::concurrent::internal::chunk_list_statistics    test_st;
+	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new alpha::concurrent::internal::chunk_header_multi_slot( param, 0, &test_st );
+	std::thread                                           tt[test_threads];
+	pthread_barrier_t                                     barrier;
+	pthread_barrier_init( &barrier, NULL, test_threads + 1 );
+
+	for ( unsigned int i = 0; i < test_threads; i++ ) {
+		tt[i] = std::thread( [p_chms, &barrier]() {
+			pthread_barrier_wait( &barrier );
+			void* test_ptr1 = p_chms->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
+			void* test_ptr2 = p_chms->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
+
+			EXPECT_NE( nullptr, test_ptr1 );
+			EXPECT_NE( nullptr, test_ptr2 );
+
+			EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr1, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
+			EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr2, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
+		} );
+	}
+	pthread_barrier_wait( &barrier );
+	for ( unsigned int i = 0; i < test_threads; i++ ) {
+		tt[i].join();
+	}
+	pthread_barrier_destroy( &barrier );
+
+	alpha::concurrent::chunk_statistics e = p_chms->get_statistics();
+
+	printf( "%s\n", e.print().c_str() );
+
+	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+	delete p_chms;
+	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 
 	{
 		int err_cnt, warn_cnt;
@@ -78,7 +168,9 @@ TEST( lfmemAlloc, TestChunkList_AdditionalAlloc )
 
 	printf( "%s\n", e.print().c_str() );
 
+	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	delete p_ch_lst;
+	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 
 	{
 		int err_cnt, warn_cnt;
