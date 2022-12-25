@@ -54,7 +54,7 @@ TEST( lfmemAlloc, OneChunkLoad )
 
 	static alpha::concurrent::param_chunk_allocation param = { 256, 20 };
 
-	alpha::concurrent::internal::chunk_header_multi_slot chms( param, &test_st );
+	alpha::concurrent::internal::chunk_header_multi_slot chms( param, 0, &test_st );
 
 	//	pthread_barrier_wait( &barrier );
 

@@ -35,12 +35,8 @@ struct chunk_statistics {
 	param_chunk_allocation alloc_conf_;        //!< chunk configuration
 	std::size_t            chunk_num_;         //!< number of current allocated chunks
 	std::size_t            valid_chunk_num_;   //!< number of valid chunks
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
-#else
-	std::size_t taken_chunk_num_;   //!< number of taken valid chunks
-	std::size_t cur_thread_num_;    //!< current number of thread
-	std::size_t max_thread_num_;    //!< max number of thread
-#endif
+	// std::size_t cur_thread_num_;    //!< current number of thread
+	// std::size_t max_thread_num_;    //!< max number of thread
 	std::size_t  total_slot_cnt_;          //!< total number of slots
 	std::size_t  free_slot_cnt_;           //!< total number of free slots
 	std::size_t  consum_cnt_;              //!< total number of used slots
@@ -101,7 +97,7 @@ struct bt_info {
 	bt_info& operator=( const bt_info& ) = default;
 	bt_info& operator=( bt_info&& )      = default;
 
-	void dump_to_log( log_type lt, int id );
+	void dump_to_log( log_type lt, char c, int id );
 };
 
 }   // namespace concurrent

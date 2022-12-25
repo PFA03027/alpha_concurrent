@@ -22,12 +22,12 @@
 
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
-// #define ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
-
 namespace alpha {
 namespace concurrent {
 
 namespace internal {
+
+#define NON_OWNERED_TL_ID ( 0 )
 
 /*!
  * @brief	chunk control status
@@ -364,7 +364,7 @@ private:
 	dynamic_tls<waiting_idx_list, rcv_idx_by_thread_terminating> tls_waiting_idx_list_;      //!< 滞留インデックスを管理するスレッドローカルリスト
 
 	std::mutex       mtx_rcv_waiting_idx_list_;   //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ(rcv_waiting_idx_list_)の排他制御を行う
-	waiting_idx_list rcv_waiting_idx_list_;
+	waiting_idx_list rcv_waiting_idx_list_;       //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ
 };
 
 struct slot_chk_result;
@@ -376,14 +376,16 @@ class chunk_header_multi_slot {
 public:
 	std::atomic<chunk_header_multi_slot*> p_next_chunk_;      //!< pointer to next chunk header. chunk header does not free. therefore we don't need to consider ABA.
 	std::atomic<chunk_control_status>     status_;            //!< chunk status for GC
+	std::atomic<unsigned int>             owner_tl_id_;       //!< owner tl_id_
 	std::atomic<int>                      num_of_accesser_;   //!< number of accesser to slot buffer
 
 	/*!
 	 * @brief	constructor
 	 */
 	chunk_header_multi_slot(
-		const param_chunk_allocation& ch_param_arg,     //!< [in] chunk allocation paramter
-		chunk_list_statistics*        p_chms_stat_arg   //!< [in] pointer to statistics inforation to store activity
+		const param_chunk_allocation& ch_param_arg,      //!< [in] chunk allocation paramter
+		const unsigned int            owner_tl_id_arg,   //!< [in] owner tl_id_
+		chunk_list_statistics*        p_chms_stat_arg    //!< [in] pointer to statistics inforation to store activity
 	);
 
 	/*!
@@ -393,6 +395,8 @@ public:
 
 	/*!
 	 * @brief	allocate new memory slot
+	 *
+	 * @pre status_ must be chunk_control_status::NORMAL
 	 *
 	 * @return	pointer to an allocated memory slot
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
@@ -436,12 +440,54 @@ public:
 	/*!
 	 * @brief	allocate new chunk
 	 *
+	 * @pre status_ must be chunk_control_status::EMPTY
+	 *
 	 * @retval true success to allocate a chunk memory
 	 * @retval false fail to allocate a chunk memory
+	 *
+	 * @post owner_tl_id_ is owner_tl_id_arg, and status_ is chunk_control_status::NORMAL
 	 */
 	bool alloc_new_chunk(
-		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
+		const param_chunk_allocation& ch_param_arg,     //!< [in] chunk allocation paramter
+		const unsigned int            owner_tl_id_arg   //!< [in] owner tl_id_
 	);
+
+	/*!
+	 * @brief	try to get ownership of this chunk
+	 *
+	 * @pre owner_tl_id_ is owner_tl_id_arg, and status_ is chunk_control_status::NORMAL or chunk_control_status::RESERVED_DELETION
+	 *
+	 * @retval non-nullptr success to get ownership and allocate a memory slot
+	 * @retval false fail to get ownership or fail to allocate a memory slot
+	 *
+	 * @post status_ is chunk_control_status::NORMAL
+	 */
+	inline void* try_allocate_mem_slot_from_reserved_deletion(
+		const unsigned int owner_tl_id_arg,   //!< [in] owner tl_id_
+		caller_context&&   caller_ctx_arg     //!< [in] caller context information
+	)
+	{
+		unsigned int cur_tl_id = owner_tl_id_.load( std::memory_order_acquire );
+		return try_allocate_mem_slot_impl( cur_tl_id, owner_tl_id_arg, std::move( caller_ctx_arg ) );
+	}
+
+	/*!
+	 * @brief	try to get ownership of this chunk
+	 *
+	 * @pre owner_tl_id_ is NON_OWNERED_TL_ID, and status_ is chunk_control_status::NORMAL or chunk_control_status::RESERVED_DELETION
+	 *
+	 * @retval non-nullptr success to get ownership and allocate a memory slot
+	 * @retval false fail to get ownership or fail to allocate a memory slot
+	 *
+	 * @post owner_tl_id_ is owner_tl_id_arg, and status_ is chunk_control_status::NORMAL
+	 */
+	inline void* try_get_ownership_allocate_mem_slot(
+		const unsigned int owner_tl_id_arg,   //!< [in] owner tl_id_
+		caller_context&&   caller_ctx_arg     //!< [in] caller context information
+	)
+	{
+		return try_allocate_mem_slot_impl( NON_OWNERED_TL_ID, owner_tl_id_arg, std::move( caller_ctx_arg ) );
+	}
 
 	bool set_delete_reservation( void );
 	bool unset_delete_reservation( void );
@@ -501,6 +547,22 @@ private:
 	bool recycle_mem_slot_impl(
 		void*            p_recycle_slot,   //!< [in] pointer to the memory slot to recycle.
 		caller_context&& caller_ctx_arg    //!< [in] caller context information
+	);
+
+	/*!
+	 * @brief	try to get ownership of this chunk
+	 *
+	 * @pre owner_tl_id_ is expect_tl_id_arg, and status_ is chunk_control_status::NORMAL or chunk_control_status::RESERVED_DELETION
+	 *
+	 * @retval non-nullptr success to get ownership and allocate a memory slot
+	 * @retval false fail to get ownership or fail to allocate a memory slot
+	 *
+	 * @post owner_tl_id_ is owner_tl_id_arg, and status_ is chunk_control_status::NORMAL
+	 */
+	void* try_allocate_mem_slot_impl(
+		const unsigned int expect_tl_id_arg,   //!< [in] owner tl_id_
+		const unsigned int owner_tl_id_arg,    //!< [in] owner tl_id_
+		caller_context&&   caller_ctx_arg      //!< [in] caller context information
 	);
 
 	chunk_list_statistics* p_statistics_;   //!< statistics
@@ -586,33 +648,59 @@ public:
 	chunk_statistics get_statistics( void ) const;
 
 private:
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
-#else
-	struct threadlocal_chunk_header_multi_slot_list_free {
-		bool release(
-			chunk_header_multi_slot*& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照。破棄されるスレッドに属するチャンクリストの先頭ポインタ。
-		);
-		void destruct(
-			chunk_header_multi_slot*& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
+	/**
+	 * @brief スレッド毎のチャンク操作のためのヒント情報、および所有者となるchunk_listへの情報を保持する構造体
+	 */
+	struct tl_chunk_param {
+		chunk_list* const        p_owner_chunk_list_;   //!< 所有者となるchunk_listへのポインタ
+		const unsigned int       tl_id_;                //!< スレッド毎に構造体を区別するためおID
+		unsigned int             num_of_pieces_;        //!< 現在のメモリ領域割り当てに使用したスロット数
+		chunk_header_multi_slot* tls_p_hint_chunk;      //!< 所有者のスレッドが最初に参照するべきchunk_header_multi_slotへのポインタ。
+
+		tl_chunk_param(
+			chunk_list*  p_owner_chunk_list_arg,   //!< [in] pointer to onwer chunk_list
+			unsigned int init_num_of_pieces_arg    //!< [in] initiall number of slots for allocation
 		);
 
-		std::mutex*               p_mtx_;                // pointer to mutex
-		chunk_header_multi_slot** pp_top_taken_chunk_;   // pointer to shared chunk list for thread discard
+	private:
+		static unsigned int              get_new_tl_id( void );
+		static std::atomic<unsigned int> tl_id_counter_;   //!< 各スレッド毎に生成されるIDをIDジェネレータ
 	};
-#endif
+	/**
+	 * @brief それぞれのスレッド終了時に実行する処理を担うfunctor
+	 */
+	struct tl_chunk_param_destructor {
+		/*!
+		 * @brief スレッド終了時に呼び出されるI/F
+		 *
+		 * @retval true 呼び出し元に対し、引数のリファレンスの実態が存在するメモリ領域を解放するように指示する。
+		 * @retval false 呼び出し元に対し、引数のリファレンスの実態が存在するメモリ領域を保持するように指示する。
+		 */
+		bool release(
+			tl_chunk_param& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
+		);
 
-	unsigned int              size_of_one_piece_;   //!< size of one piece in a chunk
-	std::atomic<unsigned int> num_of_pieces_;       //!< number of pieces in a chunk
+		/*!
+		 * @brief インスタンス削除時に呼び出されるI/F
+		 */
+		void destruct(
+			tl_chunk_param& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
+		);
+	};
 
-#ifdef ALCONCURRENT_CONF_SELECT_SHARED_CHUNK_LIST
-	std::atomic<chunk_header_multi_slot*> p_top_chunk_;   //!< pointer to chunk_header that is top of list.
-#else
-	dynamic_tls<chunk_header_multi_slot*, threadlocal_chunk_header_multi_slot_list_free> tls_p_top_chunk_;   //!< thread local pointer to chunk_header that is top of list.
+	void mark_as_reserved_deletion(
+		unsigned int             target_tl_id_arg,    //!< [in] 削除予約対象に変更するtl_id_
+		chunk_header_multi_slot* p_non_deletion_arg   //!< [in] 削除予約対象としないchunk_header_multi_slotへのポインタ
+	);
 
-	mutable std::mutex       mtx_p_top_taken_chunk_;   //!< mutex for p_top_taken_chunk_
-	chunk_header_multi_slot* p_top_taken_chunk_;       //!< the head pointer of the chunk list that was taken
-#endif
-	dynamic_tls<chunk_header_multi_slot*> tls_p_hint_chunk;   //!< thread loacal pointer to chunk_header that is success to allocate recently for a thread.
+	void release_all_of_ownership(
+		unsigned int target_tl_id_arg   //!< [in] オーナー権を開放する対象のtl_id_
+	);
+
+	const param_chunk_allocation chunk_param_;
+
+	std::atomic<chunk_header_multi_slot*>                  p_top_chunk_;   //!< pointer to chunk_header that is top of list.
+	dynamic_tls<tl_chunk_param, tl_chunk_param_destructor> tls_hint_;      //!< thread loacal pointer to chunk_header that is success to allocate recently for a thread.
 
 	chunk_list_statistics statistics_;   //!< statistics
 };
