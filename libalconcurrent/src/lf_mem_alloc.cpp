@@ -1234,11 +1234,16 @@ std::atomic<unsigned int> chunk_list::tl_chunk_param::tl_id_counter_( 1 );
 
 unsigned int chunk_list::tl_chunk_param::get_new_tl_id( void )
 {
+#ifdef ALCONCURRENT_CONF_PREFER_TO_SHARE_CHUNK
+	// tl_idを固定値とするとことで、chunkの区別がつかないようにする。
+	return 1;
+#else
 	unsigned int ans = tl_id_counter_.fetch_add( 1 );
 	if ( ans == NON_OWNERED_TL_ID ) {
 		ans = tl_id_counter_.fetch_add( 1 );
 	}
 	return ans;
+#endif
 }
 
 chunk_list::tl_chunk_param::tl_chunk_param(
