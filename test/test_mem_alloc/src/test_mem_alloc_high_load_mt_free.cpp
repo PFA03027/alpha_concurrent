@@ -77,7 +77,7 @@ void* func_test_fifo( void* p_data )
 
 	pthread_barrier_wait( &barrier );
 
-	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	for ( int i = 0; i < p_test_param->num_loop; i++ ) {
 		int cur_alloc_num = num_dist( engine );
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
@@ -104,7 +104,7 @@ void* func_test_fifo( void* p_data )
 			p_tmg->deallocate( p_tmp_alloc );
 		}
 	}
-	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 20, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 20, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 
 	return nullptr;
 }
@@ -158,7 +158,7 @@ void load_test_lockfree_bw_mult_thread_startstop( int num_of_thd, alpha::concurr
 	int            start_stop_reqeat = 2;
 	test_fifo_type fifo;
 
-	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 0, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 0, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 
 	test_params tda;
 	tda.p_test_obj = &fifo;
@@ -181,7 +181,7 @@ void load_test_lockfree_bw_mult_thread_startstop( int num_of_thd, alpha::concurr
 		}
 		delete[] threads;
 
-		printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", j, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+		// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", j, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	}
 
 	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
@@ -194,7 +194,7 @@ void load_test_lockfree_bw_mult_thread_startstop( int num_of_thd, alpha::concurr
 
 	std::list<alpha::concurrent::chunk_statistics> statistics = p_tmg_arg->get_statistics();
 
-	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 1, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 1, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	printf( "Statistics is;\n" );
 	for ( auto& e : statistics ) {
 		printf( "%s\n", e.print().c_str() );
@@ -213,7 +213,7 @@ void prune_thread( std::atomic_bool* p_loop, alpha::concurrent::general_mem_allo
 
 TEST( lfmemAlloc_prune, TestAllocFreeBwMultThread1 )
 {
-	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 90, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 90, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	{
 		alpha::concurrent::general_mem_allocator test1_gma( param2, 7 );
 		{
@@ -227,11 +227,11 @@ TEST( lfmemAlloc_prune, TestAllocFreeBwMultThread1 )
 			prune_loop.store( false, std::memory_order_release );
 			prune_th.join();
 			std::this_thread::sleep_for( std::chrono::milliseconds( 200 ) );
-			printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 91, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+			// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 91, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 		}
-		printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 92, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+		// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 92, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	}
-	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 93, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 93, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	{
 		int err_cnt, warn_cnt;
 		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
