@@ -41,7 +41,7 @@ function exec_sanitizer () {
 JOBS=$[$(grep cpu.cores /proc/cpuinfo | sort -u | sed 's/[^0-9]//g') + 1]
 
 if [ "$#" = "0" ]; then
-	for i in {1..14}
+	for i in {1..15}
 	do
 		exec_sanitizer ${BUILDTYPE} ${BUILDTARGET} ${i}
 	done

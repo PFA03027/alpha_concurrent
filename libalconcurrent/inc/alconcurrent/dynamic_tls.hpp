@@ -36,6 +36,65 @@ namespace concurrent {
 
 namespace internal {
 
+#define ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE          ( 1024 )
+#define ALCONCURRENT_CONF_DYNAMIC_TLS_DESTUCT_ITERATE_MAX ( 10 )
+
+struct dynamic_tls_key {
+	enum class alloc_stat {
+		NOT_USED = 0,
+		RELEASING,
+		USED
+	};
+
+	unsigned int            idx_;         //!< index of key
+	std::atomic<alloc_stat> is_used_;     //!< flag whether this key is used or not.
+	void ( *tls_destructor_ )( void* );   //!< thread local storage destructor
+
+	dynamic_tls_key( void )
+	  : idx_( 0 )
+	  , is_used_( alloc_stat::NOT_USED )
+	  , tls_destructor_( nullptr )
+	{
+	}
+};
+
+using dynamic_tls_key_t = dynamic_tls_key*;   //!< pointer to dynamic_tls_key as a key
+
+struct dynamic_tls_status_info {
+	unsigned int num_content_head_;
+	unsigned int next_base_idx_;
+};
+
+/*!
+ * @brief	create a key of dynamic thread local storage and count up the number of dynamic thread local memory
+ *
+ *　動的thread local storageを割り当て、割り当て数を１つ増やす。
+ *　割り当て数は不具合解析など使用する。
+ */
+void dynamic_tls_key_create( dynamic_tls_key_t* p_key, void ( *destructor )( void* ) );
+
+/*!
+ * @brief	release a key of dynamic thread local storage and count down the number of dynamic thread local memory
+ *
+ *　動的thread local storageの割り当てを解除し、割り当て数を１つ減らす。
+ *　割り当て数は不具合解析など使用する。
+ */
+void dynamic_tls_key_release( dynamic_tls_key_t key );
+
+/*!
+ * @brief	set a value to a thread local storage
+ *
+ */
+bool dynamic_tls_setspecific( dynamic_tls_key_t key, void* pointer );
+
+/*!
+ * @brief	get a value from a thread local storage
+ *
+ */
+void* dynamic_tls_getspecific( dynamic_tls_key_t key );
+
+dynamic_tls_status_info dynamic_tls_get_status( void );
+
 /*!
  * @brief	call pthread_key_create() and count up the number of dynamic thread local memory
  *
@@ -51,6 +110,19 @@ void dynamic_tls_pthread_key_create( pthread_key_t* p_key, void ( *destructor )(
  *　不具合解析など使用する。
  */
 void dynamic_tls_pthread_key_delete( pthread_key_t key );
+
+/**
+ * @brief get the value of thread local storage
+ *
+ * @return the value of thread local storage
+ * @retval nullptr normally, this value means it is not assigned a value.
+ */
+void* dynamic_tls_pthread_getspecific( pthread_key_t key );
+
+/**
+ * @brief set a value to thread local storage
+ */
+void dynamic_tls_pthread_setspecific( pthread_key_t key, void* p_tls_arg );
 
 /*!
  * @brief	get the number of dynamic thread local memory
@@ -236,8 +308,8 @@ struct threadlocal_destructor_functor {
 	/*!
 	 * @brief スレッド終了時に呼び出されるI/F
 	 *
-	 * @retval true 呼び出し元に対し、引数のリファレンスの実態が存在するメモリ領域を解放するように指示する。
-	 * @retval false 呼び出し元に対し、引数のリファレンスの実態が存在するメモリ領域を保持するように指示する。
+	 * @retval true 呼び出し元に対し、引数のリファレンスの実体が存在するメモリ領域を解放するように指示する。
+	 * @retval false 呼び出し元に対し、引数のリファレンスの実体が存在するメモリ領域を保持するように指示する。
 	 */
 	bool release(
 		value_reference data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
@@ -452,7 +524,7 @@ private:
 	value_reference get_tls_instance_pred_impl( TFUNC pred )
 	{
 		// pthread_getspecific()が、ロックフリーであることを祈る。
-		tls_cont_pointer p_tls = reinterpret_cast<tls_cont_pointer>( pthread_getspecific( tls_key ) );
+		tls_cont_pointer p_tls = reinterpret_cast<tls_cont_pointer>( internal::dynamic_tls_pthread_getspecific( tls_key ) );
 		if ( p_tls == nullptr ) {
 			p_tls = allocate_free_tls_container();
 			if ( p_tls->p_value == nullptr ) {   // 確保済みの領域の場合は、pred()を呼び出さず、そのまま再利用する。
@@ -462,17 +534,7 @@ private:
 			// 新しいスレッド用のスレッドローカルストレージの割り当てが行われたため、スレッド数のカウントをアップする。
 			th_cnt_.count_up();
 
-			int status;
-			status = pthread_setspecific( tls_key, (void*)p_tls );
-			if ( status < 0 ) {
-				internal::LogOutput(
-					log_type::ERR,
-					"pthread_setspecific failed, errno %d, cur_thread_count_=%d, max_thread_count_=%d",
-					errno,
-					th_cnt_.cur_thread_count_.load( std::memory_order_acquire ),
-					th_cnt_.max_thread_count_.load( std::memory_order_acquire ) );
-				pthread_exit( (void*)1 );
-			}
+			internal::dynamic_tls_pthread_setspecific( tls_key, (void*)p_tls );
 		}
 
 		return *( p_tls->p_value );
