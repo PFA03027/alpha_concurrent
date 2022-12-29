@@ -25,7 +25,7 @@ function exec_sanitizer () {
 	echo cmake -DCMAKE_BUILD_TYPE=$1 -DBUILD_TARGET=$2 -DSANITIZER_TYPE=$3 -G "Unix Makefiles" ../
 	cmake -DCMAKE_BUILD_TYPE=$1 -DBUILD_TARGET=$2 -DSANITIZER_TYPE=$3 -G "Unix Makefiles" ../
 	cmake --build . -j ${JOBS} -v --target build-test
-	echo $3 / 14.
+	echo $3 / 15.
 	cmake --build . -j ${JOBS} -v --target test
 	result=$?
 	if [ "$result" = "0" ]; then
