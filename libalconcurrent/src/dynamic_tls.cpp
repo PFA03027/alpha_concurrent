@@ -232,9 +232,9 @@ public:
 			}
 			if ( key_array_[cur_hint].is_used_.compare_exchange_strong( expected_alloc_stat, dynamic_tls_key::alloc_stat::USED ) ) {
 				// 割り当て成功
+				num_of_free_.fetch_sub( 1 );
 				key_array_[cur_hint].tls_destructor_ = destructor_arg;
 				hint_to_alloc_.store( new_hint, std::memory_order_release );
-				num_of_free_.fetch_sub( 1 );
 				return &( key_array_[cur_hint] );
 			}
 		}
