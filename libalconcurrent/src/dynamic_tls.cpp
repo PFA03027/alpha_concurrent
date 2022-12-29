@@ -548,59 +548,7 @@ dynamic_tls_status_info dynamic_tls_get_status( void )
 	return dynamic_tls_mgr::get_instance().get_status();
 }
 
-/*!
- * @brief	call pthread_key_create() and count up the number of dynamic thread local memory
- *
- *　pthread_key_create()での割り当て数を１つ増やす。pthread_key_create()を呼び出すときに併せて呼び出す。
- *　不具合解析など使用する。
- */
-void dynamic_tls_pthread_key_create( pthread_key_t* p_key, void ( *destructor )( void* ) )
-{
-	int status = pthread_key_create( p_key, destructor );
-	if ( status != 0 ) {
-		error_log_output( status, "pthread_key_create()" );
-		internal::LogOutput( log_type::ERR, "PTHREAD_KEYS_MAX: %d", PTHREAD_KEYS_MAX );
-		std::abort();   // because of the critical error, let's exit. TODO: should throw std::runtime_error ?
-	}
 
-	cur_count_of_tls_keys++;
-
-	int cur_max = max_count_of_tls_keys.load();
-	if ( cur_max < cur_count_of_tls_keys.load() ) {
-		max_count_of_tls_keys.compare_exchange_strong( cur_max, cur_count_of_tls_keys.load() );
-	}
-}
-
-/*!
- * @brief	call pthread_key_delete() and count down the number of dynamic thread local memory
- *
- *　pthread_key_create()での割り当て数を１つ減らす。pthread_key_delete()を呼び出すときに併せて呼び出す。
- *　不具合解析など使用する。
- */
-void dynamic_tls_pthread_key_delete( pthread_key_t key )
-{
-	int status = pthread_key_delete( key );
-	if ( status != 0 ) {
-		error_log_output( status, "pthread_key_delete()" );
-		std::abort();   // because of the critical error, let's exit. TODO: should throw std::runtime_error ?
-	}
-
-	cur_count_of_tls_keys--;
-}
-
-void* dynamic_tls_pthread_getspecific( pthread_key_t key )
-{
-	return pthread_getspecific( key );
-}
-
-void dynamic_tls_pthread_setspecific( pthread_key_t key, void* p_tls_arg )
-{
-	int status = pthread_setspecific( key, (void*)p_tls_arg );
-	if ( status != 0 ) {
-		error_log_output( status, "pthread_setspecific()" );
-		pthread_exit( (void*)1 );   // 回復不能の不具合なので、スレッド終了する。TBD
-	}
-}
 
 /*!
  * @brief	get the number of dynamic thread local memory
