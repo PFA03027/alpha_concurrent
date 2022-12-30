@@ -21,7 +21,7 @@
 
 alpha::concurrent::param_chunk_allocation param = { 27, 2 };
 
-class ChunkHeaderMultiSlotMaltiThread : public testing::TestWithParam<int> {
+class ChunkHeaderMultiSlotMaltiThread : public testing::TestWithParam<unsigned int> {
 	// You can implement all the usual fixture class members here.
 	// To access the test parameter, call GetParam() from class
 	// TestWithParam<T>.
@@ -51,7 +51,7 @@ public:
 		EXPECT_EQ( warn_cnt, 0 );
 	}
 
-	int num_thread_;
+	unsigned int num_thread_;
 };
 
 TEST_P( ChunkHeaderMultiSlotMaltiThread, TC_one_by_one )

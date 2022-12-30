@@ -12,9 +12,9 @@
 #define INC_CONF_LOGGER_HPP_
 
 #include <execinfo.h>
-#include <stdio.h>
 #include <string.h>
 
+#include <cstdio>
 #include <memory>
 
 #define CONF_LOGGER_INTERNAL_BUFF_SIZE ( 2048 )
