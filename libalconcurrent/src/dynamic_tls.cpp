@@ -233,7 +233,7 @@ public:
 			if ( key_array_[cur_hint].is_used_.compare_exchange_strong( expected_alloc_stat, dynamic_tls_key::alloc_stat::USED ) ) {
 				// 割り当て成功
 				num_of_free_.fetch_sub( 1 );
-				key_array_[cur_hint].tls_destructor_ = destructor_arg;
+				key_array_[cur_hint].tls_destructor_.store( destructor_arg, std::memory_order_release );
 				hint_to_alloc_.store( new_hint, std::memory_order_release );
 				return &( key_array_[cur_hint] );
 			}
@@ -443,7 +443,7 @@ void call_destructor_for_array_and_clear_data( dynamic_tls_key_array* p_key_arra
 
 			void* p_tmp                            = p_content_array_arg->content_array_[i];
 			p_content_array_arg->content_array_[i] = nullptr;
-			( *( p_key_array_arg->key_array_[i].tls_destructor_ ) )( p_tmp );
+			( *( p_key_array_arg->key_array_[i].tls_destructor_.load( std::memory_order_acquire ) ) )( p_tmp );
 		}
 		bool is_finish = true;
 		for ( int i = 0; i < ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE; i++ ) {
@@ -489,7 +489,7 @@ bool dynamic_tls_key_array::release_key( dynamic_tls_key* p_key_arg )
 	if ( !p_key_arg->is_used_.compare_exchange_strong( expected_alloc_stat, dynamic_tls_key::alloc_stat::RELEASING ) ) return false;
 
 	// releaseの作業権が確保できた
-	p_key_arg->tls_destructor_ = nullptr;
+	p_key_arg->tls_destructor_.store( nullptr, std::memory_order_release );
 
 	// すべての該当するスレッドローカルストレージをクリアする
 	dynamic_tls_content_head* p_cur_dtls_c = dynamic_tls_mgr::get_instance().get_top_dynamic_tls_content_head();
@@ -547,8 +547,6 @@ dynamic_tls_status_info dynamic_tls_get_status( void )
 {
 	return dynamic_tls_mgr::get_instance().get_status();
 }
-
-
 
 /*!
  * @brief	get the number of dynamic thread local memory

@@ -46,9 +46,9 @@ struct dynamic_tls_key {
 		USED
 	};
 
-	unsigned int            idx_;         //!< index of key
-	std::atomic<alloc_stat> is_used_;     //!< flag whether this key is used or not.
-	void ( *tls_destructor_ )( void* );   //!< thread local storage destructor
+	unsigned int                     idx_;              //!< index of key
+	std::atomic<alloc_stat>          is_used_;          //!< flag whether this key is used or not.
+	std::atomic<void ( * )( void* )> tls_destructor_;   //!< atomic pointer of destructor for thread local storage
 
 	dynamic_tls_key( void )
 	  : idx_( 0 )
@@ -94,8 +94,6 @@ bool dynamic_tls_setspecific( dynamic_tls_key_t key, void* pointer );
 void* dynamic_tls_getspecific( dynamic_tls_key_t key );
 
 dynamic_tls_status_info dynamic_tls_get_status( void );
-
-
 
 /*!
  * @brief	get the number of dynamic thread local memory

@@ -35,6 +35,9 @@ bool test_platform_std_atomic_lockfree_condition( void )
 	ans = ans && std::atomic<internal::chunk_header_multi_slot*> { nullptr }.is_lock_free();
 	ans = ans && ( ATOMIC_INT_LOCK_FREE == 2 );
 
+	// using fp_t = void ( * )( void* );
+	ans = ans && std::atomic<void ( * )( void* )>().is_lock_free();
+
 	return ans;
 }
 
