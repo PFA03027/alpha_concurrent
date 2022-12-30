@@ -11,7 +11,9 @@
 #include <pthread.h>
 
 #include <chrono>
+#include <condition_variable>
 #include <iostream>
+#include <mutex>
 #include <random>
 
 #include "gtest/gtest.h"
@@ -85,6 +87,8 @@ public:
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
+
+		EXPECT_FALSE( err_flag.load() );
 
 		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::gmem_get_statistics();
 
@@ -292,3 +296,137 @@ TEST_P( lfmemAllocFreeBwMultThread, TC2 )
 INSTANTIATE_TEST_SUITE_P( many_tls,
                           lfmemAllocFreeBwMultThread,
                           testing::Values( 1, 2, 5, 30 ) );
+
+TEST( lfmemAllocLoad, TC_Unstable_Threads )
+{
+	const int total_thread_num     = 1000;
+	const int generated_thread_num = 10;
+	const int gmem_max_alloc_size  = 16000;
+	{
+		test_fifo_type          fifo;
+		int                     exit_count( 0 );
+		std::mutex              exit_count_mtx;
+		std::condition_variable exit_cv;
+
+		auto thd_functor1 = [&]( int num_loop ) {
+			std::random_device              seed_gen;
+			std::mt19937                    engine( seed_gen() );
+			std::uniform_int_distribution<> size_dist( 1, gmem_max_alloc_size );
+
+			for ( int i = 0; i < num_loop; i++ ) {
+				void* p_tmp_alloc_to_push = alpha::concurrent::gmem_allocate( size_dist( engine ) );
+
+				fifo.push( p_tmp_alloc_to_push );
+
+				// std::this_thread::sleep_for( std::chrono::milliseconds( num_sleep( engine ) ) );
+
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
+				auto [pop_flag, p_tmp_alloc] = fifo.pop();
+#else
+				auto local_ret   = fifo.pop();
+				auto pop_flag    = std::get<0>( local_ret );
+				auto p_tmp_alloc = std::get<1>( local_ret );
+#endif
+				if ( !pop_flag ) {
+					printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
+					printf( "fifo size count: %d\n", fifo.get_size() );
+					err_flag.store( true );
+					break;
+				}
+
+				alpha::concurrent::gmem_deallocate( p_tmp_alloc );
+			}
+
+			{
+				std::lock_guard<std::mutex> lg( exit_count_mtx );
+				exit_count++;
+				exit_cv.notify_one();
+			}
+		};
+
+		auto thd_functor2 = [&]( int num_loop ) {
+			std::random_device              seed_gen;
+			std::mt19937                    engine( seed_gen() );
+			std::uniform_int_distribution<> size_dist( 1, gmem_max_alloc_size );
+
+			for ( int i = 0; i < num_loop; i++ ) {
+				void* p_tmp_alloc_to_push = alpha::concurrent::gmem_allocate( size_dist( engine ) );
+
+				fifo.push( p_tmp_alloc_to_push );
+			}
+
+			for ( int i = 0; i < num_loop; i++ ) {
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
+				auto [pop_flag, p_tmp_alloc] = fifo.pop();
+#else
+				auto local_ret   = fifo.pop();
+				auto pop_flag    = std::get<0>( local_ret );
+				auto p_tmp_alloc = std::get<1>( local_ret );
+#endif
+				if ( !pop_flag ) {
+					printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
+					printf( "fifo size count: %d\n", fifo.get_size() );
+					err_flag.store( true );
+					break;
+				}
+
+				alpha::concurrent::gmem_deallocate( p_tmp_alloc );
+			}
+
+			{
+				std::lock_guard<std::mutex> lg( exit_count_mtx );
+				exit_count++;
+				exit_cv.notify_one();
+			}
+		};
+
+		std::random_device seed_gen;
+		std::mt19937       engine( seed_gen() );
+
+		// 0以上9以下の値を等確率で発生させる
+		std::uniform_int_distribution<> loop_num( 50, 10000 );
+
+		for ( int i = 0; i < total_thread_num; i++ ) {
+			std::thread tt1( thd_functor1, loop_num( engine ) );
+			std::thread tt2( thd_functor2, loop_num( engine ) );
+			tt1.detach();
+			tt2.detach();
+			alpha::concurrent::gmem_prune();
+
+			{
+				std::unique_lock<std::mutex> lg( exit_count_mtx );
+				exit_cv.wait( lg, [&exit_count, i]() { return exit_count > ( i * 2 - generated_thread_num ); } );
+			}
+		}
+
+		{
+			std::unique_lock<std::mutex> lg( exit_count_mtx );
+			exit_cv.wait( lg, [&exit_count]() { return exit_count >= ( total_thread_num * 2 ); } );
+		}
+
+		EXPECT_EQ( 0, fifo.get_size() );
+	}
+
+	alpha::concurrent::gmem_prune();
+
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+
+		EXPECT_FALSE( err_flag.load() );
+
+		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::gmem_get_statistics();
+
+		printf( "gmem Statistics is;\n" );
+		for ( auto& e : statistics ) {
+			// EXPECT_EQ( 0, e.valid_chunk_num_ );
+			// EXPECT_EQ( 0, e.consum_cnt_ );
+			printf( "%s\n", e.print().c_str() );
+		}
+	}
+}

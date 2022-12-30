@@ -33,11 +33,12 @@ namespace internal {
  * @brief	chunk control status
  */
 enum class chunk_control_status : int {
-	EMPTY,                 //!< chunk header has no allocated chunk memory.
-	RESERVED_ALLOCATION,   //!< chunk header has no allocated chunk memory. But some one start to allocation
-	NORMAL,                //!< allow to allocate the memory from this chunk
-	RESERVED_DELETION,     //!< does not allow to allocate the memory from this chunk. But if needed to reuse this chunk, allow to change NORMAL
-	DELETION,              //!< does not allow to access any more except GC. After shift to this state, chunk memory will be free after confirmed accesser is zero.
+	EMPTY,                   //!< chunk header has no allocated chunk memory.
+	RESERVED_ALLOCATION,     //!< chunk header has no allocated chunk memory. But some one start to allocation
+	NORMAL,                  //!< allow to allocate the memory from this chunk
+	RESERVED_DELETION,       //!< does not allow to allocate the memory from this chunk. But if needed to reuse this chunk, allow to change NORMAL
+	ANNOUNCEMENT_DELETION,   //!< does not allow to allocate the memory from this chunk. And some one start to deletion trail.
+	DELETION,                //!< does not allow to access any more except GC. After shift to this state, chunk memory will be free after confirmed accesser is zero.
 };
 
 /*!

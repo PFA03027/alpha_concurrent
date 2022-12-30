@@ -896,37 +896,40 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 		case chunk_control_status::EMPTY:
 		case chunk_control_status::RESERVED_ALLOCATION:
 		case chunk_control_status::DELETION:
-			return false;
+			return false;   // すでにaccessできない状態になっている。
 			break;
 
 		case chunk_control_status::NORMAL:
 		case chunk_control_status::RESERVED_DELETION:
+		case chunk_control_status::ANNOUNCEMENT_DELETION:
 			break;
 	}
 
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
 	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
 
-	// access権を取得を試みる
+	// まだaccess可能状態かどうかを事前チェック
 	switch ( status_.load( std::memory_order_acquire ) ) {
 		default:
 		case chunk_control_status::EMPTY:
 		case chunk_control_status::RESERVED_ALLOCATION:
 		case chunk_control_status::DELETION:
-			return false;
+			return false;   // すでにaccessできない状態になっている。
 			break;
 
 		case chunk_control_status::NORMAL:
 		case chunk_control_status::RESERVED_DELETION:
+		case chunk_control_status::ANNOUNCEMENT_DELETION:
 			break;
 	}
 
+	// 自分のものかを確認する
 	std::uintptr_t slot_header_addr_tmp = reinterpret_cast<std::uintptr_t>( p_recycle_addr );
 	slot_header_addr_tmp -= get_slot_header_size();
 	void* p_slot_addr = reinterpret_cast<void*>( slot_header_addr_tmp );
 
 	// check correct address or not.
-	if ( p_slot_addr < p_chunk_ ) return false;
+	if ( p_slot_addr < p_chunk_ ) return false;   // 自分のものではなかった。
 
 	std::uintptr_t p_chking_addr = reinterpret_cast<std::uintptr_t>( p_slot_addr );
 	p_chking_addr -= reinterpret_cast<std::uintptr_t>( p_chunk_ );
@@ -934,8 +937,9 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 	std::uintptr_t idx = p_chking_addr / slot_conf_.size_of_one_piece_;
 	std::uintptr_t adt = p_chking_addr % slot_conf_.size_of_one_piece_;
 
-	if ( idx >= slot_conf_.num_of_pieces_ ) return false;
-	if ( adt != 0 ) return false;
+	if ( idx >= slot_conf_.num_of_pieces_ ) return false;   // 自分のものではなかった。
+	if ( adt != 0 ) return false;                           // 自分のものではなかった。
+		                                                    // ここに到達した時点で、自分のものであること判明
 
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 	p_statistics_->dealloc_req_cnt_++;
@@ -1012,6 +1016,7 @@ void* chunk_header_multi_slot::try_allocate_mem_slot_impl(
 		case chunk_control_status::EMPTY:
 		case chunk_control_status::RESERVED_ALLOCATION:
 		case chunk_control_status::DELETION:
+		case chunk_control_status::ANNOUNCEMENT_DELETION:
 			return nullptr;
 			break;
 
@@ -1030,6 +1035,7 @@ void* chunk_header_multi_slot::try_allocate_mem_slot_impl(
 		case chunk_control_status::EMPTY:
 		case chunk_control_status::RESERVED_ALLOCATION:
 		case chunk_control_status::DELETION:
+		case chunk_control_status::ANNOUNCEMENT_DELETION:
 			return nullptr;
 			break;
 
@@ -1074,9 +1080,24 @@ bool chunk_header_multi_slot::exec_deletion( void )
 	// access者がいないことを確認する
 	if ( num_of_accesser_.load() != 0 ) return false;
 
-	// DELETEの所有権の獲得を試みる。
-	chunk_control_status expect = chunk_control_status::RESERVED_DELETION;
-	bool                 result = status_.compare_exchange_strong( expect, chunk_control_status::DELETION );
+	chunk_control_status expect;
+	bool                 result;
+#if 0
+	expect = chunk_control_status::NORMAL;
+	result = status_.compare_exchange_strong( expect, chunk_control_status::RESERVED_DELETION );
+	if ( result ) {
+		for ( unsigned int ii = 0; ii < slot_conf_.num_of_pieces_; ii++ ) {
+			if ( p_free_slot_mark_[ii].load( std::memory_order_acquire ) != slot_status_mark::FREE ) {
+				// 使用中のslotが見つかったため、削除を取りやめる。
+				return false;
+			}
+		}
+	}
+#endif
+
+	// DELETEの予告を試みる。
+	expect = chunk_control_status::RESERVED_DELETION;
+	result = status_.compare_exchange_strong( expect, chunk_control_status::ANNOUNCEMENT_DELETION );
 	if ( !result ) return false;
 
 	// access者の有無を再確認
@@ -1093,6 +1114,11 @@ bool chunk_header_multi_slot::exec_deletion( void )
 			return false;
 		}
 	}
+
+	// DELETEの実行権の獲得を試みる。
+	expect = chunk_control_status::ANNOUNCEMENT_DELETION;
+	result = status_.compare_exchange_strong( expect, chunk_control_status::ANNOUNCEMENT_DELETION );
+	if ( !result ) return false;
 
 	std::free( p_chunk_ );
 	delete[] p_free_slot_mark_;
@@ -1470,6 +1496,9 @@ bool chunk_list::recycle_mem_slot(
 		p_cur_chms                           = p_next_chms;
 	}
 
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+	statistics_.dealloc_req_err_cnt_++;
+#endif
 	return false;
 }
 
