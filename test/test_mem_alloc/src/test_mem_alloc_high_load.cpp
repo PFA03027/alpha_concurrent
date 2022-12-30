@@ -35,8 +35,7 @@ pthread_barrier_t barrier;
 
 constexpr int max_slot_size  = 1000;
 constexpr int max_alloc_size = 900;
-constexpr int num_loop       = 1200;
-constexpr int num_thread     = 5;
+constexpr int num_loop       = 200;
 
 void write_task( char* p_write )
 {
@@ -44,7 +43,7 @@ void write_task( char* p_write )
 }
 
 // chunk_header_multi_slot単体のCPU負荷測定
-TEST( lfmemAlloc, OneChunkLoad )
+TEST( lfmemAllocOneChunk, TC_Load )
 {
 	alpha::concurrent::internal::chunk_list_statistics test_st;
 
@@ -623,4 +622,4 @@ TEST_P( lfmemAllocLoadTest, load_test_lockfree_actual_behavior )
 
 INSTANTIATE_TEST_SUITE_P( various_threads,
                           lfmemAllocLoadTest,
-                          testing::Values( 1, num_thread ) );
+                          testing::Values( 1, 20 ) );

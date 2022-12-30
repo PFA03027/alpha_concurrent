@@ -45,8 +45,7 @@ static pthread_barrier_t barrier;
 
 constexpr int max_slot_size  = 1000;
 constexpr int max_alloc_size = 900;
-constexpr int num_loop       = 1200;
-constexpr int num_thread     = 10;
+constexpr int num_loop       = 200;
 
 using test_fifo_type = alpha::concurrent::fifo_list<void*, true, false>;
 
@@ -54,6 +53,40 @@ struct test_params {
 	test_fifo_type*                           p_test_obj;
 	alpha::concurrent::general_mem_allocator* p_tmg;
 	int                                       num_loop;
+};
+
+class lfmemAllocFreeBwMultThread : public testing::TestWithParam<int> {
+	// You can implement all the usual fixture class members here.
+	// To access the test parameter, call GetParam() from class
+	// TestWithParam<T>.
+public:
+	lfmemAllocFreeBwMultThread( void )
+	  : num_thread_( 1 )
+	{
+		num_thread_ = GetParam();
+	}
+
+	void SetUp() override
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+
+		err_flag.store( false );
+	}
+	void TearDown() override
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
+
+	int num_thread_;
 };
 
 /**
@@ -211,7 +244,7 @@ void prune_thread( std::atomic_bool* p_loop, alpha::concurrent::general_mem_allo
 	}
 }
 
-TEST( lfmemAlloc_prune, TestAllocFreeBwMultThread1 )
+TEST_P( lfmemAllocFreeBwMultThread, TC1_prune )
 {
 	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 90, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	{
@@ -222,7 +255,7 @@ TEST( lfmemAlloc_prune, TestAllocFreeBwMultThread1 )
 			std::thread prune_th( prune_thread, &prune_loop, &test1_gma );
 
 			err_flag.store( false );
-			EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread_startstop( num_thread, &test1_gma ) );
+			EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread_startstop( num_thread_, &test1_gma ) );
 
 			prune_loop.store( false, std::memory_order_release );
 			prune_th.join();
@@ -231,50 +264,23 @@ TEST( lfmemAlloc_prune, TestAllocFreeBwMultThread1 )
 		}
 		// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 92, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	}
-	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 93, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
-	{
-		int err_cnt, warn_cnt;
-		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
-		EXPECT_EQ( err_cnt, 0 );
-		EXPECT_EQ( warn_cnt, 0 );
-		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
-		EXPECT_EQ( err_cnt, 0 );
-		EXPECT_EQ( warn_cnt, 0 );
-	}
+	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 93, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 }
 
-TEST( lfmemAlloc, TestAllocFreeBwMultThread1 )
+TEST_P( lfmemAllocFreeBwMultThread, TC1 )
 {
 	alpha::concurrent::general_mem_allocator test1_gma( nullptr, 0 );
 
-	err_flag.store( false );
-	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread( num_thread, &test1_gma ) );
-
-	{
-		int err_cnt, warn_cnt;
-		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
-		EXPECT_EQ( err_cnt, 0 );
-		EXPECT_EQ( warn_cnt, 0 );
-		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
-		EXPECT_EQ( err_cnt, 0 );
-		EXPECT_EQ( warn_cnt, 0 );
-	}
+	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread( num_thread_, &test1_gma ) );
 }
 
-TEST( lfmemAlloc, TestAllocFreeBwMultThread2 )
+TEST_P( lfmemAllocFreeBwMultThread, TC2 )
 {
 	alpha::concurrent::general_mem_allocator test2_gma( param, 7 );
 
-	err_flag.store( false );
-	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread( num_thread, &test2_gma ) );
-
-	{
-		int err_cnt, warn_cnt;
-		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
-		EXPECT_EQ( err_cnt, 0 );
-		EXPECT_EQ( warn_cnt, 0 );
-		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
-		EXPECT_EQ( err_cnt, 0 );
-		EXPECT_EQ( warn_cnt, 0 );
-	}
+	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread( num_thread_, &test2_gma ) );
 }
+
+INSTANTIATE_TEST_SUITE_P( many_tls,
+                          lfmemAllocFreeBwMultThread,
+                          testing::Values( 1, 2, 5, 100 ) );
