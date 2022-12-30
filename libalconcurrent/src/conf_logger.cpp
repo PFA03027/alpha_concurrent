@@ -9,6 +9,7 @@
  */
 
 #include <atomic>
+#include <cstdlib>
 
 #include "alconcurrent/conf_logger.hpp"
 
@@ -80,6 +81,27 @@ bool is_allowed_to_output(
 
 }   // namespace internal
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+void bt_info::dump_to_log( log_type lt, char c, int id )
+{
+	if ( count_ == 0 ) {
+		internal::LogOutput( lt, "[%d-%c] no back trace. this slot has not allocated yet.", id, c );
+		return;
+	}
+
+	internal::LogOutput( lt, "[%d-%c] backtrace count value = %d", id, c, count_ );
+
+	int    actual_count = ( count_ < 0 ) ? -count_ : count_;
+	char** bt_strings   = backtrace_symbols( bt_, actual_count );
+	for ( int i = 0; i < actual_count; i++ ) {
+		internal::LogOutput( lt, "[%d-%c] [%d] %s", id, c, i, bt_strings[i] );
+	}
+	std::free( bt_strings );
+
+	return;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
 void SetLoggerIf( std::unique_ptr<logger_if_abst> up_logger_if_inst )
 {
 	static std::unique_ptr<logger_if_abst> up_keep_inst_of_logger_if( nullptr );

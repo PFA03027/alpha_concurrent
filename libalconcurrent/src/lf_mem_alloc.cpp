@@ -8,8 +8,6 @@
  * Copyright (C) 2021 by alpha Teruaki Ata <PFA03027@nifty.com>
  */
 
-#include <execinfo.h>
-
 #include <algorithm>
 #include <atomic>
 #include <cassert>
@@ -39,35 +37,6 @@ bool test_platform_std_atomic_lockfree_condition( void )
 	ans = ans && std::atomic<void ( * )( void* )>().is_lock_free();
 
 	return ans;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-#define RECORD_BACKTRACE_GET_BACKTRACE( BT_INFO_N )                                                 \
-	do {                                                                                            \
-		BT_INFO_N.count_ = backtrace( BT_INFO_N.bt_, ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE ); \
-	} while ( 0 )
-#define RECORD_BACKTRACE_INVALIDATE_BACKTRACE( BT_INFO_N ) \
-	do {                                                   \
-		BT_INFO_N.count_ = -( BT_INFO_N.count_ );          \
-	} while ( 0 )
-
-void bt_info::dump_to_log( log_type lt, char c, int id )
-{
-	if ( count_ == 0 ) {
-		internal::LogOutput( lt, "[%d-%c] no back trace. this slot has not allocated yet.", id, c );
-		return;
-	}
-
-	internal::LogOutput( lt, "[%d-%c] backtrace count value = %d", id, c, count_ );
-
-	int    actual_count = ( count_ < 0 ) ? -count_ : count_;
-	char** bt_strings   = backtrace_symbols( bt_, actual_count );
-	for ( int i = 0; i < actual_count; i++ ) {
-		internal::LogOutput( lt, "[%d-%c] [%d] %s", id, c, i, bt_strings[i] );
-	}
-	free( bt_strings );
-
-	return;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////

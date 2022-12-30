@@ -39,25 +39,7 @@ namespace internal {
 #define ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE          ( 1024 )
 #define ALCONCURRENT_CONF_DYNAMIC_TLS_DESTUCT_ITERATE_MAX ( 10 )
 
-struct dynamic_tls_key {
-	enum class alloc_stat {
-		NOT_USED = 0,
-		RELEASING,
-		USED
-	};
-
-	unsigned int                     idx_;              //!< index of key
-	std::atomic<alloc_stat>          is_used_;          //!< flag whether this key is used or not.
-	std::atomic<void ( * )( void* )> tls_destructor_;   //!< atomic pointer of destructor for thread local storage
-
-	dynamic_tls_key( void )
-	  : idx_( 0 )
-	  , is_used_( alloc_stat::NOT_USED )
-	  , tls_destructor_( nullptr )
-	{
-	}
-};
-
+struct dynamic_tls_key;
 using dynamic_tls_key_t = dynamic_tls_key*;   //!< pointer to dynamic_tls_key as a key
 
 struct dynamic_tls_status_info {

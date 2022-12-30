@@ -78,6 +78,28 @@ void error_log_output( int errno_arg, const char* p_func_name )
 	return;
 }
 
+struct dynamic_tls_key {
+	enum class alloc_stat {
+		NOT_USED = 0,
+		RELEASING,
+		USED
+	};
+
+	unsigned int                     idx_;              //!< index of key
+	std::atomic<alloc_stat>          is_used_;          //!< flag whether this key is used or not.
+	std::atomic<void ( * )( void* )> tls_destructor_;   //!< atomic pointer of destructor for thread local storage
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	bt_info bt_when_allocate_;   //!< back trace information when key is allocated
+#endif
+
+	dynamic_tls_key( void )
+	  : idx_( 0 )
+	  , is_used_( alloc_stat::NOT_USED )
+	  , tls_destructor_( nullptr )
+	{
+	}
+};
+
 class dynamic_tls_content_array;
 class dynamic_tls_key_array;
 void call_destructor_for_array( dynamic_tls_key_array* p_key_array_arg, dynamic_tls_content_array* p_content_array_arg );
@@ -233,6 +255,9 @@ public:
 			if ( key_array_[cur_hint].is_used_.compare_exchange_strong( expected_alloc_stat, dynamic_tls_key::alloc_stat::USED ) ) {
 				// 割り当て成功
 				num_of_free_.fetch_sub( 1 );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+				RECORD_BACKTRACE_GET_BACKTRACE( key_array_[cur_hint].bt_when_allocate_ );
+#endif
 				key_array_[cur_hint].tls_destructor_.store( destructor_arg, std::memory_order_release );
 				hint_to_alloc_.store( new_hint, std::memory_order_release );
 				return &( key_array_[cur_hint] );
@@ -515,7 +540,21 @@ void call_destructor_for_array_and_clear_data( dynamic_tls_key_array* p_key_arra
 
 			void* p_tmp                            = p_content_array_arg->content_array_[i];
 			p_content_array_arg->content_array_[i] = nullptr;
-			( *( p_key_array_arg->key_array_[i].tls_destructor_.load( std::memory_order_acquire ) ) )( p_tmp );
+			auto p_destructer                      = p_key_array_arg->key_array_[i].tls_destructor_.load( std::memory_order_acquire );
+			if ( p_destructer != nullptr ) {
+				( *p_destructer )( p_tmp );   // 登録されたthread local storageの破棄処理を呼び出す。
+				if ( p_key_array_arg->key_array_[i].is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) {
+					internal::LogOutput( log_type::WARN, "during thread local storage destructor calling, dynamic thread local variable is destructed. this is dangerous race condition." );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+					static std::atomic<int> ec( 0 );
+					int                     cc = ec.fetch_add( 1 );
+					internal::LogOutput( log_type::WARN, "dynamic_tls_key(%p): backtrace when allocated", &( p_key_array_arg->key_array_[i] ) );
+					p_key_array_arg->key_array_[i].bt_when_allocate_.dump_to_log( log_type::WARN, 'a', cc );
+#else
+					internal::LogOutput( log_type::WARN, "dynamic_tls_key(%p): if you would like to get previous released backtrace, please compile libalconcurrent with ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE", &( p_key_array_arg->key_array_[i] ) );
+#endif
+				}
+			}
 		}
 		bool is_finish = true;
 		for ( int i = 0; i < ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE; i++ ) {
@@ -558,7 +597,28 @@ bool dynamic_tls_key_array::release_key( dynamic_tls_key* p_key_arg )
 
 	// releaseの作業権の確保
 	dynamic_tls_key::alloc_stat expected_alloc_stat = dynamic_tls_key::alloc_stat::USED;
-	if ( !p_key_arg->is_used_.compare_exchange_strong( expected_alloc_stat, dynamic_tls_key::alloc_stat::RELEASING ) ) return false;
+	if ( !p_key_arg->is_used_.compare_exchange_strong( expected_alloc_stat, dynamic_tls_key::alloc_stat::RELEASING ) ) {
+		static std::atomic<int> ec( 0 );
+		int                     cc = ec.fetch_add( 1 );
+		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p) is fail to release. Current back trace is;", p_key_arg );
+		bt_info cur_bt;
+		RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
+		cur_bt.dump_to_log( log_type::ERR, 'c', cc );
+		if ( expected_alloc_stat == dynamic_tls_key::alloc_stat::NOT_USED ) {
+			internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p) is double-released", p_key_arg );
+		} else if ( expected_alloc_stat == dynamic_tls_key::alloc_stat::RELEASING ) {
+			internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p) is now release key race condition by double-releasing", p_key_arg );
+		} else {
+			internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p) is now unknown status", p_key_arg );
+		}
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p): backtrace when this key is allocated", p_key_arg );
+		p_key_arg->bt_when_allocate_.dump_to_log( log_type::ERR, 'p', cc );
+#else
+		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p): if you would like to get backtrace when this key is allocated, please compile libalconcurrent with ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE", p_key_arg );
+#endif
+		return false;
+	}
 
 	// releaseの作業権が確保できた
 	p_key_arg->tls_destructor_.store( nullptr, std::memory_order_release );
@@ -569,6 +629,10 @@ bool dynamic_tls_key_array::release_key( dynamic_tls_key* p_key_arg )
 		p_cur_dtls_c->set_tls( p_key_arg->idx_, nullptr );
 		p_cur_dtls_c = p_cur_dtls_c->p_next_.load( std::memory_order_acquire );
 	}
+
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	RECORD_BACKTRACE_INVALIDATE_BACKTRACE( p_key_arg->bt_when_allocate_ );
+#endif
 
 	num_of_free_.fetch_add( 1 );
 
