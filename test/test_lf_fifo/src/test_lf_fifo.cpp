@@ -41,20 +41,17 @@ class lffifoTest : public ::testing::Test {
 protected:
 	virtual void SetUp()
 	{
-#ifndef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 		set_param_to_free_nd_mem_alloc( param, 3 );
-#endif
+		alpha::concurrent::gmem_prune();
 	}
 
 	virtual void TearDown()
 	{
-#ifndef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::internal::node_of_list::get_statistics();
 
 		for ( auto& e : statistics ) {
 			printf( "%s\n", e.print().c_str() );
 		}
-#endif
 
 		printf( "number of keys of dynamic_tls_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
 		printf( "max number of keys of dynamic_tls_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );

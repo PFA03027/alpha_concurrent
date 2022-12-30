@@ -74,6 +74,7 @@ public:
 		EXPECT_EQ( warn_cnt, 0 );
 
 		err_flag.store( false );
+		alpha::concurrent::gmem_prune();
 	}
 	void TearDown() override
 	{
@@ -84,6 +85,13 @@ public:
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
+
+		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::gmem_get_statistics();
+
+		printf( "gmem Statistics is;\n" );
+		for ( auto& e : statistics ) {
+			printf( "%s\n", e.print().c_str() );
+		}
 	}
 
 	int num_thread_;

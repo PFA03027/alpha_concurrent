@@ -143,6 +143,14 @@ void gmem_deallocate(
 void gmem_prune( void );
 
 /*!
+ * @brief	get statistics from a global general_mem_allocator instance
+ *
+ * @note
+ * This I/F does not lock allocat/deallocate itself, but this I/F execution is not lock free.
+ */
+std::list<chunk_statistics> gmem_get_statistics( void );
+
+/*!
  * @brief get backtrace information
  *
  * this is for debug purpose.

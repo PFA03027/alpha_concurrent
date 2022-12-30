@@ -38,6 +38,7 @@ public:
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::gmem_prune();
 	}
 	void TearDown() override
 	{
@@ -140,6 +141,7 @@ public:
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
+		alpha::concurrent::gmem_prune();
 	}
 	void TearDown() override
 	{

@@ -264,8 +264,6 @@ void free_nd_storage::rcv_thread_local_fifo_list( thread_local_fifo_list* p_rcv 
 	return;
 }
 
-#ifndef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
-
 #if 0
 // example
 static param_chunk_allocation param[] = {
@@ -275,16 +273,32 @@ static param_chunk_allocation param[] = {
 };
 #endif
 
+#ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
+// not set paramter, because compile option request to use malloc/free
+#else
+#ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
 static general_mem_allocator& get_gma( void )
 {
 	static general_mem_allocator singlton;
 	return singlton;
 }
+#else
+// not set, because use gmem_allocater
+#endif
+#endif
 
 void* node_of_list::operator new( std::size_t n )   // usual new...(1)
 {
 	void* p_ans;
+#ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
+	p_ans = std::malloc( n );
+#else
+#ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
 	p_ans = get_gma().allocate( n );
+#else
+	p_ans = gmem_allocate( n );
+#endif
+#endif
 
 	if ( p_ans == nullptr ) throw std::bad_alloc();
 
@@ -292,14 +306,30 @@ void* node_of_list::operator new( std::size_t n )   // usual new...(1)
 }
 void node_of_list::operator delete( void* p_mem ) noexcept   // usual new...(2)
 {
+#ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
+	std::free( p_mem );
+#else
+#ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
 	get_gma().deallocate( p_mem );
+#else
+	gmem_deallocate( p_mem );
+#endif
+#endif
 	return;
 }
 
 void* node_of_list::operator new[]( std::size_t n )   // usual new...(1)
 {
 	void* p_ans;
+#ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
+	p_ans = std::malloc( n );
+#else
+#ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
 	p_ans = get_gma().allocate( n );
+#else
+	p_ans = gmem_allocate( n );
+#endif
+#endif
 
 	if ( p_ans == nullptr ) throw std::bad_alloc();
 
@@ -307,7 +337,15 @@ void* node_of_list::operator new[]( std::size_t n )   // usual new...(1)
 }
 void node_of_list::operator delete[]( void* p_mem ) noexcept   // usual new...(2)
 {
+#ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
+	std::free( p_mem );
+#else
+#ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
 	get_gma().deallocate( p_mem );
+#else
+	gmem_deallocate( p_mem );
+#endif
+#endif
 	return;
 }
 
@@ -322,10 +360,16 @@ void node_of_list::operator delete( void* p, void* p2 ) noexcept   // placement 
 
 std::list<chunk_statistics> node_of_list::get_statistics( void )
 {
+#ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
+	return std::list<chunk_statistics> {};
+#else
+#ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
 	return get_gma().get_statistics();
-}
-
+#else
+	return gmem_get_statistics();
 #endif
+#endif
+}
 
 void node_of_list::release_ownership( void )
 {
@@ -356,7 +400,11 @@ void set_param_to_free_nd_mem_alloc(
 #ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 	// not set paramter, because compile option request to use malloc/free
 #else
+#ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
 	internal::get_gma().set_param( p_param_array, num );
+#else
+	// not set, because use gmem_allocater
+#endif
 #endif
 }
 

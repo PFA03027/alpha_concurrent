@@ -36,20 +36,17 @@ class lfStackTest : public ::testing::Test {
 protected:
 	virtual void SetUp()
 	{
-#ifndef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 		set_param_to_free_nd_mem_alloc( param, 3 );
-#endif
+		alpha::concurrent::gmem_prune();
 	}
 
 	virtual void TearDown()
 	{
-#ifndef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::internal::node_of_list::get_statistics();
 
 		for ( auto& e : statistics ) {
 			printf( "%s\n", e.print().c_str() );
 		}
-#endif
 
 		printf( "number of keys of dynamic_tls_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
 		printf( "max number of keys of dynamic_tls_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
@@ -311,9 +308,9 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( test_lifo_type* p_test_obj[] )
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [pop_flag, vv] = p_test_obj[0]->pop();
 #else
-			auto local_ret = p_test_obj[0]->pop();
-			auto pop_flag  = std::get<0>( local_ret );
-			auto vv        = std::get<1>( local_ret );
+            auto local_ret = p_test_obj[0]->pop();
+            auto pop_flag  = std::get<0>( local_ret );
+            auto vv        = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v1 ).c_str() );
@@ -326,9 +323,9 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( test_lifo_type* p_test_obj[] )
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [pop_flag, vv] = p_test_obj[1]->pop();
 #else
-			auto local_ret = p_test_obj[1]->pop();
-			auto pop_flag  = std::get<0>( local_ret );
-			auto vv        = std::get<1>( local_ret );
+            auto local_ret = p_test_obj[1]->pop();
+            auto pop_flag  = std::get<0>( local_ret );
+            auto vv        = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v2 ).c_str() );

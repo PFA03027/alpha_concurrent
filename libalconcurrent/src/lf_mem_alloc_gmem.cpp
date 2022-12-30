@@ -48,5 +48,10 @@ void gmem_prune( void )
 	return;
 }
 
+std::list<chunk_statistics> gmem_get_statistics( void )
+{
+	return internal::get_g_gm_mem_instance().get_statistics();
+}
+
 }   // namespace concurrent
 }   // namespace alpha
