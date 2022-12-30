@@ -317,7 +317,7 @@ public:
 	 */
 	dynamic_tls_content_head* get_current_thread_dynamic_tls_content_head( void )
 	{
-		dynamic_tls_content_head* p_ans = reinterpret_cast<dynamic_tls_content_head*>( pthread_getspecific( key_ ) );
+		dynamic_tls_content_head* p_ans = tl_cnt_head_.get_p_content_head();
 		if ( p_ans != nullptr ) return p_ans;
 
 		// 空きdynamic_tls_content_headを探す
@@ -338,7 +338,7 @@ public:
 			dtls_content_head_cnt_.fetch_add( 1 );
 		}
 
-		pthread_setspecific( key_, reinterpret_cast<dynamic_tls_content_head*>( p_ans ) );
+		tl_cnt_head_.set_p_content_head( p_ans );
 
 		return p_ans;
 	}
@@ -352,30 +352,88 @@ public:
 	static void destructor( void* p_data );
 
 private:
+#ifdef ALCONCURRENT_CONF_USE_THREAD_LOCAL
+	class tl_content_head {
+	public:
+		tl_content_head( void )
+		  : p_tl_cnt_head_( nullptr )
+		{
+			return;
+		}
+
+		~tl_content_head()
+		{
+			if ( p_tl_cnt_head_ == nullptr ) return;
+			dynamic_tls_mgr::destructor( p_tl_cnt_head_ );
+		}
+
+		inline dynamic_tls_content_head* get_p_content_head( void )
+		{
+			return p_tl_cnt_head_;
+		}
+
+		inline void set_p_content_head( dynamic_tls_content_head* p_tl_cnt_head_arg )
+		{
+			p_tl_cnt_head_ = p_tl_cnt_head_arg;
+		}
+
+	private:
+		dynamic_tls_content_head* p_tl_cnt_head_;
+	};
+#else
+	class tl_content_head {
+	public:
+		tl_content_head( void )
+		{
+			int status = pthread_key_create( &key_, dynamic_tls_mgr::destructor );
+			if ( status != 0 ) {
+				error_log_output( status, "pthread_key_create()" );
+				internal::LogOutput( log_type::ERR, "PTHREAD_KEYS_MAX: %d", PTHREAD_KEYS_MAX );
+				std::abort();   // because of the critical error, let's exit. TODO: should throw std::runtime_error ?
+			}
+			return;
+		}
+
+		~tl_content_head()
+		{
+			int status = pthread_key_delete( key_ );
+			if ( status != 0 ) {
+				error_log_output( status, "pthread_key_delete()" );
+				internal::LogOutput( log_type::ERR, "PTHREAD_KEYS_MAX: %d", PTHREAD_KEYS_MAX );
+				std::abort();   // because of the critical error, let's exit. TODO: should throw std::runtime_error ?
+			}
+		}
+
+		inline dynamic_tls_content_head* get_p_content_head( void )
+		{
+			return reinterpret_cast<dynamic_tls_content_head*>( pthread_getspecific( key_ ) );
+		}
+
+		inline void set_p_content_head( dynamic_tls_content_head* p_tl_cnt_head_arg )
+		{
+			pthread_setspecific( key_, reinterpret_cast<void*>( p_tl_cnt_head_arg ) );
+		}
+
+	private:
+		pthread_key_t key_;
+	};
+#endif
+
 	dynamic_tls_mgr( void )
 	  : next_base_idx_( 0 )
 	  , p_top_dtls_key_array_( nullptr )
 	  , p_top_dtls_content_head_( nullptr )
 	  , dtls_content_head_cnt_( 0 )
 	{
-		int status = pthread_key_create( &key_, destructor );
-		if ( status != 0 ) {
-			error_log_output( status, "pthread_key_create()" );
-			internal::LogOutput( log_type::ERR, "PTHREAD_KEYS_MAX: %d", PTHREAD_KEYS_MAX );
-			std::abort();   // because of the critical error, let's exit. TODO: should throw std::runtime_error ?
-		}
 
 		push_front_dynamic_tls_key_array();
+
+		is_live_.store( true, std::memory_order_release );
 	}
 
 	~dynamic_tls_mgr()
 	{
-		int status = pthread_key_delete( key_ );
-		if ( status != 0 ) {
-			error_log_output( status, "pthread_key_delete()" );
-			internal::LogOutput( log_type::ERR, "PTHREAD_KEYS_MAX: %d", PTHREAD_KEYS_MAX );
-			std::abort();   // because of the critical error, let's exit. TODO: should throw std::runtime_error ?
-		}
+		is_live_.store( false, std::memory_order_release );
 
 		dynamic_tls_key_array* p_cur_dtls_ka = p_top_dtls_key_array_.load( std::memory_order_acquire );
 		p_top_dtls_key_array_.store( nullptr, std::memory_order_release );
@@ -413,16 +471,30 @@ private:
 		return nullptr;
 	}
 
-	pthread_key_t key_;
-
 	std::atomic<unsigned int>              next_base_idx_;
 	std::atomic<dynamic_tls_key_array*>    p_top_dtls_key_array_;
 	std::atomic<dynamic_tls_content_head*> p_top_dtls_content_head_;
 	std::atomic<unsigned int>              dtls_content_head_cnt_;
+
+#ifdef ALCONCURRENT_CONF_USE_THREAD_LOCAL
+	static thread_local tl_content_head tl_cnt_head_;
+#else
+	tl_content_head tl_cnt_head_;
+#endif
+
+	static std::atomic<bool> is_live_;
 };
+
+#ifdef ALCONCURRENT_CONF_USE_THREAD_LOCAL
+thread_local dynamic_tls_mgr::tl_content_head dynamic_tls_mgr::tl_cnt_head_;
+#else
+#endif
+std::atomic<bool> dynamic_tls_mgr::is_live_( false );
 
 void dynamic_tls_mgr::destructor( void* p_data )
 {
+	if ( !is_live_.load( std::memory_order_acquire ) ) return;
+
 	dynamic_tls_content_head* p_destruct_dtls_head = reinterpret_cast<dynamic_tls_content_head*>( p_data );
 	p_destruct_dtls_head->call_destructor_and_release_ownership();
 
