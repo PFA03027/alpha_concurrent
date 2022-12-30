@@ -55,6 +55,22 @@
             "problemMatcher": [
                 "$gcc"
             ]
+        },
+        {
+            "label": "build with a sanitizer",
+            "type": "shell",
+            "command": "bash make_linux_sanitizer_build.sh 14",
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "test with a sanitizer",
+            "type": "shell",
+            "command": "bash make_linux_full_sanitizer.sh 14",
+            "problemMatcher": [
+                "$gcc"
+            ]
         }
     ]
 }
