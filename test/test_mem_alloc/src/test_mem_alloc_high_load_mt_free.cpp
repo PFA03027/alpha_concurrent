@@ -283,4 +283,4 @@ TEST_P( lfmemAllocFreeBwMultThread, TC2 )
 
 INSTANTIATE_TEST_SUITE_P( many_tls,
                           lfmemAllocFreeBwMultThread,
-                          testing::Values( 1, 2, 5, 100 ) );
+                          testing::Values( 1, 2, 5, 30 ) );
