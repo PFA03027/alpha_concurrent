@@ -255,8 +255,8 @@ TEST_F( lfmemAlloc, TestGeneralMemAllocator )
 
 	delete p_mem_allocator;
 
-	printf( "number of keys of pthread_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
-	printf( "max number of keys of pthread_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
+	printf( "number of keys of dynamic_tls_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
+	printf( "max number of keys of dynamic_tls_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
 }
 
 TEST_F( lfmemAlloc, TestGeneralMemAllocator_prune )
@@ -317,8 +317,8 @@ TEST_F( lfmemAlloc, TestGeneralMemAllocator_prune )
 
 	delete p_mem_allocator;
 
-	printf( "number of keys of pthread_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
-	printf( "max number of keys of pthread_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
+	printf( "number of keys of dynamic_tls_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
+	printf( "max number of keys of dynamic_tls_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
 
 	return;
 }
@@ -342,8 +342,8 @@ TEST_F( lfmemAlloc, TestGMemAllocator )
 		rq_size *= 2;
 	}
 
-	printf( "number of keys of pthread_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
-	printf( "max number of keys of pthread_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
+	printf( "number of keys of dynamic_tls_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
+	printf( "max number of keys of dynamic_tls_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
 }
 
 TEST_F( lfmemAlloc, PlatformCheck )

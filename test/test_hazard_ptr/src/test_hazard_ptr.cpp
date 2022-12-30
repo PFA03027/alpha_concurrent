@@ -181,8 +181,8 @@ TEST( HazardPtr, TC1 )
 		ASSERT_NO_FATAL_FAILURE( test_case1() );
 	}
 
-	printf( "number of keys of pthread_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
-	printf( "max number of keys of pthread_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
+	printf( "number of keys of dynamic_tls_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
+	printf( "max number of keys of dynamic_tls_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
 	std::cout << "!!!End World!!!" << std::endl;   // prints !!!Hello World!!!
 	return;
 }
