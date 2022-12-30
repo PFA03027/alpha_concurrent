@@ -37,14 +37,14 @@ class lflistTest : public ::testing::Test {
 protected:
 	virtual void SetUp()
 	{
-#ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
+#ifndef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 		set_param_to_free_nd_mem_alloc( param, 3 );
 #endif
 	}
 
 	virtual void TearDown()
 	{
-#ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
+#ifndef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::internal::node_of_list::get_statistics();
 
 		for ( auto& e : statistics ) {

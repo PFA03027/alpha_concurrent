@@ -145,10 +145,10 @@ void fifo_free_nd_list::push( fifo_free_nd_list::node_pointer const p_push_node 
 }
 
 /*!
-	 * @brief	FIFOキューからノードを取り出す。
-	 *
-	 * @return	取り出された管理ノードへのポインタ。nullptrの場合、FIFOキューが空だったことを示す。管理対象ポインタは、
-	 */
+ * @brief	FIFOキューからノードを取り出す。
+ *
+ * @return	取り出された管理ノードへのポインタ。nullptrの場合、FIFOキューが空だったことを示す。管理対象ポインタは、
+ */
 fifo_free_nd_list::node_pointer fifo_free_nd_list::pop( void )
 {
 	scoped_hazard_ref scoped_ref_first( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_FIRST );
@@ -264,7 +264,7 @@ void free_nd_storage::rcv_thread_local_fifo_list( thread_local_fifo_list* p_rcv 
 	return;
 }
 
-#ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
+#ifndef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 
 #if 0
 // example
@@ -339,7 +339,6 @@ void node_of_list::teardown_by_recycle( void )
 
 }   // namespace internal
 
-#ifndef NOT_USE_LOCK_FREE_MEM_ALLOC
 /*!
  * @brief	Set parameters in the lock-free memory allocator to enable the function.
  *
@@ -354,10 +353,12 @@ void set_param_to_free_nd_mem_alloc(
 	unsigned int                  num              //!< [in] array size
 )
 {
+#ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
+	// not set paramter, because compile option request to use malloc/free
+#else
 	internal::get_gma().set_param( p_param_array, num );
-}
-
 #endif
+}
 
 }   // namespace concurrent
 }   // namespace alpha

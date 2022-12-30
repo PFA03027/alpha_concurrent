@@ -84,10 +84,10 @@ struct node_of_list {
 #endif
 
 private:
-	node_of_list( const node_of_list& ) = delete;
-	node_of_list( node_of_list&& )      = delete;
+	node_of_list( const node_of_list& )           = delete;
+	node_of_list( node_of_list&& )                = delete;
 	node_of_list operator=( const node_of_list& ) = delete;
-	node_of_list operator=( node_of_list&& ) = delete;
+	node_of_list operator=( node_of_list&& )      = delete;
 
 	std::atomic<node_of_list*> next_[2];
 };
@@ -114,10 +114,10 @@ public:
 	}
 
 private:
-	thread_local_fifo_list( const thread_local_fifo_list& ) = delete;
-	thread_local_fifo_list( thread_local_fifo_list&& )      = delete;
+	thread_local_fifo_list( const thread_local_fifo_list& )           = delete;
+	thread_local_fifo_list( thread_local_fifo_list&& )                = delete;
 	thread_local_fifo_list operator=( const thread_local_fifo_list& ) = delete;
-	thread_local_fifo_list operator=( thread_local_fifo_list&& ) = delete;
+	thread_local_fifo_list operator=( thread_local_fifo_list&& )      = delete;
 
 	static constexpr node_of_list::next_slot_idx next_slot_idx_ = node_of_list::next_slot_idx::TL_LIST_SLOT;
 
@@ -156,10 +156,10 @@ public:
 	bool check_hazard_list( node_pointer const p_chk_node );
 
 private:
-	fifo_free_nd_list( const fifo_free_nd_list& ) = delete;
-	fifo_free_nd_list( fifo_free_nd_list&& )      = delete;
+	fifo_free_nd_list( const fifo_free_nd_list& )           = delete;
+	fifo_free_nd_list( fifo_free_nd_list&& )                = delete;
 	fifo_free_nd_list operator=( const fifo_free_nd_list& ) = delete;
-	fifo_free_nd_list operator=( fifo_free_nd_list&& ) = delete;
+	fifo_free_nd_list operator=( fifo_free_nd_list&& )      = delete;
 
 	using hazard_ptr_storage = hazard_ptr<node_of_list, hzrd_max_slot_>;
 	using scoped_hazard_ref  = hazard_ptr_scoped_ref<node_of_list, hzrd_max_slot_>;
@@ -293,10 +293,10 @@ public:
 	int get_allocated_num( void );
 
 private:
-	free_nd_storage( const free_nd_storage& ) = delete;
-	free_nd_storage( free_nd_storage&& )      = delete;
+	free_nd_storage( const free_nd_storage& )           = delete;
+	free_nd_storage( free_nd_storage&& )                = delete;
 	free_nd_storage operator=( const free_nd_storage& ) = delete;
-	free_nd_storage operator=( free_nd_storage&& ) = delete;
+	free_nd_storage operator=( free_nd_storage&& )      = delete;
 
 	struct rcv_fifo_list_by_thread_terminating {
 		rcv_fifo_list_by_thread_terminating( free_nd_storage* p_fns_arg )
@@ -351,7 +351,6 @@ private:
 
 }   // namespace internal
 
-#ifndef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 /*!
  * @brief	Set parameters in the lock-free memory allocator to enable the function.
  *
@@ -360,12 +359,13 @@ private:
  * @note
  * If this I / F parameter setting is not performed, memory allocation using malloc / free will be performed. @n
  * このI/Fによるパラメータ設定が行われない場合、malloc/freeを使用したメモリアロケーションが行われる。
+ *
+ * @warning if compile with ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC, this API has no effect.
  */
 void set_param_to_free_nd_mem_alloc(
 	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
 	unsigned int                  num              //!< [in] array size
 );
-#endif
 
 }   // namespace concurrent
 }   // namespace alpha
