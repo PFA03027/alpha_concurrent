@@ -34,6 +34,8 @@ elseif("${SANITIZER_TYPE}" EQUAL "12")
  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fsanitize-address-use-after-scope -DALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER")	# for test purpose
 elseif("${SANITIZER_TYPE}" EQUAL "13")
  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_THREADSANITIZER -O2 -fno-omit-frame-pointer -fsanitize=thread -DALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER")	# for test purpose. thread sanitizer needs -O1/-O2. Unfortunately this finds false positive.
+elseif("${SANITIZER_TYPE}" EQUAL "14")
+ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_THREADSANITIZER -O2 -fno-omit-frame-pointer -fsanitize=thread")	# for test purpose. thread sanitizer needs -O1/-O2. Unfortunately this finds false positive.
 else()
  # no sanitizer option
 endif()

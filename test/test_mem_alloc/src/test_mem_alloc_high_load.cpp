@@ -540,26 +540,25 @@ void load_test_malloc_free_actual_behavior( int num_of_thd )
 	delete[] threads;
 }
 
-TEST( lfmemAlloc, LoadTest )
-{
-#if 1
-	load_test_empty( 1 );
-	load_test_malloc_free( 1 );
-	load_test_lockfree_min2( 1 );
-	load_test_lockfree( 1 );
-	load_test_empty_actual_behavior( 1 );
-	load_test_malloc_free_actual_behavior( 1 );
-	load_test_lockfree_actual_behavior( 1 );
-	load_test_empty( num_thread );
-	load_test_malloc_free( num_thread );
-	load_test_lockfree_min2( num_thread );
-	load_test_lockfree( num_thread );
-	load_test_empty_actual_behavior( num_thread );
-	load_test_malloc_free_actual_behavior( num_thread );
-	load_test_lockfree_min2_actual_behavior( num_thread );
-	load_test_lockfree_actual_behavior( num_thread );
-#endif
+class lfmemAllocLoadTest : public testing::TestWithParam<int> {
+	// You can implement all the usual fixture class members here.
+	// To access the test parameter, call GetParam() from class
+	// TestWithParam<T>.
+public:
+	lfmemAllocLoadTest( void )
+	  : num_thread_( 1 )
+	{
+		num_thread_ = GetParam();
+	}
 
+	void SetUp() override
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
+	void TearDown() override
 	{
 		int err_cnt, warn_cnt;
 		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
@@ -570,5 +569,58 @@ TEST( lfmemAlloc, LoadTest )
 		EXPECT_EQ( warn_cnt, 0 );
 	}
 
+	int num_thread_;
+};
+
+TEST_P( lfmemAllocLoadTest, load_test_empty )
+{
+	load_test_empty( num_thread_ );
+
 	return;
 }
+
+TEST_P( lfmemAllocLoadTest, load_test_malloc_free )
+{
+	load_test_malloc_free( num_thread_ );
+
+	return;
+}
+
+TEST_P( lfmemAllocLoadTest, load_test_lockfree_min2 )
+{
+	load_test_lockfree_min2( num_thread_ );
+
+	return;
+}
+
+TEST_P( lfmemAllocLoadTest, load_test_lockfree )
+{
+	load_test_lockfree( num_thread_ );
+
+	return;
+}
+
+TEST_P( lfmemAllocLoadTest, load_test_empty_actual_behavior )
+{
+	load_test_empty_actual_behavior( num_thread_ );
+
+	return;
+}
+
+TEST_P( lfmemAllocLoadTest, load_test_malloc_free_actual_behavior )
+{
+	load_test_malloc_free_actual_behavior( num_thread_ );
+
+	return;
+}
+
+TEST_P( lfmemAllocLoadTest, load_test_lockfree_actual_behavior )
+{
+	load_test_lockfree_actual_behavior( num_thread_ );
+
+	return;
+}
+
+INSTANTIATE_TEST_SUITE_P( various_threads,
+                          lfmemAllocLoadTest,
+                          testing::Values( 1, num_thread ) );

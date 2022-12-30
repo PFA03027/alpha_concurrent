@@ -18,33 +18,20 @@ BUILDTYPE=Debug
 # 1st: BUILDTYPE
 # 2nd: BUILDTARGET
 # 3rd: SANITIZER type number. please see common.cmake
-function exec_sanitizer () {
-	rm -fr build
+function build_sanitizer () {
 	mkdir -p build
 	cd build
 	echo cmake -DCMAKE_BUILD_TYPE=$1 -DBUILD_TARGET=$2 -DSANITIZER_TYPE=$3 -G "Unix Makefiles" ../
 	cmake -DCMAKE_BUILD_TYPE=$1 -DBUILD_TARGET=$2 -DSANITIZER_TYPE=$3 -G "Unix Makefiles" ../
 	cmake --build . -j ${JOBS} -v --target build-test
 	echo $3 / 15.
-	cmake --build . -j ${JOBS} -v --target test
-	result=$?
-	if [ "$result" = "0" ]; then
-		echo $3 is OK. result=$result
-	else
-		echo $3 is FAIL. result=$result
-		cd ..
-		exit $result
-	fi
 	cd ..
 }
 
 JOBS=$[$(grep cpu.cores /proc/cpuinfo | sort -u | sed 's/[^0-9]//g') + 1]
 
 if [ "$#" = "0" ]; then
-	for i in {1..15}
-	do
-		exec_sanitizer ${BUILDTYPE} ${BUILDTARGET} ${i}
-	done
+	exit $result
 else
-	exec_sanitizer ${BUILDTYPE} ${BUILDTARGET} $1
+	build_sanitizer ${BUILDTYPE} ${BUILDTARGET} $1
 fi

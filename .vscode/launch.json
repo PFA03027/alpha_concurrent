@@ -5,6 +5,68 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "(gdb) test_lf_fifo起動",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/test/test_lf_fifo/test_lf_fifo",
+            "args": [
+                "--gtest_catch_exceptions=0",
+                // "--gtest_repeat=100",
+                // "--gtest_filter=lfmemAlloc.TestChunkHeaderMultiSlot_MT_at_same_time"
+                // "--gtest_filter=lfmemAlloc.TestChunkHeaderMultiSlot_MT_one_by_one"
+                // "--gtest_filter=lfmemAlloc_prune.TestAllocFreeBwMultThread1"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "gdb の再フォーマットを有効にする",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "逆アセンブリ フレーバーを Intel に設定",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            // "preLaunchTask": "make all and build test"
+        },
+        {
+            "name": "(gdb) test_dynamic_tls起動",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/test/test_dynamic_tls/test_dynamic_tls",
+            "args": [
+                "--gtest_catch_exceptions=0",
+                // "--gtest_repeat=100",
+                // "--gtest_filter=lfmemAlloc.TestChunkHeaderMultiSlot_MT_at_same_time"
+                // "--gtest_filter=lfmemAlloc.TestChunkHeaderMultiSlot_MT_one_by_one"
+                // "--gtest_filter=lfmemAlloc_prune.TestAllocFreeBwMultThread1"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "gdb の再フォーマットを有効にする",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "逆アセンブリ フレーバーを Intel に設定",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "make all and build test"
+        },
+        {
             "name": "(gdb) test_mem_alloc起動",
             "type": "cppdbg",
             "request": "launch",
@@ -34,6 +96,39 @@
                 }
             ],
             "preLaunchTask": "make all and build test"
+        },
+        {
+            "name": "(gdb) test_mem_alloc with sanitizer起動",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/test/test_mem_alloc/test_mem_alloc",
+            "args": [
+                "--gtest_catch_exceptions=0",
+                // "--gtest_repeat=100",
+                // "--gtest_filter=lfmemAlloc.TestChunkHeaderMultiSlot_MT_at_same_time"
+                // "--gtest_filter=lfmemAlloc.TestChunkHeaderMultiSlot_MT_one_by_one"
+                // "--gtest_filter=lfmemAlloc_prune.TestAllocFreeBwMultThread1"
+                // "--gtest_filter=various_threads/lfmemAllocLoadTest.load_test_lockfree_min2/1"
+                // "--gtest_filter=lfmemAlloc.PlatformCheck"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "gdb の再フォーマットを有効にする",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "逆アセンブリ フレーバーを Intel に設定",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build with a sanitizer"
         },
     ]
 }
