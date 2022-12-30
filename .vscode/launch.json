@@ -12,9 +12,7 @@
             "args": [
                 "--gtest_catch_exceptions=0",
                 // "--gtest_repeat=100",
-                // "--gtest_filter=lfmemAlloc.TestChunkHeaderMultiSlot_MT_at_same_time"
-                // "--gtest_filter=lfmemAlloc.TestChunkHeaderMultiSlot_MT_one_by_one"
-                // "--gtest_filter=lfmemAlloc_prune.TestAllocFreeBwMultThread1"
+                // "--gtest_filter=lfmemAllocLoad.TC_Unstable_Threads"
             ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
@@ -33,7 +31,7 @@
                     "ignoreFailures": true
                 }
             ],
-            // "preLaunchTask": "make all and build test"
+            "preLaunchTask": "make all and build test"
         },
         {
             "name": "(gdb) test_dynamic_tls起動",
@@ -76,7 +74,8 @@
                 // "--gtest_repeat=100",
                 // "--gtest_filter=lfmemAlloc.TestChunkHeaderMultiSlot_MT_at_same_time"
                 // "--gtest_filter=lfmemAlloc.TestChunkHeaderMultiSlot_MT_one_by_one"
-                "--gtest_filter=lfmemAlloc_prune.TestAllocFreeBwMultThread1"
+                // "--gtest_filter=lfmemAlloc_prune.TestAllocFreeBwMultThread1"
+                "--gtest_filter=lfmemAllocLoad.TC_Unstable_Threads"
             ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
