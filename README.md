@@ -164,10 +164,14 @@ After Build step, please execute below commands
         $ cmake --build . --target test  
 
 # Configuration MACRO
-Please refer libalconcurrent/CMakeLists.txt
+Please refer common.cmake also
 
 ### ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 If comiple with ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC, lock free algorithms uses malloc/free instead of general_mem_allocator.
+
+### ALCONCURRENT_CONF_USE_THREAD_LOCAL
+If compile with ALCONCURRENT_CONF_USE_THREAD_LOCAL, this library uses thread_local for dynamic thread local storage class instead of pthread thread local storage.
+Currently this compile option is enabled.
 
 ### ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DEBUG, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP
 Configuration for log output type.
