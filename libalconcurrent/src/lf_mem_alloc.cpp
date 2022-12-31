@@ -1082,7 +1082,7 @@ bool chunk_header_multi_slot::exec_deletion( void )
 
 	chunk_control_status expect;
 	bool                 result;
-#if 0
+#if 1
 	expect = chunk_control_status::NORMAL;
 	result = status_.compare_exchange_strong( expect, chunk_control_status::RESERVED_DELETION );
 	if ( result ) {
@@ -1100,19 +1100,19 @@ bool chunk_header_multi_slot::exec_deletion( void )
 	result = status_.compare_exchange_strong( expect, chunk_control_status::ANNOUNCEMENT_DELETION );
 	if ( !result ) return false;
 
-	// access者の有無を再確認
-	if ( num_of_accesser_.load() != 0 ) {
-		// access者がいるため、削除を取りやめる。
-		status_.store( chunk_control_status::RESERVED_DELETION, std::memory_order_release );
-		return false;
-	}
-
 	for ( unsigned int ii = 0; ii < slot_conf_.num_of_pieces_; ii++ ) {
 		if ( p_free_slot_mark_[ii].load( std::memory_order_acquire ) != slot_status_mark::FREE ) {
 			// 使用中のslotが見つかったため、削除を取りやめる。
 			status_.store( chunk_control_status::RESERVED_DELETION, std::memory_order_release );
 			return false;
 		}
+	}
+
+	// access者の有無を再確認
+	if ( num_of_accesser_.load() != 0 ) {
+		// access者がいるため、削除を取りやめる。
+		status_.store( chunk_control_status::RESERVED_DELETION, std::memory_order_release );
+		return false;
 	}
 
 	// DELETEの実行権の獲得を試みる。
