@@ -36,17 +36,15 @@ public:
 	{
 		int err_cnt, warn_cnt;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
-		EXPECT_EQ( err_cnt, 0 );
-		EXPECT_EQ( warn_cnt, 0 );
 		alpha::concurrent::gmem_prune();
 	}
 	void TearDown() override
 	{
 		int err_cnt, warn_cnt;
-		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
-		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
 	}
@@ -137,19 +135,18 @@ public:
 
 	void SetUp() override
 	{
+
 		int err_cnt, warn_cnt;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
-		EXPECT_EQ( err_cnt, 0 );
-		EXPECT_EQ( warn_cnt, 0 );
 		alpha::concurrent::gmem_prune();
 	}
 	void TearDown() override
 	{
 		int err_cnt, warn_cnt;
-		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
-		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
 	}
@@ -389,7 +386,7 @@ TEST_F( lfmemAlloc, TestBacktrace )
 #else
 	EXPECT_EQ( 0, std::get<1>( bt_info1 ).count_ );
 #endif
-	alpha::concurrent::output_backtrace_info( alpha::concurrent::log_type::ERR, test_ptr1 );
+	alpha::concurrent::output_backtrace_info( alpha::concurrent::log_type::TEST, test_ptr1 );
 
 	alpha::concurrent::gmem_deallocate( test_ptr1 );
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
@@ -416,7 +413,7 @@ TEST_F( lfmemAlloc, TestBacktrace )
 	EXPECT_EQ( 0, std::get<1>( bt_info2 ).count_ );
 #endif
 
-	alpha::concurrent::output_backtrace_info( alpha::concurrent::log_type::ERR, test_ptr2 );
+	alpha::concurrent::output_backtrace_info( alpha::concurrent::log_type::TEST, test_ptr2 );
 
 	alpha::concurrent::gmem_deallocate( test_ptr2 );
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
@@ -432,8 +429,6 @@ TEST_F( lfmemAlloc, TestBacktrace )
 #endif
 #endif
 
-	int err_cnt, warn_cnt;
-	alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 	return;
 }
 

@@ -168,10 +168,10 @@ TEST_F( lfStackTest, TC1 )
 
 	{
 		int err_cnt, warn_cnt;
-		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
-		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
 	}

@@ -81,10 +81,10 @@ TEST( lfmemAllocOneChunk, TC_Load )
 
 	{
 		int err_cnt, warn_cnt;
-		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
-		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
 	}
@@ -554,17 +554,15 @@ public:
 	{
 		int err_cnt, warn_cnt;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
-		EXPECT_EQ( err_cnt, 0 );
-		EXPECT_EQ( warn_cnt, 0 );
 		alpha::concurrent::gmem_prune();
 	}
 	void TearDown() override
 	{
 		int err_cnt, warn_cnt;
-		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
-		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
 	}

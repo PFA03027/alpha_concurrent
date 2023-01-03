@@ -72,8 +72,6 @@ public:
 	{
 		int err_cnt, warn_cnt;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
-		EXPECT_EQ( err_cnt, 0 );
-		EXPECT_EQ( warn_cnt, 0 );
 
 		err_flag.store( false );
 		alpha::concurrent::gmem_prune();
@@ -81,10 +79,10 @@ public:
 	void TearDown() override
 	{
 		int err_cnt, warn_cnt;
-		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
-		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
 
@@ -186,6 +184,7 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 	std::cout << "thread is " << num_of_thd
 			  << " func_test_fifo() Exec time: " << diff.count() << " msec" << std::endl;
 
+	EXPECT_EQ( 0, fifo.get_size() );
 	EXPECT_FALSE( err_flag.load() );
 
 	std::list<alpha::concurrent::chunk_statistics> statistics = p_tmg_arg->get_statistics();
@@ -235,6 +234,7 @@ void load_test_lockfree_bw_mult_thread_startstop( int num_of_thd, alpha::concurr
 	std::cout << "thread is " << num_of_thd
 			  << " func_test_fifo() Exec time: " << diff.count() << " msec" << std::endl;
 
+	EXPECT_EQ( 0, fifo.get_size() );
 	EXPECT_FALSE( err_flag.load() );
 
 	std::list<alpha::concurrent::chunk_statistics> statistics = p_tmg_arg->get_statistics();
@@ -407,14 +407,14 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 		EXPECT_EQ( 0, fifo.get_size() );
 	}
 
-	alpha::concurrent::gmem_prune();
+	// alpha::concurrent::gmem_prune();
 
 	{
 		int err_cnt, warn_cnt;
-		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
-		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		alpha::concurrent::GetErrorWarningLogCount( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
 
