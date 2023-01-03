@@ -1345,6 +1345,26 @@ void chunk_list::mark_as_reserved_deletion(
 	return;
 }
 
+unsigned int chunk_list::get_cur_max_slot_size(
+	unsigned int target_tl_id_arg   //!< [in] オーナー権を開放する対象のtl_id_
+)
+{
+	unsigned int             ans_cur_max_size = 0;
+	chunk_header_multi_slot* p_cur_chms       = p_top_chunk_.load( std::memory_order_acquire );
+	while ( p_cur_chms != nullptr ) {
+		if ( p_cur_chms->owner_tl_id_.load( std::memory_order_acquire ) == target_tl_id_arg ) {
+			const param_chunk_allocation& pca = p_cur_chms->get_param_chunk_allocation();
+			if ( pca.num_of_pieces_ > ans_cur_max_size ) {
+				ans_cur_max_size = pca.num_of_pieces_;
+			}
+		}
+		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
+		p_cur_chms                           = p_next_chms;
+	}
+
+	return ans_cur_max_size;
+}
+
 void chunk_list::release_all_of_ownership(
 	unsigned int                   target_tl_id_arg,         //!< [in] オーナー権を開放する対象のtl_id_
 	const chunk_header_multi_slot* p_non_release_chunk_arg   //!< [in] オーナー権解放の対象外とするchunk_header_multi_slotへのポインタ。指定しない場合は、nullptrを指定すること。
@@ -1435,9 +1455,13 @@ void* chunk_list::allocate_mem_slot(
 
 	// 以降は、新しいメモリ領域をmallocで確保することになる。
 	// 確保するスロットサイズを決める。既存のスロット数では足りなかったので、スロット数を2倍化する。
-	unsigned int cur_slot_num = hint_params.num_of_pieces_;
+	// unsigned int cur_slot_num = hint_params.num_of_pieces_;
+	unsigned int cur_slot_num = get_cur_max_slot_size( hint_params.tl_id_ );
 	unsigned int new_slot_num = cur_slot_num * 2;
-	if ( cur_slot_num > new_slot_num ) {
+	if ( cur_slot_num == 0 ) {
+		new_slot_num = chunk_param_.num_of_pieces_;
+	}
+	if ( ( (size_t)cur_slot_num * (size_t)chunk_param_.size_of_one_piece_ ) >= MAX_ALLOC_SIZE_LIMIT ) {
 		// オーバーフローしてしまったら、2倍化を取りやめる。
 		new_slot_num = cur_slot_num;
 	}

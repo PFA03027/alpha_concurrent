@@ -92,6 +92,7 @@ public:
 
 		printf( "gmem Statistics is;\n" );
 		for ( auto& e : statistics ) {
+			EXPECT_EQ( 0, e.consum_cnt_ );
 			printf( "%s\n", e.print().c_str() );
 		}
 	}
@@ -425,7 +426,7 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 		printf( "gmem Statistics is;\n" );
 		for ( auto& e : statistics ) {
 			// EXPECT_EQ( 0, e.valid_chunk_num_ );
-			// EXPECT_EQ( 0, e.consum_cnt_ );
+			EXPECT_EQ( 0, e.consum_cnt_ );
 			printf( "%s\n", e.print().c_str() );
 		}
 	}

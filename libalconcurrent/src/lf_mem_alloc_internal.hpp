@@ -27,7 +27,8 @@ namespace concurrent {
 
 namespace internal {
 
-#define NON_OWNERED_TL_ID ( 0 )
+#define MAX_ALLOC_SIZE_LIMIT ( (size_t)( 2UL * 1024UL * 1024UL * 1024UL ) )
+#define NON_OWNERED_TL_ID    ( 0 )
 
 /*!
  * @brief	chunk control status
@@ -494,6 +495,11 @@ public:
 	bool unset_delete_reservation( void );
 	bool exec_deletion( void );
 
+	const param_chunk_allocation& get_param_chunk_allocation( void ) const
+	{
+		return slot_conf_;
+	}
+
 	/*!
 	 * @brief	get chunk_header_multi_slot address from void* address that allocate_mem_slot() returns.
 	 *
@@ -697,6 +703,10 @@ private:
 	void release_all_of_ownership(
 		unsigned int                   target_tl_id_arg,         //!< [in] オーナー権を開放する対象のtl_id_
 		const chunk_header_multi_slot* p_non_release_chunk_arg   //!< [in] オーナー権解放の対象外とするchunk_header_multi_slotへのポインタ。指定しない場合は、nullptrを指定すること。
+	);
+
+	unsigned int get_cur_max_slot_size(
+		unsigned int target_tl_id_arg   //!< [in] オーナー権を開放する対象のtl_id_
 	);
 
 	const param_chunk_allocation chunk_param_;

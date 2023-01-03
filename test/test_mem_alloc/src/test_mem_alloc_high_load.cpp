@@ -74,10 +74,14 @@ TEST( lfmemAllocOneChunk, TC_Load )
 	}
 
 	alpha::concurrent::chunk_statistics e = chms.get_statistics();
-
 	printf( "%s\n", e.print().c_str() );
 
-	//	chms.dump();
+	printf( "gmem Statistics is;\n" );
+	std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::gmem_get_statistics();
+	for ( auto& e : statistics ) {
+		EXPECT_EQ( 0, e.consum_cnt_ );
+		printf( "%s\n", e.print().c_str() );
+	}
 
 	{
 		int err_cnt, warn_cnt;

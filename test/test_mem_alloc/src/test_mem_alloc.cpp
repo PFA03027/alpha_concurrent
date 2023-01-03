@@ -139,9 +139,23 @@ public:
 		int err_cnt, warn_cnt;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		alpha::concurrent::gmem_prune();
+
+		printf( "gmem Statistics is;\n" );
+		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::gmem_get_statistics();
+		for ( auto& e : statistics ) {
+			EXPECT_EQ( 0, e.consum_cnt_ );
+			printf( "%s\n", e.print().c_str() );
+		}
 	}
 	void TearDown() override
 	{
+		printf( "gmem Statistics is;\n" );
+		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::gmem_get_statistics();
+		for ( auto& e : statistics ) {
+			EXPECT_EQ( 0, e.consum_cnt_ );
+			printf( "%s\n", e.print().c_str() );
+		}
+
 		int err_cnt, warn_cnt;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		EXPECT_EQ( err_cnt, 0 );
@@ -328,7 +342,7 @@ TEST_F( lfmemAlloc, TestGeneralMemAllocator_prune )
 TEST_F( lfmemAlloc, TestGMemAllocator )
 {
 	std::size_t rq_size = RQ_SIZE;
-	for ( int i = 1; i < 13; i++ ) {
+	for ( int i = 0; i < 13; i++ ) {
 		void* test_ptr1 = alpha::concurrent::gmem_allocate( rq_size );
 		EXPECT_NE( nullptr, test_ptr1 ) << std::to_string( i ) << ": request size: " << std::to_string( rq_size ) << std::endl;
 
