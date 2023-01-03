@@ -378,7 +378,7 @@ public:
 	std::atomic<chunk_header_multi_slot*> p_next_chunk_;      //!< pointer to next chunk header. chunk header does not free. therefore we don't need to consider ABA.
 	std::atomic<chunk_control_status>     status_;            //!< chunk status for GC
 	std::atomic<unsigned int>             owner_tl_id_;       //!< owner tl_id_
-	std::atomic<int>                      num_of_accesser_;   //!< number of accesser to slot buffer
+	mutable std::atomic<int>              num_of_accesser_;   //!< number of accesser to slot buffer
 
 	/*!
 	 * @brief	constructor
@@ -695,7 +695,8 @@ private:
 	);
 
 	void release_all_of_ownership(
-		unsigned int target_tl_id_arg   //!< [in] オーナー権を開放する対象のtl_id_
+		unsigned int                   target_tl_id_arg,         //!< [in] オーナー権を開放する対象のtl_id_
+		const chunk_header_multi_slot* p_non_release_chunk_arg   //!< [in] オーナー権解放の対象外とするchunk_header_multi_slotへのポインタ。指定しない場合は、nullptrを指定すること。
 	);
 
 	const param_chunk_allocation chunk_param_;

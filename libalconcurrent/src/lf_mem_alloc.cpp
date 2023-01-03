@@ -783,6 +783,9 @@ void chunk_header_multi_slot::set_slot_allocation_conf(
 	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
 )
 {
+	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
+	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+
 	slot_conf_.size_of_one_piece_ = get_size_of_one_slot( ch_param_arg );
 	slot_conf_.num_of_pieces_     = ( ch_param_arg.num_of_pieces_ >= 2 ) ? ch_param_arg.num_of_pieces_ : 2;
 
@@ -1063,6 +1066,9 @@ void* chunk_header_multi_slot::try_allocate_mem_slot_impl(
 
 bool chunk_header_multi_slot::set_delete_reservation( void )
 {
+	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
+	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+
 	chunk_control_status expect = chunk_control_status::NORMAL;
 	bool                 result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::RESERVED_DELETION );
 	return result;
@@ -1070,6 +1076,9 @@ bool chunk_header_multi_slot::set_delete_reservation( void )
 
 bool chunk_header_multi_slot::unset_delete_reservation( void )
 {
+	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
+	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+
 	chunk_control_status expect = chunk_control_status::RESERVED_DELETION;
 	bool                 result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::NORMAL );
 	return result;
@@ -1080,20 +1089,30 @@ bool chunk_header_multi_slot::exec_deletion( void )
 	// access者がいないことを確認する
 	if ( num_of_accesser_.load() != 0 ) return false;
 
+	if ( owner_tl_id_.load( std::memory_order_acquire ) != NON_OWNERED_TL_ID ) {
+		// 明確な所有者スレッドが存在するため、削除対象としない。
+		return false;
+	}
+
 	chunk_control_status expect;
 	bool                 result;
-#if 1
+
+	// 削除予約付けを試みる。
 	expect = chunk_control_status::NORMAL;
 	result = status_.compare_exchange_strong( expect, chunk_control_status::RESERVED_DELETION );
-	if ( result ) {
-		for ( unsigned int ii = 0; ii < slot_conf_.num_of_pieces_; ii++ ) {
-			if ( p_free_slot_mark_[ii].load( std::memory_order_acquire ) != slot_status_mark::FREE ) {
-				// 使用中のslotが見つかったため、削除を取りやめる。
-				return false;
-			}
+	if ( !result ) {
+		// 削除予約付けに失敗した。ただし、すでに、削除予約付け済みかもしれないため、チェックする。
+		if ( expect != chunk_control_status::RESERVED_DELETION ) {
+			// すでに何らかのほかの状態に遷移済みのため、削除を取りやめる。
+			return false;
 		}
 	}
-#endif
+	for ( unsigned int ii = 0; ii < slot_conf_.num_of_pieces_; ii++ ) {
+		if ( p_free_slot_mark_[ii].load( std::memory_order_acquire ) != slot_status_mark::FREE ) {
+			// 使用中のslotが見つかったため、削除を取りやめる。
+			return false;
+		}
+	}
 
 	// DELETEの予告を試みる。
 	expect = chunk_control_status::RESERVED_DELETION;
@@ -1125,7 +1144,7 @@ bool chunk_header_multi_slot::exec_deletion( void )
 
 	p_chunk_          = nullptr;
 	p_free_slot_mark_ = nullptr;
-	owner_tl_id_.store( 0, std::memory_order_release );
+	owner_tl_id_.store( NON_OWNERED_TL_ID, std::memory_order_release );
 	free_slot_idx_mgr_.set_idx_size( 0 );
 
 	p_statistics_->valid_chunk_num_.fetch_sub( 1 );
@@ -1157,6 +1176,9 @@ slot_chk_result chunk_header_multi_slot::get_chunk(
 
 chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
 {
+	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
+	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+
 	chunk_statistics ans { 0 };
 
 	ans = p_statistics_->get_statistics();
@@ -1171,6 +1193,9 @@ chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
  */
 void chunk_header_multi_slot::dump( void )
 {
+	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
+	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+
 	if ( p_chunk_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
 		                     "object chunk_%p as %p \n",
@@ -1260,7 +1285,7 @@ bool chunk_list::tl_chunk_param_destructor::release(
 	tl_chunk_param& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
 )
 {
-	data.p_owner_chunk_list_->release_all_of_ownership( data.tl_id_ );
+	data.p_owner_chunk_list_->release_all_of_ownership( data.tl_id_, nullptr );
 	return true;
 }
 
@@ -1268,7 +1293,7 @@ void chunk_list::tl_chunk_param_destructor::destruct(
 	tl_chunk_param& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
 )
 {
-	// data.p_owner_chunk_list_->release_all_of_ownership( data.tl_id_ );
+	// data.p_owner_chunk_list_->release_all_of_ownership( data.tl_id_, nullptr );
 	return;
 }
 
@@ -1321,13 +1346,16 @@ void chunk_list::mark_as_reserved_deletion(
 }
 
 void chunk_list::release_all_of_ownership(
-	unsigned int target_tl_id_arg   //!< [in] オーナー権を開放する対象のtl_id_
+	unsigned int                   target_tl_id_arg,         //!< [in] オーナー権を開放する対象のtl_id_
+	const chunk_header_multi_slot* p_non_release_chunk_arg   //!< [in] オーナー権解放の対象外とするchunk_header_multi_slotへのポインタ。指定しない場合は、nullptrを指定すること。
 )
 {
 	chunk_header_multi_slot* p_cur_chms = p_top_chunk_.load( std::memory_order_acquire );
 	while ( p_cur_chms != nullptr ) {
-		if ( p_cur_chms->owner_tl_id_.load( std::memory_order_acquire ) == target_tl_id_arg ) {
-			p_cur_chms->owner_tl_id_.store( NON_OWNERED_TL_ID, std::memory_order_release );
+		if ( p_cur_chms != p_non_release_chunk_arg ) {
+			if ( p_cur_chms->owner_tl_id_.load( std::memory_order_acquire ) == target_tl_id_arg ) {
+				p_cur_chms->owner_tl_id_.store( NON_OWNERED_TL_ID, std::memory_order_release );
+			}
 		}
 		chunk_header_multi_slot* p_next_chms = p_cur_chms->p_next_chunk_.load( std::memory_order_acquire );
 		p_cur_chms                           = p_next_chms;
@@ -1422,6 +1450,9 @@ void* chunk_list::allocate_mem_slot(
 			// 空きchunk_header_multi_slotに対して、メモリ割り当てを試みる。ここでロックが発生する可能性がある。
 			if ( p_cur_chms->alloc_new_chunk( cur_alloc_conf, hint_params.tl_id_ ) ) {
 				// 再割り当て成功
+				// 既存のオーナー権を持つチャンクを解放
+				release_all_of_ownership( hint_params.tl_id_, p_cur_chms );
+				// メモリスロットを確保する。
 				p_ans = p_cur_chms->allocate_mem_slot( caller_context( cur_cc ) );
 				if ( p_ans != nullptr ) {
 					hint_params.tls_p_hint_chunk = p_cur_chms;
@@ -1465,6 +1496,9 @@ void* chunk_list::allocate_mem_slot(
 		delete p_new_chms;
 		return nullptr;   // TODO: should throw exception ?
 	}
+
+	// 既存のオーナー権を持つチャンクを解放。
+	release_all_of_ownership( hint_params.tl_id_, nullptr );   // まだ新しいchunkをリストに登録していないので、nullptrを指定する。
 
 	// 新たに確保したchunkを、chunkリストの先頭に追加する。
 	chunk_header_multi_slot* p_cur_top = p_top_chunk_.load( std::memory_order_acquire );
