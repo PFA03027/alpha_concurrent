@@ -1802,7 +1802,7 @@ std::tuple<bool,
            alpha::concurrent::bt_info,
            alpha::concurrent::bt_info>
 get_backtrace_info(
-	void* p_mem   //!< [in] pointer to allocated memory by allocate()
+	const void* p_mem   //!< [in] pointer to allocated memory by allocate()
 )
 {
 	std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
@@ -1828,7 +1828,7 @@ get_backtrace_info(
 
 void output_backtrace_info(
 	const log_type lt,     //!< [in] log type
-	void*          p_mem   //!< [in] pointer to allocated memory by allocate()
+	const void*    p_mem   //!< [in] pointer to allocated memory by allocate()
 )
 {
 	static std::atomic_int counter( 0 );
