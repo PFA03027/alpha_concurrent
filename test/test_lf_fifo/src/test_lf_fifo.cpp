@@ -258,7 +258,6 @@ void* func_test_fifo2( void* data )
 	typename test_fifo_type_part::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		auto p_node = new test_fifo_type_part::node_type( v );
-		pointer_strage_local.emplace_back( p_node );
 		p_test_obj->push( p_node );
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 		auto [p_poped_node, vv] = p_test_obj->pop();
@@ -271,6 +270,7 @@ void* func_test_fifo2( void* data )
 			printf( "Buggggggg!!!  %s\n", std::to_string( v ).c_str() );
 			exit( 1 );
 		}
+		pointer_strage_local.emplace_back( p_poped_node );
 		v = vv + 1;
 	}
 
