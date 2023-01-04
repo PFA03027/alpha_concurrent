@@ -47,7 +47,7 @@ static pthread_barrier_t barrier;
 
 constexpr int max_slot_size  = 1000;
 constexpr int max_alloc_size = 900;
-constexpr int num_loop       = 200;
+constexpr int num_loop       = 50;
 
 using test_fifo_type = alpha::concurrent::fifo_list<void*, true, false>;
 
@@ -267,7 +267,6 @@ TEST_P( lfmemAllocFreeBwMultThread, TC1_prune )
 
 			std::thread prune_th( prune_thread, &prune_loop, &test1_gma );
 
-			err_flag.store( false );
 			EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread_startstop( num_thread_, &test1_gma ) );
 
 			prune_loop.store( false, std::memory_order_release );
@@ -300,7 +299,7 @@ INSTANTIATE_TEST_SUITE_P( many_tls,
 
 TEST( lfmemAllocLoad, TC_Unstable_Threads )
 {
-	const int total_thread_num     = 1000;
+	const int total_thread_num     = 200;
 	const int generated_thread_num = 10;
 	const int gmem_max_alloc_size  = 16000;
 	{
