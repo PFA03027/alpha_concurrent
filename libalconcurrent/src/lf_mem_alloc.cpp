@@ -513,6 +513,7 @@ idx_mgr::idx_mgr(
 idx_mgr::~idx_mgr()
 {
 	delete[] p_idx_mgr_element_array_;
+	p_idx_mgr_element_array_ = nullptr;
 }
 
 void idx_mgr::set_idx_size( const int idx_size_arg )
