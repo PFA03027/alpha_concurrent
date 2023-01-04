@@ -502,11 +502,11 @@ idx_mgr::idx_mgr(
   , invalid_element_storage_( &idx_mgr_element::p_invalid_idx_next_element_, p_alloc_collision_cnt_ )
   , valid_element_storage_( &idx_mgr_element::p_valid_idx_next_element_, p_dealloc_collision_cnt_ )
   , tls_waiting_idx_list_( rcv_idx_by_thread_terminating( this ) )
-  , rcv_waiting_idx_list_( idx_size_, idx_size_ver_ )
+  , rcv_waiting_idx_list_( idx_size_.load(), idx_size_ver_.load() )
 {
-	if ( idx_size_ <= 0 ) return;
+	if ( idx_size_.load() <= 0 ) return;
 
-	set_idx_size( idx_size_ );
+	set_idx_size( idx_size_.load() );
 	return;
 }
 
@@ -527,15 +527,15 @@ void idx_mgr::set_idx_size( const int idx_size_arg )
 	idx_size_ver_++;
 
 	if ( idx_size_arg <= 0 ) {
-		idx_size_ = -1;
+		idx_size_.store( -1 );
 		return;
 	}
 
 	// idx_mgr_elementのコンストラクタによる初期化を機能させるため、配列の再利用はしない。
 	p_idx_mgr_element_array_ = new idx_mgr_element[idx_size_arg];
-	idx_size_                = idx_size_arg;
+	idx_size_.store( idx_size_arg );
 
-	tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
+	tls_waiting_idx_list_.get_tls_instance( idx_size_.load(), idx_size_ver_.load() );
 
 	for ( int i = 0; i < idx_size_; i++ ) {
 		p_idx_mgr_element_array_[i].idx_ = i;
@@ -548,9 +548,9 @@ void idx_mgr::set_idx_size( const int idx_size_arg )
 int idx_mgr::pop( void )
 {
 	int               ans       = -1;
-	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
+	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( idx_size_.load(), idx_size_ver_.load() );
 
-	ans = wait_list.pop_from_tls( idx_size_, idx_size_ver_ );
+	ans = wait_list.pop_from_tls( idx_size_.load(), idx_size_ver_.load() );
 	if ( ans != -1 ) {
 		return ans;
 	}
@@ -560,7 +560,7 @@ int idx_mgr::pop( void )
 	if ( p_valid_pop_element == nullptr ) {
 		std::unique_lock<std::mutex> lk( mtx_rcv_waiting_idx_list_, std::try_to_lock );
 		if ( lk.owns_lock() ) {
-			int tmp_ans = rcv_waiting_idx_list_.pop_from_tls( idx_size_, idx_size_ver_ );
+			int tmp_ans = rcv_waiting_idx_list_.pop_from_tls( idx_size_.load(), idx_size_ver_.load() );
 			if ( tmp_ans >= 0 ) {
 				return tmp_ans;
 			}
@@ -580,13 +580,13 @@ void idx_mgr::push(
 	const int idx_arg   //!< [in] 返却するインデックス番号
 )
 {
-	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
+	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( idx_size_.load(), idx_size_ver_.load() );
 
 	idx_mgr_element* p_invalid_element = invalid_element_storage_.pop_element();
 
 	if ( p_invalid_element == nullptr ) {
 		// スロットに空きがないので、ローカルストレージで保持する。
-		wait_list.push_to_tls( idx_arg, idx_size_, idx_size_ver_ );
+		wait_list.push_to_tls( idx_arg, idx_size_.load(), idx_size_ver_.load() );
 	} else {
 
 		p_invalid_element->idx_ = idx_arg;
@@ -601,11 +601,11 @@ void idx_mgr::rcv_wait_idx_by_thread_terminating( waiting_idx_list* p_idx_list )
 {
 	std::lock_guard<std::mutex> lock( mtx_rcv_waiting_idx_list_ );
 
-	int tmp_idx = p_idx_list->pop_from_tls( idx_size_, idx_size_ver_ );
+	int tmp_idx = p_idx_list->pop_from_tls( idx_size_.load(), idx_size_ver_.load() );
 
 	while ( tmp_idx >= 0 ) {
-		rcv_waiting_idx_list_.push_to_tls( tmp_idx, idx_size_, idx_size_ver_ );
-		tmp_idx = p_idx_list->pop_from_tls( idx_size_, idx_size_ver_ );
+		rcv_waiting_idx_list_.push_to_tls( tmp_idx, idx_size_.load(), idx_size_ver_.load() );
+		tmp_idx = p_idx_list->pop_from_tls( idx_size_.load(), idx_size_ver_.load() );
 	}
 
 	return;
@@ -613,7 +613,7 @@ void idx_mgr::rcv_wait_idx_by_thread_terminating( waiting_idx_list* p_idx_list )
 
 void idx_mgr::dump( void )
 {
-	const waiting_idx_list& tmp_wel = tls_waiting_idx_list_.get_tls_instance( idx_size_, idx_size_ver_ );
+	const waiting_idx_list& tmp_wel = tls_waiting_idx_list_.get_tls_instance( idx_size_.load(), idx_size_ver_.load() );
 
 	internal::LogOutput( log_type::DUMP,
 	                     "object idx_mgr_%p as %p {\n"
@@ -625,8 +625,8 @@ void idx_mgr::dump( void )
 	                     "\t waiting_element_list = %p\n"
 	                     "}\n",
 	                     this, this,
-	                     idx_size_,
-	                     idx_size_ver_,
+	                     idx_size_.load(),
+	                     idx_size_ver_.load(),
 	                     p_idx_mgr_element_array_,
 	                     &invalid_element_storage_,
 	                     &valid_element_storage_,

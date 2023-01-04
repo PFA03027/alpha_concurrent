@@ -354,8 +354,8 @@ private:
 	 */
 	void clear( void );
 
-	int idx_size_;       //!< 割り当てられたインデックス番号の数
-	int idx_size_ver_;   //!< 割り当てられたインデックス番号の数の情報のバージョン番号
+	std::atomic<int> idx_size_;       //!< 割り当てられたインデックス番号の数
+	std::atomic<int> idx_size_ver_;   //!< 割り当てられたインデックス番号の数の情報のバージョン番号
 
 	std::atomic<unsigned int>* p_alloc_collision_cnt_;     //!< idxをpopする時に発生した衝突回数をカウントする変数へのポインタ
 	std::atomic<unsigned int>* p_dealloc_collision_cnt_;   //!< idxをpushする時に発生した衝突回数をカウントする変数へのポインタ
