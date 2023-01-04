@@ -1606,7 +1606,8 @@ general_mem_allocator::general_mem_allocator(
   , up_param_ch_array_()
   , exclusive_ctl_of_prune_( false )
 {
-#ifndef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+#else
 	set_param( p_param_array, num );
 #endif
 	return;
