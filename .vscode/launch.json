@@ -12,7 +12,8 @@
             "args": [
                 "--gtest_catch_exceptions=0",
                 // "--gtest_repeat=100",
-                // "--gtest_filter=lfmemAllocLoad.TC_Unstable_Threads"
+                // "--gtest_filter=lffifoTest.TC1_SimplePushPop"
+                // "--gtest_filter=lffifoTest.TC1_MultThreadPushPop"
             ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
@@ -32,6 +33,36 @@
                 }
             ],
             "preLaunchTask": "make all and build test"
+        },
+        {
+            "name": "(gdb) test_lf_fifo with sanitizer起動",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/test/test_lf_fifo/test_lf_fifo",
+            "args": [
+                "--gtest_catch_exceptions=0",
+                // "--gtest_repeat=100",
+                // "--gtest_filter=lffifoTest.TC1_SimplePushPop"
+                // "--gtest_filter=lffifoTest.TC1_MultThreadPushPop"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "gdb の再フォーマットを有効にする",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "逆アセンブリ フレーバーを Intel に設定",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build with a sanitizer"
         },
         {
             "name": "(gdb) test_dynamic_tls起動",
@@ -71,11 +102,14 @@
             "program": "${workspaceFolder}/build/test/test_mem_alloc/test_mem_alloc",
             "args": [
                 "--gtest_catch_exceptions=0",
-                // "--gtest_repeat=100",
-                // "--gtest_filter=lfmemAlloc.TestChunkHeaderMultiSlot_MT_at_same_time"
-                // "--gtest_filter=lfmemAlloc.TestChunkHeaderMultiSlot_MT_one_by_one"
+                "--gtest_repeat=100",
+                // "--gtest_filter=many_tls/lfmemAllocFreeBwMultThread.TC1_prune/0:many_tls/lfmemAllocFreeBwMultThread.TC1_prune/3:various_threads/lfmemAllocLoadTest.load_test_lockfree_actual_behavior/1:lfmemAllocLoad.TC_Unstable_Threads",
+                // "--gtest_filter=many_tls/lfmemAllocFreeBwMultThread.TC1_prune/3",
+                // "--gtest_filter=various_threads/lfmemAllocLoadTest.load_test_lockfree_actual_behavior/1",
+                // "--gtest_filter=many_tls/lfmemAllocFreeBwMultThread.TC1/2",
+                "--gtest_filter=lfmemAlloc.TestGMemAllocator"
                 // "--gtest_filter=lfmemAlloc_prune.TestAllocFreeBwMultThread1"
-                "--gtest_filter=lfmemAllocLoad.TC_Unstable_Threads"
+                // "--gtest_filter=lfmemAllocLoad.TC_Unstable_Threads"
             ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
