@@ -292,6 +292,7 @@ void* node_of_list::operator new( std::size_t n )   // usual new...(1)
 	void* p_ans;
 #ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 	p_ans = std::malloc( n );
+	// p_ans = ::operator new( n );
 #else
 #ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
 	p_ans = get_gma().allocate( n );
@@ -308,6 +309,7 @@ void node_of_list::operator delete( void* p_mem ) noexcept   // usual new...(2)
 {
 #ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 	std::free( p_mem );
+	// ::operator delete( p_mem );
 #else
 #ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
 	get_gma().deallocate( p_mem );
@@ -323,6 +325,7 @@ void* node_of_list::operator new[]( std::size_t n )   // usual new...(1)
 	void* p_ans;
 #ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 	p_ans = std::malloc( n );
+	// p_ans = ::operator new[]( n );
 #else
 #ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
 	p_ans = get_gma().allocate( n );
@@ -339,6 +342,7 @@ void node_of_list::operator delete[]( void* p_mem ) noexcept   // usual new...(2
 {
 #ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
 	std::free( p_mem );
+	// ::operator delete[]( p_mem );
 #else
 #ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
 	get_gma().deallocate( p_mem );
