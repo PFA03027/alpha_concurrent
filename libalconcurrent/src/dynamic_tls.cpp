@@ -15,6 +15,9 @@
 #include <atomic>
 #include <cerrno>
 #include <cstdlib>
+#ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
+#include <mutex>
+#endif
 
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/dynamic_tls.hpp"
@@ -25,6 +28,10 @@ namespace concurrent {
 namespace internal {
 
 #define STRERROR_BUFF_SIZE ( 256 )
+
+#ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
+std::recursive_mutex dynamic_tls_global_exclusive_control_for_destructions;   //!< to avoid rece condition b/w thread local destruction and normal destruction globally
+#endif
 
 static std::atomic<int> cur_count_of_tls_keys( 0 );
 static std::atomic<int> max_count_of_tls_keys( 0 );
@@ -576,6 +583,10 @@ void call_destructor_for_array_and_clear_data( dynamic_tls_key_array* p_key_arra
 
 void dynamic_tls_content_head::call_destructor_and_release_ownership( void )
 {
+#ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
+	std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
+#endif
+
 	dynamic_tls_content_array* p_cur_tls_ca = p_head_content_;
 	while ( p_cur_tls_ca != nullptr ) {
 		dynamic_tls_key_array* p_pare = dynamic_tls_mgr::get_instance().get_dynamic_tls_key_array( p_cur_tls_ca->base_idx_ );
@@ -594,6 +605,10 @@ bool dynamic_tls_key_array::release_key( dynamic_tls_key* p_key_arg )
 {
 	if ( p_key_arg < key_array_ ) return false;
 	if ( &( key_array_[ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE] ) <= p_key_arg ) return false;
+
+#ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
+	std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
+#endif
 
 	// releaseの作業権の確保
 	dynamic_tls_key::alloc_stat expected_alloc_stat = dynamic_tls_key::alloc_stat::USED;
