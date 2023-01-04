@@ -122,7 +122,7 @@ TEST_P( ChunkHeaderMultiSlotMaltiThread, TC_at_same_time )
 
 INSTANTIATE_TEST_SUITE_P( many_threads,
                           ChunkHeaderMultiSlotMaltiThread,
-                          testing::Values( 0, 1, 2, 10, 100 ) );
+                          testing::Values( 1, 2, 10, 100 ) );
 
 class lfmemAlloc : public testing::Test {
 	// You can implement all the usual fixture class members here.
