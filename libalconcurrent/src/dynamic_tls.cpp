@@ -25,13 +25,13 @@
 namespace alpha {
 namespace concurrent {
 
-namespace internal {
-
-#define STRERROR_BUFF_SIZE ( 256 )
-
 #ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
 std::recursive_mutex dynamic_tls_global_exclusive_control_for_destructions;   //!< to avoid rece condition b/w thread local destruction and normal destruction globally
 #endif
+
+namespace internal {
+
+#define STRERROR_BUFF_SIZE ( 256 )
 
 static std::atomic<int> cur_count_of_tls_keys( 0 );
 static std::atomic<int> max_count_of_tls_keys( 0 );
@@ -107,9 +107,7 @@ struct dynamic_tls_key {
 	}
 };
 
-class dynamic_tls_content_array;
 class dynamic_tls_key_array;
-void call_destructor_for_array( dynamic_tls_key_array* p_key_array_arg, dynamic_tls_content_array* p_content_array_arg );
 
 class dynamic_tls_content_array {
 public:
@@ -177,7 +175,7 @@ public:
 	{
 		if ( ownership_state_.load( std::memory_order_acquire ) != cnt_arry_state::USED ) return nullptr;
 
-		dynamic_tls_content_array* p_cur_tls_ca = p_head_content_;
+		dynamic_tls_content_array* p_cur_tls_ca = p_head_content_.load( std::memory_order_acquire );
 		while ( p_cur_tls_ca != nullptr ) {
 			auto ret = p_cur_tls_ca->get_tls( idx );
 			if ( ret.is_in_this_array_ ) {
@@ -189,8 +187,8 @@ public:
 		// 見つからなかったので、dynamic_tls_content_arrayが不足しているので、追加
 		unsigned int               base_idx = ( idx / ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE ) * ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE;
 		dynamic_tls_content_array* p_new    = new dynamic_tls_content_array( base_idx );
-		p_new->p_next_                      = p_head_content_;
-		p_head_content_                     = p_new;
+		p_new->p_next_                      = p_head_content_.load( std::memory_order_acquire );
+		p_head_content_.store( p_new, std::memory_order_release );
 
 		return nullptr;   // 見つからなかったので、nullptrを返す
 	}
@@ -199,7 +197,7 @@ public:
 	{
 		if ( ownership_state_.load( std::memory_order_acquire ) != cnt_arry_state::USED ) return false;
 
-		dynamic_tls_content_array* p_cur_tls_ca = p_head_content_;
+		dynamic_tls_content_array* p_cur_tls_ca = p_head_content_.load( std::memory_order_acquire );
 		while ( p_cur_tls_ca != nullptr ) {
 			auto ret = p_cur_tls_ca->set_tls( idx, p_data_arg );
 			if ( ret ) {
@@ -211,10 +209,10 @@ public:
 		// 見つからなかったので、dynamic_tls_content_arrayが不足しているので、追加
 		unsigned int               base_idx = ( idx / ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE ) * ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE;
 		dynamic_tls_content_array* p_new    = new dynamic_tls_content_array( base_idx );
-		p_new->p_next_                      = p_head_content_;
-		p_head_content_                     = p_new;
+		p_new->p_next_                      = p_head_content_.load( std::memory_order_acquire );
+		p_head_content_.store( p_new, std::memory_order_release );
 
-		return p_head_content_->set_tls( idx, p_data_arg );
+		return p_new->set_tls( idx, p_data_arg );
 	}
 
 	bool try_get_ownership( void )
@@ -228,8 +226,8 @@ public:
 	std::atomic<dynamic_tls_content_head*> p_next_;   //!< thread方向で、次のarrayへのポインタ
 
 private:
-	std::atomic<cnt_arry_state> ownership_state_;   //!< 所有者の有無の状態
-	dynamic_tls_content_array*  p_head_content_;
+	std::atomic<cnt_arry_state>             ownership_state_;   //!< 所有者の有無の状態
+	std::atomic<dynamic_tls_content_array*> p_head_content_;
 };
 
 class dynamic_tls_key_array {
@@ -396,6 +394,7 @@ private:
 		~tl_content_head()
 		{
 			if ( p_tl_cnt_head_ == nullptr ) return;
+
 			dynamic_tls_mgr::destructor( p_tl_cnt_head_ );
 		}
 
@@ -527,6 +526,10 @@ void dynamic_tls_mgr::destructor( void* p_data )
 {
 	if ( !is_live_.load( std::memory_order_acquire ) ) return;
 
+#ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
+	std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
+#endif
+
 	dynamic_tls_content_head* p_destruct_dtls_head = reinterpret_cast<dynamic_tls_content_head*>( p_data );
 	p_destruct_dtls_head->call_destructor_and_release_ownership();
 
@@ -583,11 +586,7 @@ void call_destructor_for_array_and_clear_data( dynamic_tls_key_array* p_key_arra
 
 void dynamic_tls_content_head::call_destructor_and_release_ownership( void )
 {
-#ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
-	std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
-#endif
-
-	dynamic_tls_content_array* p_cur_tls_ca = p_head_content_;
+	dynamic_tls_content_array* p_cur_tls_ca = p_head_content_.load( std::memory_order_acquire );
 	while ( p_cur_tls_ca != nullptr ) {
 		dynamic_tls_key_array* p_pare = dynamic_tls_mgr::get_instance().get_dynamic_tls_key_array( p_cur_tls_ca->base_idx_ );
 		if ( p_pare != nullptr ) {

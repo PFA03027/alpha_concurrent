@@ -37,14 +37,14 @@
 namespace alpha {
 namespace concurrent {
 
+#ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
+extern std::recursive_mutex dynamic_tls_global_exclusive_control_for_destructions;   //!< to avoid rece condition b/w thread local destruction and normal destruction globally
+#endif
+
 namespace internal {
 
 #define ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE          ( 1024 )
 #define ALCONCURRENT_CONF_DYNAMIC_TLS_DESTUCT_ITERATE_MAX ( 10 )
-
-#ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
-extern std::recursive_mutex dynamic_tls_global_exclusive_control_for_destructions;   //!< to avoid rece condition b/w thread local destruction and normal destruction globally
-#endif
 
 struct dynamic_tls_key;
 using dynamic_tls_key_t = dynamic_tls_key*;   //!< pointer to dynamic_tls_key as a key
@@ -363,7 +363,7 @@ public:
 		internal::LogOutput( log_type::DEBUG, "dynamic_tls::destructor is called" );
 
 #ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
-		std::lock_guard<std::recursive_mutex> lg( internal::dynamic_tls_global_exclusive_control_for_destructions );
+		std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
 #endif
 
 		internal::dynamic_tls_key_release( tls_key );
