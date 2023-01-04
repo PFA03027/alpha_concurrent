@@ -27,7 +27,7 @@ public:
 
 	void test_write( void )
 	{
-#ifdef ENABLE_THREADSANITIZER
+#ifdef TEST_ENABLE_THREADSANITIZER
 #else
 		dummy[0] = 1;   // dummy access only. If you need to check by ThreadSanitizer, please comment out.
 #endif

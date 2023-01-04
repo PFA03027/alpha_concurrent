@@ -448,7 +448,7 @@ TEST_F( lfmemAlloc, TestBacktrace )
 
 TEST_F( lfmemAlloc, TestBacktrace2 )
 {
-#ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+#if defined( TEST_ENABLE_THREADSANITIZER ) || defined( TEST_ENABLE_ADDRESSSANITIZER )
 #else
 	std::size_t rq_size   = RQ_SIZE;
 	void*       test_ptr1 = std::malloc( rq_size );
