@@ -518,18 +518,12 @@ idx_mgr::~idx_mgr()
 
 void idx_mgr::set_idx_size( const int idx_size_arg )
 {
-	valid_element_storage_.clear();
-	invalid_element_storage_.clear();
-
-	delete[] p_idx_mgr_element_array_;
-	p_idx_mgr_element_array_ = nullptr;
-
-	idx_size_ver_++;
-
 	if ( idx_size_arg <= 0 ) {
 		idx_size_.store( -1 );
 		return;
 	}
+
+	idx_size_ver_++;
 
 	// idx_mgr_elementのコンストラクタによる初期化を機能させるため、配列の再利用はしない。
 	p_idx_mgr_element_array_ = new idx_mgr_element[idx_size_arg];
@@ -537,12 +531,31 @@ void idx_mgr::set_idx_size( const int idx_size_arg )
 
 	tls_waiting_idx_list_.get_tls_instance( idx_size_.load(), idx_size_ver_.load() );
 
-	for ( int i = 0; i < idx_size_; i++ ) {
+	for ( int i = 0; i < idx_size_.load(); i++ ) {
 		p_idx_mgr_element_array_[i].idx_ = i;
 		valid_element_storage_.push_element( &( p_idx_mgr_element_array_[i] ) );
 	}
 
 	return;
+}
+
+void idx_mgr::clear( void )
+{
+#ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
+	std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
+#endif
+
+	invalid_element_storage_.~idx_element_storage_mgr();   // 強引に動的スレッドローカルストレージを含めて破棄する。
+	valid_element_storage_.~idx_element_storage_mgr();     // 強引に動的スレッドローカルストレージを含めて破棄する。
+	tls_waiting_idx_list_.~dynamic_tls();                  // 強引に動的スレッドローカルストレージを含めて破棄する。
+
+	delete[] p_idx_mgr_element_array_;
+	p_idx_mgr_element_array_ = nullptr;
+
+	// 強引に初期化
+	new ( &invalid_element_storage_ ) idx_element_storage_mgr( &idx_mgr_element::p_invalid_idx_next_element_, p_alloc_collision_cnt_ );
+	new ( &valid_element_storage_ ) idx_element_storage_mgr( &idx_mgr_element::p_valid_idx_next_element_, p_dealloc_collision_cnt_ );
+	new ( &tls_waiting_idx_list_ ) dynamic_tls<waiting_idx_list, rcv_idx_by_thread_terminating>( rcv_idx_by_thread_terminating( this ) );
 }
 
 int idx_mgr::pop( void )
@@ -1140,13 +1153,17 @@ bool chunk_header_multi_slot::exec_deletion( void )
 	result = status_.compare_exchange_strong( expect, chunk_control_status::ANNOUNCEMENT_DELETION );
 	if ( !result ) return false;
 
+#ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
+	std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
+#endif
+
 	std::free( p_chunk_ );
 	delete[] p_free_slot_mark_;
 
 	p_chunk_          = nullptr;
 	p_free_slot_mark_ = nullptr;
 	owner_tl_id_.store( NON_OWNERED_TL_ID, std::memory_order_release );
-	free_slot_idx_mgr_.set_idx_size( 0 );
+	free_slot_idx_mgr_.clear();
 
 	p_statistics_->valid_chunk_num_.fetch_sub( 1 );
 	p_statistics_->total_slot_cnt_.fetch_sub( slot_conf_.num_of_pieces_ );

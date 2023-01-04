@@ -150,7 +150,7 @@ public:
 	);
 
 	/*!
-	 * @brief	リスト操作時の衝突回数を取得する。
+	 * @brief	保持しているidx_mgr_elementをクリアする。
 	 */
 	void clear( void );
 
@@ -286,6 +286,11 @@ struct idx_mgr {
 	);
 
 	/*!
+	 * @brief	clear
+	 */
+	void clear( void );
+
+	/*!
 	 * @brief	利用可能なインデックス番号を取り出す。
 	 *
 	 * @return	利用可能なインデックス番号
@@ -348,11 +353,6 @@ private:
 	 * スレッドセーフではあるが、ロックによる排他制御が行われる。
 	 */
 	void rcv_wait_idx_by_thread_terminating( waiting_idx_list* p_idx_list );
-
-	/*!
-	 * @brief	clear
-	 */
-	void clear( void );
 
 	std::atomic<int> idx_size_;       //!< 割り当てられたインデックス番号の数
 	std::atomic<int> idx_size_ver_;   //!< 割り当てられたインデックス番号の数の情報のバージョン番号
