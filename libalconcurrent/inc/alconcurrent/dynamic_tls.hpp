@@ -26,20 +26,16 @@
 #include <cerrno>
 #include <cstdlib>
 #include <memory>
+#include <mutex>
 #include <type_traits>
 #include <utility>
-#ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
-#include <mutex>
-#endif
 
 #include "conf_logger.hpp"
 
 namespace alpha {
 namespace concurrent {
 
-#ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
 extern std::recursive_mutex dynamic_tls_global_exclusive_control_for_destructions;   //!< to avoid rece condition b/w thread local destruction and normal destruction globally
-#endif
 
 namespace internal {
 
@@ -362,9 +358,7 @@ public:
 	{
 		internal::LogOutput( log_type::DEBUG, "dynamic_tls::destructor is called" );
 
-#ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
 		std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
-#endif
 
 		internal::dynamic_tls_key_release( tls_key );
 

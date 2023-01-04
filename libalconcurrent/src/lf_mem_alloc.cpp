@@ -541,9 +541,7 @@ void idx_mgr::set_idx_size( const int idx_size_arg )
 
 void idx_mgr::clear( void )
 {
-#ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
 	std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
-#endif
 
 	invalid_element_storage_.~idx_element_storage_mgr();   // 強引に動的スレッドローカルストレージを含めて破棄する。
 	valid_element_storage_.~idx_element_storage_mgr();     // 強引に動的スレッドローカルストレージを含めて破棄する。
@@ -1153,9 +1151,7 @@ bool chunk_header_multi_slot::exec_deletion( void )
 	result = status_.compare_exchange_strong( expect, chunk_control_status::ANNOUNCEMENT_DELETION );
 	if ( !result ) return false;
 
-#ifdef ALCONCURRENT_CONF_ENABLE_GLOBAL_LOCK_OF_DYNAMIC_TLS_FOR_DESTRUCTOR
 	std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
-#endif
 
 	std::free( p_chunk_ );
 	delete[] p_free_slot_mark_;
