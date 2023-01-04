@@ -490,7 +490,6 @@ private:
 	template <typename TFUNC>
 	value_reference get_tls_instance_pred_impl( TFUNC pred )
 	{
-		// pthread_getspecific()が、ロックフリーであることを祈る。
 		tls_cont_pointer p_tls = reinterpret_cast<tls_cont_pointer>( internal::dynamic_tls_getspecific( tls_key ) );
 		if ( p_tls == nullptr ) {
 			p_tls = allocate_free_tls_container();
