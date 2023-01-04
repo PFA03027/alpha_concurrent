@@ -4,7 +4,7 @@ If you are possible to design the necessary memory size, semi lock-free algorith
 
 # Pre-requirement
 * C++11 standard and standard C++ library are required.
-* POSIX pthread thread local storage API is required.
+* POSIX pthread thread local storage API is required optionaly in case disable ALCONCURRENT_CONF_USE_THREAD_LOCAL of common.cmake.
 
 ## Supplement
 C++14 or newer C++ standard is better to compile.
@@ -92,7 +92,10 @@ Non lock free behavior cases are below;
 Support dynamic allocatable thread local storage.
 
 When allocating dynamic allocatable thread local storage for a thread, it is not lock free. This will be happened by 1st access of a value instance.
-After allocation, this class may be lock free. This depends whether pthread_getspecific() is lock free or not.
+After allocation, this class may be lock free.
+If disable ALCONCURRENT_CONF_USE_THREAD_LOCAL, this depends whether pthread_getspecific() is lock free or not.
+
+To avoid race condtion b/w dynamic_tls class and thread local storage destructor, currently global mutex lock is introduced.
 
 # general memory allocator class that is semi lock-free in lf_mem_alloc.hpp
 This is general memory allocator to get lock-free behavior and to avoid memory fragmentation.
@@ -101,8 +104,10 @@ The current implementation requires a small additional overhead compared to mall
 Configured of memory is kept to re-use.
 If the required size is over the max size of configuration paramter, it allocates directly from malloc() and free it by free() also.
 
+general_mem_allocator::prune() and gmem_prune() is introduce to release the allocated memory if that is release by general_mem_allocator::deallocate() or gmem_deallocate().
+
 # Important points
-Whether the provided class is lock-free depends on whether the POSIX API for thread-local storage is lock-free.
+If disable ALCONCURRENT_CONF_USE_THREAD_LOCAL, Whether the provided class is lock-free depends on whether the POSIX API for thread-local storage is lock-free.
 
 If the POSIX thread-local storage API is lock-free, the main operations such as push () / pop () will behave as lock-free.
 
