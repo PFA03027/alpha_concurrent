@@ -67,24 +67,15 @@ std::deque<test_fifo_type_part::node_type*> pointer_strage;   // 管理ノード
  */
 void* func_push( void* data )
 {
-	std::deque<test_fifo_type_part::node_type*> pointer_strage_local;
-	test_fifo_type_part*                        p_test_obj = reinterpret_cast<test_fifo_type_part*>( data );
+	test_fifo_type_part* p_test_obj = reinterpret_cast<test_fifo_type_part*>( data );
 
 	pthread_barrier_wait( &barrier );
 
 	typename test_fifo_type_part::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		auto p_node = new test_fifo_type_part::node_type( i );
-		pointer_strage_local.emplace_back( p_node );
 		p_test_obj->push( p_node );
 		v++;
-	}
-
-	{
-		std::lock_guard<std::mutex> lk( mtx_pointer_strage );
-		for ( auto& e : pointer_strage_local ) {
-			pointer_strage.emplace_back( e );
-		}
 	}
 
 	return reinterpret_cast<void*>( v );
@@ -95,7 +86,8 @@ void* func_push( void* data )
  */
 void* func_pop( void* data )
 {
-	test_fifo_type_part* p_test_obj = reinterpret_cast<test_fifo_type_part*>( data );
+	std::deque<test_fifo_type_part::node_type*> pointer_strage_local;
+	test_fifo_type_part*                        p_test_obj = reinterpret_cast<test_fifo_type_part*>( data );
 
 	pthread_barrier_wait( &barrier );
 
@@ -113,14 +105,76 @@ void* func_pop( void* data )
 			return reinterpret_cast<void*>( v );
 			exit( 1 );
 		}
+		pointer_strage_local.emplace_back( p_node );
 		v++;
 		//		delete p_node;
+	}
+
+	{
+		std::lock_guard<std::mutex> lk( mtx_pointer_strage );
+		for ( auto& e : pointer_strage_local ) {
+			pointer_strage.emplace_back( e );
+		}
 	}
 
 	return reinterpret_cast<void*>( v );
 }
 
-TEST_F( lffifoTest, TC1 )
+TEST_F( lffifoTest, TC0_CreateDestory )
+{
+	test_fifo_type_part* p_test_obj = new test_fifo_type_part();
+
+	delete p_test_obj;
+
+	return;
+}
+
+TEST_F( lffifoTest, TC1_SimplePushPop )
+{
+	test_fifo_type_part* p_test_obj = new test_fifo_type_part();
+
+	auto p_push_node = new test_fifo_type_part::node_type( 1 );
+	p_test_obj->push( p_push_node );
+
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
+	auto [p_pop_node, val] = p_test_obj->pop();
+#else
+	auto local_ret1 = p_test_obj->pop();
+	auto p_pop_node = std::get<0>( local_ret1 );
+	auto val = std::get<1>( local_ret );
+#endif
+
+	ASSERT_NE( nullptr, p_pop_node );
+	EXPECT_EQ( 1, val );
+
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
+	auto [p_node_no_data, val2] = p_test_obj->pop();
+#else
+	auto local_ret2 = p_test_obj->pop();
+	auto p_node_no_data = std::get<0>( local_ret2 );
+//	auto val2 = std::get<1>( local_ret );
+#endif
+
+	EXPECT_EQ( nullptr, p_node_no_data );   // 全部読み出し完了いること(p_node == nullptr)が期待値。もし残っていたらNG。
+
+	delete p_test_obj;
+
+	return;
+}
+
+TEST_F( lffifoTest, TC1_SimplePushDestroy )
+{
+	test_fifo_type_part* p_test_obj = new test_fifo_type_part();
+
+	auto p_push_node = new test_fifo_type_part::node_type( 1 );
+	p_test_obj->push( p_push_node );
+
+	delete p_test_obj;
+
+	return;
+}
+
+TEST_F( lffifoTest, TC1_MultThreadPushPop )
 {
 	test_fifo_type_part* p_test_obj = new test_fifo_type_part();
 
