@@ -175,9 +175,9 @@ Please refer common.cmake also
 If comiple with ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC, lock free algorithms uses malloc/free instead of general_mem_allocator.
 
 ### ALCONCURRENT_CONF_USE_THREAD_LOCAL
-If compile with ALCONCURRENT_CONF_USE_THREAD_LOCAL, this library uses thread_local for dynamic thread local storage class instead of pthread thread local storage. @n 
-If you could rely on the destructor behavior of thread_local variable of C++ compiler, you could enable this option. @n 
-And then, you could get a little bit better performance. @n 
+If compile with ALCONCURRENT_CONF_USE_THREAD_LOCAL, this library uses thread_local for dynamic thread local storage class instead of pthread thread local storage.  
+If you could rely on the destructor behavior of thread_local variable of C++ compiler, you could enable this option.  
+And then, you could get a little bit better performance.  
 (G++ version 11.3.0 works well.)
 
 ### ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DEBUG, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP
