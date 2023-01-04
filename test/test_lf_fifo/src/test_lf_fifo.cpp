@@ -147,6 +147,8 @@ TEST_F( lffifoTest, TC1_SimplePushPop )
 	ASSERT_NE( nullptr, p_pop_node );
 	EXPECT_EQ( 1, val );
 
+	delete p_pop_node;
+
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 	auto [p_node_no_data, val2] = p_test_obj->pop();
 #else
