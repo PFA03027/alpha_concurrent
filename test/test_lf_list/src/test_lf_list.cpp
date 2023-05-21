@@ -414,6 +414,8 @@ TEST_F( lflistTest, TC4 )
 	std::cout << "Expect: " << expect << std::endl;
 	std::cout << "Sum:    " << sum << std::endl;
 
+	std::cout << "final count of p_test_obj[0] is " << count_list.get_size() << std::endl;
+
 	EXPECT_EQ( expect, sum );
 
 	return;

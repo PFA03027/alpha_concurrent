@@ -111,6 +111,8 @@ void* func_test_one_side_deque_back2front( void* data )
 		v = vv + 1;
 	}
 
+	printf( "final count of p_test_obj is %d", p_test_obj->get_size() );
+
 	return reinterpret_cast<void*>( v );
 }
 

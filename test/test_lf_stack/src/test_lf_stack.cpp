@@ -121,7 +121,7 @@ TEST_F( lfStackTest, TC1 )
 
 	std::cout << "!!!Ready!!!" << std::endl;   // prints !!!Hello World!!!
 	pthread_barrier_wait( &barrier );
-	std::cout << "!!!GO!!!" << std::endl;   // prints !!!Hello World!!!
+	std::cout << "!!!GO!!!" << std::endl;      // prints !!!Hello World!!!
 
 	uintptr_t sum = 0;
 	for ( int i = 0; i < num_thread; i++ ) {
@@ -230,7 +230,7 @@ TEST_F( lfStackTest, TC2 )
 
 	std::cout << "!!!Ready!!!" << std::endl;   // prints !!!Hello World!!!
 	pthread_barrier_wait( &barrier );
-	std::cout << "!!!GO!!!" << std::endl;   // prints !!!Hello World!!!
+	std::cout << "!!!GO!!!" << std::endl;      // prints !!!Hello World!!!
 
 	uintptr_t sum = 0;
 	for ( int i = 0; i < num_thread; i++ ) {
@@ -363,8 +363,8 @@ TEST_F( lfStackTest, TC3 )
 	auto [a1, a2] = func_test_fifo2( p_test_obj );
 #else
 	auto local_ret = func_test_fifo2( p_test_obj );
-	auto a1 = std::get<0>( local_ret );
-	auto a2 = std::get<1>( local_ret );
+	auto a1        = std::get<0>( local_ret );
+	auto a2        = std::get<1>( local_ret );
 #endif
 	std::cout << "Thread X: last dequeued = " << a1 << ", " << a2 << std::endl;
 
@@ -426,9 +426,9 @@ void* func_test4_fifo( void* data )
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 		auto [pop_flag, vv] = p_test_obj->pop();
 #else
-		auto local_ret = p_test_obj->pop();
-		auto pop_flag = std::get<0>( local_ret );
-		auto vv = std::get<1>( local_ret );
+        auto local_ret = p_test_obj->pop();
+        auto pop_flag  = std::get<0>( local_ret );
+        auto vv        = std::get<1>( local_ret );
 #endif
 		if ( !pop_flag ) {
 			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string( v ).c_str() );
@@ -471,9 +471,9 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( test_lifo_type2* p_test_obj[]
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [pop_flag, vv] = p_test_obj[0]->pop();
 #else
-			auto local_ret = p_test_obj[0]->pop();
-			auto pop_flag = std::get<0>( local_ret );
-			auto vv = std::get<1>( local_ret );
+            auto local_ret = p_test_obj[0]->pop();
+            auto pop_flag  = std::get<0>( local_ret );
+            auto vv        = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v1 ).c_str() );
@@ -486,9 +486,9 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( test_lifo_type2* p_test_obj[]
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [pop_flag, vv] = p_test_obj[1]->pop();
 #else
-			auto local_ret = p_test_obj[1]->pop();
-			auto pop_flag = std::get<0>( local_ret );
-			auto vv = std::get<1>( local_ret );
+            auto local_ret = p_test_obj[1]->pop();
+            auto pop_flag  = std::get<0>( local_ret );
+            auto vv        = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v2 ).c_str() );
@@ -498,6 +498,8 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( test_lifo_type2* p_test_obj[]
 			v2 = vv + 1;
 		}
 	}
+
+	printf( "final count of p_test_obj[0] is %d", p_test_obj[0]->get_size() );
 
 	return std::tuple<uintptr_t, uintptr_t>( v1, v2 );
 }
@@ -526,8 +528,8 @@ TEST_F( lfStackTest, TC4 )
 	auto [a1, a2] = func_test4_fifo2( p_test_obj );
 #else
 	auto local_ret = func_test4_fifo2( p_test_obj );
-	auto a1 = std::get<0>( local_ret );
-	auto a2 = std::get<1>( local_ret );
+	auto a1        = std::get<0>( local_ret );
+	auto a2        = std::get<1>( local_ret );
 #endif
 	std::cout << "Thread X: last dequeued = " << a1 << ", " << a2 << std::endl;
 

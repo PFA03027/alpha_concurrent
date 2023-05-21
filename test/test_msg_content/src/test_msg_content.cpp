@@ -132,6 +132,8 @@ void* func_test_fifo_consumer( void* data )
 		}
 	}
 
+	printf( "final count of p_test_obj is %d", p_test_obj->get_size() );
+
 	return reinterpret_cast<void*>( 1 );
 }
 

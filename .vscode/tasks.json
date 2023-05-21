@@ -59,7 +59,7 @@
         {
             "label": "build with a sanitizer",
             "type": "shell",
-            "command": "bash make_linux_sanitizer_build.sh 14",
+            "command": "bash make_linux_sanitizer_build.sh 6",
             "problemMatcher": [
                 "$gcc"
             ]
@@ -67,7 +67,7 @@
         {
             "label": "test with a sanitizer",
             "type": "shell",
-            "command": "bash make_linux_full_sanitizer.sh 1",
+            "command": "bash make_linux_full_sanitizer.sh 6",
             "problemMatcher": [
                 "$gcc"
             ]
