@@ -174,7 +174,7 @@ inline void LogOutput( const log_type lt, const char* p_str )
  * even if no call this API, this library uses the default logger. @n
  * Default logger outputs a log by printf.
  */
-void SetLoggerIf( std::unique_ptr<logger_if_abst> up_logger_if_inst );
+std::unique_ptr<logger_if_abst> SetLoggerIf( std::unique_ptr<logger_if_abst> up_logger_if_inst );
 
 /*!
  * @brief	Get the number of ERR type and WARN type log output

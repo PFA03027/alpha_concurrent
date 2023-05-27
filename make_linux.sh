@@ -29,7 +29,7 @@ else
 		cd build
 		cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -G "Unix Makefiles" ../
 		cmake --build . -j ${JOBS} -v --target build-test
-		cmake --build . -j ${JOBS} -v --target test
+		ctest -j ${JOBS} -v
 	elif [ "$1" = "full" ]; then
 		rm -fr build
 		mkdir -p build

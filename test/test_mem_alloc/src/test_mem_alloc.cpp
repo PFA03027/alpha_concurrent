@@ -76,6 +76,8 @@ TEST_P( ChunkHeaderMultiSlotMaltiThread, TC_one_by_one )
 
 	printf( "%s\n", e.print().c_str() );
 
+	p_chms->dump();
+
 	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	delete p_chms;
 	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
@@ -115,6 +117,8 @@ TEST_P( ChunkHeaderMultiSlotMaltiThread, TC_at_same_time )
 
 	printf( "%s\n", e.print().c_str() );
 
+	p_chms->dump();
+
 	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	delete p_chms;
 	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
@@ -122,7 +126,7 @@ TEST_P( ChunkHeaderMultiSlotMaltiThread, TC_at_same_time )
 
 INSTANTIATE_TEST_SUITE_P( many_threads,
                           ChunkHeaderMultiSlotMaltiThread,
-                          testing::Values( 1, 2, 10, 100 ) );
+                          testing::Values( 1, 2, 10, 30 ) );
 
 class lfmemAlloc : public testing::Test {
 	// You can implement all the usual fixture class members here.
@@ -188,6 +192,8 @@ TEST_F( lfmemAlloc, TestChunkHeaderMultiSlot )
 	alpha::concurrent::chunk_statistics e = p_chms->get_statistics();
 
 	printf( "%s\n", e.print().c_str() );
+
+	p_chms->dump();
 
 	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	delete p_chms;

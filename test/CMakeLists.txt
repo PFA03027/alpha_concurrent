@@ -38,5 +38,6 @@ add_subdirectory(test_lf_stack)
 add_subdirectory(test_lf_one_side_deque)
 add_subdirectory(test_lf_list)
 add_subdirectory(test_msg_content)
+add_subdirectory(test_conf)
 
 

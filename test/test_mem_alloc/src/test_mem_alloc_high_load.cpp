@@ -83,6 +83,8 @@ TEST( lfmemAllocOneChunk, TC_Load )
 		printf( "%s\n", e.print().c_str() );
 	}
 
+	chms.dump();
+
 	{
 		int err_cnt, warn_cnt;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );

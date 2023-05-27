@@ -162,6 +162,8 @@ public:
 		return p_collision_cnt_->load();
 	}
 
+	void dump( void ) const;
+
 private:
 	static constexpr int hzrd_max_slot_ = 3;
 	enum class hazard_ptr_idx : int {
@@ -217,14 +219,14 @@ private:
 	dynamic_tls<waiting_element_list, rcv_el_by_thread_terminating> tls_waiting_list_;   //!< 滞留要素を管理するスレッドローカルリスト
 	hazard_ptr<idx_mgr_element, hzrd_max_slot_>                     hzrd_element_;       //!< ハザードポインタを管理する構造体。
 
-	std::atomic<idx_mgr_element*> head_;                                  //!< リスト構造のヘッドへのポインタ
-	std::atomic<idx_mgr_element*> tail_;                                  //!< リスト構造の終端要素へのポインタ
-	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_;   //!< リスト構造の次のノードへのポインタを格納したメンバ変数へのメンバ変数ポインタ
+	std::atomic<idx_mgr_element*> head_;                                                 //!< リスト構造のヘッドへのポインタ
+	std::atomic<idx_mgr_element*> tail_;                                                 //!< リスト構造の終端要素へのポインタ
+	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_;                  //!< リスト構造の次のノードへのポインタを格納したメンバ変数へのメンバ変数ポインタ
 
-	std::mutex           mtx_rcv_wait_element_list_;   //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取るメンバ変数rcv_wait_element_list_の排他制御用Mutex
-	waiting_element_list rcv_wait_element_list_;       //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取る
+	std::mutex           mtx_rcv_wait_element_list_;                                     //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取るメンバ変数rcv_wait_element_list_の排他制御用Mutex
+	waiting_element_list rcv_wait_element_list_;                                         //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取る
 
-	std::atomic<unsigned int>* p_collision_cnt_;   //!< ロックフリーアルゴリズム内で発生した衝突回数を記録する変数への参照
+	std::atomic<unsigned int>* p_collision_cnt_;                                         //!< ロックフリーアルゴリズム内で発生した衝突回数を記録する変数への参照
 };
 
 /*!
@@ -354,19 +356,19 @@ private:
 	 */
 	void rcv_wait_idx_by_thread_terminating( waiting_idx_list* p_idx_list );
 
-	std::atomic<int> idx_size_;       //!< 割り当てられたインデックス番号の数
-	std::atomic<int> idx_size_ver_;   //!< 割り当てられたインデックス番号の数の情報のバージョン番号
+	std::atomic<int> idx_size_;                                                              //!< 割り当てられたインデックス番号の数
+	std::atomic<int> idx_size_ver_;                                                          //!< 割り当てられたインデックス番号の数の情報のバージョン番号
 
-	std::atomic<unsigned int>* p_alloc_collision_cnt_;     //!< idxをpopする時に発生した衝突回数をカウントする変数へのポインタ
-	std::atomic<unsigned int>* p_dealloc_collision_cnt_;   //!< idxをpushする時に発生した衝突回数をカウントする変数へのポインタ
+	std::atomic<unsigned int>* p_alloc_collision_cnt_;                                       //!< idxをpopする時に発生した衝突回数をカウントする変数へのポインタ
+	std::atomic<unsigned int>* p_dealloc_collision_cnt_;                                     //!< idxをpushする時に発生した衝突回数をカウントする変数へのポインタ
 
 	idx_mgr_element*                                             p_idx_mgr_element_array_;   //!< インデックス番号を管理情報を保持する配列
 	idx_element_storage_mgr                                      invalid_element_storage_;   //!< インデックス番号を所持しない要素を管理するストレージ
 	idx_element_storage_mgr                                      valid_element_storage_;     //!< インデックス番号を所持する要素を管理するストレージ
 	dynamic_tls<waiting_idx_list, rcv_idx_by_thread_terminating> tls_waiting_idx_list_;      //!< 滞留インデックスを管理するスレッドローカルリスト
 
-	std::mutex       mtx_rcv_waiting_idx_list_;   //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ(rcv_waiting_idx_list_)の排他制御を行う
-	waiting_idx_list rcv_waiting_idx_list_;       //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ
+	std::mutex       mtx_rcv_waiting_idx_list_;                                              //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ(rcv_waiting_idx_list_)の排他制御を行う
+	waiting_idx_list rcv_waiting_idx_list_;                                                  //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ
 };
 
 struct slot_chk_result;
@@ -572,12 +574,12 @@ private:
 		caller_context&&   caller_ctx_arg      //!< [in] caller context information
 	);
 
-	chunk_list_statistics* p_statistics_;   //!< statistics
+	chunk_list_statistics* p_statistics_;               //!< statistics
 
-	param_chunk_allocation slot_conf_;       //!< allocation configuration paramter. value is corrected internally.
-	std::size_t            size_of_chunk_;   //!< allocated memory size of this chunk
+	param_chunk_allocation slot_conf_;                  //!< allocation configuration paramter. value is corrected internally.
+	std::size_t            size_of_chunk_;              //!< allocated memory size of this chunk
 
-	idx_mgr free_slot_idx_mgr_;   //<! manager of free slot index
+	idx_mgr free_slot_idx_mgr_;                         //<! manager of free slot index
 
 	std::atomic<slot_status_mark>* p_free_slot_mark_;   //!< if slot is free, this is marked as true. This is prior information than free slot idx stack.
 	void*                          p_chunk_;            //!< pointer to an allocated memory as a chunk
@@ -593,8 +595,8 @@ struct slot_header {
 	std::atomic<std::uintptr_t>           at_mark_;      //!< checker mark
 	caller_context                        caller_ctx_;   //!< caller context information
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-	bt_info alloc_bt_info_;   //!< backtrace information when is allocated
-	bt_info free_bt_info_;    //!< backtrace information when is free
+	bt_info alloc_bt_info_;                              //!< backtrace information when is allocated
+	bt_info free_bt_info_;                               //!< backtrace information when is free
 #endif
 
 	void set_addr_of_chunk_header_multi_slot(
@@ -714,7 +716,7 @@ private:
 	std::atomic<chunk_header_multi_slot*>                  p_top_chunk_;   //!< pointer to chunk_header that is top of list.
 	dynamic_tls<tl_chunk_param, tl_chunk_param_destructor> tls_hint_;      //!< thread loacal pointer to chunk_header that is success to allocate recently for a thread.
 
-	chunk_list_statistics statistics_;   //!< statistics
+	chunk_list_statistics statistics_;                                     //!< statistics
 };
 
 }   // namespace internal

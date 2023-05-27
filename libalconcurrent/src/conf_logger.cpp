@@ -102,17 +102,21 @@ void bt_info::dump_to_log( log_type lt, char c, int id )
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-void SetLoggerIf( std::unique_ptr<logger_if_abst> up_logger_if_inst )
+std::unique_ptr<logger_if_abst> SetLoggerIf( std::unique_ptr<logger_if_abst> up_logger_if_inst )
 {
 	static std::unique_ptr<logger_if_abst> up_keep_inst_of_logger_if( nullptr );
 
 	internal::p_concrete_logger_if = nullptr;
 
-	up_keep_inst_of_logger_if = std::move( up_logger_if_inst );
+	up_keep_inst_of_logger_if.swap( up_logger_if_inst );
 
-	internal::p_concrete_logger_if = up_keep_inst_of_logger_if.get();
+	if ( up_keep_inst_of_logger_if == nullptr ) {
+		internal::p_concrete_logger_if = &internal::default_logger_inst;
+	} else {
+		internal::p_concrete_logger_if = up_keep_inst_of_logger_if.get();
+	}
 
-	return;
+	return up_logger_if_inst;
 }
 
 void GetErrorWarningLogCount(

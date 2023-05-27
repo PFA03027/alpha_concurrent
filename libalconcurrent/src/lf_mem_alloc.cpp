@@ -278,6 +278,12 @@ void idx_element_storage_mgr::clear( void )
 	return;
 }
 
+void idx_element_storage_mgr::dump( void ) const
+{
+	rcv_wait_element_list_.dump();
+	return;
+}
+
 idx_mgr_element* idx_element_storage_mgr::pop_element_from_list( void )
 {
 	scoped_hazard_ref scoped_ref_first( hzrd_element_, (int)hazard_ptr_idx::POP_CUR );
@@ -652,10 +658,12 @@ void idx_mgr::dump( void )
 	internal::LogOutput( log_type::DUMP,
 	                     "%p --> %p \n",
 	                     this, &invalid_element_storage_ );
+	invalid_element_storage_.dump();
 
 	internal::LogOutput( log_type::DUMP,
 	                     "%p --> %p \n",
 	                     this, &valid_element_storage_ );
+	valid_element_storage_.dump();
 
 	internal::LogOutput( log_type::DUMP,
 	                     "%p --> %p \n",
