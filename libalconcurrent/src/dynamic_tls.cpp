@@ -27,7 +27,7 @@ std::recursive_mutex dynamic_tls_global_exclusive_control_for_destructions;   //
 
 namespace internal {
 
-#define STRERROR_BUFF_SIZE ( 256 )
+constexpr size_t STRERROR_BUFF_SIZE = 256;
 
 static std::atomic<int> cur_count_of_tls_keys( 0 );
 static std::atomic<int> max_count_of_tls_keys( 0 );
@@ -92,7 +92,7 @@ struct dynamic_tls_key {
 	std::atomic<alloc_stat>          is_used_;          //!< flag whether this key is used or not.
 	std::atomic<void ( * )( void* )> tls_destructor_;   //!< atomic pointer of destructor for thread local storage
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-	bt_info bt_when_allocate_;   //!< back trace information when key is allocated
+	bt_info bt_when_allocate_;                          //!< back trace information when key is allocated
 #endif
 
 	dynamic_tls_key( void )
@@ -234,7 +234,7 @@ public:
 	  , num_of_free_( ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE )
 	  , hint_to_alloc_( 0 )
 	{
-		for ( int i = 0; i < ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE; i++ ) {
+		for ( size_t i = 0; i < ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE; i++ ) {
 			key_array_[i].idx_ = i + base_idx_;
 		}
 	}
@@ -245,10 +245,10 @@ public:
 			return nullptr;
 		}
 
-		int new_hint = hint_to_alloc_.load( std::memory_order_acquire );
-		for ( int i = 0; i < ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE; i++ ) {
+		size_t new_hint = hint_to_alloc_.load( std::memory_order_acquire );
+		for ( size_t i = 0; i < ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE; i++ ) {
 			dynamic_tls_key::alloc_stat expected_alloc_stat = dynamic_tls_key::alloc_stat::NOT_USED;
-			int                         cur_hint            = new_hint;
+			size_t                      cur_hint            = new_hint;
 			new_hint++;
 			if ( new_hint >= ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE ) {
 				new_hint = 0;
@@ -271,12 +271,12 @@ public:
 	bool release_key( dynamic_tls_key* p_key_arg );
 
 	std::atomic<dynamic_tls_key_array*> p_next_;
-	const unsigned int                  base_idx_;
+	const size_t                        base_idx_;
 
 private:
-	std::atomic<int> num_of_free_;
-	std::atomic<int> hint_to_alloc_;
-	dynamic_tls_key  key_array_[ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE];
+	std::atomic<size_t> num_of_free_;
+	std::atomic<size_t> hint_to_alloc_;
+	dynamic_tls_key     key_array_[ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE];
 
 	friend void call_destructor_for_array_and_clear_data( dynamic_tls_key_array* p_key_array_arg, dynamic_tls_content_array* p_content_array_arg );
 };
@@ -478,7 +478,7 @@ private:
 		unsigned int           cur_base_idx     = next_base_idx_.fetch_add( ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE );
 		dynamic_tls_key_array* p_new_dtls_ka    = new dynamic_tls_key_array( cur_base_idx );   // 可変長とするために、malloc()使われてしまうのは割り切る
 		dynamic_tls_key_array* p_expect_dtls_ka = p_top_dtls_key_array_.load( std::memory_order_acquire );
-		do {   // 置き換えに成功するまでビジーループ
+		do {                                                                                   // 置き換えに成功するまでビジーループ
 			p_new_dtls_ka->p_next_.store( p_expect_dtls_ka, std::memory_order_release );
 		} while ( !p_top_dtls_key_array_.compare_exchange_strong( p_expect_dtls_ka, p_new_dtls_ka ) );
 	}
@@ -538,8 +538,8 @@ dynamic_tls_mgr& dynamic_tls_mgr::get_instance( void )
 
 void call_destructor_for_array_and_clear_data( dynamic_tls_key_array* p_key_array_arg, dynamic_tls_content_array* p_content_array_arg )
 {
-	for ( int j = 0; j < ALCONCURRENT_CONF_DYNAMIC_TLS_DESTUCT_ITERATE_MAX; j++ ) {
-		for ( int i = 0; i < ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE; i++ ) {
+	for ( unsigned int j = 0; j < ALCONCURRENT_CONF_DYNAMIC_TLS_DESTUCT_ITERATE_MAX; j++ ) {
+		for ( size_t i = 0; i < ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE; i++ ) {
 			if ( p_key_array_arg->key_array_[i].is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) continue;
 
 			void* p_tmp                            = p_content_array_arg->content_array_[i];
@@ -561,7 +561,7 @@ void call_destructor_for_array_and_clear_data( dynamic_tls_key_array* p_key_arra
 			}
 		}
 		bool is_finish = true;
-		for ( int i = 0; i < ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE; i++ ) {
+		for ( size_t i = 0; i < ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE; i++ ) {
 			if ( p_content_array_arg->content_array_[i] != nullptr ) {
 				is_finish = false;
 				break;
@@ -571,7 +571,7 @@ void call_destructor_for_array_and_clear_data( dynamic_tls_key_array* p_key_arra
 			return;
 		}
 	}
-	for ( int i = 0; i < ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE; i++ ) {
+	for ( size_t i = 0; i < ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE; i++ ) {
 		p_content_array_arg->content_array_[i] = nullptr;
 	}
 

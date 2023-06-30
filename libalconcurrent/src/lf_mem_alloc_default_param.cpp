@@ -19,8 +19,8 @@
 namespace alpha {
 namespace concurrent {
 
-#define MINIMUM_ALLOC_SIZE   ( alignof( std::max_align_t ) )   //!< cache line bytes. This is configurable value
-#define INITIAL_NUM_OF_SLOTS ( 32 )
+constexpr size_t MINIMUM_ALLOC_SIZE   = alignof( std::max_align_t );   //!< cache line bytes. This is configurable value
+constexpr size_t INITIAL_NUM_OF_SLOTS = 32;
 
 const unsigned int           num_of_default_param_array = 11;   //!< array size of default parameter array
 const param_chunk_allocation default_param_array[]      = {

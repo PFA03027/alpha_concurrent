@@ -113,9 +113,9 @@ TEST_P( dynamic_tls_many_tls, TC_many_number_set_get )
 INSTANTIATE_TEST_SUITE_P( many_tls,
                           dynamic_tls_many_tls,
                           testing::Values( 1, 2,
-                                           ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE - 1, ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE, ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE + 1,
-                                           ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2 - 1, ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2, ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2 + 1,
-                                           ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 - 1, ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3, ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 + 1 ) );
+                                           alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE - 1, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE + 1,
+                                           alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2 - 1, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2 + 1,
+                                           alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 - 1, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 + 1 ) );
 
 #define THREAD_COUNT ( 1000 )
 
@@ -213,7 +213,7 @@ TEST_P( dynamic_tls_many_thd_many, TC_many_number_set_get )
 INSTANTIATE_TEST_SUITE_P( many_tls,
                           dynamic_tls_many_thd_many,
                           testing::Values( 1, 2,
-                                           ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE - 1, ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE, ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE + 1,
-                                           ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2 - 1, ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2, ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2 + 1,
-                                           ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 - 1, ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3, ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 + 1,
-                                           ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 - 1, ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3, ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 + 1 ) );
+                                           alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE - 1, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE + 1,
+                                           alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2 - 1, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2 + 1,
+                                           alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 - 1, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 + 1,
+                                           alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 - 1, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 + 1 ) );

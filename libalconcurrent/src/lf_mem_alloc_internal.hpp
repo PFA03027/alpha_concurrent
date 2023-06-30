@@ -27,8 +27,8 @@ namespace concurrent {
 
 namespace internal {
 
-#define MAX_ALLOC_SIZE_LIMIT ( (size_t)( 2UL * 1024UL * 1024UL * 1024UL ) )
-#define NON_OWNERED_TL_ID    ( 0 )
+constexpr size_t MAX_ALLOC_SIZE_LIMIT = (size_t)( 2UL * 1024UL * 1024UL * 1024UL );
+constexpr size_t NON_OWNERED_TL_ID    = 0;
 
 /*!
  * @brief	chunk control status

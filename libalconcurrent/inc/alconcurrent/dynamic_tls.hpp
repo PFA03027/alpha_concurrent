@@ -39,8 +39,8 @@ extern std::recursive_mutex dynamic_tls_global_exclusive_control_for_destruction
 
 namespace internal {
 
-#define ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE          ( 1024 )
-#define ALCONCURRENT_CONF_DYNAMIC_TLS_DESTUCT_ITERATE_MAX ( 10 )
+constexpr size_t       ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE          = 1024;
+constexpr unsigned int ALCONCURRENT_CONF_DYNAMIC_TLS_DESTUCT_ITERATE_MAX = 10;
 
 struct dynamic_tls_key;
 using dynamic_tls_key_t = dynamic_tls_key*;   //!< pointer to dynamic_tls_key as a key
@@ -515,12 +515,12 @@ private:
 		return;
 	}
 
-	internal::dynamic_tls_key_t tls_key;   //!<	key for thread local storage of POSIX.
+	internal::dynamic_tls_key_t tls_key;                  //!<	key for thread local storage of POSIX.
 
 	TL_PRE_DESTRUCTOR             pre_exec_of_cleanup_;   //!< functor to clean-up the resources when thread is terminated.
 	std::atomic<tls_cont_pointer> head_;                  //!< head of thread local data container list
 
-	internal::dynamic_tls_thread_cnt th_cnt_;   //!< thread count information
+	internal::dynamic_tls_thread_cnt th_cnt_;             //!< thread count information
 };
 
 // this class is possible to set a value to inialize, but requires that T needs to have a default constructor and copy constructor.

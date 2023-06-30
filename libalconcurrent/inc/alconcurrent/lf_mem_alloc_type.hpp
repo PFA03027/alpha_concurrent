@@ -22,8 +22,8 @@ namespace concurrent {
  * @brief	configuration paramters when allocate chunk
  */
 struct param_chunk_allocation {
-	unsigned int size_of_one_piece_ = 0;   //!< size of one piece in a chunk
-	unsigned int num_of_pieces_     = 0;   //!< number of pieces in a chunk
+	size_t size_of_one_piece_ = 0;   //!< size of one piece in a chunk
+	size_t num_of_pieces_     = 0;   //!< number of pieces in a chunk
 };
 
 /*!

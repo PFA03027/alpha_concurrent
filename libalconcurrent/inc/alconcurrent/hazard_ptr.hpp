@@ -24,10 +24,10 @@
 
 #include "dynamic_tls.hpp"
 
-#define NUM_OF_PRE_ALLOCATED_NODES ( 0 )   //!< 事前に用意する管理ノード数。なお、空きノードがあれば、それを流用するので、mallocが発生しない。
-
 namespace alpha {
 namespace concurrent {
+
+constexpr size_t NUM_OF_PRE_ALLOCATED_NODES = 0;   //!< 事前に用意する管理ノード数。なお、空きノードがあれば、それを流用するので、mallocが発生しない。
 
 /*!
  * @brief	hazard pointer support class
@@ -234,7 +234,7 @@ private:
 		  : head_( nullptr )
 		  , node_count_( 0 )
 		{
-			for ( int i = 0; i < NUM_OF_PRE_ALLOCATED_NODES; i++ ) {
+			for ( size_t i = 0; i < NUM_OF_PRE_ALLOCATED_NODES; i++ ) {
 				auto p_hzrd_ptr_node = add_one_new_hazard_ptr_node();
 				p_hzrd_ptr_node->release_owner();
 			}

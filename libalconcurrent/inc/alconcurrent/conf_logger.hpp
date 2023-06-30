@@ -17,10 +17,11 @@
 #include <cstdio>
 #include <memory>
 
-#define CONF_LOGGER_INTERNAL_BUFF_SIZE ( 2048 )
-
 namespace alpha {
 namespace concurrent {
+
+constexpr size_t CONF_LOGGER_INTERNAL_BUFF_SIZE              = 2048;
+constexpr size_t ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE = 100;   //!< size of backtrace buffer size
 
 /*!
  * @brief	log type that is used by this library
@@ -64,8 +65,6 @@ struct caller_context {
 	}
 #endif
 
-#define ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE ( 100 )   //!< size of backtrace buffer size
-
 /*!
  * @brief	caller backtrace information
  */
@@ -87,9 +86,9 @@ struct bt_info {
 	void dump_to_log( log_type lt, char c, int id );
 };
 
-#define RECORD_BACKTRACE_GET_BACKTRACE( BT_INFO_N )                                                 \
-	do {                                                                                            \
-		BT_INFO_N.count_ = backtrace( BT_INFO_N.bt_, ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE ); \
+#define RECORD_BACKTRACE_GET_BACKTRACE( BT_INFO_N )                                                                    \
+	do {                                                                                                               \
+		BT_INFO_N.count_ = backtrace( BT_INFO_N.bt_, alpha::concurrent::ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE ); \
 	} while ( 0 )
 #define RECORD_BACKTRACE_INVALIDATE_BACKTRACE( BT_INFO_N ) \
 	do {                                                   \

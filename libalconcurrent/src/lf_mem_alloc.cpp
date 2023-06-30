@@ -42,6 +42,8 @@ bool test_platform_std_atomic_lockfree_condition( void )
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 namespace internal {
 
+constexpr size_t GM_ALIGN_SIZE = alignof( std::max_align_t );
+
 chunk_statistics chunk_list_statistics::get_statistics( void ) const
 {
 	chunk_statistics ans { 0 };
@@ -775,8 +777,6 @@ chunk_header_multi_slot::~chunk_header_multi_slot()
 
 	return;
 }
-
-#define GM_ALIGN_SIZE ( alignof( std::max_align_t ) )
 
 constexpr std::size_t get_slot_header_size( void )
 {
