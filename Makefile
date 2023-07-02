@@ -16,7 +16,7 @@ BUILDTARGET?=common
 # BUILDTYPE=Debug
 # BUILDTYPE=Release
 # 
-BUILDTYPE?=Release
+BUILDTYPE?=Debug
 
 # Sanitizer test option:
 # SANITIZER_TYPE= 1 ~ 20 or ""
