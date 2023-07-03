@@ -26,3 +26,15 @@ TEST( Alloc_only_class, Call_push )
 
 	// Assert
 }
+
+TEST( Alloc_only_class, Call_dump )
+{
+	// Arrange
+	auto mmap_alloc_ret = alpha::concurrent::internal::allocate_by_mmap( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	alpha::concurrent::internal::alloc_chamber_head::get_inst().push( mmap_alloc_ret.p_allocated_addr_, alpha::concurrent::internal::default_align_size );
+
+	// Act
+	alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::TEST, 't', 1 );
+
+	// Assert
+}

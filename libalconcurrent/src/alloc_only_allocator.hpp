@@ -17,6 +17,8 @@
 
 #include <atomic>
 
+#include "alconcurrent/conf_logger.hpp"
+
 namespace alpha {
 namespace concurrent {
 
@@ -32,6 +34,8 @@ public:
 	static alloc_chamber_head& get_inst( void );
 
 	void push( void* p_alloced_mem, size_t allocated_size );
+
+	void dump_to_log( log_type lt, char c, int id );
 
 private:
 	alloc_chamber_head( void )
