@@ -170,7 +170,8 @@ void alloc_chamber::dump_to_log( log_type lt, char c, int id )
 {
 	internal::LogOutput(
 		lt,
-		"[%d-%c] addr = %p, allocated_size = 0x%zx, next_ = %p, ref_stack_next_ = %p, offset_ = 0x%zx",
+		// "[%d-%c] addr = %p, allocated_size = 0x%zx, next_ = %p, ref_stack_next_ = %p, offset_ = 0x%zx",
+		"[%d-%c] addr = %p, allocated_size = 0x%zx, next_ = %p, offset_ = 0x%zx",
 		id, c,
 		this,
 		chamber_size_,
@@ -238,10 +239,16 @@ void alloc_chamber_head::dump_to_log( log_type lt, char c, int id )
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 void* allocating_only( size_t req_size, size_t req_align )
 {
+	static_assert( conf_pre_mmap_size > sizeof( alloc_chamber ), "conf_pre_mmap_size is too small" );
+
 	void* p_ans = alloc_chamber_head::get_inst().allocate( req_size, req_align );
 	if ( p_ans != nullptr ) return p_ans;
 
-	allocate_result ret_mmap = allocate_by_mmap( conf_pre_mmap_size, default_align_size );
+	size_t cur_pre_alloc_size = conf_pre_mmap_size;
+	if ( cur_pre_alloc_size < req_size ) {
+		cur_pre_alloc_size = req_size * 2 + sizeof( alloc_chamber );
+	}
+	allocate_result ret_mmap = allocate_by_mmap( cur_pre_alloc_size, default_align_size );
 	if ( ret_mmap.p_allocated_addr_ == nullptr ) return nullptr;
 	if ( ret_mmap.allocated_size_ == 0 ) return nullptr;
 
