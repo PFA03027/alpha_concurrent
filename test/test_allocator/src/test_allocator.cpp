@@ -16,6 +16,34 @@
 
 constexpr size_t REQ_ALLOC_SIZE = 1024;
 
+TEST( MMAP_Alocator, DO_max_size )
+{
+	// Arrange
+
+	// Act
+	auto mmap_alloc_ret = alpha::concurrent::internal::allocate_by_mmap( alpha::concurrent::internal::conf_max_mmap_alloc_size, 0 );
+
+	// Assert
+	ASSERT_NE( nullptr, mmap_alloc_ret.p_allocated_addr_ );
+	EXPECT_GE( alpha::concurrent::internal::conf_max_mmap_alloc_size, mmap_alloc_ret.allocated_size_ );
+
+	// Cleanup
+	auto ret_unmap = alpha::concurrent::internal::deallocate_by_munmap( mmap_alloc_ret.p_allocated_addr_, mmap_alloc_ret.allocated_size_ );
+	EXPECT_EQ( 0, ret_unmap );
+}
+
+TEST( MMAP_Alocator, DO_max_size_plus_one )
+{
+	// Arrange
+
+	// Act
+	auto mmap_alloc_ret = alpha::concurrent::internal::allocate_by_mmap( alpha::concurrent::internal::conf_max_mmap_alloc_size + 1, 0 );
+
+	// Assert
+	EXPECT_EQ( nullptr, mmap_alloc_ret.p_allocated_addr_ );
+	EXPECT_EQ( 0, mmap_alloc_ret.allocated_size_ );
+}
+
 TEST( Alloc_only_class, Call_push )
 {
 	// Arrange

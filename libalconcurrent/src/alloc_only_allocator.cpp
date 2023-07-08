@@ -35,10 +35,22 @@ struct room_boader {
 
 	room_boader( size_t chopped_size_arg, size_t req_size, size_t req_align );
 
+	/**
+	 * @brief Get the allocated memory addr that is assigned to caller
+	 *
+	 * @return void* the allocated memory addr
+	 */
 	void* get_allocated_mem_addr( void );
 
 	void dump_to_log( log_type lt, char c, int id );
 
+	/**
+	 * @brief calculate allocated memory top address from base_addr that is room_boarder class with considering alignment
+	 *
+	 * @param base_addr top address of room_boarder class
+	 * @param req_align considering alignment
+	 * @return uintptr_t allocated memory top address
+	 */
 	static uintptr_t calc_allocated_addr( uintptr_t base_addr, size_t req_align );
 };
 

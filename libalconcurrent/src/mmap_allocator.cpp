@@ -25,7 +25,11 @@ namespace internal {
 
 static size_t get_cur_system_page_size( void )
 {
-	return static_cast<size_t>( sysconf( _SC_PAGE_SIZE ) );
+	size_t ans = static_cast<size_t>( sysconf( _SC_PAGE_SIZE ) );
+	if ( ans == 0 ) {
+		ans = 1024 * 4;   // もしシステムコールがNGとなった場合のフォールバッグ。ただ、本質的には無駄が多い。
+	}
+	return ans;
 }
 
 static const size_t page_size = get_cur_system_page_size();
@@ -38,6 +42,10 @@ struct alloc_params {
 
 inline alloc_params calc_cur_system_alloc_params( size_t req_alloc_size, size_t align_size )
 {
+	if ( align_size < sizeof( void* ) ) {
+		align_size = sizeof( void* );   // 最低のアライメントをポインタサイズに制約する
+	}
+
 	size_t num_alloc_pages     = req_alloc_size / page_size;
 	size_t cur_real_alloc_size = page_size * ( num_alloc_pages + ( ( ( req_alloc_size % page_size ) == 0 ) ? 0 : 1 ) );
 
@@ -53,6 +61,14 @@ inline alloc_params calc_cur_system_alloc_params( size_t req_alloc_size, size_t 
 
 allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size )
 {
+	if ( req_alloc_size > conf_max_mmap_alloc_size ) {
+		// too big allocation request
+		return allocate_result { nullptr, 0 };
+	}
+	if ( align_size < sizeof( void* ) ) {
+		align_size = sizeof( void* );   // 最低のアライメントをポインタサイズに制約する
+	}
+
 	alloc_params page_aligned_params = calc_cur_system_alloc_params( req_alloc_size, align_size );
 #ifndef DEBUG_LOG
 	printf( "page_size = %zu = 0x%zx\n", page_size, page_size );

@@ -48,6 +48,9 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size );
  */
 int deallocate_by_munmap( void* p_allocated_addr, size_t allocated_size );
 
+// configuration value
+constexpr size_t conf_max_mmap_alloc_size = 1024 * 1024 * 1024;   // 1G
+
 }   // namespace internal
 }   // namespace concurrent
 }   // namespace alpha
