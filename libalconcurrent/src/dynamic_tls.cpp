@@ -145,7 +145,16 @@ public:
 		return true;
 	}
 
-	dynamic_tls_content_array* p_next_;   //!< thread local storage方向で、次のarrayへのポインタ
+	void* operator new( std::size_t n );                   // usual new...(1)
+	void  operator delete( void* p_mem ) noexcept;         // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
+
+	void* operator new[]( std::size_t n );                 // usual new...(1)
+	void  operator delete[]( void* p_mem ) noexcept;       // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
+
+	void* operator new( std::size_t n, void* p );          // placement new
+	void  operator delete( void* p, void* p2 ) noexcept;   // placement delete...(3)
+
+	dynamic_tls_content_array* p_next_;                    //!< thread local storage方向で、次のarrayへのポインタ
 	const unsigned int         base_idx_;
 
 private:
@@ -609,7 +618,7 @@ void dynamic_tls_content_head::call_destructor_and_release_ownership( void )
 		p_cur_tls_ca = p_cur_tls_ca->p_next_;
 	}
 
-	ownership_state_.store( cnt_arry_state::NOT_USED );
+	ownership_state_.store( cnt_arry_state::NOT_USED, std::memory_order_release );
 
 	return;
 }
@@ -653,6 +662,49 @@ void* dynamic_tls_content_head::operator new( std::size_t n, void* p )   // plac
 void dynamic_tls_content_head::operator delete( void* p, void* p2 ) noexcept   // placement delete...(3)
 {
 	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+/////////////////////////////////////////////////////////////////////////
+
+void* dynamic_tls_content_array::operator new( std::size_t n )   // usual new...(1)
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	void* p_ans = allocating_only( n );
+	if ( p_ans == nullptr ) {
+		throw std::bad_alloc();
+	}
+
+	return p_ans;
+}
+void dynamic_tls_content_array::operator delete( void* p_mem ) noexcept   // usual delete...(2)
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void* dynamic_tls_content_array::operator new[]( std::size_t n )   // usual new...(1)
+{
+	// dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	// が、このクラスが配列形式で使用する想定はされていない。
+	void* p_ans = allocating_only( n );
+	if ( p_ans == nullptr ) {
+		throw std::bad_alloc();
+	}
+
+	return p_ans;
+}
+void dynamic_tls_content_array::operator delete[]( void* p_mem ) noexcept   // usual delete...(2)
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void* dynamic_tls_content_array::operator new( std::size_t n, void* p )   // placement new
+{
+	// dynamic_tls_content_arrayのクラスがplacement new形式で使用する想定はされていない。
+	return p;
+}
+void dynamic_tls_content_array::operator delete( void* p, void* p2 ) noexcept   // placement delete...(3)
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
 }
 
 /////////////////////////////////////////////////////////////////////////
