@@ -68,11 +68,11 @@ struct node_of_list {
 	virtual void release_ownership( void );
 	virtual void teardown_by_recycle( void );
 
-	void* operator new( std::size_t n );             // usual new...(1)
-	void  operator delete( void* p_mem ) noexcept;   // usual new...(2)
+	void* operator new( std::size_t n );                   // usual new...(1)
+	void  operator delete( void* p_mem ) noexcept;         // usual delete...(2)
 
-	void* operator new[]( std::size_t n );             // usual new...(1)
-	void  operator delete[]( void* p_mem ) noexcept;   // usual new...(2)
+	void* operator new[]( std::size_t n );                 // usual new...(1)
+	void  operator delete[]( void* p_mem ) noexcept;       // usual delete...(2)
 
 	void* operator new( std::size_t n, void* p );          // placement new
 	void  operator delete( void* p, void* p2 ) noexcept;   // placement delete...(3)

@@ -23,16 +23,18 @@ namespace concurrent {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 namespace internal {
 
-static size_t get_cur_system_page_size( void )
-{
-	size_t ans = static_cast<size_t>( sysconf( _SC_PAGE_SIZE ) );
-	if ( ans == 0 ) {
-		ans = 1024 * 4;   // もしシステムコールがNGとなった場合のフォールバッグ。ただ、本質的には無駄が多い。
-	}
-	return ans;
-}
+// static size_t get_cur_system_page_size( void )
+// {
+// 	auto   v   = sysconf( _SC_PAGE_SIZE );
+// 	size_t ans = static_cast<size_t>( v );
+// 	if ( v <= 0 ) {
+// 		ans = 1024 * 4;   // もしシステムコールがNGとなった場合のフォールバッグ。ただ、本質的には無駄が多い。
+// 	}
+// 	return ans;
+// }
 
-static const size_t page_size = get_cur_system_page_size();
+// static const size_t page_size = get_cur_system_page_size();
+static constexpr size_t page_size = 1024 * 4;   //  = sysconf( _SC_PAGE_SIZE );
 
 struct alloc_params {
 	size_t page_aligned_align_size_;
