@@ -56,7 +56,7 @@ struct dynamic_tls_status_info {
  *　動的thread local storageを割り当て、割り当て数を１つ増やす。
  *　割り当て数は不具合解析など使用する。
  */
-void dynamic_tls_key_create( dynamic_tls_key_t* p_key, void ( *destructor )( void* ) );
+dynamic_tls_key_t dynamic_tls_key_create( void ( *destructor )( void* ) );
 
 /*!
  * @brief	release a key of dynamic thread local storage and count down the number of dynamic thread local memory
@@ -331,27 +331,27 @@ public:
 	using value_reference = T&;
 
 	dynamic_tls( void )
-	  : pre_exec_of_cleanup_()
+	  : tls_key_( internal::dynamic_tls_key_create( destr_fn ) )
+	  , pre_exec_of_cleanup_()
 	  , head_( nullptr )
 	  , th_cnt_()
 	{
-		internal::dynamic_tls_key_create( &tls_key, destr_fn );
 	}
 
 	dynamic_tls( const TL_PRE_DESTRUCTOR& tl_dest_functor_arg )
-	  : pre_exec_of_cleanup_( tl_dest_functor_arg )
+	  : tls_key_( internal::dynamic_tls_key_create( destr_fn ) )
+	  , pre_exec_of_cleanup_( tl_dest_functor_arg )
 	  , head_( nullptr )
 	  , th_cnt_()
 	{
-		internal::dynamic_tls_key_create( &tls_key, destr_fn );
 	}
 
 	dynamic_tls( TL_PRE_DESTRUCTOR&& tl_dest_functor_arg )
-	  : pre_exec_of_cleanup_( std::move( tl_dest_functor_arg ) )
+	  : tls_key_( internal::dynamic_tls_key_create( destr_fn ) )
+	  , pre_exec_of_cleanup_( std::move( tl_dest_functor_arg ) )
 	  , head_( nullptr )
 	  , th_cnt_()
 	{
-		internal::dynamic_tls_key_create( &tls_key, destr_fn );
 	}
 
 	~dynamic_tls()
@@ -360,7 +360,7 @@ public:
 
 		std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
 
-		internal::dynamic_tls_key_release( tls_key );
+		internal::dynamic_tls_key_release( tls_key_ );
 
 		// メモリリークが無いように、スレッドローカルストレージを削除する
 		// この処理と、スレッド終了処理によるdestr_fn()の同時呼び出しは、未定義動作とする。
@@ -484,7 +484,7 @@ private:
 	template <typename TFUNC>
 	value_reference get_tls_instance_pred_impl( TFUNC pred )
 	{
-		tls_cont_pointer p_tls = reinterpret_cast<tls_cont_pointer>( internal::dynamic_tls_getspecific( tls_key ) );
+		tls_cont_pointer p_tls = reinterpret_cast<tls_cont_pointer>( internal::dynamic_tls_getspecific( tls_key_ ) );
 		if ( p_tls == nullptr ) {
 			p_tls = allocate_free_tls_container();
 			if ( p_tls->p_value == nullptr ) {   // 確保済みの領域の場合は、pred()を呼び出さず、そのまま再利用する。
@@ -494,7 +494,7 @@ private:
 			// 新しいスレッド用のスレッドローカルストレージの割り当てが行われたため、スレッド数のカウントをアップする。
 			th_cnt_.count_up();
 
-			internal::dynamic_tls_setspecific( tls_key, (void*)p_tls );
+			internal::dynamic_tls_setspecific( tls_key_, (void*)p_tls );
 		}
 
 		return *( p_tls->p_value );
@@ -504,7 +504,10 @@ private:
 	{
 		internal::LogOutput( log_type::DEBUG, "dynamic_tls::destr_fn is called              - %p", param );
 
-		if ( param == nullptr ) return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。どうしようもないので、諦める。
+		if ( param == nullptr ) {
+			internal::LogOutput( log_type::DEBUG, "dynamic_tls::destr_fn is called but param is nullptr" );
+			return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。どうしようもないので、諦める。
+		}
 
 		tls_cont_pointer p_target_node = reinterpret_cast<tls_cont_pointer>( param );
 
@@ -515,7 +518,7 @@ private:
 		return;
 	}
 
-	internal::dynamic_tls_key_t tls_key;                  //!<	key for thread local storage of POSIX.
+	internal::dynamic_tls_key_t tls_key_;                 //!<	key for thread local storage of POSIX.
 
 	TL_PRE_DESTRUCTOR             pre_exec_of_cleanup_;   //!< functor to clean-up the resources when thread is terminated.
 	std::atomic<tls_cont_pointer> head_;                  //!< head of thread local data container list

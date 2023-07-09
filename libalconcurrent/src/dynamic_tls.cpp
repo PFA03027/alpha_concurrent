@@ -805,9 +805,9 @@ void dynamic_tls_key_array::operator delete( void* p, void* p2 ) noexcept   // p
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void dynamic_tls_key_create( dynamic_tls_key_t* p_key, void ( *destructor )( void* ) )
+dynamic_tls_key_t dynamic_tls_key_create( void ( *destructor )( void* ) )
 {
-	*p_key = dynamic_tls_mgr::get_instance().allocate_key( destructor );
+	dynamic_tls_key_t p_ans = dynamic_tls_mgr::get_instance().allocate_key( destructor );
 
 	cur_count_of_tls_keys++;
 
@@ -815,7 +815,7 @@ void dynamic_tls_key_create( dynamic_tls_key_t* p_key, void ( *destructor )( voi
 	if ( cur_max < cur_count_of_tls_keys.load() ) {
 		max_count_of_tls_keys.compare_exchange_strong( cur_max, cur_count_of_tls_keys.load() );
 	}
-	return;
+	return p_ans;
 }
 
 void dynamic_tls_key_release( dynamic_tls_key_t key )

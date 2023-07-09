@@ -30,8 +30,7 @@ void nothing_to_do( void* p_arg )
 
 TEST( dynamic_tls, TC_create_release )
 {
-	alpha::concurrent::internal::dynamic_tls_key_t key;
-	alpha::concurrent::internal::dynamic_tls_key_create( &key, nothing_to_do );
+	alpha::concurrent::internal::dynamic_tls_key_t key = alpha::concurrent::internal::dynamic_tls_key_create( nothing_to_do );
 
 	ASSERT_NE( nullptr, key );
 	EXPECT_EQ( 1, alpha::concurrent::internal::get_num_of_tls_key() );
@@ -44,8 +43,7 @@ TEST( dynamic_tls, TC_create_release )
 
 TEST( dynamic_tls, TC_set_get )
 {
-	alpha::concurrent::internal::dynamic_tls_key_t key;
-	alpha::concurrent::internal::dynamic_tls_key_create( &key, nothing_to_do );
+	alpha::concurrent::internal::dynamic_tls_key_t key = alpha::concurrent::internal::dynamic_tls_key_create( nothing_to_do );
 
 	ASSERT_NE( nullptr, key );
 	EXPECT_EQ( 1, alpha::concurrent::internal::get_num_of_tls_key() );
@@ -87,7 +85,7 @@ TEST_P( dynamic_tls_many_tls, TC_many_number_set_get )
 	alpha::concurrent::internal::dynamic_tls_key_t keys[max_num_];
 
 	for ( auto& e_key : keys ) {
-		alpha::concurrent::internal::dynamic_tls_key_create( &e_key, nothing_to_do );
+		e_key = alpha::concurrent::internal::dynamic_tls_key_create( nothing_to_do );
 		ASSERT_NE( nullptr, e_key );
 	}
 
@@ -143,7 +141,7 @@ public:
 		pthread_barrier_init( &barrier_, NULL, THREAD_COUNT + 1 );
 
 		for ( int i = 0; i < max_num_; i++ ) {
-			alpha::concurrent::internal::dynamic_tls_key_create( &( p_keys_array_[i] ), nothing_to_do );
+			p_keys_array_[i] = alpha::concurrent::internal::dynamic_tls_key_create( nothing_to_do );
 			ASSERT_NE( nullptr, p_keys_array_[i] );
 		}
 		EXPECT_EQ( max_num_, alpha::concurrent::internal::get_num_of_tls_key() );
