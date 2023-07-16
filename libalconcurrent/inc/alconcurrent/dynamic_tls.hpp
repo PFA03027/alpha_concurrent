@@ -50,13 +50,36 @@ struct dynamic_tls_status_info {
 	unsigned int next_base_idx_;
 };
 
+enum class op_ret {
+	INVALID,        //!< p_data_ data is invalid
+	SUCCESS,        //!< p_data_ data is valid
+	INVALID_KEY,    //!< p_data_ data is invalid by key is invalid
+	OUT_OF_RANGE,   //!< p_data_ data is invalid by key is out of range
+	UNEXPECT_ERR    //!< p_data_ data is invalid by unexpected error
+};
+struct get_result {
+	op_ret    stat_;     //!< 取得処理に成功した場合にtrue
+	uintptr_t p_data_;   //!< 取得処理に成功した場合に、取得した値が保持される
+
+	get_result( void )
+	  : stat_( op_ret::INVALID )
+	  , p_data_( 0U )
+	{
+	}
+	get_result( op_ret stat_arg, uintptr_t p_data_arg )
+	  : stat_( stat_arg )
+	  , p_data_( p_data_arg )
+	{
+	}
+};
+
 /*!
  * @brief	create a key of dynamic thread local storage and count up the number of dynamic thread local memory
  *
  *　動的thread local storageを割り当て、割り当て数を１つ増やす。
  *　割り当て数は不具合解析など使用する。
  */
-dynamic_tls_key_t dynamic_tls_key_create( void ( *destructor )( void* ) );
+dynamic_tls_key_t dynamic_tls_key_create( void* p_param, uintptr_t ( *allocator )( void* p_param ), void ( *deallocator )( uintptr_t tls_data, void* p_param ) );
 
 /*!
  * @brief	release a key of dynamic thread local storage and count down the number of dynamic thread local memory
@@ -70,13 +93,13 @@ void dynamic_tls_key_release( dynamic_tls_key_t key );
  * @brief	set a value to a thread local storage
  *
  */
-bool dynamic_tls_setspecific( dynamic_tls_key_t key, void* pointer );
+op_ret dynamic_tls_setspecific( dynamic_tls_key_t key, uintptr_t tls_data );
 
 /*!
  * @brief	get a value from a thread local storage
  *
  */
-void* dynamic_tls_getspecific( dynamic_tls_key_t key );
+get_result dynamic_tls_getspecific( dynamic_tls_key_t key );
 
 dynamic_tls_status_info dynamic_tls_get_status( void );
 
@@ -129,159 +152,42 @@ struct dynamic_tls_thread_cnt {
 	std::atomic_int max_thread_count_;   //!< max thread count
 };
 
-/*!
- * @brief	動的スレッドローカルストレージで使用する内部処理用クラス
- *
- * @note
- * lf_mem_allocクラスで使用するため、
- * コンポーネントの上下関係から、メモリの確保にはnewを使用せず、malloc/freeと配置newのみを使用する。
- */
-template <typename T, typename TL_PRE_DESTRUCTOR>
-class tls_data_container {
-public:
-	using value_type         = T;
-	using value_pointer_type = value_type*;
-
-	enum class ocupied_status : int {
-		UNUSED,
-		UNUSED_INITIALIZED,
-		USING
-	};
-
-	tls_data_container( dynamic_tls_thread_cnt* p_th_cnt_arg, TL_PRE_DESTRUCTOR& df )
-	  : p_value( nullptr )
-	  , p_th_cnt_( p_th_cnt_arg )
-	  , status_( ocupied_status::USING )
-	  , next_( nullptr )
-	  , pre_exec_( df )
-	{
-		internal::LogOutput( log_type::DEBUG, "tls_data_container::constructor is called - %p", this );
-		assert( p_th_cnt_ != nullptr );
-	}
-
-	~tls_data_container()
-	{
-		internal::LogOutput( log_type::DEBUG, "tls_data_container::destructor is called  - %p, p_value - %p", this, p_value );
-
-		if ( p_value != nullptr ) {
-			pre_exec_.destruct( *p_value );
-			p_value->~T();
-			std::free( p_value );
-
-			next_.store( nullptr, std::memory_order_release );
-			status_.store( ocupied_status::UNUSED, std::memory_order_release );
-			p_value = nullptr;
-		}
-	}
-
-	/*!
-	 * @brief	スレッド終了時に管理しているスレッドローカルストレージを解放する。
-	 */
-	void release_owner( void )
-	{
-		if ( p_value != nullptr ) {
-			bool ret = pre_exec_.release( *p_value );
-
-			if ( ret ) {
-				p_value->~T();
-				std::free( p_value );
-
-				p_value = nullptr;
-			}
-		}
-		if ( p_value != nullptr ) {
-			status_.store( ocupied_status::UNUSED_INITIALIZED, std::memory_order_release );
-		} else {
-			status_.store( ocupied_status::UNUSED, std::memory_order_release );
-		}
-		return;
-	}
-
-	bool try_to_get_owner( void )
-	{
-		ocupied_status cur;
-		cur = get_status();
-		if ( cur == ocupied_status::USING ) {
-			return false;
-		}
-
-		bool ans = status_.compare_exchange_strong( cur, ocupied_status::USING );
-
-		return ans;
-	}
-
-	ocupied_status get_status( void )
-	{
-		return status_.load( std::memory_order_acquire );
-	}
-
-	tls_data_container* get_next( void )
-	{
-		return next_.load( std::memory_order_acquire );
-	}
-
-	void set_next( tls_data_container* p_new_next )
-	{
-		next_.store( p_new_next, std::memory_order_release );
-		return;
-	}
-
-	bool next_CAS( tls_data_container** pp_expect_ptr, tls_data_container* p_desired_ptr )
-	{
-		return next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
-	}
-
-	value_pointer_type p_value;
-
-	dynamic_tls_thread_cnt* const p_th_cnt_;
-
-private:
-	std::atomic<ocupied_status>      status_;
-	std::atomic<tls_data_container*> next_;
-	TL_PRE_DESTRUCTOR&               pre_exec_;
-};
-
 }   // namespace internal
 
 /*!
- * @brief	スレッド終了時にスレッドローカルストレージを解放する前に呼び出されるファンクタ
+ * @brief	スレッド生成時、終了時にスレッドローカルストレージに対して処理を行うハンドラクラス
  *
- * @param [in]	T	ファンクタに引数として渡される型。実際の引数は、この型の参照T&となる。
+ * @tparam 	T	ファンクタに引数として渡される型。
  *
- * このファンクタ自身は、何もしないというファンクタとして動作する。
+ * このファンクタ自身は、スレッド生成時には、型Tのクラスをデフォルト構築し、スレッド終了時には何もしないというファンクタとして動作する。
  *
  *
- * @brief A functor called before freeing thread-local storage at the end of a thread
+ * @brief Handler class that processes thread local storage at thread creation and termination
  *
- * @param [in] T The type passed as an argument to the functor. The actual argument is a reference T & of this type.
+ * @tparam The type passed as an argument to the T functor.
  *
- * This funktor itself acts as a funktor that does nothing.
+ * This functor itself operates as a functor that constructs a class of type T by default when a thread is created and does nothing when the thread terminates.
  */
 template <typename T>
-struct threadlocal_destructor_functor {
-	using value_reference = T&;
-
-	/*!
-	 * @brief スレッド終了時に呼び出されるI/F
+struct threadlocal_default_handler {
+	/**
+	 * @brief 型Tのオブジェクトを生成するファクトリ関数
 	 *
-	 * @retval true 呼び出し元に対し、引数のリファレンスの実体が存在するメモリ領域を解放するように指示する。
-	 * @retval false 呼び出し元に対し、引数のリファレンスの実体が存在するメモリ領域を保持するように指示する。
+	 * 型Tのオブジェクトはデフォルトコンストラクタで生成される
 	 */
-	bool release(
-		value_reference data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
-	)
+	uintptr_t allocate( void )
 	{
-		return true;
+		return reinterpret_cast<uintptr_t>( new T() );
 	}
 
 	/*!
-	 * @brief インスタンス削除時に呼び出されるI/F
+	 * @brief スレッド終了時に、allocateで生成されたオブジェクトの破棄処理を行う関数
 	 */
-	void destruct(
-		value_reference data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
+	void deallocate(
+		uintptr_t p_data   //!< [in] allocateで生成されたオブジェクトへのポインタ
 	)
 	{
-		return;
+		delete reinterpret_cast<T*>( p_data );
 	}
 };
 
@@ -292,7 +198,7 @@ struct threadlocal_destructor_functor {
  * このクラスのインスタンス変数自体がdestructされる場合は、呼び出されない。
  *
  * @tparam [in]	T	スレッドローカルストレージとして確保する型
- * @tparam [in]	TL_PRE_DESTRUCTOR	スレッド終了時、およびインスタンス自身がdestructされる時に、呼び出されるファンクタ。例えばTが何らかのクラスへのポインタ型である場合、その解放処理制御に使用する。
+ * @tparam [in]	TL_HANDLER	スレッド終了時、およびインスタンス自身がdestructされる時に、呼び出されるファンクタ。例えばTが何らかのクラスへのポインタ型である場合、その解放処理制御に使用する。
  *
  * @warn
  * デストラクタ処理と、スレッド終了処理によるdestr_fn()の同時呼び出しは、不定動作とする。　@n
@@ -307,14 +213,14 @@ struct threadlocal_destructor_functor {
  *
  * @brief Class that realizes dynamic thread local storage
  *
- * At the end of the thread, the instance of TL_PRE_DESTRUCTOR specified in the constructor is called before destructing the thread local storage.
+ * At the end of the thread, the instance of TL_HANDLER specified in the constructor is called before destructing the thread local storage.
  * If the instance variable of this class itself is destroyed, it will not be called.
  *
  * @tparam [in] T Type reserved as thread local storage
- * @tparam [in] TL_PRE_DESTRUCTOR A functor that is called at the end of a thread and when the instance itself is destroyed
+ * @tparam [in] TL_HANDLER A functor that is called at the end of a thread and when the instance itself is destroyed
  *
  * @warn
- * Simultaneous call of destr_fn () by destructor processing and thread termination processing is an indefinite operation. @n
+ * Simultaneous call of dealloc_fn () by destructor processing and thread termination processing is an indefinite operation. @n
  * Therefore, do not destroy the instance and terminate the thread at the same time.
  *
  * @warn
@@ -324,32 +230,30 @@ struct threadlocal_destructor_functor {
  * Because it is used in the lf_mem_alloc class
  * Due to the hierarchical relationship of components, new is not used to allocate memory, only malloc/free and placement new are used.
  */
-template <typename T, typename TL_PRE_DESTRUCTOR = threadlocal_destructor_functor<T>>
+template <typename T, typename TL_HANDLER = threadlocal_default_handler<T>>
 class dynamic_tls {
 public:
 	using value_type      = T;
 	using value_reference = T&;
+	using value_pointer   = T*;
 
 	dynamic_tls( void )
-	  : tls_key_( internal::dynamic_tls_key_create( destr_fn ) )
-	  , pre_exec_of_cleanup_()
-	  , head_( nullptr )
+	  : tls_key_( internal::dynamic_tls_key_create( this, alloc_fn, dealloc_fn ) )
+	  , tl_handler_()
 	  , th_cnt_()
 	{
 	}
 
-	dynamic_tls( const TL_PRE_DESTRUCTOR& tl_dest_functor_arg )
-	  : tls_key_( internal::dynamic_tls_key_create( destr_fn ) )
-	  , pre_exec_of_cleanup_( tl_dest_functor_arg )
-	  , head_( nullptr )
+	dynamic_tls( const TL_HANDLER& tl_dest_functor_arg )
+	  : tls_key_( internal::dynamic_tls_key_create( this, alloc_fn, dealloc_fn ) )
+	  , tl_handler_( tl_dest_functor_arg )
 	  , th_cnt_()
 	{
 	}
 
-	dynamic_tls( TL_PRE_DESTRUCTOR&& tl_dest_functor_arg )
-	  : tls_key_( internal::dynamic_tls_key_create( destr_fn ) )
-	  , pre_exec_of_cleanup_( std::move( tl_dest_functor_arg ) )
-	  , head_( nullptr )
+	dynamic_tls( TL_HANDLER&& tl_dest_functor_arg )
+	  : tls_key_( internal::dynamic_tls_key_create( this, alloc_fn, dealloc_fn ) )
+	  , tl_handler_( std::move( tl_dest_functor_arg ) )
 	  , th_cnt_()
 	{
 	}
@@ -361,27 +265,6 @@ public:
 		std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
 
 		internal::dynamic_tls_key_release( tls_key_ );
-
-		// メモリリークが無いように、スレッドローカルストレージを削除する
-		// この処理と、スレッド終了処理によるdestr_fn()の同時呼び出しは、未定義動作とする。
-		tls_cont_pointer p_cur = head_.load( std::memory_order_acquire );
-		bool             ret   = head_.compare_exchange_strong( p_cur, nullptr );
-		if ( !ret ) {
-			internal::LogOutput( log_type::WARN, "dynamic_tls::destructor is called in race condition" );
-			return;
-		}
-
-		while ( p_cur != nullptr ) {
-			tls_cont_pointer p_nxt = p_cur->get_next();
-
-			// ノード自身のデストラクタ処理を行う。
-			p_cur->~tls_cont();
-
-			// ノードのメモリ領域を解放する。
-			std::free( p_cur );
-
-			p_cur = p_nxt;
-		}
 	}
 
 	/**
@@ -393,48 +276,18 @@ public:
 	 * @tparam Args	constructor paramter types of T
 	 *
 	 * @return a reference of thread local data
+	 *
+	 * @exception if fail to allocate thread local data, throw std::bad_alloc
 	 */
-	template <typename... Args>
-	value_reference get_tls_instance(
-		Args... args   //!< [in] constructor paramters of T
-	)
+	value_reference get_tls_instance( void )
 	{
-		return get_tls_instance_pred_impl( [&args...]() -> T* {
-			void* p_tmp = std::malloc( sizeof( T ) );
-			return new ( p_tmp ) T( args... );
-		} );
-	}
+		auto tmp_ret = internal::dynamic_tls_getspecific( tls_key_ );
+		if ( tmp_ret.stat_ != internal::op_ret::SUCCESS ) {
+			throw std::bad_alloc();
+		}
 
-	/**
-	 * @brief gets a reference of thread local data with a procedure functor and the constructor paramters for first call of a thread
-	 *
-	 * @tparam TFUNC	functor to get an inialized value of T
-	 * TFUNC should have a operator(): void operator()(T& v) @n
-	 * v is a reference that is constructed with Args and args.
-	 *
-	 * @return a reference of thread local data
-	 *
-	 * If a call of this I/F by a thread is first, this I/F will do below steps to construct initial value.
-	 * @li Step#1 Allocates a thread local memory for T by malloc.
-	 * @li Step#2 call T's constructor with Args and args.
-	 * @li Step#3 call pred with a reference of a instace of T.
-	 *
-	 * @note
-	 * If TL_PRE_DESTRUCTOR does not release thread local data area of T, there is a possibility that thread local data area has some value by re-using.
-	 * In this case, pred is not called.
-	 */
-	template <typename TFUNC, typename... Args>
-	value_reference get_tls_instance_pred(
-		TFUNC pred,    //!< [in] functor to get an inialized value of T
-		Args... args   //!< [in] constructor paramters of T
-	)
-	{
-		return get_tls_instance_pred_impl( [&pred, &args...]() -> T* {
-			void* p_tmp = std::malloc( sizeof( T ) );
-			T*    p_ans = new ( p_tmp ) T( args... );
-			pred( *p_ans );
-			return p_ans;
-		} );
+		// printf( "XXXXXXXXXXX tmp_ret.p_data_ = %lx\n", tmp_ret.p_data_ );
+		return *( reinterpret_cast<value_pointer>( tmp_ret.p_data_ ) );
 	}
 
 	/**
@@ -451,127 +304,162 @@ public:
 	}
 
 private:
-	using tls_cont         = internal::tls_data_container<T, TL_PRE_DESTRUCTOR>;
-	using tls_cont_pointer = tls_cont*;
-
-	tls_cont_pointer allocate_free_tls_container( void )
+	static uintptr_t alloc_fn( void* p_param )
 	{
-		// 空きノードを探す。
-		tls_cont_pointer p_ans = head_.load( std::memory_order_acquire );
-		while ( p_ans != nullptr ) {
-			if ( p_ans->get_status() != tls_cont::ocupied_status::USING ) {
-				if ( p_ans->try_to_get_owner() ) {
-					internal::LogOutput( log_type::DEBUG, "node is allocated." );
-					return p_ans;
-				}
-			}
-			p_ans = p_ans->get_next();
+		internal::LogOutput( log_type::DEBUG, "dynamic_tls::alloc_fn is called              - p_param=%p", p_param );
+		dynamic_tls* p_this_param = reinterpret_cast<dynamic_tls*>( p_param );
+
+		if ( p_this_param == nullptr ) {
+			internal::LogOutput( log_type::ERR, "dynamic_tls::alloc_fn is called but p_param is nullptr" );
+			return 0U;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。どうしようもないので、諦める。
 		}
 
-		void* p_tmp = std::malloc( sizeof( tls_cont ) );
-		p_ans       = new ( p_tmp ) tls_cont( &th_cnt_, pre_exec_of_cleanup_ );
-
-		// リストの先頭に追加
-		tls_cont_pointer p_cur_head = head_.load( std::memory_order_acquire );
-		do {
-			p_ans->set_next( p_cur_head );
-		} while ( !head_.compare_exchange_strong( p_cur_head, p_ans ) );
-
-		internal::LogOutput( log_type::DEBUG, "glist is added." );
-		return p_ans;
+		p_this_param->th_cnt_.count_up();
+		return p_this_param->tl_handler_.allocate();
 	}
 
-	template <typename TFUNC>
-	value_reference get_tls_instance_pred_impl( TFUNC pred )
+	static void dealloc_fn( uintptr_t p_obj, void* p_param )
 	{
-		tls_cont_pointer p_tls = reinterpret_cast<tls_cont_pointer>( internal::dynamic_tls_getspecific( tls_key_ ) );
-		if ( p_tls == nullptr ) {
-			p_tls = allocate_free_tls_container();
-			if ( p_tls->p_value == nullptr ) {   // 確保済みの領域の場合は、pred()を呼び出さず、そのまま再利用する。
-				p_tls->p_value = pred();
-			}
+		internal::LogOutput( log_type::DEBUG, "dynamic_tls::dealloc_fn is called              - p_obj=%p, p_param=%p", p_param );
+		dynamic_tls* p_this_param = reinterpret_cast<dynamic_tls*>( p_param );
 
-			// 新しいスレッド用のスレッドローカルストレージの割り当てが行われたため、スレッド数のカウントをアップする。
-			th_cnt_.count_up();
-
-			internal::dynamic_tls_setspecific( tls_key_, (void*)p_tls );
+		if ( p_obj == 0U ) {
+			internal::LogOutput( log_type::DEBUG, "dynamic_tls::dealloc_fn is called but p_obj is nullptr" );
+			return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。どうしようもないので、諦める。
 		}
-
-		return *( p_tls->p_value );
-	}
-
-	static void destr_fn( void* param )
-	{
-		internal::LogOutput( log_type::DEBUG, "dynamic_tls::destr_fn is called              - %p", param );
-
-		if ( param == nullptr ) {
-			internal::LogOutput( log_type::DEBUG, "dynamic_tls::destr_fn is called but param is nullptr" );
+		if ( p_param == nullptr ) {
+			internal::LogOutput( log_type::ERR, "dynamic_tls::dealloc_fn is called but p_param is nullptr" );
 			return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。どうしようもないので、諦める。
 		}
 
-		tls_cont_pointer p_target_node = reinterpret_cast<tls_cont_pointer>( param );
-
-		p_target_node->release_owner();
-
-		p_target_node->p_th_cnt_->count_down();
-
+		p_this_param->tl_handler_.deallocate( p_obj );
+		p_this_param->th_cnt_.count_down();
 		return;
 	}
 
-	internal::dynamic_tls_key_t tls_key_;                 //!<	key for thread local storage of POSIX.
+	internal::dynamic_tls_key_t tls_key_;       //!<	key for thread local storage of POSIX.
 
-	TL_PRE_DESTRUCTOR             pre_exec_of_cleanup_;   //!< functor to clean-up the resources when thread is terminated.
-	std::atomic<tls_cont_pointer> head_;                  //!< head of thread local data container list
+	TL_HANDLER tl_handler_;                     //!< functor to clean-up the resources when thread is terminated.
 
-	internal::dynamic_tls_thread_cnt th_cnt_;             //!< thread count information
+	internal::dynamic_tls_thread_cnt th_cnt_;   //!< thread count information
 };
 
-// this class is possible to set a value to inialize, but requires that T needs to have a default constructor and copy constructor.
-template <typename T, typename TL_PRE_DESTRUCTOR = threadlocal_destructor_functor<T>>
-class dynamic_tls_wi : public dynamic_tls<T, TL_PRE_DESTRUCTOR> {
+/**
+ * @brief ポインタ型は部分特殊化を行う
+ *
+ * @tparam T
+ * @tparam TL_HANDLER
+ */
+template <typename T, typename TL_HANDLER>
+class dynamic_tls<T*, TL_HANDLER> {
 public:
-	using value_type      = typename dynamic_tls<T, TL_PRE_DESTRUCTOR>::value_type;
-	using value_reference = typename dynamic_tls<T, TL_PRE_DESTRUCTOR>::value_reference;
+	using value_type = T*;
 
-	dynamic_tls_wi( void )
-	  : dynamic_tls_wi<T, TL_PRE_DESTRUCTOR>() {}
+	dynamic_tls( void )
+	  : tls_key_( internal::dynamic_tls_key_create( this, alloc_fn, dealloc_fn ) )
+	  , tl_handler_()
+	  , th_cnt_()
+	{
+	}
 
-	dynamic_tls_wi( const T& init_v )
-	  : dynamic_tls<T, TL_PRE_DESTRUCTOR>()
-	  , init_value_( init_v ) {}
+	dynamic_tls( const TL_HANDLER& tl_dest_functor_arg )
+	  : tls_key_( internal::dynamic_tls_key_create( this, alloc_fn, dealloc_fn ) )
+	  , tl_handler_( tl_dest_functor_arg )
+	  , th_cnt_()
+	{
+	}
 
-	dynamic_tls_wi( const TL_PRE_DESTRUCTOR& tl_dest_functor_arg )
-	  : dynamic_tls<T, TL_PRE_DESTRUCTOR>( tl_dest_functor_arg ) {}
+	dynamic_tls( TL_HANDLER&& tl_dest_functor_arg )
+	  : tls_key_( internal::dynamic_tls_key_create( this, alloc_fn, dealloc_fn ) )
+	  , tl_handler_( std::move( tl_dest_functor_arg ) )
+	  , th_cnt_()
+	{
+	}
 
-	dynamic_tls_wi( TL_PRE_DESTRUCTOR&& tl_dest_functor_arg )
-	  : dynamic_tls<T, TL_PRE_DESTRUCTOR>( std::move( tl_dest_functor_arg ) ) {}
+	~dynamic_tls()
+	{
+		// internal::LogOutput( log_type::DEBUG, "dynamic_tls<T*>::destructor is called" );
 
-	dynamic_tls_wi( const T& init_v, const TL_PRE_DESTRUCTOR& tl_dest_functor_arg )
-	  : dynamic_tls<T, TL_PRE_DESTRUCTOR>( tl_dest_functor_arg )
-	  , init_value_( init_v ) {}
+		std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
 
-	dynamic_tls_wi( const T& init_v, TL_PRE_DESTRUCTOR&& tl_dest_functor_arg )
-	  : dynamic_tls<T, TL_PRE_DESTRUCTOR>( std::move( tl_dest_functor_arg ) )
-	  , init_value_( init_v ) {}
+		internal::dynamic_tls_key_release( tls_key_ );
+	}
 
 	/**
-	 * @brief gets a reference of thread local data copy-constructed by a copy of init_v for first call of a thread
+	 * @brief gets a reference of thread local data with the constructor paramters for first call of a thread
 	 *
 	 * If a call of this I/F by a thread is first, this I/F will allocate a thread local memory for T and
-	 * construct it by copy constructor with a copy of init_v
+	 * construct it by it's constructor with Args and args.
+	 *
+	 * @tparam Args	constructor paramter types of T
 	 *
 	 * @return a reference of thread local data
+	 *
+	 * @exception if fail to allocate thread local data, throw std::bad_alloc
 	 */
-	value_reference get_tls_instance_wi( void )
+	value_type get_tls_instance( void )
 	{
-		return get_tls_instance( [this]() -> T* {
-			void* p_tmp = std::malloc( sizeof( T ) );
-			return new ( p_tmp ) T( this->init_value_ );
-		} );
+		auto tmp_ret = internal::dynamic_tls_getspecific( tls_key_ );
+		if ( tmp_ret.stat_ != internal::op_ret::SUCCESS ) {
+			throw std::bad_alloc();
+		}
+
+		// printf( "YYYYYYYYYYY tmp_ret.p_data_ = %lx\n", tmp_ret.p_data_ );
+		return reinterpret_cast<value_type>( tmp_ret.p_data_ );
+	}
+
+	/**
+	 * @brief get thread count information
+	 *
+	 * @return 1st: current thread count
+	 * @return 2nd: max thread count
+	 */
+	std::pair<int, int> get_thread_count_info( void ) const
+	{
+		return std::pair<int, int>(
+			th_cnt_.cur_thread_count_.load( std::memory_order_acquire ),
+			th_cnt_.max_thread_count_.load( std::memory_order_acquire ) );
 	}
 
 private:
-	const T init_value_;   //!< a value that it constructs thread local mememory storage with
+	static uintptr_t alloc_fn( void* p_param )
+	{
+		internal::LogOutput( log_type::DEBUG, "dynamic_tls<T*>::alloc_fn is called              - p_param=%p", p_param );
+		dynamic_tls* p_this_param = reinterpret_cast<dynamic_tls*>( p_param );
+
+		if ( p_this_param == nullptr ) {
+			internal::LogOutput( log_type::ERR, "dynamic_tls<T*>::alloc_fn is called but p_param is nullptr" );
+			return 0U;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。どうしようもないので、諦める。
+		}
+
+		p_this_param->th_cnt_.count_up();
+		return p_this_param->tl_handler_.allocate();
+	}
+
+	static void dealloc_fn( uintptr_t p_obj, void* p_param )
+	{
+		internal::LogOutput( log_type::DEBUG, "dynamic_tls<T*>::dealloc_fn is called              - p_obj=0x%lx, p_param=%p", p_obj, p_param );
+		dynamic_tls* p_this_param = reinterpret_cast<dynamic_tls*>( p_param );
+
+		if ( p_obj == 0U ) {
+			internal::LogOutput( log_type::DEBUG, "dynamic_tls<T*>::dealloc_fn is called but p_obj is nullptr" );
+			return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。どうしようもないので、諦める。
+		}
+		if ( p_param == nullptr ) {
+			internal::LogOutput( log_type::ERR, "dynamic_tls<T*>::dealloc_fn is called but p_param is nullptr" );
+			return;   // なぜかnullptrで呼び出された。多分pthread内でのrace conditionのせい。どうしようもないので、諦める。
+		}
+
+		p_this_param->tl_handler_.deallocate( p_obj );
+		p_this_param->th_cnt_.count_down();
+		return;
+	}
+
+	internal::dynamic_tls_key_t tls_key_;       //!<	key for thread local storage of POSIX.
+
+	TL_HANDLER tl_handler_;                     //!< functor to clean-up the resources when thread is terminated.
+
+	internal::dynamic_tls_thread_cnt th_cnt_;   //!< thread count information
 };
 
 }   // namespace concurrent

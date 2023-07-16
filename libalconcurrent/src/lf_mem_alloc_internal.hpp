@@ -173,21 +173,22 @@ private:
 	};
 	using scoped_hazard_ref = hazard_ptr_scoped_ref<idx_mgr_element, hzrd_max_slot_>;
 
-	struct rcv_el_by_thread_terminating {
-		rcv_el_by_thread_terminating( idx_element_storage_mgr* p_elst_arg )
+	struct rcv_el_threadlocal_handler {
+		rcv_el_threadlocal_handler( idx_element_storage_mgr* p_elst_arg )
 		  : p_elst_( p_elst_arg )
 		{
 		}
 
-		bool release( waiting_element_list& destructing_tls )
+		uintptr_t allocate( void )
 		{
-			p_elst_->rcv_wait_element_by_thread_terminating( &destructing_tls );
-			return true;
+			return reinterpret_cast<uintptr_t>( new waiting_element_list() );
 		}
 
-		void destruct( waiting_element_list& destructing_tls )
+		void deallocate( uintptr_t p_destructing_tls )
 		{
-			return;
+			waiting_element_list* p_tmp = reinterpret_cast<waiting_element_list*>( p_destructing_tls );
+			p_elst_->rcv_wait_element_by_thread_terminating( p_tmp );
+			delete p_tmp;
 		}
 
 		idx_element_storage_mgr* p_elst_;
@@ -216,17 +217,17 @@ private:
 	 */
 	void rcv_wait_element_by_thread_terminating( waiting_element_list* p_el_list );
 
-	dynamic_tls<waiting_element_list, rcv_el_by_thread_terminating> tls_waiting_list_;   //!< 滞留要素を管理するスレッドローカルリスト
-	hazard_ptr<idx_mgr_element, hzrd_max_slot_>                     hzrd_element_;       //!< ハザードポインタを管理する構造体。
+	dynamic_tls<waiting_element_list, rcv_el_threadlocal_handler> tls_waiting_list_;   //!< 滞留要素を管理するスレッドローカルリスト
+	hazard_ptr<idx_mgr_element, hzrd_max_slot_>                   hzrd_element_;       //!< ハザードポインタを管理する構造体。
 
-	std::atomic<idx_mgr_element*> head_;                                                 //!< リスト構造のヘッドへのポインタ
-	std::atomic<idx_mgr_element*> tail_;                                                 //!< リスト構造の終端要素へのポインタ
-	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_;                  //!< リスト構造の次のノードへのポインタを格納したメンバ変数へのメンバ変数ポインタ
+	std::atomic<idx_mgr_element*> head_;                                               //!< リスト構造のヘッドへのポインタ
+	std::atomic<idx_mgr_element*> tail_;                                               //!< リスト構造の終端要素へのポインタ
+	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_;                //!< リスト構造の次のノードへのポインタを格納したメンバ変数へのメンバ変数ポインタ
 
-	std::mutex           mtx_rcv_wait_element_list_;                                     //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取るメンバ変数rcv_wait_element_list_の排他制御用Mutex
-	waiting_element_list rcv_wait_element_list_;                                         //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取る
+	std::mutex           mtx_rcv_wait_element_list_;                                   //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取るメンバ変数rcv_wait_element_list_の排他制御用Mutex
+	waiting_element_list rcv_wait_element_list_;                                       //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取る
 
-	std::atomic<unsigned int>* p_collision_cnt_;                                         //!< ロックフリーアルゴリズム内で発生した衝突回数を記録する変数への参照
+	std::atomic<unsigned int>* p_collision_cnt_;                                       //!< ロックフリーアルゴリズム内で発生した衝突回数を記録する変数への参照
 };
 
 /*!
@@ -334,15 +335,16 @@ private:
 		{
 		}
 
-		bool release( waiting_idx_list& destructing_tls )
+		uintptr_t allocate( void )
 		{
-			p_elst_->rcv_wait_idx_by_thread_terminating( &destructing_tls );
-			return true;
+			return reinterpret_cast<uintptr_t>( new waiting_idx_list( p_elst_->idx_size_.load(), p_elst_->idx_size_ver_.load() ) );
 		}
 
-		void destruct( waiting_idx_list& destructing_tls )
+		void deallocate( uintptr_t p_destructing_tls )
 		{
-			return;
+			waiting_idx_list* p_tmp = reinterpret_cast<waiting_idx_list*>( p_destructing_tls );
+			p_elst_->rcv_wait_idx_by_thread_terminating( p_tmp );
+			delete p_tmp;
 		}
 
 		idx_mgr* p_elst_;
@@ -679,22 +681,101 @@ private:
 	 * @brief それぞれのスレッド終了時に実行する処理を担うfunctor
 	 */
 	struct tl_chunk_param_destructor {
-		/*!
-		 * @brief スレッド終了時に呼び出されるI/F
-		 *
-		 * @retval true 呼び出し元に対し、引数のリファレンスの実態が存在するメモリ領域を解放するように指示する。
-		 * @retval false 呼び出し元に対し、引数のリファレンスの実態が存在するメモリ領域を保持するように指示する。
-		 */
-		bool release(
-			tl_chunk_param& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
-		);
+		tl_chunk_param_destructor( chunk_list* p_chlst_arg )
+		  : p_chlst_( p_chlst_arg )
+		{
+		}
+
+		uintptr_t allocate( void )
+		{
+			return reinterpret_cast<uintptr_t>( new tl_chunk_param( p_chlst_, p_chlst_->chunk_param_.num_of_pieces_ ) );
+		}
 
 		/*!
-		 * @brief インスタンス削除時に呼び出されるI/F
+		 * @brief スレッド終了時等に呼び出されるI/F
 		 */
-		void destruct(
-			tl_chunk_param& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
-		);
+		void deallocate( uintptr_t p_destructing_tls )
+		{
+			tl_chunk_param* p_tmp = reinterpret_cast<tl_chunk_param*>( p_destructing_tls );
+
+			p_tmp->p_owner_chunk_list_->release_all_of_ownership( p_tmp->tl_id_, nullptr );
+
+			delete p_tmp;
+		}
+
+		chunk_list* p_chlst_;
+	};
+
+	// TODO 仮実装
+	class atomic_push_list {
+	public:
+		class forward_iterator {
+		public:
+			forward_iterator( chunk_header_multi_slot* p_arg )
+			  : p_( p_arg )
+			{
+			}
+
+			chunk_header_multi_slot& operator*( void )
+			{
+				return *p_;
+			}
+			chunk_header_multi_slot& operator->( void )
+			{
+				return *p_;
+			}
+			forward_iterator& operator++( void )
+			{
+				p_ = p_->p_next_chunk_.load( std::memory_order_acquire );
+				return *this;
+			}
+			bool operator!=( const forward_iterator& v )
+			{
+				return p_ != v.p_;
+			}
+
+		private:
+			chunk_header_multi_slot* p_;
+		};
+
+		atomic_push_list( void )
+		  : p_top_( nullptr )
+		{
+		}
+		~atomic_push_list()
+		{
+			chunk_header_multi_slot* p_chms = p_top_.load( std::memory_order_acquire );
+			while ( p_chms != nullptr ) {
+				chunk_header_multi_slot* p_next_chms = p_chms->p_next_chunk_.load();
+				delete p_chms;
+				p_chms = p_next_chms;
+			}
+		}
+
+		chunk_header_multi_slot* load( std::memory_order order )
+		{
+			return p_top_.load( order );
+		}
+
+		void push( chunk_header_multi_slot* p_new_chms )
+		{
+			chunk_header_multi_slot* p_cur_top = p_top_.load( std::memory_order_acquire );
+			do {
+				p_new_chms->p_next_chunk_.store( p_cur_top, std::memory_order_release );
+			} while ( !p_top_.compare_exchange_weak( p_cur_top, p_new_chms ) );
+		}
+
+		forward_iterator begin( void )
+		{
+			return forward_iterator( p_top_.load( std::memory_order_acquire ) );
+		}
+		forward_iterator end( void )
+		{
+			return forward_iterator( nullptr );
+		}
+
+	private:
+		std::atomic<chunk_header_multi_slot*> p_top_;
 	};
 
 	void mark_as_reserved_deletion(
@@ -713,8 +794,10 @@ private:
 
 	const param_chunk_allocation chunk_param_;
 
-	std::atomic<chunk_header_multi_slot*>                  p_top_chunk_;   //!< pointer to chunk_header that is top of list.
-	dynamic_tls<tl_chunk_param, tl_chunk_param_destructor> tls_hint_;      //!< thread loacal pointer to chunk_header that is success to allocate recently for a thread.
+	atomic_push_list                                       p_top_chunk_;   //!< pointer to chunk_header that is top of list.
+	dynamic_tls<tl_chunk_param, tl_chunk_param_destructor> tls_hint_;      //!< thread local pointer to chunk_header that is success to allocate recently for a thread.
+	                                                                       //!< tls_hint_は、p_top_chunk_を参照しているため、この2つのメンバ変数の宣言順(p_top_chunk_の次にtls_hint_)を入れ替えてはならない。
+	                                                                       //!< 入れ替えてしまった場合、デストラクタでの解放処理で、解放済みのメモリ領域にアクセスしてしまう。
 
 	chunk_list_statistics statistics_;                                     //!< statistics
 };

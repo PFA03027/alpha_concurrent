@@ -294,21 +294,22 @@ private:
 	free_nd_storage operator=( const free_nd_storage& ) = delete;
 	free_nd_storage operator=( free_nd_storage&& )      = delete;
 
-	struct rcv_fifo_list_by_thread_terminating {
-		rcv_fifo_list_by_thread_terminating( free_nd_storage* p_fns_arg )
+	struct rcv_fifo_list_handler {
+		rcv_fifo_list_handler( free_nd_storage* p_fns_arg )
 		  : p_fns_( p_fns_arg )
 		{
 		}
 
-		bool release( thread_local_fifo_list& destructing_tls )
+		uintptr_t allocate( void )
 		{
-			p_fns_->rcv_thread_local_fifo_list( &destructing_tls );
-			return true;
+			return reinterpret_cast<uintptr_t>( new thread_local_fifo_list() );
 		}
 
-		void destruct( thread_local_fifo_list& destructing_tls )
+		void deallocate( uintptr_t p_destructing_tls )
 		{
-			return;
+			thread_local_fifo_list* p_tls_list = reinterpret_cast<thread_local_fifo_list*>( p_destructing_tls );
+			p_fns_->rcv_thread_local_fifo_list( p_tls_list );
+			delete p_tls_list;
 		}
 
 		free_nd_storage* p_fns_;
@@ -331,6 +332,16 @@ private:
 		return p_ans;
 	}
 
+	/**
+	 * @brief スレッド終了時にスレッドローカルリストに残留しているノードを引き取る
+	 *
+	 * 引き取るのはノードだけで、リストの管理構造体p_rcvはそのまま残るため、必要に応じて破棄する必要あり。
+	 *
+	 * @param p_rcv フリーノードとして開放待ちとなっているスレッドローカルリストへのポインタ
+	 *
+	 * @note
+	 * スレッド終了時に呼び出される関数であるため、内部でmutexによる排他制御ロックが行われる。
+	 */
 	void rcv_thread_local_fifo_list( thread_local_fifo_list* p_rcv );
 
 	static constexpr int num_recycle_exec = 16;   //!< recycle処理を行うノード数。処理量を一定化するために、ループ回数を定数化する。２以上とする事。だいたいCPU数程度にすればよい。
@@ -339,7 +350,7 @@ private:
 
 	fifo_free_nd_list node_list_;
 
-	dynamic_tls<thread_local_fifo_list, rcv_fifo_list_by_thread_terminating> tls_fifo_;
+	dynamic_tls<thread_local_fifo_list, rcv_fifo_list_handler> tls_fifo_;
 
 	std::mutex             mtx_rcv_thread_local_fifo_list_;
 	thread_local_fifo_list rcv_thread_local_fifo_list_;

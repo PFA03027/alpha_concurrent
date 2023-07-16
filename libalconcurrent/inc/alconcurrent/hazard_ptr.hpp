@@ -49,7 +49,7 @@ public:
 	static constexpr int hzrd_max_slot = N;
 
 	hazard_ptr( void )
-	  : p_hzd_ptr_node_( threadlocal_destructor_functor() )
+	  : p_hzd_ptr_node_( threadlocal_handler_functor( this ) )
 	{
 	}
 
@@ -273,7 +273,7 @@ private:
 			// 空きノードが見つからなかったので、新しいノードを用意する。
 			p_ans = add_one_new_hazard_ptr_node();
 
-			internal::LogOutput( log_type::DEBUG, "glist is added." );
+			internal::LogOutput( log_type::DEBUG, "glist is added by allocate_hazard_ptr_node(%p)", p_ans );
 			return p_ans;
 		}
 
@@ -321,7 +321,7 @@ private:
 			} while ( !cas_success );   // CASが成功するまで繰り返す。
 			node_count_++;
 
-			internal::LogOutput( log_type::DEBUG, "glist is added." );
+			internal::LogOutput( log_type::DEBUG, "glist is added by add_one_new_hazard_ptr_node(%p)", p_ans );
 			return p_ans;
 		}
 
@@ -343,31 +343,34 @@ private:
 
 	inline node_for_hazard_ptr* check_local_storage( void )
 	{
-		node_for_hazard_ptr* p_ans = p_hzd_ptr_node_.get_tls_instance( nullptr );
-		if ( p_ans == nullptr ) {
-			p_ans                              = get_head_instance().allocate_hazard_ptr_node();
-			p_hzd_ptr_node_.get_tls_instance() = p_ans;
-		}
+		node_for_hazard_ptr* p_ans = p_hzd_ptr_node_.get_tls_instance();
 		return p_ans;
 	}
 
-	struct threadlocal_destructor_functor {
-		using value_type      = node_for_hazard_ptr*;
-		using value_reference = value_type&;
-
-		bool release( value_reference data )
+	struct threadlocal_handler_functor {
+		threadlocal_handler_functor( hazard_ptr* p_node_list_owner_arg )
+		  : p_node_list_owner_( p_node_list_owner_arg )
 		{
-			data->release_owner();
-			return true;
 		}
 
-		void destruct( value_reference data )
+		uintptr_t allocate( void )
 		{
-			return;
+			node_for_hazard_ptr* p_ans = p_node_list_owner_->get_head_instance().allocate_hazard_ptr_node();
+			if ( p_ans == nullptr ) {
+				throw std::bad_alloc();
+			}
+			return reinterpret_cast<uintptr_t>( p_ans );
 		}
+		void deallocate( uintptr_t p_destructing_tls )
+		{
+			node_for_hazard_ptr* p_tmp = reinterpret_cast<node_for_hazard_ptr*>( p_destructing_tls );
+			p_tmp->release_owner();
+		}
+
+		hazard_ptr* p_node_list_owner_;
 	};
 
-	dynamic_tls<node_for_hazard_ptr*, threadlocal_destructor_functor> p_hzd_ptr_node_;
+	dynamic_tls<node_for_hazard_ptr*, threadlocal_handler_functor> p_hzd_ptr_node_;
 };
 
 /*!
