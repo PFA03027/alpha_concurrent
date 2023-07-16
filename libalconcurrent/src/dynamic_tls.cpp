@@ -22,6 +22,7 @@
 #include "alconcurrent/dynamic_tls.hpp"
 
 #include "alloc_only_allocator.hpp"
+#include "utility.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -29,48 +30,6 @@ namespace concurrent {
 std::recursive_mutex dynamic_tls_global_exclusive_control_for_destructions;   //!< to avoid rece condition b/w thread local destruction and normal destruction globally
 
 namespace internal {
-
-class scoped_cnt {
-public:
-	scoped_cnt( void )
-	  : cnt_( 0 )
-	{
-	}
-
-	void up( void )
-	{
-		cnt_.fetch_add( 1 );
-	}
-	void down( void )
-	{
-		cnt_.fetch_sub( 1 );
-	}
-
-	int get_cur_cnt( void )
-	{
-		return cnt_.load( std::memory_order_acquire );
-	}
-
-private:
-	std::atomic<int> cnt_;
-};
-
-class scoped_cnt_lock {
-public:
-	scoped_cnt_lock( scoped_cnt& ref_arg )
-	  : ref_( ref_arg )
-	{
-		ref_.up();
-	}
-
-	~scoped_cnt_lock()
-	{
-		ref_.down();
-	}
-
-private:
-	scoped_cnt& ref_;
-};
 
 constexpr size_t STRERROR_BUFF_SIZE = 256;
 
@@ -133,9 +92,11 @@ struct dynamic_tls_key {
 		USED
 	};
 
-	unsigned int                                idx_;               //!< index of key
-	std::atomic<alloc_stat>                     is_used_;           //!< flag whether this key is used or not.
-	scoped_cnt                                  acc_cnt_;           //!< count of accessor
+	unsigned int            idx_;                                   //!< index of key
+	std::atomic<alloc_stat> is_used_;                               //!< flag whether this key is used or not.
+#ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
+	std::atomic<int> acc_cnt_;                                      //!< count of accessor
+#endif
 	std::atomic<void*>                          tls_p_data_;        //!< atomic pointer of the paramter data for thread local storage
 	std::atomic<uintptr_t ( * )( void* )>       tls_allocator_;     //!< atomic pointer of allocator for thread local storage
 	std::atomic<void ( * )( uintptr_t, void* )> tls_deallocator_;   //!< atomic pointer of deallocator for thread local storage
@@ -164,9 +125,6 @@ public:
 	  : p_next_( nullptr )
 	  , base_idx_( base_idx_arg )
 	{
-		// for ( auto& e : content_array_ ) {
-		// 	e = nullptr;
-		// }
 	}
 
 	get_result get_tls( dynamic_tls_key_t key )
@@ -511,6 +469,13 @@ private:
 	std::atomic<dynamic_tls_content_array*> p_head_content_;
 };
 
+/**
+ * @brief dynamic thread local のキー配列を管理するクラス
+ *
+ * @note
+ * 一度確保したら解放することはないクラスなので、allocate_only()からメモリ領域を確保する。
+ *
+ */
 class dynamic_tls_key_array {
 public:
 	dynamic_tls_key_array( unsigned int base_idx_arg )
@@ -782,9 +747,9 @@ private:
 	void push_front_dynamic_tls_key_array( void )
 	{
 		unsigned int           cur_base_idx     = next_base_idx_.fetch_add( ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE );
-		dynamic_tls_key_array* p_new_dtls_ka    = new dynamic_tls_key_array( cur_base_idx );   // 可変長とするために、malloc()使われてしまうのは割り切る
+		dynamic_tls_key_array* p_new_dtls_ka    = new dynamic_tls_key_array( cur_base_idx );
 		dynamic_tls_key_array* p_expect_dtls_ka = p_top_dtls_key_array_.load( std::memory_order_acquire );
-		do {                                                                                   // 置き換えに成功するまでビジーループ
+		do {   // 置き換えに成功するまでビジーループ
 			p_new_dtls_ka->p_next_.store( p_expect_dtls_ka, std::memory_order_release );
 		} while ( !p_top_dtls_key_array_.compare_exchange_strong( p_expect_dtls_ka, p_new_dtls_ka ) );
 	}
@@ -847,7 +812,9 @@ void call_destructor_for_array_and_clear_data( dynamic_tls_key_array* p_key_arra
 	for ( unsigned int j = 0; j < ALCONCURRENT_CONF_DYNAMIC_TLS_DESTUCT_ITERATE_MAX; j++ ) {
 		bool is_finish = true;
 		for ( auto& cur_key : ( *p_key_array_arg ) ) {
-			scoped_cnt_lock cl( cur_key.acc_cnt_ );
+#ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
+			scoped_inout_counter<std::atomic<int>> cl( cur_key.acc_cnt_ );
+#endif
 			if ( cur_key.is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) continue;
 
 			auto   it_tls_        = p_content_array_arg->search( &cur_key );
@@ -1008,11 +975,13 @@ bool dynamic_tls_key_array::release_key( dynamic_tls_key* p_key_arg )
 	}
 
 	// releaseの作業権が確保できた
+#ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
 	// アクセススレッドが自分以外に存在しなくなるのを待つ
-	while ( p_key_arg->acc_cnt_.get_cur_cnt() != 1 ) {
+	while ( p_key_arg->acc_cnt_.load( std::memory_order_acquire ) != 1 ) {
 		// 1以外の場合は、ほかのスレッドがアクセス中のため、いったん実行権を解放して、ほかのスレッドの実行を完了させる。
 		std::this_thread::yield();
 	}
+#endif
 
 	// すべての該当するスレッドローカルストレージをクリアする
 	dynamic_tls_content_head* p_cur_dtls_c = dynamic_tls_mgr::get_instance().get_top_dynamic_tls_content_head();
@@ -1113,7 +1082,9 @@ void dynamic_tls_key_release( dynamic_tls_key_t key )
 {
 	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) return;
 
-	scoped_cnt_lock cl( key->acc_cnt_ );
+#ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
+	scoped_inout_counter<std::atomic<int>> cl( key->acc_cnt_ );
+#endif
 
 	if ( dynamic_tls_mgr::get_instance().release_key( key ) ) {
 		cur_count_of_tls_keys--;
@@ -1125,7 +1096,9 @@ op_ret dynamic_tls_setspecific( dynamic_tls_key_t key, uintptr_t tls_data )
 {
 	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) return op_ret::INVALID;
 
-	scoped_cnt_lock cl( key->acc_cnt_ );
+#ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
+	scoped_inout_counter<std::atomic<int>> cl( key->acc_cnt_ );
+#endif
 
 	dynamic_tls_content_head* p_cur_dtls = dynamic_tls_mgr::get_instance().get_current_thread_dynamic_tls_content_head();
 	return p_cur_dtls->set_tls( key, tls_data );
@@ -1135,7 +1108,9 @@ get_result dynamic_tls_getspecific( dynamic_tls_key_t key )
 {
 	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) return get_result();
 
-	scoped_cnt_lock cl( key->acc_cnt_ );
+#ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
+	scoped_inout_counter<std::atomic<int>> cl( key->acc_cnt_ );
+#endif
 
 	dynamic_tls_content_head* p_cur_dtls = dynamic_tls_mgr::get_instance().get_current_thread_dynamic_tls_content_head();
 	return p_cur_dtls->get_tls( key );

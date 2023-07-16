@@ -20,6 +20,7 @@
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
 #include "lf_mem_alloc_internal.hpp"
+#include "utility.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -681,26 +682,6 @@ void idx_mgr::dump( void )
 
 	return;
 }
-
-////////////////////////////////////////////////////////////////////////////////
-
-template <typename T>
-class scoped_inout_counter {
-public:
-	scoped_inout_counter( T& atomic_couter_ref_arg )
-	  : atomic_couter_ref( atomic_couter_ref_arg )
-	{
-		atomic_couter_ref++;
-	}
-
-	~scoped_inout_counter()
-	{
-		atomic_couter_ref--;
-	}
-
-private:
-	T& atomic_couter_ref;
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 
