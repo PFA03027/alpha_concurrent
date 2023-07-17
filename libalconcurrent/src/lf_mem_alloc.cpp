@@ -19,7 +19,9 @@
 
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
+
 #include "lf_mem_alloc_internal.hpp"
+#include "mmap_allocator.hpp"
 #include "utility.hpp"
 
 namespace alpha {
@@ -736,6 +738,7 @@ chunk_header_multi_slot::chunk_header_multi_slot(
   , free_slot_idx_mgr_( -1, &( p_statistics_->alloc_collision_cnt_ ), &( p_statistics_->dealloc_collision_cnt_ ) )
   , p_free_slot_mark_( nullptr )
   , p_chunk_( nullptr )
+  , allocated_size_( 0 )
 {
 	assert( p_statistics_ != nullptr );
 
@@ -749,10 +752,11 @@ chunk_header_multi_slot::chunk_header_multi_slot(
 chunk_header_multi_slot::~chunk_header_multi_slot()
 {
 	delete[] p_free_slot_mark_;
-	std::free( p_chunk_ );
+	deallocate_by_munmap( p_chunk_, allocated_size_ );
 
 	p_free_slot_mark_ = nullptr;
 	p_chunk_          = nullptr;
+	allocated_size_   = 0U;
 
 	p_statistics_->chunk_num_--;
 
@@ -826,13 +830,15 @@ bool chunk_header_multi_slot::alloc_new_chunk(
 		p_free_slot_mark_[i].store( slot_status_mark::FREE );
 	}
 
-	p_chunk_ = std::malloc( tmp_size );
-	if ( p_chunk_ == nullptr ) {
+	auto alloc_ret = allocate_by_mmap( tmp_size, sizeof( uintptr_t ) );
+	if ( alloc_ret.p_allocated_addr_ == nullptr ) {
 		delete[] p_free_slot_mark_;
 		p_free_slot_mark_ = nullptr;
 		status_.store( chunk_control_status::EMPTY, std::memory_order_release );
 		return false;
 	}
+	p_chunk_        = alloc_ret.p_allocated_addr_;
+	allocated_size_ = alloc_ret.allocated_size_;
 
 	size_of_chunk_ = tmp_size;
 
@@ -1142,10 +1148,11 @@ bool chunk_header_multi_slot::exec_deletion( void )
 
 	std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
 
-	std::free( p_chunk_ );
+	deallocate_by_munmap( p_chunk_, allocated_size_ );
 	delete[] p_free_slot_mark_;
 
 	p_chunk_          = nullptr;
+	allocated_size_   = 0U;
 	p_free_slot_mark_ = nullptr;
 	owner_tl_id_.store( NON_OWNERED_TL_ID, std::memory_order_release );
 	free_slot_idx_mgr_.clear();

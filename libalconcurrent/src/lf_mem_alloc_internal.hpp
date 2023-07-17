@@ -585,6 +585,7 @@ private:
 
 	std::atomic<slot_status_mark>* p_free_slot_mark_;   //!< if slot is free, this is marked as true. This is prior information than free slot idx stack.
 	void*                          p_chunk_;            //!< pointer to an allocated memory as a chunk
+	size_t                         allocated_size_;
 };
 
 struct slot_chk_result {
