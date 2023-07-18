@@ -129,15 +129,33 @@ public:
 
 	get_result get_tls( dynamic_tls_key_t key )
 	{
-		iterator cnt_it = search( key );
-		if ( cnt_it == end() ) {
-			return get_result { op_ret::OUT_OF_RANGE, 0U };   // 範囲外なので、取得処理失敗と判定し、OUT_OF_RANGEを返す。
-		}
 		if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) {
 			return get_result { op_ret::INVALID_KEY, 0U };   // 有効なkeyではないため、取得処理失敗と判定し、INVALID_KEYを返す。
 		}
 
+		iterator cnt_it = search( key );
+		if ( cnt_it == end() ) {
+			return get_result { op_ret::OUT_OF_RANGE, 0U };   // 範囲外なので、取得処理失敗と判定し、OUT_OF_RANGEを返す。
+		}
+
 		tls_data_and_stat::stat cur_stat = cnt_it->tls_stat_.load( std::memory_order_acquire );
+#if 1
+		if ( cur_stat == tls_data_and_stat::stat::USED ) {
+			// already initialized
+		} else {
+			if ( cur_stat == tls_data_and_stat::stat::UNINITIALIZED ) {
+				// if before initialized
+				cnt_it->tls_data_ = ( *( key->tls_allocator_ ) )( key->tls_p_data_ );
+				cnt_it->tls_stat_.store( tls_data_and_stat::stat::USED, std::memory_order_release );
+			} else {
+				// cur_stat == tls_data_and_stat::stat::DESTRUCTING or unknown value
+				// Should not happen this condition
+				internal::LogOutput( log_type::ERR, "into the unexpected condition for dynamic_tls_content_array::get_tls()" );
+				return get_result { op_ret::UNEXPECT_ERR, 0U };   // fail to get
+			}
+		}
+		return get_result { op_ret::SUCCESS, cnt_it->tls_data_ };
+#else
 		switch ( cur_stat ) {
 			case tls_data_and_stat::stat::UNINITIALIZED: {
 				// if before initialized
@@ -152,22 +170,22 @@ public:
 			case tls_data_and_stat::stat::DESTRUCTING: {
 				// Should not happen this condition
 				internal::LogOutput( log_type::ERR, "into the unexpected condition for dynamic_tls_content_array::get_tls()" );
-				return get_result { op_ret::UNEXPECT_ERR, 0U };
-				;   // fail to get
+				return get_result { op_ret::UNEXPECT_ERR, 0U };   // fail to get
 			} break;
 		}
-
 		return get_result { op_ret::SUCCESS, cnt_it->tls_data_ };
+#endif
 	}
 
 	op_ret set_tls( dynamic_tls_key_t key, uintptr_t p_data_arg )
 	{
+		if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) {
+			return op_ret::INVALID_KEY;   // 有効なkeyではないため、保存処理失敗と判定し、falseを返す。
+		}
+
 		iterator cnt_it = search( key );
 		if ( cnt_it == end() ) {
 			return op_ret::OUT_OF_RANGE;   // 範囲外なので、保存処理失敗と判定し、OUT_OF_RANGEを返す。
-		}
-		if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) {
-			return op_ret::INVALID_KEY;   // 有効なkeyではないため、保存処理失敗と判定し、falseを返す。
 		}
 
 		tls_data_and_stat::stat cur_stat = cnt_it->tls_stat_.load( std::memory_order_acquire );
@@ -299,12 +317,12 @@ private:
 
 	using iterator = tls_data_and_stat*;
 
-	iterator begin( void )
+	inline iterator begin( void )
 	{
 		return &( content_array_[0] );
 	}
 
-	iterator end( void )
+	inline iterator end( void )
 	{
 		return &( content_array_[ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE] );
 	}
@@ -315,7 +333,7 @@ private:
 			// 範囲外なので、取得処理失敗と判定し、OUT_OF_RANGEを返す。
 			return end();
 		}
-		if ( key->idx_ >= ( base_idx_ + ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE ) ) {
+		if ( ( key->idx_ - base_idx_ ) >= ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE ) {
 			// 範囲外なので、取得処理失敗と判定し、OUT_OF_RANGEを返す。
 			return end();
 		}
@@ -349,6 +367,17 @@ public:
 		dynamic_tls_content_array* p_cur_tls_ca = p_head_content_.load( std::memory_order_acquire );
 		while ( p_cur_tls_ca != nullptr ) {
 			auto ret = p_cur_tls_ca->get_tls( key );
+#if 1
+			if ( ret.stat_ != op_ret::OUT_OF_RANGE ) {
+				// case op_ret::INVALID:
+				// case op_ret::INVALID_KEY:
+				// case op_ret::UNEXPECT_ERR: {
+				// 	// 引数のkeyに問題があるため、取得処理失敗で終了する。
+				// case op_ret::SUCCESS: {
+				//  // 処理成功のため、終了する
+				return ret;
+			}
+#else
 			switch ( ret.stat_ ) {
 				default:
 				case op_ret::INVALID:
@@ -365,6 +394,7 @@ public:
 					// continue to next dynamic_tls_content_array
 				} break;
 			}
+#endif
 			p_cur_tls_ca = p_cur_tls_ca->p_next_;
 		}
 
@@ -374,7 +404,8 @@ public:
 		return p_new->get_tls( key );
 	}
 
-	op_ret set_tls( dynamic_tls_key_t key, uintptr_t p_data_arg )
+	op_ret
+	set_tls( dynamic_tls_key_t key, uintptr_t p_data_arg )
 	{
 		if ( ownership_state_.load( std::memory_order_acquire ) != cnt_arry_state::USED ) return op_ret::INVALID;
 
