@@ -339,7 +339,7 @@ void idx_element_storage_mgr::push_element_to_list(
 	idx_mgr_element* p_push_element   //!< [in] pointer of element to push
 )
 {
-	( p_push_element->*p_next_ptr_offset_ ).store( nullptr );
+	( p_push_element->*p_next_ptr_offset_ ).store( nullptr, std::memory_order_release );
 
 	scoped_hazard_ref scoped_ref_cur( hzrd_element_, (int)hazard_ptr_idx::PUSH_CUR );
 
@@ -353,13 +353,13 @@ void idx_element_storage_mgr::push_element_to_list(
 			continue;
 		}
 
-		( p_push_element->*p_next_ptr_offset_ ).store( p_cur_top );
+		( p_push_element->*p_next_ptr_offset_ ).store( p_cur_top, std::memory_order_release );
 
 		// head_を更新する。
 		// ここで、プリエンプションして、tail_がA->B->A'となった時、p_cur_lastが期待値とは異なるが、
 		// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
 		if ( head_.compare_exchange_weak( p_cur_top, p_push_element ) ) {
-			return;   // 追加完了
+			break;   // 追加完了
 		}
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 		( *p_collision_cnt_ )++;
