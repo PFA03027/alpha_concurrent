@@ -72,7 +72,7 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size )
 	}
 
 	alloc_params page_aligned_params = calc_cur_system_alloc_params( req_alloc_size, align_size );
-#ifndef DEBUG_LOG
+#ifdef DEBUG_LOG
 	printf( "page_size = %zu = 0x%zx\n", page_size, page_size );
 	printf( "page_aligned_overfit_alloc_size\t=       0x%zx\n", page_aligned_params.page_aligned_request_overfit_alloc_size_ );
 #endif
@@ -83,7 +83,7 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size )
 		perror( "mmap is fail." );
 		return allocate_result { nullptr, 0 };
 	} else {
-#ifndef DEBUG_LOG
+#ifdef DEBUG_LOG
 		printf( "p_alloc_by_mmap\t\t\t= %p\n", p_alloc_by_mmap );
 #endif
 	}
@@ -102,7 +102,7 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size )
 	void* p_pre_unmap_block  = reinterpret_cast<void*>( addr_unmap_pre_block );
 	void* p_post_unmap_block = reinterpret_cast<void*>( addr_unmap_post_block );
 
-#ifndef DEBUG_LOG
+#ifdef DEBUG_LOG
 	printf( "p_pre_unmap_block\t\t= %p - %p\n", p_pre_unmap_block, reinterpret_cast<void*>( addr_unmap_pre_block + size_unmap_pre_block ) );
 	printf( "p_alloc_expected\t\t= %p - %p\n", p_alloc_expected, reinterpret_cast<void*>( addr_alloc_expected + page_aligned_params.page_aligned_real_alloc_size_ ) );
 	printf( "p_post_unmap_block\t\t= %p - %p\n", p_post_unmap_block, reinterpret_cast<void*>( addr_unmap_post_block + size_unmap_post_block ) );

@@ -98,19 +98,19 @@ void idx_mgr_element::dump( void ) const
 
 	if ( p_invalid_idx_next_element_.load() != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		                     "%p --> %p : invalid\n",
+		                     "%p --> %p : invalid",
 		                     this, p_invalid_idx_next_element_.load() );
 	}
 
 	if ( p_valid_idx_next_element_.load() != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		                     "%p --> %p : valid\n",
+		                     "%p --> %p : valid",
 		                     this, p_valid_idx_next_element_.load() );
 	}
 
 	if ( p_waiting_next_element_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		                     "%p --> %p : waiting\n",
+		                     "%p --> %p : waiting",
 		                     this, p_waiting_next_element_ );
 	}
 
@@ -168,20 +168,20 @@ void waiting_element_list::dump( void ) const
 	                     "object waiting_element_list_%p as %p {\n"
 	                     "\t head_ = %p\n"
 	                     "\t tail_ = %p\n"
-	                     "}\n",
+	                     "}",
 	                     this, this,
 	                     head_,
 	                     tail_ );
 
 	if ( head_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		                     "%p --> %p\n",
+		                     "%p --> %p",
 		                     this, head_ );
 	}
 
 	if ( tail_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		                     "%p --> %p\n",
+		                     "%p --> %p",
 		                     this, tail_ );
 	}
 
@@ -473,7 +473,7 @@ void waiting_idx_list::dump( void ) const
 	                     "\t idx_buff_size_ = %d\n"
 	                     "\t idx_top_idx_ = %d\n"
 	                     "\t p_idx_buff_ = %p\n"
-	                     "}\n",
+	                     "}",
 	                     this, this,
 	                     idx_buff_size_,
 	                     idx_top_idx_,
@@ -481,16 +481,16 @@ void waiting_idx_list::dump( void ) const
 
 	if ( p_idx_buff_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		                     "object p_idx_buff_%p as %p {\n",
+		                     "object p_idx_buff_%p as %p {",
 		                     this, this );
 
 		for ( int i = 0; i < idx_buff_size_; i++ ) {
 			internal::LogOutput( log_type::DUMP,
-			                     "\t %d => %d\n",
+			                     "\t %d => %d",
 			                     i, p_idx_buff_[i] );
 		}
 
-		internal::LogOutput( log_type::DUMP, "}\n" );
+		internal::LogOutput( log_type::DUMP, "}" );
 	}
 
 	return;
@@ -645,7 +645,7 @@ void idx_mgr::dump( void )
 	                     "\t invalid_element_stack_head_ = %p\n"
 	                     "\t valid_element_stack_head_ = %p\n"
 	                     "\t waiting_element_list = %p\n"
-	                     "}\n",
+	                     "}",
 	                     this, this,
 	                     idx_size_.load(),
 	                     idx_size_ver_.load(),
@@ -656,22 +656,22 @@ void idx_mgr::dump( void )
 
 	if ( p_idx_mgr_element_array_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		                     "%p --> %p \n",
+		                     "%p --> %p ",
 		                     this, p_idx_mgr_element_array_ );
 	}
 
 	internal::LogOutput( log_type::DUMP,
-	                     "%p --> %p \n",
+	                     "%p --> %p ",
 	                     this, &invalid_element_storage_ );
 	invalid_element_storage_.dump();
 
 	internal::LogOutput( log_type::DUMP,
-	                     "%p --> %p \n",
+	                     "%p --> %p ",
 	                     this, &valid_element_storage_ );
 	valid_element_storage_.dump();
 
 	internal::LogOutput( log_type::DUMP,
-	                     "%p --> %p \n",
+	                     "%p --> %p ",
 	                     this, &tmp_wel );
 
 	if ( p_idx_mgr_element_array_ != nullptr ) {
@@ -1177,7 +1177,7 @@ slot_chk_result chunk_header_multi_slot::get_chunk(
 	slot_chk_result ret = p_slot_addr->chk_header_data();
 	if ( !( ret.correct_ ) ) {
 		internal::LogOutput( log_type::ERR,
-		                     "a header of slot_header is corrupted %p\n",
+		                     "a header of slot_header is corrupted %p",
 		                     p_addr );
 	}
 
@@ -1208,13 +1208,13 @@ void chunk_header_multi_slot::dump( void )
 
 	if ( p_chunk_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		                     "object chunk_%p as %p \n",
+		                     "object chunk_%p as %p ",
 		                     p_chunk_, p_chunk_ );
 	}
 
 	if ( p_free_slot_mark_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
-		                     "object p_free_slot_mark_%p as %p {\n",
+		                     "object p_free_slot_mark_%p as %p {",
 		                     p_free_slot_mark_, p_free_slot_mark_ );
 
 		for ( std::size_t i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
@@ -1234,10 +1234,10 @@ void chunk_header_multi_slot::dump( void )
 				} break;
 			}
 			internal::LogOutput( log_type::DUMP,
-			                     "%zu = %s \n",
+			                     "%zu = %s",
 			                     i, p_value_str );
 		}
-		internal::LogOutput( log_type::DUMP, "}\n" );
+		internal::LogOutput( log_type::DUMP, "}" );
 	}
 
 	internal::LogOutput( log_type::DUMP,
@@ -1248,7 +1248,7 @@ void chunk_header_multi_slot::dump( void )
 	                     "\t p_free_slot_mark_ = %p \n"
 	                     "\t p_chunk_ = %p \n"
 	                     "\t free_slot_idx_mgr_ = %p \n"
-	                     "}\n",
+	                     "}",
 	                     this, this,
 	                     slot_conf_.size_of_one_piece_,
 	                     slot_conf_.num_of_pieces_,
