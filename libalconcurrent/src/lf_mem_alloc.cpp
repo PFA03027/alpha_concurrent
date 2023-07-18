@@ -309,9 +309,9 @@ idx_mgr_element* idx_element_storage_mgr::pop_element_from_list( void )
 			return nullptr;
 		}
 
-		idx_mgr_element* p_cur_next = ( p_cur_first->*p_next_ptr_offset_ ).load();
+		idx_mgr_element* p_cur_next = ( p_cur_first->*p_next_ptr_offset_ ).load( std::memory_order_acquire );
 		scoped_ref_next.regist_ptr_as_hazard_ptr( p_cur_next );
-		if ( p_cur_next != ( p_cur_first->*p_next_ptr_offset_ ).load() ) {
+		if ( p_cur_next != ( p_cur_first->*p_next_ptr_offset_ ).load( std::memory_order_acquire ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 			( *p_collision_cnt_ )++;
 #endif
@@ -881,7 +881,7 @@ void* chunk_header_multi_slot::allocate_mem_slot_impl(
 
 	// フリースロットからスロットを確保したので、使用中のマークを付ける。
 	// Since we got a slot from a free slot, mark it as in use.
-	p_free_slot_mark_[read_idx].store( slot_status_mark::INUSE );
+	p_free_slot_mark_[read_idx].store( slot_status_mark::INUSE, std::memory_order_release );
 
 	// 得たスロットに対応する実際のメモリ領域のアドレス情報を生成する。
 	// Generate the address information of the actual memory area corresponding to the obtained slot.
@@ -960,7 +960,7 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 #ifdef ALCONCURRENT_CONF_ENABLE_NON_REUSE_MEMORY_SLOT
 	bool result = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, slot_status_mark::DISCARED );
 #else
-	bool result = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, slot_status_mark::FREE );
+	bool result = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, slot_status_mark::FREE, std::memory_order_acq_rel );
 #endif
 
 	if ( !result ) {
