@@ -748,16 +748,20 @@ private:
 	};
 #endif
 
-	dynamic_tls_mgr( void )
+#ifdef ALCONCURRENT_CONF_USE_THREAD_LOCAL
+	constexpr
+#else
+#endif
+		dynamic_tls_mgr( void )
 	  : next_base_idx_( 0 )
 	  , p_top_dtls_key_array_( nullptr )
 	  , p_top_dtls_content_head_( nullptr )
 	  , dtls_content_head_cnt_( 0 )
+#ifdef ALCONCURRENT_CONF_USE_THREAD_LOCAL
+#else
+	  , tl_cnt_head_()
+#endif
 	{
-
-		push_front_dynamic_tls_key_array();
-
-		is_live_.store( true, std::memory_order_release );
 	}
 
 	~dynamic_tls_mgr()
@@ -808,17 +812,21 @@ private:
 #ifdef ALCONCURRENT_CONF_USE_THREAD_LOCAL
 	static thread_local tl_content_head tl_cnt_head_;
 #else
-	tl_content_head tl_cnt_head_;
+	tl_content_head        tl_cnt_head_;
 #endif
 
 	static std::atomic<bool> is_live_;
+#ifdef ALCONCURRENT_CONF_USE_THREAD_LOCAL
+	static dynamic_tls_mgr singleton;
+#else
+#endif
 };
 
 #ifdef ALCONCURRENT_CONF_USE_THREAD_LOCAL
 thread_local dynamic_tls_mgr::tl_content_head dynamic_tls_mgr::tl_cnt_head_;
 #else
 #endif
-std::atomic<bool> dynamic_tls_mgr::is_live_( false );
+std::atomic<bool> dynamic_tls_mgr::is_live_( true );
 
 void dynamic_tls_mgr::destructor( void* p_data )
 {
@@ -832,9 +840,17 @@ void dynamic_tls_mgr::destructor( void* p_data )
 	return;
 }
 
+#ifdef ALCONCURRENT_CONF_USE_THREAD_LOCAL
+dynamic_tls_mgr dynamic_tls_mgr::singleton;
+#else
+#endif
+
 dynamic_tls_mgr& dynamic_tls_mgr::get_instance( void )
 {
+#ifdef ALCONCURRENT_CONF_USE_THREAD_LOCAL
+#else
 	static dynamic_tls_mgr singleton;
+#endif
 	return singleton;
 }
 
