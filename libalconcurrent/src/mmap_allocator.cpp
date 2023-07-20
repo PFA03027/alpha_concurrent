@@ -8,6 +8,7 @@
  * @copyright Copyright (c) 2023 by Teruaki Ata <PFA03027@nifty.com>
  *
  */
+#include <atomic>
 #include <cstdint>
 #include <cstdio>
 
@@ -35,6 +36,9 @@ namespace internal {
 
 // static const size_t page_size = get_cur_system_page_size();
 static constexpr size_t page_size = 1024 * 4;   //  = sysconf( _SC_PAGE_SIZE );
+
+std::atomic<size_t> cur_total_allocation_size( 0 );
+std::atomic<size_t> max_total_allocation_size( 0 );
 
 struct alloc_params {
 	size_t page_aligned_align_size_;
@@ -123,12 +127,29 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size )
 		}
 	}
 
+	size_t new_cur_size = cur_total_allocation_size.fetch_add( page_aligned_params.page_aligned_real_alloc_size_ );
+	new_cur_size += page_aligned_params.page_aligned_real_alloc_size_;
+	size_t cur_max = max_total_allocation_size.load( std::memory_order_acquire );
+	if ( new_cur_size > cur_max ) {
+		max_total_allocation_size.compare_exchange_strong( cur_max, new_cur_size );
+	}
 	return allocate_result { p_alloc_expected, page_aligned_params.page_aligned_real_alloc_size_ };
 }
 
 int deallocate_by_munmap( void* p_allocated_addr, size_t allocated_size )
 {
+	cur_total_allocation_size.fetch_sub( allocated_size );
 	return munmap( p_allocated_addr, static_cast<size_t>( allocated_size ) );
+}
+
+void print_of_mmap_allocator( void )
+{
+	size_t cur_size = cur_total_allocation_size.load( std::memory_order_acquire );
+	size_t cur_max  = max_total_allocation_size.load( std::memory_order_acquire );
+
+	printf( "page_size               = %16zu = 0x%016zx\n", page_size, page_size );
+	printf( "current allocation size = %16zu = 0x%016zx\n", cur_size, cur_size );
+	printf( "max allocation size     = %16zu = 0x%016zx\n", cur_max, cur_max );
 }
 
 }   // namespace internal

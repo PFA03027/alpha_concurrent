@@ -21,6 +21,16 @@
 #include "alconcurrent/lf_fifo.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
 
+namespace alpha {
+namespace concurrent {
+namespace internal {
+
+void print_of_mmap_allocator( void );
+
+}
+}   // namespace concurrent
+}   // namespace alpha
+
 static alpha::concurrent::param_chunk_allocation param[] = {
 	{ 16, 100 },
 	{ 32, 200 },
@@ -95,6 +105,7 @@ public:
 			EXPECT_EQ( 0, e.consum_cnt_ );
 			printf( "%s\n", e.print().c_str() );
 		}
+		alpha::concurrent::internal::print_of_mmap_allocator();
 	}
 
 	int num_thread_;
