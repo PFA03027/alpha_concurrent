@@ -1118,9 +1118,9 @@ dynamic_tls_key_t dynamic_tls_key_create( void* p_param, uintptr_t ( *allocator 
 
 	cur_count_of_tls_keys++;
 
-	int cur_max = max_count_of_tls_keys.load();
-	if ( cur_max < cur_count_of_tls_keys.load() ) {
-		max_count_of_tls_keys.compare_exchange_strong( cur_max, cur_count_of_tls_keys.load() );
+	int cur_max = max_count_of_tls_keys.load( std::memory_order_acquire );
+	if ( cur_max < cur_count_of_tls_keys.load( std::memory_order_acquire ) ) {
+		max_count_of_tls_keys.compare_exchange_strong( cur_max, cur_count_of_tls_keys.load( std::memory_order_acquire ) );
 	}
 	return p_ans;
 }
@@ -1176,7 +1176,7 @@ dynamic_tls_status_info dynamic_tls_get_status( void )
  */
 int get_num_of_tls_key( void )
 {
-	return cur_count_of_tls_keys.load();
+	return cur_count_of_tls_keys.load( std::memory_order_acquire );
 }
 
 /*!
@@ -1187,7 +1187,7 @@ int get_num_of_tls_key( void )
  */
 int get_max_num_of_tls_key( void )
 {
-	return max_count_of_tls_keys.load();
+	return max_count_of_tls_keys.load( std::memory_order_acquire );
 }
 
 }   // namespace internal

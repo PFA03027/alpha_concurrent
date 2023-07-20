@@ -125,10 +125,10 @@ void GetErrorWarningLogCount(
 )
 {
 	if ( p_num_err != nullptr ) {
-		*p_num_err = internal::err_log_count.load();
+		*p_num_err = internal::err_log_count.load( std::memory_order_acquire );
 	}
 	if ( p_num_warn != nullptr ) {
-		*p_num_warn = internal::warn_log_count.load();
+		*p_num_warn = internal::warn_log_count.load( std::memory_order_acquire );
 	}
 	return;
 }
@@ -139,14 +139,14 @@ void GetErrorWarningLogCountAndReset(
 )
 {
 	if ( p_num_err != nullptr ) {
-		*p_num_err = internal::err_log_count.load();
+		*p_num_err = internal::err_log_count.load( std::memory_order_acquire );
 	}
 	if ( p_num_warn != nullptr ) {
-		*p_num_warn = internal::warn_log_count.load();
+		*p_num_warn = internal::warn_log_count.load( std::memory_order_acquire );
 	}
 
-	internal::err_log_count.store( 0 );
-	internal::warn_log_count.store( 0 );
+	internal::err_log_count.store( 0, std::memory_order_release );
+	internal::warn_log_count.store( 0, std::memory_order_release );
 
 	return;
 }

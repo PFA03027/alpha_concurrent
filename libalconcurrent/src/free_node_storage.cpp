@@ -100,7 +100,7 @@ fifo_free_nd_list::~fifo_free_nd_list()
 
 void fifo_free_nd_list::initial_push( fifo_free_nd_list::node_pointer const p_push_node )
 {
-	if ( ( head_.load() != nullptr ) || ( tail_.load() != nullptr ) ) {
+	if ( ( head_.load( std::memory_order_acquire ) != nullptr ) || ( tail_.load( std::memory_order_acquire ) != nullptr ) ) {
 		internal::LogOutput( log_type::ERR, "Because already this fifo_free_nd_list instance has sentinel node, fail to initial_push()." );
 		return;
 	}

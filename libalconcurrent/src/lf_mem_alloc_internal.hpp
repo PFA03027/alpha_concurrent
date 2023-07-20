@@ -337,7 +337,7 @@ private:
 
 		uintptr_t allocate( void )
 		{
-			return reinterpret_cast<uintptr_t>( new waiting_idx_list( p_elst_->idx_size_.load(), p_elst_->idx_size_ver_.load() ) );
+			return reinterpret_cast<uintptr_t>( new waiting_idx_list( p_elst_->idx_size_.load( std::memory_order_acquire ), p_elst_->idx_size_ver_.load( std::memory_order_acquire ) ) );
 		}
 
 		void deallocate( uintptr_t p_destructing_tls )
@@ -747,7 +747,7 @@ private:
 		{
 			chunk_header_multi_slot* p_chms = p_top_.load( std::memory_order_acquire );
 			while ( p_chms != nullptr ) {
-				chunk_header_multi_slot* p_next_chms = p_chms->p_next_chunk_.load();
+				chunk_header_multi_slot* p_next_chms = p_chms->p_next_chunk_.load( std::memory_order_acquire );
 				delete p_chms;
 				p_chms = p_next_chms;
 			}

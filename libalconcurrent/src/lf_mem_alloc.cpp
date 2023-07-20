@@ -92,20 +92,20 @@ void idx_mgr_element::dump( void ) const
 	                     "}\n",
 	                     this, this,
 	                     idx_,
-	                     p_invalid_idx_next_element_.load(),
-	                     p_valid_idx_next_element_.load(),
+	                     p_invalid_idx_next_element_.load( std::memory_order_acquire ),
+	                     p_valid_idx_next_element_.load( std::memory_order_acquire ),
 	                     p_waiting_next_element_ );
 
-	if ( p_invalid_idx_next_element_.load() != nullptr ) {
+	if ( p_invalid_idx_next_element_.load( std::memory_order_acquire ) != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
 		                     "%p --> %p : invalid",
-		                     this, p_invalid_idx_next_element_.load() );
+		                     this, p_invalid_idx_next_element_.load( std::memory_order_acquire ) );
 	}
 
-	if ( p_valid_idx_next_element_.load() != nullptr ) {
+	if ( p_valid_idx_next_element_.load( std::memory_order_acquire ) != nullptr ) {
 		internal::LogOutput( log_type::DUMP,
 		                     "%p --> %p : valid",
-		                     this, p_valid_idx_next_element_.load() );
+		                     this, p_valid_idx_next_element_.load( std::memory_order_acquire ) );
 	}
 
 	if ( p_waiting_next_element_ != nullptr ) {
@@ -513,11 +513,11 @@ idx_mgr::idx_mgr(
   , invalid_element_storage_( &idx_mgr_element::p_invalid_idx_next_element_, p_alloc_collision_cnt_ )
   , valid_element_storage_( &idx_mgr_element::p_valid_idx_next_element_, p_dealloc_collision_cnt_ )
   , tls_waiting_idx_list_( rcv_idx_by_thread_terminating( this ) )
-  , rcv_waiting_idx_list_( idx_size_.load(), idx_size_ver_.load() )
+  , rcv_waiting_idx_list_( idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) )
 {
-	if ( idx_size_.load() <= 0 ) return;
+	if ( idx_size_.load( std::memory_order_acquire ) <= 0 ) return;
 
-	set_idx_size( idx_size_.load() );
+	set_idx_size( idx_size_.load( std::memory_order_acquire ) );
 	return;
 }
 
@@ -530,7 +530,7 @@ idx_mgr::~idx_mgr()
 void idx_mgr::set_idx_size( const int idx_size_arg )
 {
 	if ( idx_size_arg <= 0 ) {
-		idx_size_.store( -1 );
+		idx_size_.store( -1, std::memory_order_release );
 		return;
 	}
 
@@ -538,11 +538,11 @@ void idx_mgr::set_idx_size( const int idx_size_arg )
 
 	// idx_mgr_elementのコンストラクタによる初期化を機能させるため、配列の再利用はしない。
 	p_idx_mgr_element_array_ = new idx_mgr_element[idx_size_arg];
-	idx_size_.store( idx_size_arg );
+	idx_size_.store( idx_size_arg, std::memory_order_release );
 
-	tls_waiting_idx_list_.get_tls_instance( /*idx_size_.load(), idx_size_ver_.load()*/ );
+	tls_waiting_idx_list_.get_tls_instance( /*idx_size_.load(std::memory_order_acquire), idx_size_ver_.load(std::memory_order_acquire)*/ );
 
-	for ( int i = 0; i < idx_size_.load(); i++ ) {
+	for ( int i = 0; i < idx_size_.load( std::memory_order_acquire ); i++ ) {
 		p_idx_mgr_element_array_[i].idx_ = i;
 		valid_element_storage_.push_element( &( p_idx_mgr_element_array_[i] ) );
 	}
@@ -570,9 +570,9 @@ void idx_mgr::clear( void )
 int idx_mgr::pop( void )
 {
 	int               ans       = -1;
-	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( /*idx_size_.load(), idx_size_ver_.load()*/ );
+	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( /*idx_size_.load(std::memory_order_acquire), idx_size_ver_.load(std::memory_order_acquire)*/ );
 
-	ans = wait_list.pop_from_tls( idx_size_.load(), idx_size_ver_.load() );
+	ans = wait_list.pop_from_tls( idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) );
 	if ( ans != -1 ) {
 		return ans;
 	}
@@ -582,7 +582,7 @@ int idx_mgr::pop( void )
 	if ( p_valid_pop_element == nullptr ) {
 		std::unique_lock<std::mutex> lk( mtx_rcv_waiting_idx_list_, std::try_to_lock );
 		if ( lk.owns_lock() ) {
-			int tmp_ans = rcv_waiting_idx_list_.pop_from_tls( idx_size_.load(), idx_size_ver_.load() );
+			int tmp_ans = rcv_waiting_idx_list_.pop_from_tls( idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) );
 			if ( tmp_ans >= 0 ) {
 				return tmp_ans;
 			}
@@ -602,13 +602,13 @@ void idx_mgr::push(
 	const int idx_arg   //!< [in] 返却するインデックス番号
 )
 {
-	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( /*idx_size_.load(), idx_size_ver_.load()*/ );
+	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( /*idx_size_.load(std::memory_order_acquire), idx_size_ver_.load(std::memory_order_acquire)*/ );
 
 	idx_mgr_element* p_invalid_element = invalid_element_storage_.pop_element();
 
 	if ( p_invalid_element == nullptr ) {
 		// スロットに空きがないので、ローカルストレージで保持する。
-		wait_list.push_to_tls( idx_arg, idx_size_.load(), idx_size_ver_.load() );
+		wait_list.push_to_tls( idx_arg, idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) );
 	} else {
 
 		p_invalid_element->idx_ = idx_arg;
@@ -623,11 +623,11 @@ void idx_mgr::rcv_wait_idx_by_thread_terminating( waiting_idx_list* p_idx_list )
 {
 	std::lock_guard<std::mutex> lock( mtx_rcv_waiting_idx_list_ );
 
-	int tmp_idx = p_idx_list->pop_from_tls( idx_size_.load(), idx_size_ver_.load() );
+	int tmp_idx = p_idx_list->pop_from_tls( idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) );
 
 	while ( tmp_idx >= 0 ) {
-		rcv_waiting_idx_list_.push_to_tls( tmp_idx, idx_size_.load(), idx_size_ver_.load() );
-		tmp_idx = p_idx_list->pop_from_tls( idx_size_.load(), idx_size_ver_.load() );
+		rcv_waiting_idx_list_.push_to_tls( tmp_idx, idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) );
+		tmp_idx = p_idx_list->pop_from_tls( idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) );
 	}
 
 	return;
@@ -635,7 +635,7 @@ void idx_mgr::rcv_wait_idx_by_thread_terminating( waiting_idx_list* p_idx_list )
 
 void idx_mgr::dump( void )
 {
-	const waiting_idx_list& tmp_wel = tls_waiting_idx_list_.get_tls_instance( /*idx_size_.load(), idx_size_ver_.load()*/ );
+	const waiting_idx_list& tmp_wel = tls_waiting_idx_list_.get_tls_instance( /*idx_size_.load(std::memory_order_acquire), idx_size_ver_.load(std::memory_order_acquire)*/ );
 
 	internal::LogOutput( log_type::DUMP,
 	                     "object idx_mgr_%p as %p {\n"
@@ -647,8 +647,8 @@ void idx_mgr::dump( void )
 	                     "\t waiting_element_list = %p\n"
 	                     "}",
 	                     this, this,
-	                     idx_size_.load(),
-	                     idx_size_ver_.load(),
+	                     idx_size_.load( std::memory_order_acquire ),
+	                     idx_size_ver_.load( std::memory_order_acquire ),
 	                     p_idx_mgr_element_array_,
 	                     &invalid_element_storage_,
 	                     &valid_element_storage_,
@@ -827,7 +827,7 @@ bool chunk_header_multi_slot::alloc_new_chunk(
 		return false;
 	}
 	for ( unsigned int i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
-		p_free_slot_mark_[i].store( slot_status_mark::FREE );
+		p_free_slot_mark_[i].store( slot_status_mark::FREE, std::memory_order_release );
 	}
 
 	auto alloc_ret = allocate_by_mmap( tmp_size, sizeof( uintptr_t ) );
@@ -1094,7 +1094,7 @@ bool chunk_header_multi_slot::unset_delete_reservation( void )
 bool chunk_header_multi_slot::exec_deletion( void )
 {
 	// access者がいないことを確認する
-	if ( num_of_accesser_.load() != 0 ) return false;
+	if ( num_of_accesser_.load( std::memory_order_acquire ) != 0 ) return false;
 
 	if ( owner_tl_id_.load( std::memory_order_acquire ) != NON_OWNERED_TL_ID ) {
 		// 明確な所有者スレッドが存在するため、削除対象としない。
@@ -1135,7 +1135,7 @@ bool chunk_header_multi_slot::exec_deletion( void )
 	}
 
 	// access者の有無を再確認
-	if ( num_of_accesser_.load() != 0 ) {
+	if ( num_of_accesser_.load( std::memory_order_acquire ) != 0 ) {
 		// access者がいるため、削除を取りやめる。
 		status_.store( chunk_control_status::RESERVED_DELETION, std::memory_order_release );
 		return false;
@@ -1219,7 +1219,7 @@ void chunk_header_multi_slot::dump( void )
 
 		for ( std::size_t i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
 			const char* p_value_str = nullptr;
-			switch ( p_free_slot_mark_[i].load() ) {
+			switch ( p_free_slot_mark_[i].load( std::memory_order_acquire ) ) {
 				case slot_status_mark::FREE: {
 					p_value_str = "slot_status_mark::FREE";
 				} break;
