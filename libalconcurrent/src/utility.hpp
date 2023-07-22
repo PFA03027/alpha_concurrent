@@ -18,22 +18,21 @@ namespace internal {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template <typename T>
-class scoped_inout_counter {
+class scoped_inout_counter_atomic_int {
 public:
-	scoped_inout_counter( T& atomic_couter_ref_arg )
+	scoped_inout_counter_atomic_int( std::atomic<int>& atomic_couter_ref_arg )
 	  : atomic_couter_ref( atomic_couter_ref_arg )
 	{
-		atomic_couter_ref++;
+		atomic_couter_ref.fetch_add( 1, std::memory_order_acq_rel );
 	}
 
-	~scoped_inout_counter()
+	~scoped_inout_counter_atomic_int()
 	{
-		atomic_couter_ref--;
+		atomic_couter_ref.fetch_sub( 1, std::memory_order_acq_rel );
 	}
 
 private:
-	T& atomic_couter_ref;
+	std::atomic<int>& atomic_couter_ref;
 };
 
 }   // namespace internal

@@ -789,7 +789,7 @@ void chunk_header_multi_slot::set_slot_allocation_conf(
 )
 {
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
-	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+	scoped_inout_counter_atomic_int cnt_inout( num_of_accesser_ );
 
 	slot_conf_.size_of_one_piece_ = get_size_of_one_slot( ch_param_arg );
 	slot_conf_.num_of_pieces_     = ( ch_param_arg.num_of_pieces_ >= 2 ) ? ch_param_arg.num_of_pieces_ : 2;
@@ -803,7 +803,7 @@ bool chunk_header_multi_slot::alloc_new_chunk(
 )
 {
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
-	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+	scoped_inout_counter_atomic_int cnt_inout( num_of_accesser_ );
 
 	// get ownership to allocate a chunk	// access権を取得を試みる
 	chunk_control_status expect = chunk_control_status::EMPTY;
@@ -862,7 +862,7 @@ void* chunk_header_multi_slot::allocate_mem_slot_impl(
 	if ( status_.load( std::memory_order_acquire ) != chunk_control_status::NORMAL ) return nullptr;
 
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
-	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+	scoped_inout_counter_atomic_int cnt_inout( num_of_accesser_ );
 
 	// access権を取得を試みる
 	if ( status_.load( std::memory_order_acquire ) != chunk_control_status::NORMAL ) return nullptr;
@@ -916,7 +916,7 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 	}
 
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
-	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+	scoped_inout_counter_atomic_int cnt_inout( num_of_accesser_ );
 
 	// まだaccess可能状態かどうかを事前チェック
 	switch ( status_.load( std::memory_order_acquire ) ) {
@@ -1036,7 +1036,7 @@ void* chunk_header_multi_slot::try_allocate_mem_slot_impl(
 	}
 
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
-	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+	scoped_inout_counter_atomic_int cnt_inout( num_of_accesser_ );
 
 	// access権を取得を試みる
 	chunk_control_status cur_as_st = status_.load( std::memory_order_acquire );
@@ -1074,7 +1074,7 @@ void* chunk_header_multi_slot::try_allocate_mem_slot_impl(
 bool chunk_header_multi_slot::set_delete_reservation( void )
 {
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
-	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+	scoped_inout_counter_atomic_int cnt_inout( num_of_accesser_ );
 
 	chunk_control_status expect = chunk_control_status::NORMAL;
 	bool                 result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::RESERVED_DELETION );
@@ -1084,7 +1084,7 @@ bool chunk_header_multi_slot::set_delete_reservation( void )
 bool chunk_header_multi_slot::unset_delete_reservation( void )
 {
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
-	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+	scoped_inout_counter_atomic_int cnt_inout( num_of_accesser_ );
 
 	chunk_control_status expect = chunk_control_status::RESERVED_DELETION;
 	bool                 result = std::atomic_compare_exchange_strong( &status_, &expect, chunk_control_status::NORMAL );
@@ -1187,7 +1187,7 @@ slot_chk_result chunk_header_multi_slot::get_chunk(
 chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
 {
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
-	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+	scoped_inout_counter_atomic_int cnt_inout( num_of_accesser_ );
 
 	chunk_statistics ans { 0 };
 
@@ -1204,7 +1204,7 @@ chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
 void chunk_header_multi_slot::dump( void )
 {
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
-	scoped_inout_counter<std::atomic<int>> cnt_inout( num_of_accesser_ );
+	scoped_inout_counter_atomic_int cnt_inout( num_of_accesser_ );
 
 	if ( p_chunk_ != nullptr ) {
 		internal::LogOutput( log_type::DUMP,

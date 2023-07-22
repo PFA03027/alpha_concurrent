@@ -862,7 +862,7 @@ void call_destructor_for_array_and_clear_data( dynamic_tls_key_array* p_key_arra
 		bool is_finish = true;
 		for ( auto& cur_key : ( *p_key_array_arg ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
-			scoped_inout_counter<std::atomic<int>> cl( cur_key.acc_cnt_ );
+			scoped_inout_counter_atomic_int cl( cur_key.acc_cnt_ );
 #endif
 			if ( cur_key.is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) continue;
 
@@ -1132,7 +1132,7 @@ void dynamic_tls_key_release( dynamic_tls_key_t key )
 	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) return;
 
 #ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
-	scoped_inout_counter<std::atomic<int>> cl( key->acc_cnt_ );
+	scoped_inout_counter_atomic_int cl( key->acc_cnt_ );
 #endif
 
 	if ( dynamic_tls_mgr::get_instance().release_key( key ) ) {
@@ -1146,7 +1146,7 @@ op_ret dynamic_tls_setspecific( dynamic_tls_key_t key, uintptr_t tls_data )
 	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) return op_ret::INVALID;
 
 #ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
-	scoped_inout_counter<std::atomic<int>> cl( key->acc_cnt_ );
+	scoped_inout_counter_atomic_int cl( key->acc_cnt_ );
 #endif
 
 	dynamic_tls_content_head* p_cur_dtls = dynamic_tls_mgr::get_instance().get_current_thread_dynamic_tls_content_head();
@@ -1158,7 +1158,7 @@ get_result dynamic_tls_getspecific( dynamic_tls_key_t key )
 	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) return get_result();
 
 #ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
-	scoped_inout_counter<std::atomic<int>> cl( key->acc_cnt_ );
+	scoped_inout_counter_atomic_int cl( key->acc_cnt_ );
 #endif
 
 	dynamic_tls_content_head* p_cur_dtls = dynamic_tls_mgr::get_instance().get_current_thread_dynamic_tls_content_head();
