@@ -180,7 +180,15 @@ void* alloc_chamber::allocate( size_t req_size, size_t req_align )
 			// 残量がなければ即座に失敗を表すnullptrで戻る。
 			return nullptr;
 		}
-		addr_chopped_room_end  = calc_addr_chopped_room_end_by( cur_offset, req_size, req_align );
+		addr_chopped_room_end = calc_addr_chopped_room_end_by( cur_offset, req_size, req_align );
+		if ( addr_chopped_room_end <= reinterpret_cast<uintptr_t>( this ) ) {
+			// 演算がオーバーフローしてしまうようであれば、失敗を表すnullptrで戻る。
+			return nullptr;
+		}
+		if ( addr_chopped_room_end > ( reinterpret_cast<uintptr_t>( this ) + static_cast<uintptr_t>( chamber_size_ ) ) ) {
+			// 最終アドレスが、chamber_size_を超えてしまうようであれば、失敗を表すnullptrで戻る。
+			return nullptr;
+		}
 		final_candidate_offset = addr_chopped_room_end - reinterpret_cast<uintptr_t>( this );
 	} while ( !offset_.compare_exchange_strong( cur_offset, final_candidate_offset ) );   // 置き換え失敗している間、ループする。
 	// 置き換えに成功したので、cur_offsetに確保できたchopped roomの先頭へのオフセットが格納されている
