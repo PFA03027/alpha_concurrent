@@ -47,7 +47,7 @@ enum class chunk_control_status : int {
  *
  */
 struct chunk_list_statistics {
-	chunk_list_statistics( void )
+	constexpr chunk_list_statistics( void )
 	  : chunk_num_( 0 )
 	  , valid_chunk_num_( 0 )
 	  , total_slot_cnt_( 0 )
@@ -62,10 +62,10 @@ struct chunk_list_statistics {
 	  , dealloc_collision_cnt_( 0 )
 	{
 	}
-	chunk_list_statistics( const chunk_list_statistics& )            = default;
-	chunk_list_statistics( chunk_list_statistics&& )                 = default;
-	chunk_list_statistics& operator=( const chunk_list_statistics& ) = default;
-	chunk_list_statistics& operator=( chunk_list_statistics&& )      = default;
+	constexpr chunk_list_statistics( const chunk_list_statistics& )            = default;
+	constexpr chunk_list_statistics( chunk_list_statistics&& )                 = default;
+	constexpr chunk_list_statistics& operator=( const chunk_list_statistics& ) = default;
+	constexpr chunk_list_statistics& operator=( chunk_list_statistics&& )      = default;
 
 	chunk_statistics get_statistics( void ) const;
 
@@ -682,7 +682,7 @@ private:
 	 * @brief それぞれのスレッド終了時に実行する処理を担うfunctor
 	 */
 	struct tl_chunk_param_destructor {
-		tl_chunk_param_destructor( chunk_list* p_chlst_arg )
+		constexpr tl_chunk_param_destructor( chunk_list* p_chlst_arg )
 		  : p_chlst_( p_chlst_arg )
 		{
 		}
@@ -712,7 +712,7 @@ private:
 	public:
 		class forward_iterator {
 		public:
-			forward_iterator( chunk_header_multi_slot* p_arg )
+			constexpr forward_iterator( chunk_header_multi_slot* p_arg )
 			  : p_( p_arg )
 			{
 			}
@@ -739,7 +739,7 @@ private:
 			chunk_header_multi_slot* p_;
 		};
 
-		atomic_push_list( void )
+		constexpr atomic_push_list( void )
 		  : p_top_( nullptr )
 		{
 		}
@@ -766,11 +766,11 @@ private:
 			} while ( !p_top_.compare_exchange_weak( p_cur_top, p_new_chms ) );
 		}
 
-		forward_iterator begin( void )
+		inline forward_iterator begin( void )
 		{
 			return forward_iterator( p_top_.load( std::memory_order_acquire ) );
 		}
-		forward_iterator end( void )
+		inline forward_iterator end( void )
 		{
 			return forward_iterator( nullptr );
 		}
