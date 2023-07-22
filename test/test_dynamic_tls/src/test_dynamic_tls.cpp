@@ -281,7 +281,7 @@ TEST_P( dynamic_tls_many_thd_many, TC_many_number_set_get )
 	EXPECT_EQ( 0, err_cnt_.load() );
 
 	alpha::concurrent::internal::dynamic_tls_status_info st = alpha::concurrent::internal::dynamic_tls_get_status();
-	printf( "num_content_head_: %u, next_base_idx_: %u\n", st.num_content_head_, st.next_base_idx_ );
+	printf( "num_of_key_array: %u, num_content_head_: %u, next_base_idx_: %u\n", st.num_key_array_cnt_, st.num_content_head_, st.next_base_idx_ );
 
 	return;
 }

@@ -39,13 +39,14 @@ extern std::recursive_mutex dynamic_tls_global_exclusive_control_for_destruction
 
 namespace internal {
 
-constexpr size_t       ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE          = 1024;
+constexpr size_t       ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE          = 1024 * 8;
 constexpr unsigned int ALCONCURRENT_CONF_DYNAMIC_TLS_DESTUCT_ITERATE_MAX = 10;
 
 struct dynamic_tls_key;
 using dynamic_tls_key_t = dynamic_tls_key*;   //!< pointer to dynamic_tls_key as a key
 
 struct dynamic_tls_status_info {
+	unsigned int num_key_array_cnt_;
 	unsigned int num_content_head_;
 	unsigned int next_base_idx_;
 };

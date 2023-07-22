@@ -676,7 +676,7 @@ public:
 
 	dynamic_tls_status_info get_status( void ) const
 	{
-		dynamic_tls_status_info ans { dtls_content_head_cnt_.load( std::memory_order_acquire ), next_base_idx_.load( std::memory_order_acquire ) };
+		dynamic_tls_status_info ans { dtls_key_array_cnt_.load( std::memory_order_acquire ), dtls_content_head_cnt_.load( std::memory_order_acquire ), next_base_idx_.load( std::memory_order_acquire ) };
 		return ans;
 	}
 
@@ -760,6 +760,7 @@ private:
 	  , p_top_dtls_key_array_( nullptr )
 	  , p_top_dtls_content_head_( nullptr )
 	  , dtls_content_head_cnt_( 0 )
+	  , dtls_key_array_cnt_( 0 )
 #ifdef ALCONCURRENT_CONF_USE_THREAD_LOCAL
 #else
 	  , tl_cnt_head_()
@@ -790,6 +791,7 @@ private:
 		do {   // 置き換えに成功するまでビジーループ
 			p_new_dtls_ka->p_next_.store( p_expect_dtls_ka, std::memory_order_release );
 		} while ( !p_top_dtls_key_array_.compare_exchange_strong( p_expect_dtls_ka, p_new_dtls_ka ) );
+		dtls_key_array_cnt_++;
 	}
 
 	dynamic_tls_key* search_key( void* p_param, uintptr_t ( *allocator )( void* p_param ), void ( *deallocator )( uintptr_t p_obj, void* p_param ) )
@@ -811,6 +813,7 @@ private:
 	std::atomic<dynamic_tls_key_array*>    p_top_dtls_key_array_;
 	std::atomic<dynamic_tls_content_head*> p_top_dtls_content_head_;
 	std::atomic<unsigned int>              dtls_content_head_cnt_;
+	std::atomic<unsigned int>              dtls_key_array_cnt_;
 
 #ifdef ALCONCURRENT_CONF_USE_THREAD_LOCAL
 	static thread_local tl_content_head tl_cnt_head_;
