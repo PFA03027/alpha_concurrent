@@ -61,12 +61,12 @@ struct get_result {
 	op_ret    stat_;     //!< 取得処理に成功した場合にtrue
 	uintptr_t p_data_;   //!< 取得処理に成功した場合に、取得した値が保持される
 
-	get_result( void )
+	constexpr get_result( void )
 	  : stat_( op_ret::INVALID )
 	  , p_data_( 0U )
 	{
 	}
-	get_result( op_ret stat_arg, uintptr_t p_data_arg )
+	constexpr get_result( op_ret stat_arg, uintptr_t p_data_arg )
 	  : stat_( stat_arg )
 	  , p_data_( p_data_arg )
 	{
@@ -124,15 +124,15 @@ int get_max_num_of_tls_key( void );
  *
  */
 struct dynamic_tls_thread_cnt {
-	dynamic_tls_thread_cnt( void )
+	constexpr dynamic_tls_thread_cnt( void )
 	  : cur_thread_count_( 0 )
 	  , max_thread_count_( 0 )
 	{
 	}
-	dynamic_tls_thread_cnt( const dynamic_tls_thread_cnt& )            = default;
-	dynamic_tls_thread_cnt( dynamic_tls_thread_cnt&& )                 = default;
-	dynamic_tls_thread_cnt& operator=( const dynamic_tls_thread_cnt& ) = default;
-	dynamic_tls_thread_cnt& operator=( dynamic_tls_thread_cnt&& )      = default;
+	constexpr dynamic_tls_thread_cnt( const dynamic_tls_thread_cnt& )            = default;
+	constexpr dynamic_tls_thread_cnt( dynamic_tls_thread_cnt&& )                 = default;
+	constexpr dynamic_tls_thread_cnt& operator=( const dynamic_tls_thread_cnt& ) = default;
+	constexpr dynamic_tls_thread_cnt& operator=( dynamic_tls_thread_cnt&& )      = default;
 
 	void count_up( void )
 	{
