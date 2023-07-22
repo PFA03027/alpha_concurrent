@@ -60,14 +60,14 @@ TEST_P( ChunkHeaderMultiSlotMaltiThread, TC_one_by_one )
 
 	for ( unsigned int i = 0; i < num_thread_; i++ ) {
 		std::thread tt( [p_chms]() {
-			void* test_ptr1 = p_chms->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
-			void* test_ptr2 = p_chms->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
+			void* test_ptr1 = p_chms->allocate_mem_slot();
+			void* test_ptr2 = p_chms->allocate_mem_slot();
 
 			EXPECT_NE( nullptr, test_ptr1 );
 			EXPECT_NE( nullptr, test_ptr2 );
 
-			EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr1, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
-			EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr2, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
+			EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr1 ) );
+			EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr2 ) );
 		} );
 		tt.join();
 	}
@@ -95,16 +95,16 @@ TEST_P( ChunkHeaderMultiSlotMaltiThread, TC_at_same_time )
 	for ( unsigned int i = 0; i < num_thread_; i++ ) {
 		tt[i] = std::thread( [p_chms, &barrier]() {
 			pthread_barrier_wait( &barrier );
-			void* test_ptr1 = p_chms->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
-			void* test_ptr2 = p_chms->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
+			void* test_ptr1 = p_chms->allocate_mem_slot();
+			void* test_ptr2 = p_chms->allocate_mem_slot();
 
 			EXPECT_NE( nullptr, test_ptr1 );
 			EXPECT_NE( nullptr, test_ptr2 );
 
 			std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
-			EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr1, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
-			EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr2, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
+			EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr1 ) );
+			EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr2 ) );
 		} );
 	}
 	pthread_barrier_wait( &barrier );
@@ -175,19 +175,19 @@ TEST_F( lfmemAlloc, TestChunkHeaderMultiSlot )
 	alpha::concurrent::internal::chunk_list_statistics    test_st;
 	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new alpha::concurrent::internal::chunk_header_multi_slot( param, 0, &test_st );
 
-	void* test_ptr1 = p_chms->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
-	void* test_ptr2 = p_chms->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
-	void* test_ptr3 = p_chms->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
+	void* test_ptr1 = p_chms->allocate_mem_slot();
+	void* test_ptr2 = p_chms->allocate_mem_slot();
+	void* test_ptr3 = p_chms->allocate_mem_slot();
 
 	EXPECT_NE( nullptr, test_ptr1 );
 	EXPECT_NE( nullptr, test_ptr2 );
 	EXPECT_EQ( nullptr, test_ptr3 );
 
-	EXPECT_FALSE( p_chms->recycle_mem_slot( test_ptr3, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
-	EXPECT_FALSE( p_chms->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 ), ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
+	EXPECT_FALSE( p_chms->recycle_mem_slot( test_ptr3 ) );
+	EXPECT_FALSE( p_chms->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 ) ) );
 
-	EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr1, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
-	EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr2, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
+	EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr1 ) );
+	EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr2 ) );
 
 	alpha::concurrent::chunk_statistics e = p_chms->get_statistics();
 
@@ -205,17 +205,17 @@ TEST_F( lfmemAlloc, TestChunkList_AdditionalAlloc )
 	// max slot数２に対し、３つ目のスロットを要求した場合のテスト
 	alpha::concurrent::internal::chunk_list* p_ch_lst = new alpha::concurrent::internal::chunk_list( param );
 
-	void* test_ptr1 = p_ch_lst->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
-	void* test_ptr2 = p_ch_lst->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
-	void* test_ptr3 = p_ch_lst->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
+	void* test_ptr1 = p_ch_lst->allocate_mem_slot();
+	void* test_ptr2 = p_ch_lst->allocate_mem_slot();
+	void* test_ptr3 = p_ch_lst->allocate_mem_slot();
 
 	EXPECT_NE( nullptr, test_ptr1 );
 	EXPECT_NE( nullptr, test_ptr2 );
 	EXPECT_NE( nullptr, test_ptr3 );
 
-	EXPECT_TRUE( p_ch_lst->recycle_mem_slot( test_ptr3, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
-	EXPECT_TRUE( p_ch_lst->recycle_mem_slot( test_ptr1, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
-	EXPECT_TRUE( p_ch_lst->recycle_mem_slot( test_ptr2, ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
+	EXPECT_TRUE( p_ch_lst->recycle_mem_slot( test_ptr3 ) );
+	EXPECT_TRUE( p_ch_lst->recycle_mem_slot( test_ptr1 ) );
+	EXPECT_TRUE( p_ch_lst->recycle_mem_slot( test_ptr2 ) );
 
 	alpha::concurrent::chunk_statistics e = p_ch_lst->get_statistics();
 
@@ -231,18 +231,18 @@ TEST_F( lfmemAlloc, TestChunkList_IllegalAddressFree )
 	// max slot数２に対し、３つ目のスロットを要求した場合のテスト
 	alpha::concurrent::internal::chunk_list* p_ch_lst = new alpha::concurrent::internal::chunk_list( param );
 
-	void* test_ptr1 = p_ch_lst->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
-	void* test_ptr2 = p_ch_lst->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
-	void* test_ptr3 = p_ch_lst->allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
+	void* test_ptr1 = p_ch_lst->allocate_mem_slot();
+	void* test_ptr2 = p_ch_lst->allocate_mem_slot();
+	void* test_ptr3 = p_ch_lst->allocate_mem_slot();
 
 	EXPECT_NE( nullptr, test_ptr1 );
 	EXPECT_NE( nullptr, test_ptr2 );
 	EXPECT_NE( nullptr, test_ptr3 );
 
-	EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr3 + 1 ), ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
-	EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 ), ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
+	EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr3 + 1 ) ) );
+	EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 ) ) );
 
-	EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr2 + 1 ), ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
+	EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr2 + 1 ) ) );
 
 	alpha::concurrent::chunk_statistics e = p_ch_lst->get_statistics();
 
@@ -371,10 +371,11 @@ TEST_F( lfmemAlloc, PlatformCheck )
 	return;
 }
 
+#if 0
 TEST_F( lfmemAlloc, caller_context )
 {
 	// default contructor
-	alpha::concurrent::caller_context test_val = ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG;
+	alpha::concurrent::caller_context test_val = ;
 
 	// copy constructor
 	alpha::concurrent::caller_context test_val2 = test_val;
@@ -392,7 +393,7 @@ TEST_F( lfmemAlloc, caller_context )
 
 	return;
 }
-
+#endif
 TEST_F( lfmemAlloc, TestBacktrace )
 {
 	std::size_t rq_size   = RQ_SIZE;

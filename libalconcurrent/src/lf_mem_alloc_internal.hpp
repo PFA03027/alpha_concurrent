@@ -408,11 +408,9 @@ public:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	inline void* allocate_mem_slot(
-		caller_context&& caller_ctx_arg   //!< [in] caller context information
-	)
+	inline void* allocate_mem_slot( void )
 	{
-		void* p_ans = allocate_mem_slot_impl( std::move( caller_ctx_arg ) );
+		void* p_ans = allocate_mem_slot_impl();
 		if ( p_ans != nullptr ) {
 			p_statistics_->free_slot_cnt_--;
 			auto cur     = p_statistics_->consum_cnt_.fetch_add( 1 ) + 1;
@@ -431,11 +429,10 @@ public:
 	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
 	 */
 	inline bool recycle_mem_slot(
-		void*            p_recycle_slot,   //!< [in] pointer to the memory slot to recycle.
-		caller_context&& caller_ctx_arg    //!< [in] caller context information
+		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
 	)
 	{
-		bool ans = recycle_mem_slot_impl( p_recycle_slot, std::move( caller_ctx_arg ) );
+		bool ans = recycle_mem_slot_impl( p_recycle_slot );
 		if ( ans ) {
 			p_statistics_->free_slot_cnt_++;
 			p_statistics_->consum_cnt_--;
@@ -469,12 +466,11 @@ public:
 	 * @post status_ is chunk_control_status::NORMAL
 	 */
 	inline void* try_allocate_mem_slot_from_reserved_deletion(
-		const unsigned int owner_tl_id_arg,   //!< [in] owner tl_id_
-		caller_context&&   caller_ctx_arg     //!< [in] caller context information
+		const unsigned int owner_tl_id_arg   //!< [in] owner tl_id_
 	)
 	{
 		unsigned int cur_tl_id = owner_tl_id_.load( std::memory_order_acquire );
-		return try_allocate_mem_slot_impl( cur_tl_id, owner_tl_id_arg, std::move( caller_ctx_arg ) );
+		return try_allocate_mem_slot_impl( cur_tl_id, owner_tl_id_arg );
 	}
 
 	/*!
@@ -488,11 +484,10 @@ public:
 	 * @post owner_tl_id_ is owner_tl_id_arg, and status_ is chunk_control_status::NORMAL
 	 */
 	inline void* try_get_ownership_allocate_mem_slot(
-		const unsigned int owner_tl_id_arg,   //!< [in] owner tl_id_
-		caller_context&&   caller_ctx_arg     //!< [in] caller context information
+		const unsigned int owner_tl_id_arg   //!< [in] owner tl_id_
 	)
 	{
-		return try_allocate_mem_slot_impl( NON_OWNERED_TL_ID, owner_tl_id_arg, std::move( caller_ctx_arg ) );
+		return try_allocate_mem_slot_impl( NON_OWNERED_TL_ID, owner_tl_id_arg );
 	}
 
 	bool set_delete_reservation( void );
@@ -545,9 +540,7 @@ private:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	void* allocate_mem_slot_impl(
-		caller_context&& caller_ctx_arg   //!< [in] caller context information
-	);
+	void* allocate_mem_slot_impl( void );
 
 	/*!
 	 * @brief	recycle memory slot
@@ -556,8 +549,7 @@ private:
 	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
 	 */
 	bool recycle_mem_slot_impl(
-		void*            p_recycle_slot,   //!< [in] pointer to the memory slot to recycle.
-		caller_context&& caller_ctx_arg    //!< [in] caller context information
+		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
 	);
 
 	/*!
@@ -572,8 +564,7 @@ private:
 	 */
 	void* try_allocate_mem_slot_impl(
 		const unsigned int expect_tl_id_arg,   //!< [in] owner tl_id_
-		const unsigned int owner_tl_id_arg,    //!< [in] owner tl_id_
-		caller_context&&   caller_ctx_arg      //!< [in] caller context information
+		const unsigned int owner_tl_id_arg     //!< [in] owner tl_id_
 	);
 
 	chunk_list_statistics* p_statistics_;               //!< statistics
@@ -594,17 +585,15 @@ struct slot_chk_result {
 };
 
 struct slot_header {
-	std::atomic<chunk_header_multi_slot*> at_p_chms_;    //!< pointer to chunk_header_multi_slot that is an owner of this slot
-	std::atomic<std::uintptr_t>           at_mark_;      //!< checker mark
-	caller_context                        caller_ctx_;   //!< caller context information
+	std::atomic<chunk_header_multi_slot*> at_p_chms_;   //!< pointer to chunk_header_multi_slot that is an owner of this slot
+	std::atomic<std::uintptr_t>           at_mark_;     //!< checker mark
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-	bt_info alloc_bt_info_;                              //!< backtrace information when is allocated
-	bt_info free_bt_info_;                               //!< backtrace information when is free
+	bt_info alloc_bt_info_;                             //!< backtrace information when is allocated
+	bt_info free_bt_info_;                              //!< backtrace information when is free
 #endif
 
 	void set_addr_of_chunk_header_multi_slot(
-		chunk_header_multi_slot* p_chms_arg,      //!< [in] pointer to a parent "chunk_header_multi_slot"
-		caller_context&&         caller_ctx_arg   //!< [in] caller context information
+		chunk_header_multi_slot* p_chms_arg   //!< [in] pointer to a parent "chunk_header_multi_slot"
 	);
 
 	slot_chk_result chk_header_data( void ) const;
@@ -634,9 +623,7 @@ public:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	void* allocate_mem_slot(
-		caller_context&& caller_ctx_arg   //!< [in] caller context information
-	);
+	void* allocate_mem_slot( void );
 
 	/*!
 	 * @brief	recycle memory slot
@@ -645,8 +632,7 @@ public:
 	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
 	 */
 	bool recycle_mem_slot(
-		void*            p_recycle_slot,   //!< [in] pointer to the memory slot to recycle.
-		caller_context&& caller_ctx_arg    //!< [in] caller context information
+		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
 	);
 
 	/*!

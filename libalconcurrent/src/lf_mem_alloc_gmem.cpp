@@ -26,19 +26,17 @@ inline general_mem_allocator& get_g_gm_mem_instance( void )
 }   // namespace internal
 
 void* gmem_allocate(
-	std::size_t      n,               //!< [in] memory size to allocate
-	caller_context&& caller_ctx_arg   //!< [in] caller context information
+	std::size_t n   //!< [in] memory size to allocate
 )
 {
-	return internal::get_g_gm_mem_instance().allocate( n, std::move( caller_ctx_arg ) );
+	return internal::get_g_gm_mem_instance().allocate( n );
 }
 
 void gmem_deallocate(
-	void*            p_mem,           //!< [in] pointer to free.
-	caller_context&& caller_ctx_arg   //!< [in] caller context information
+	void* p_mem   //!< [in] pointer to free.
 )
 {
-	internal::get_g_gm_mem_instance().deallocate( p_mem, std::move( caller_ctx_arg ) );
+	internal::get_g_gm_mem_instance().deallocate( p_mem );
 	return;
 }
 

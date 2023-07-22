@@ -36,36 +36,6 @@ enum class log_type {
 };
 
 /*!
- * @brief	caller context
- */
-struct caller_context {
-	const char* p_caller_src_fname_;   //!< caller side source file name
-	int         caller_lineno_;        //!< caller side line number
-	const char* p_caller_func_name_;   //!< function name calling this I/F
-
-	caller_context( const char* p_src_arg, int lin_arg, const char* p_fn_arg )
-	  : p_caller_src_fname_( p_src_arg )
-	  , caller_lineno_( lin_arg )
-	  , p_caller_func_name_( p_fn_arg )
-	{
-	}
-};
-
-#ifdef __GNUC__
-#define ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG                  \
-	alpha::concurrent::caller_context                            \
-	{                                                            \
-		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION() \
-	}
-#else
-#define ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG \
-	alpha::concurrent::caller_context           \
-	{                                           \
-		nullptr, 0, nullptr                     \
-	}
-#endif
-
-/*!
  * @brief	caller backtrace information
  */
 struct bt_info {

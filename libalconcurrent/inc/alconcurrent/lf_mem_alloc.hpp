@@ -59,16 +59,14 @@ public:
 	 * @brief	allocate memory
 	 */
 	void* allocate(
-		std::size_t      n,                                                         //!< [in] memory size to allocate
-		caller_context&& caller_ctx_arg = ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG   //!< [in] caller context information
+		std::size_t n   //!< [in] memory size to allocate
 	);
 
 	/*!
 	 * @brief	deallocate memory
 	 */
 	void deallocate(
-		void*            p_mem,                                                     //!< [in] pointer to allocated memory by allocate()
-		caller_context&& caller_ctx_arg = ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG   //!< [in] caller context information
+		void* p_mem   //!< [in] pointer to allocated memory by allocate()
 	);
 
 	/*!
@@ -107,7 +105,7 @@ private:
 	unsigned int                        pr_ch_size_;          //!< array size of chunk and param array
 	std::unique_ptr<param_chunk_comb[]> up_param_ch_array_;   //!< unique pointer to chunk and param array
 
-	std::atomic_bool exclusive_ctl_of_prune_;   //!< exclusive control for prune()
+	std::atomic_bool exclusive_ctl_of_prune_;                 //!< exclusive control for prune()
 };
 
 /*!
@@ -120,8 +118,7 @@ private:
  * This uses default_param_array and num_of_default_param_array as initial allocation parameter
  */
 void* gmem_allocate(
-	std::size_t      n,                                                         //!< [in] memory size to allocate
-	caller_context&& caller_ctx_arg = ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG   //!< [in] caller context information
+	std::size_t n   //!< [in] memory size to allocate
 );
 
 /*!
@@ -133,8 +130,7 @@ void* gmem_allocate(
  * If p_mem is not a memory that is not allocated by gmem_allocate(), this I/F will try to free by calling free().
  */
 void gmem_deallocate(
-	void*            p_mem,                                                     //!< [in] pointer to free.
-	caller_context&& caller_ctx_arg = ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG   //!< [in] caller context information
+	void* p_mem   //!< [in] pointer to free.
 );
 
 /*!
