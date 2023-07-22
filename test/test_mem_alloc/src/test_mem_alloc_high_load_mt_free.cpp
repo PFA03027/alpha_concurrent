@@ -21,15 +21,8 @@
 #include "alconcurrent/lf_fifo.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
 
-namespace alpha {
-namespace concurrent {
-namespace internal {
-
-void print_of_mmap_allocator( void );
-
-}
-}   // namespace concurrent
-}   // namespace alpha
+#include "alloc_only_allocator.hpp"
+#include "mmap_allocator.hpp"
 
 static alpha::concurrent::param_chunk_allocation param[] = {
 	{ 16, 100 },
@@ -105,7 +98,9 @@ public:
 			EXPECT_EQ( 0, e.consum_cnt_ );
 			printf( "%s\n", e.print().c_str() );
 		}
+
 		alpha::concurrent::internal::print_of_mmap_allocator();
+		alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::DUMP, 'A', 1 );
 	}
 
 	int num_thread_;

@@ -102,6 +102,20 @@ void room_boader::dump_to_log( log_type lt, char c, int id )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
+struct alloc_chamber_statistics {
+	size_t alloc_size_;
+	size_t consum_size_;
+	size_t free_size_;
+
+	alloc_chamber_statistics& operator+=( const alloc_chamber_statistics& op )
+	{
+		alloc_size_ += op.alloc_size_;
+		consum_size_ += op.consum_size_;
+		free_size_ += op.free_size_;
+		return *this;
+	}
+};
+
 struct alloc_chamber {
 	const size_t                chamber_size_;     //!< alloc_chamberのサイズ
 	std::atomic<alloc_chamber*> next_;             //!< alloc_chamberのスタックリスト上の次のalloc_chamber
@@ -116,7 +130,8 @@ struct alloc_chamber {
 
 	void* allocate( size_t req_size, size_t req_align );
 
-	void dump_to_log( log_type lt, char c, int id );
+	void                     dump_to_log( log_type lt, char c, int id );
+	alloc_chamber_statistics get_statistics( void ) const;
 
 private:
 	uintptr_t calc_addr_chopped_room_end_by( uintptr_t expected_offset_, size_t req_size, size_t req_align );
@@ -205,6 +220,16 @@ void alloc_chamber::dump_to_log( log_type lt, char c, int id )
 	}
 }
 
+alloc_chamber_statistics alloc_chamber::get_statistics( void ) const
+{
+	alloc_chamber_statistics ans;
+	ans.alloc_size_  = chamber_size_;
+	ans.consum_size_ = static_cast<size_t>( offset_.load( std::memory_order_acquire ) );
+	ans.free_size_   = ans.alloc_size_ - ans.consum_size_;
+
+	return ans;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 alloc_chamber_head          alloc_chamber_head::singleton_;
 thread_local alloc_chamber* alloc_chamber_head::p_forcusing_chamber_ = nullptr;
@@ -241,11 +266,26 @@ void* alloc_chamber_head::allocate( size_t req_size, size_t req_align )
 
 void alloc_chamber_head::dump_to_log( log_type lt, char c, int id )
 {
+	alloc_chamber_statistics total_statistics { 0 };
+	size_t                   chamber_count = 0;
+
 	auto p_cur_chamber = head_.load( std::memory_order_acquire );
 	while ( p_cur_chamber != nullptr ) {
 		p_cur_chamber->dump_to_log( lt, c, id );
+		chamber_count++;
+		total_statistics += p_cur_chamber->get_statistics();
 		p_cur_chamber = p_cur_chamber->next_.load( std::memory_order_acquire );
 	}
+
+	internal::LogOutput(
+		lt,
+		"[%d-%c] chamber count = %zu, total allocated size = 0x%zx, consumed size = 0x%zx(%.2fM), free size = 0x%zx(%.2fM), used ratio = %2.1f %%",
+		id, c,
+		chamber_count,
+		total_statistics.alloc_size_,
+		total_statistics.consum_size_, (double)total_statistics.consum_size_ / (double)( 1024 * 1024 ),
+		total_statistics.free_size_, (double)total_statistics.free_size_ / (double)( 1024 * 1024 ),
+		(double)total_statistics.consum_size_ / (double)total_statistics.alloc_size_ * 100.0f );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////

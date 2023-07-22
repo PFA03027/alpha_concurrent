@@ -23,6 +23,9 @@
 
 #include "alconcurrent/dynamic_tls.hpp"
 
+#include "alloc_only_allocator.hpp"
+#include "mmap_allocator.hpp"
+
 struct keep_argument_value {
 	keep_argument_value( void )
 	  : param_of_allocate_( nullptr )
@@ -143,6 +146,8 @@ public:
 	}
 	void TearDown() override
 	{
+		alpha::concurrent::internal::print_of_mmap_allocator();
+		alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::DUMP, 'A', 1 );
 	}
 
 	int max_num_;
@@ -222,6 +227,9 @@ public:
 		}
 		EXPECT_EQ( 0, alpha::concurrent::internal::get_num_of_tls_key() );
 		pthread_barrier_destroy( &barrier_ );
+
+		alpha::concurrent::internal::print_of_mmap_allocator();
+		alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::DUMP, 'A', 1 );
 	}
 
 	int                                             max_num_;
