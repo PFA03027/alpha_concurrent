@@ -842,9 +842,9 @@ bool chunk_header_multi_slot::alloc_new_chunk(
 	free_slot_idx_mgr_.set_idx_size( slot_conf_.num_of_pieces_ );
 	owner_tl_id_.store( owner_tl_id_arg, std::memory_order_release );
 
-	p_statistics_->valid_chunk_num_.fetch_add( 1 );
-	p_statistics_->total_slot_cnt_.fetch_add( slot_conf_.num_of_pieces_ );
-	p_statistics_->free_slot_cnt_.fetch_add( slot_conf_.num_of_pieces_ );
+	p_statistics_->valid_chunk_num_.fetch_add( 1, std::memory_order_acq_rel );
+	p_statistics_->total_slot_cnt_.fetch_add( slot_conf_.num_of_pieces_, std::memory_order_acq_rel );
+	p_statistics_->free_slot_cnt_.fetch_add( slot_conf_.num_of_pieces_, std::memory_order_acq_rel );
 
 	status_.store( chunk_control_status::NORMAL, std::memory_order_release );
 
@@ -961,7 +961,7 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 		internal::LogOutput( log_type::ERR, "double free has occured." );
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 		static std::atomic_int double_free_counter( 0 );
-		int                    id_count = double_free_counter.fetch_add( 1 );
+		int                    id_count = double_free_counter.fetch_add( 1, std::memory_order_acq_rel );
 
 		internal::LogOutput( log_type::ERR, "[%d-f] backtrace of previous free call", id_count );
 		p_sh->free_bt_info_.dump_to_log( log_type::ERR, 'f', id_count );
@@ -1139,9 +1139,9 @@ bool chunk_header_multi_slot::exec_deletion( void )
 	owner_tl_id_.store( NON_OWNERED_TL_ID, std::memory_order_release );
 	free_slot_idx_mgr_.clear();
 
-	p_statistics_->valid_chunk_num_.fetch_sub( 1 );
-	p_statistics_->total_slot_cnt_.fetch_sub( slot_conf_.num_of_pieces_ );
-	p_statistics_->free_slot_cnt_.fetch_sub( slot_conf_.num_of_pieces_ );
+	p_statistics_->valid_chunk_num_.fetch_sub( 1, std::memory_order_acq_rel );
+	p_statistics_->total_slot_cnt_.fetch_sub( slot_conf_.num_of_pieces_, std::memory_order_acq_rel );
+	p_statistics_->free_slot_cnt_.fetch_sub( slot_conf_.num_of_pieces_, std::memory_order_acq_rel );
 
 	status_.store( chunk_control_status::EMPTY, std::memory_order_release );
 
@@ -1253,9 +1253,9 @@ unsigned int chunk_list::tl_chunk_param::get_new_tl_id( void )
 	// tl_idを固定値とするとことで、chunkの区別がつかないようにする。
 	return 1;
 #else
-	unsigned int ans = tl_id_counter_.fetch_add( 1 );
+	unsigned int ans = tl_id_counter_.fetch_add( 1, std::memory_order_acq_rel );
 	if ( ans == NON_OWNERED_TL_ID ) {
-		ans = tl_id_counter_.fetch_add( 1 );
+		ans = tl_id_counter_.fetch_add( 1, std::memory_order_acq_rel );
 	}
 	return ans;
 #endif
@@ -1745,7 +1745,7 @@ void output_backtrace_info(
 )
 {
 	static std::atomic_int counter( 0 );
-	int                    id_count = counter.fetch_add( 1 );
+	int                    id_count = counter.fetch_add( 1, std::memory_order_acq_rel );
 
 	std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
 	tmp_addr -= internal::get_slot_header_size();

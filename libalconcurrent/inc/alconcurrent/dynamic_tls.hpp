@@ -137,7 +137,7 @@ struct dynamic_tls_thread_cnt {
 
 	void count_up( void )
 	{
-		auto cur     = cur_thread_count_.fetch_add( 1 ) + 1;
+		auto cur     = cur_thread_count_.fetch_add( 1, std::memory_order_acq_rel ) + 1;
 		auto cur_max = max_thread_count_.load( std::memory_order_acquire );
 		if ( cur > cur_max ) {
 			max_thread_count_.compare_exchange_strong( cur_max, cur );
@@ -146,7 +146,7 @@ struct dynamic_tls_thread_cnt {
 
 	void count_down( void )
 	{
-		cur_thread_count_.fetch_sub( 1 );
+		cur_thread_count_.fetch_sub( 1, std::memory_order_acq_rel );
 	}
 
 	std::atomic_int cur_thread_count_;   //!< current thread count

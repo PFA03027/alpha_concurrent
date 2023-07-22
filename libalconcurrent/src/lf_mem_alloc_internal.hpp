@@ -413,7 +413,7 @@ public:
 		void* p_ans = allocate_mem_slot_impl();
 		if ( p_ans != nullptr ) {
 			p_statistics_->free_slot_cnt_--;
-			auto cur     = p_statistics_->consum_cnt_.fetch_add( 1 ) + 1;
+			auto cur     = p_statistics_->consum_cnt_.fetch_add( 1, std::memory_order_acq_rel ) + 1;
 			auto cur_max = p_statistics_->max_consum_cnt_.load( std::memory_order_acquire );
 			if ( cur > cur_max ) {
 				p_statistics_->max_consum_cnt_.compare_exchange_strong( cur_max, cur );

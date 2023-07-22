@@ -127,7 +127,7 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size )
 		}
 	}
 
-	size_t new_cur_size = cur_total_allocation_size.fetch_add( page_aligned_params.page_aligned_real_alloc_size_ );
+	size_t new_cur_size = cur_total_allocation_size.fetch_add( page_aligned_params.page_aligned_real_alloc_size_, std::memory_order_acq_rel );
 	new_cur_size += page_aligned_params.page_aligned_real_alloc_size_;
 	size_t cur_max = max_total_allocation_size.load( std::memory_order_acquire );
 	if ( new_cur_size > cur_max ) {
@@ -138,7 +138,7 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size )
 
 int deallocate_by_munmap( void* p_allocated_addr, size_t allocated_size )
 {
-	cur_total_allocation_size.fetch_sub( allocated_size );
+	cur_total_allocation_size.fetch_sub( allocated_size, std::memory_order_acq_rel );
 	return munmap( p_allocated_addr, static_cast<size_t>( allocated_size ) );
 }
 

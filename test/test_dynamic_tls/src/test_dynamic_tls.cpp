@@ -248,7 +248,7 @@ public:
 		for ( int i = 0; i < p_test_fixture->max_num_; i++ ) {
 			auto data = alpha::concurrent::internal::dynamic_tls_getspecific( p_test_fixture->p_keys_array_[i] );
 			if ( static_cast<uintptr_t>( i + 1 ) != data.p_data_ ) {
-				p_test_fixture->err_cnt_.fetch_add( 1 );
+				p_test_fixture->err_cnt_.fetch_add( 1, std::memory_order_acq_rel );
 			}
 		}
 	}
