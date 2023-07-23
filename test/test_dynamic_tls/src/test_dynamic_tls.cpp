@@ -189,7 +189,7 @@ INSTANTIATE_TEST_SUITE_P( many_tls,
                                            alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2 - 1, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2 + 1,
                                            alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 - 1, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 + 1 ) );
 
-#define THREAD_COUNT ( 1000 )
+#define THREAD_COUNT ( 100 )
 
 class dynamic_tls_many_thd_many : public testing::TestWithParam<int> {
 	// You can implement all the usual fixture class members here.

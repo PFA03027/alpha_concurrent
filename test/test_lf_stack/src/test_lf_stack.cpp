@@ -341,10 +341,10 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( test_lifo_type* p_test_obj[] )
 
 TEST_F( lfStackTest, TC3 )
 {
-	//	test_lifo_type* p_test_obj = new test_lifo_type( num_thread );
+	test_lifo_type  sut[2] = { num_thread, num_thread };
 	test_lifo_type* p_test_obj[2];
-	p_test_obj[0] = new test_lifo_type( num_thread );
-	p_test_obj[1] = new test_lifo_type( num_thread );
+	p_test_obj[0] = &( sut[0] );
+	p_test_obj[1] = &( sut[1] );
 
 	pthread_barrier_init( &barrier, NULL, num_thread + 1 );
 	pthread_t* threads = new pthread_t[num_thread];
@@ -392,9 +392,6 @@ TEST_F( lfStackTest, TC3 )
 
 	std::cout << "Allocated nodes #0:    " << p_test_obj[0]->get_allocated_num() << std::endl;
 	std::cout << "Allocated nodes #1:    " << p_test_obj[1]->get_allocated_num() << std::endl;
-
-	delete p_test_obj[0];
-	delete p_test_obj[1];
 
 	return;
 }

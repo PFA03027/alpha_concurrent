@@ -93,6 +93,8 @@ fifo_free_nd_list::~fifo_free_nd_list()
 			delete p_cur;
 			p_cur = p_nxt;
 		} while ( p_cur != nullptr );
+	} else {
+		internal::LogOutput( log_type::ERR, "Sentinel node is deleted! This is LOGIC error!" );
 	}
 
 	return;
