@@ -346,14 +346,14 @@ private:
 
 	static constexpr int num_recycle_exec = 16;   //!< recycle処理を行うノード数。処理量を一定化するために、ループ回数を定数化する。２以上とする事。だいたいCPU数程度にすればよい。
 
+	std::mutex             mtx_rcv_thread_local_fifo_list_;
+	thread_local_fifo_list rcv_thread_local_fifo_list_;
+
 	std::atomic<int> allocated_node_count_;
 
 	fifo_free_nd_list node_list_;
 
-	dynamic_tls<thread_local_fifo_list, rcv_fifo_list_handler> tls_fifo_;
-
-	std::mutex             mtx_rcv_thread_local_fifo_list_;
-	thread_local_fifo_list rcv_thread_local_fifo_list_;
+	dynamic_tls<thread_local_fifo_list, rcv_fifo_list_handler> tls_fifo_;   //!< dynamic_tlsで指定しているrcv_fifo_list_handlerによって、デストラクタ実行時にrcv_thread_local_fifo_list_に残留データをpushする。そのため、メンバ変数rcv_thread_local_fifo_list_よりも後に変数宣言を行っている。
 };
 
 }   // namespace internal

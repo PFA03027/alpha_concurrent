@@ -196,11 +196,13 @@ idx_element_storage_mgr::idx_element_storage_mgr(
 	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_arg,   //!< [in] nextポインタを保持しているメンバ変数へのメンバ変数ポインタ
 	std::atomic<unsigned int>*                      p_collition_counter      //!< [in] 衝突が発生した回数を記録するアトミック変数へのポインタ
 	)
-  : tls_waiting_list_( rcv_el_threadlocal_handler( this ) )
+  : mtx_rcv_wait_element_list_()
+  , rcv_wait_element_list_()
+  , tls_waiting_list_( rcv_el_threadlocal_handler( this ) )
+  , hzrd_element_()
   , head_( nullptr )
   , tail_( nullptr )
   , p_next_ptr_offset_( p_next_ptr_offset_arg )
-  , rcv_wait_element_list_()
   , p_collision_cnt_( p_collition_counter )
 {
 	return;
@@ -507,13 +509,14 @@ idx_mgr::idx_mgr(
 	)
   : idx_size_( idx_size_arg )
   , idx_size_ver_( 0 )
+  , mtx_rcv_waiting_idx_list_()
+  , rcv_waiting_idx_list_( idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) )
   , p_alloc_collision_cnt_( p_alloc_collision_cnt_arg )
   , p_dealloc_collision_cnt_( p_dealloc_collision_cnt_arg )
   , p_idx_mgr_element_array_( nullptr )
   , invalid_element_storage_( &idx_mgr_element::p_invalid_idx_next_element_, p_alloc_collision_cnt_ )
   , valid_element_storage_( &idx_mgr_element::p_valid_idx_next_element_, p_dealloc_collision_cnt_ )
   , tls_waiting_idx_list_( rcv_idx_by_thread_terminating( this ) )
-  , rcv_waiting_idx_list_( idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) )
 {
 	if ( idx_size_.load( std::memory_order_acquire ) <= 0 ) return;
 

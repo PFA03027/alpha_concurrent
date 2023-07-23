@@ -217,15 +217,15 @@ private:
 	 */
 	void rcv_wait_element_by_thread_terminating( waiting_element_list* p_el_list );
 
-	dynamic_tls<waiting_element_list, rcv_el_threadlocal_handler> tls_waiting_list_;   //!< 滞留要素を管理するスレッドローカルリスト
+	std::mutex           mtx_rcv_wait_element_list_;                                   //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取るメンバ変数rcv_wait_element_list_の排他制御用Mutex
+	waiting_element_list rcv_wait_element_list_;                                       //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取る
+
+	dynamic_tls<waiting_element_list, rcv_el_threadlocal_handler> tls_waiting_list_;   //!< 滞留要素を管理するスレッドローカルリスト。dynamic_tlsで指定しているrcv_el_threadlocal_handlerによって、デストラクタ実行時にrcv_wait_element_list_に残留データをpushする。そのため、メンバ変数rcv_wait_element_list_よりも後に変数宣言を行っている。
 	hazard_ptr<idx_mgr_element, hzrd_max_slot_>                   hzrd_element_;       //!< ハザードポインタを管理する構造体。
 
 	std::atomic<idx_mgr_element*> head_;                                               //!< リスト構造のヘッドへのポインタ
 	std::atomic<idx_mgr_element*> tail_;                                               //!< リスト構造の終端要素へのポインタ
 	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_;                //!< リスト構造の次のノードへのポインタを格納したメンバ変数へのメンバ変数ポインタ
-
-	std::mutex           mtx_rcv_wait_element_list_;                                   //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取るメンバ変数rcv_wait_element_list_の排他制御用Mutex
-	waiting_element_list rcv_wait_element_list_;                                       //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取る
 
 	std::atomic<unsigned int>* p_collision_cnt_;                                       //!< ロックフリーアルゴリズム内で発生した衝突回数を記録する変数への参照
 };
@@ -361,16 +361,16 @@ private:
 	std::atomic<int> idx_size_;                                                              //!< 割り当てられたインデックス番号の数
 	std::atomic<int> idx_size_ver_;                                                          //!< 割り当てられたインデックス番号の数の情報のバージョン番号
 
+	std::mutex       mtx_rcv_waiting_idx_list_;                                              //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ(rcv_waiting_idx_list_)の排他制御を行う
+	waiting_idx_list rcv_waiting_idx_list_;                                                  //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ
+
 	std::atomic<unsigned int>* p_alloc_collision_cnt_;                                       //!< idxをpopする時に発生した衝突回数をカウントする変数へのポインタ
 	std::atomic<unsigned int>* p_dealloc_collision_cnt_;                                     //!< idxをpushする時に発生した衝突回数をカウントする変数へのポインタ
 
 	idx_mgr_element*                                             p_idx_mgr_element_array_;   //!< インデックス番号を管理情報を保持する配列
 	idx_element_storage_mgr                                      invalid_element_storage_;   //!< インデックス番号を所持しない要素を管理するストレージ
 	idx_element_storage_mgr                                      valid_element_storage_;     //!< インデックス番号を所持する要素を管理するストレージ
-	dynamic_tls<waiting_idx_list, rcv_idx_by_thread_terminating> tls_waiting_idx_list_;      //!< 滞留インデックスを管理するスレッドローカルリスト
-
-	std::mutex       mtx_rcv_waiting_idx_list_;                                              //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ(rcv_waiting_idx_list_)の排他制御を行う
-	waiting_idx_list rcv_waiting_idx_list_;                                                  //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ
+	dynamic_tls<waiting_idx_list, rcv_idx_by_thread_terminating> tls_waiting_idx_list_;      //!< 滞留インデックスを管理するスレッドローカルリスト。dynamic_tlsで指定しているrcv_idx_by_thread_terminatingによって、デストラクタ実行時にrcv_waiting_idx_list_に残留データをpushする。そのため、メンバ変数rcv_waiting_idx_list_よりも後に変数宣言を行っている。
 };
 
 struct slot_chk_result;

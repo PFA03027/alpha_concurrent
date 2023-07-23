@@ -208,9 +208,11 @@ bool fifo_free_nd_list::check_hazard_list( fifo_free_nd_list::node_pointer const
 ////////////////////////////////////////////////////////////////////////////
 
 free_nd_storage::free_nd_storage( void )
-  : allocated_node_count_( 0 )
-  , tls_fifo_( rcv_fifo_list_handler( this ) )
+  : mtx_rcv_thread_local_fifo_list_()
   , rcv_thread_local_fifo_list_()
+  , allocated_node_count_( 0 )
+  , node_list_()
+  , tls_fifo_( rcv_fifo_list_handler( this ) )
 {
 }
 
