@@ -61,7 +61,7 @@ TEST( lfmemAllocOneChunk, TC_Load )
 	for ( int i = 0; i < 1; i++ ) {
 		int cur_alloc_num = 15;
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
-			alloc_addr[j] = chms.allocate_mem_slot( ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG );
+			alloc_addr[j] = chms.allocate_mem_slot();
 		}
 
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
@@ -69,7 +69,7 @@ TEST( lfmemAllocOneChunk, TC_Load )
 		}
 
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
-			ASSERT_TRUE( chms.recycle_mem_slot( alloc_addr[j], ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG ) );
+			ASSERT_TRUE( chms.recycle_mem_slot( alloc_addr[j] ) );
 		}
 	}
 

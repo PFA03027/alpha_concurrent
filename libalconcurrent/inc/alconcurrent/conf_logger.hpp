@@ -36,52 +36,23 @@ enum class log_type {
 };
 
 /*!
- * @brief	caller context
- */
-struct caller_context {
-	const char* p_caller_src_fname_;   //!< caller side source file name
-	int         caller_lineno_;        //!< caller side line number
-	const char* p_caller_func_name_;   //!< function name calling this I/F
-
-	caller_context( const char* p_src_arg, int lin_arg, const char* p_fn_arg )
-	  : p_caller_src_fname_( p_src_arg )
-	  , caller_lineno_( lin_arg )
-	  , p_caller_func_name_( p_fn_arg )
-	{
-	}
-};
-
-#ifdef __GNUC__
-#define ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG                  \
-	alpha::concurrent::caller_context                            \
-	{                                                            \
-		__builtin_FILE(), __builtin_LINE(), __builtin_FUNCTION() \
-	}
-#else
-#define ALCONCURRENT_DEFAULT_CALLER_CONTEXT_ARG \
-	alpha::concurrent::caller_context           \
-	{                                           \
-		nullptr, 0, nullptr                     \
-	}
-#endif
-
-/*!
  * @brief	caller backtrace information
  */
 struct bt_info {
 	int   count_;                                             //!< backtrace data size. Zero: no data, Plus value: call stack information is valid, Minus value: information of previous allocation
 	void* bt_[ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE];   //!< call stack of backtrace
 
-	bt_info( void )
+	constexpr bt_info( void )
 	  : count_( 0 )
+	  , bt_ { 0 }
 	{
 	}
 
-	~bt_info()                           = default;
-	bt_info( const bt_info& )            = default;
-	bt_info( bt_info&& )                 = default;
-	bt_info& operator=( const bt_info& ) = default;
-	bt_info& operator=( bt_info&& )      = default;
+	~bt_info()                                     = default;
+	constexpr bt_info( const bt_info& )            = default;
+	constexpr bt_info( bt_info&& )                 = default;
+	constexpr bt_info& operator=( const bt_info& ) = default;
+	constexpr bt_info& operator=( bt_info&& )      = default;
 
 	void dump_to_log( log_type lt, char c, int id );
 };

@@ -93,6 +93,8 @@ fifo_free_nd_list::~fifo_free_nd_list()
 			delete p_cur;
 			p_cur = p_nxt;
 		} while ( p_cur != nullptr );
+	} else {
+		internal::LogOutput( log_type::ERR, "Sentinel node is deleted! This is LOGIC error!" );
 	}
 
 	return;
@@ -100,7 +102,7 @@ fifo_free_nd_list::~fifo_free_nd_list()
 
 void fifo_free_nd_list::initial_push( fifo_free_nd_list::node_pointer const p_push_node )
 {
-	if ( ( head_.load() != nullptr ) || ( tail_.load() != nullptr ) ) {
+	if ( ( head_.load( std::memory_order_acquire ) != nullptr ) || ( tail_.load( std::memory_order_acquire ) != nullptr ) ) {
 		internal::LogOutput( log_type::ERR, "Because already this fifo_free_nd_list instance has sentinel node, fail to initial_push()." );
 		return;
 	}
@@ -206,9 +208,11 @@ bool fifo_free_nd_list::check_hazard_list( fifo_free_nd_list::node_pointer const
 ////////////////////////////////////////////////////////////////////////////
 
 free_nd_storage::free_nd_storage( void )
-  : allocated_node_count_( 0 )
-  , tls_fifo_( rcv_fifo_list_by_thread_terminating( this ) )
+  : mtx_rcv_thread_local_fifo_list_()
   , rcv_thread_local_fifo_list_()
+  , allocated_node_count_( 0 )
+  , node_list_()
+  , tls_fifo_( rcv_fifo_list_handler( this ) )
 {
 }
 

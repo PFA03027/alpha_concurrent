@@ -47,7 +47,7 @@ enum class chunk_control_status : int {
  *
  */
 struct chunk_list_statistics {
-	chunk_list_statistics( void )
+	constexpr chunk_list_statistics( void )
 	  : chunk_num_( 0 )
 	  , valid_chunk_num_( 0 )
 	  , total_slot_cnt_( 0 )
@@ -62,10 +62,10 @@ struct chunk_list_statistics {
 	  , dealloc_collision_cnt_( 0 )
 	{
 	}
-	chunk_list_statistics( const chunk_list_statistics& )            = default;
-	chunk_list_statistics( chunk_list_statistics&& )                 = default;
-	chunk_list_statistics& operator=( const chunk_list_statistics& ) = default;
-	chunk_list_statistics& operator=( chunk_list_statistics&& )      = default;
+	constexpr chunk_list_statistics( const chunk_list_statistics& )            = default;
+	constexpr chunk_list_statistics( chunk_list_statistics&& )                 = default;
+	constexpr chunk_list_statistics& operator=( const chunk_list_statistics& ) = default;
+	constexpr chunk_list_statistics& operator=( chunk_list_statistics&& )      = default;
 
 	chunk_statistics get_statistics( void ) const;
 
@@ -173,21 +173,22 @@ private:
 	};
 	using scoped_hazard_ref = hazard_ptr_scoped_ref<idx_mgr_element, hzrd_max_slot_>;
 
-	struct rcv_el_by_thread_terminating {
-		rcv_el_by_thread_terminating( idx_element_storage_mgr* p_elst_arg )
+	struct rcv_el_threadlocal_handler {
+		rcv_el_threadlocal_handler( idx_element_storage_mgr* p_elst_arg )
 		  : p_elst_( p_elst_arg )
 		{
 		}
 
-		bool release( waiting_element_list& destructing_tls )
+		uintptr_t allocate( void )
 		{
-			p_elst_->rcv_wait_element_by_thread_terminating( &destructing_tls );
-			return true;
+			return reinterpret_cast<uintptr_t>( new waiting_element_list() );
 		}
 
-		void destruct( waiting_element_list& destructing_tls )
+		void deallocate( uintptr_t p_destructing_tls )
 		{
-			return;
+			waiting_element_list* p_tmp = reinterpret_cast<waiting_element_list*>( p_destructing_tls );
+			p_elst_->rcv_wait_element_by_thread_terminating( p_tmp );
+			delete p_tmp;
 		}
 
 		idx_element_storage_mgr* p_elst_;
@@ -216,17 +217,17 @@ private:
 	 */
 	void rcv_wait_element_by_thread_terminating( waiting_element_list* p_el_list );
 
-	dynamic_tls<waiting_element_list, rcv_el_by_thread_terminating> tls_waiting_list_;   //!< 滞留要素を管理するスレッドローカルリスト
-	hazard_ptr<idx_mgr_element, hzrd_max_slot_>                     hzrd_element_;       //!< ハザードポインタを管理する構造体。
+	std::mutex           mtx_rcv_wait_element_list_;                                   //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取るメンバ変数rcv_wait_element_list_の排他制御用Mutex
+	waiting_element_list rcv_wait_element_list_;                                       //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取る
 
-	std::atomic<idx_mgr_element*> head_;                                                 //!< リスト構造のヘッドへのポインタ
-	std::atomic<idx_mgr_element*> tail_;                                                 //!< リスト構造の終端要素へのポインタ
-	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_;                  //!< リスト構造の次のノードへのポインタを格納したメンバ変数へのメンバ変数ポインタ
+	dynamic_tls<waiting_element_list, rcv_el_threadlocal_handler> tls_waiting_list_;   //!< 滞留要素を管理するスレッドローカルリスト。dynamic_tlsで指定しているrcv_el_threadlocal_handlerによって、デストラクタ実行時にrcv_wait_element_list_に残留データをpushする。そのため、メンバ変数rcv_wait_element_list_よりも後に変数宣言を行っている。
+	hazard_ptr<idx_mgr_element, hzrd_max_slot_>                   hzrd_element_;       //!< ハザードポインタを管理する構造体。
 
-	std::mutex           mtx_rcv_wait_element_list_;                                     //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取るメンバ変数rcv_wait_element_list_の排他制御用Mutex
-	waiting_element_list rcv_wait_element_list_;                                         //!< tls_waiting_list_のスレッドローカルストレージが破棄される際に滞留中の要素を受け取る
+	std::atomic<idx_mgr_element*> head_;                                               //!< リスト構造のヘッドへのポインタ
+	std::atomic<idx_mgr_element*> tail_;                                               //!< リスト構造の終端要素へのポインタ
+	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_;                //!< リスト構造の次のノードへのポインタを格納したメンバ変数へのメンバ変数ポインタ
 
-	std::atomic<unsigned int>* p_collision_cnt_;                                         //!< ロックフリーアルゴリズム内で発生した衝突回数を記録する変数への参照
+	std::atomic<unsigned int>* p_collision_cnt_;                                       //!< ロックフリーアルゴリズム内で発生した衝突回数を記録する変数への参照
 };
 
 /*!
@@ -334,15 +335,16 @@ private:
 		{
 		}
 
-		bool release( waiting_idx_list& destructing_tls )
+		uintptr_t allocate( void )
 		{
-			p_elst_->rcv_wait_idx_by_thread_terminating( &destructing_tls );
-			return true;
+			return reinterpret_cast<uintptr_t>( new waiting_idx_list( p_elst_->idx_size_.load( std::memory_order_acquire ), p_elst_->idx_size_ver_.load( std::memory_order_acquire ) ) );
 		}
 
-		void destruct( waiting_idx_list& destructing_tls )
+		void deallocate( uintptr_t p_destructing_tls )
 		{
-			return;
+			waiting_idx_list* p_tmp = reinterpret_cast<waiting_idx_list*>( p_destructing_tls );
+			p_elst_->rcv_wait_idx_by_thread_terminating( p_tmp );
+			delete p_tmp;
 		}
 
 		idx_mgr* p_elst_;
@@ -359,16 +361,16 @@ private:
 	std::atomic<int> idx_size_;                                                              //!< 割り当てられたインデックス番号の数
 	std::atomic<int> idx_size_ver_;                                                          //!< 割り当てられたインデックス番号の数の情報のバージョン番号
 
+	std::mutex       mtx_rcv_waiting_idx_list_;                                              //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ(rcv_waiting_idx_list_)の排他制御を行う
+	waiting_idx_list rcv_waiting_idx_list_;                                                  //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ
+
 	std::atomic<unsigned int>* p_alloc_collision_cnt_;                                       //!< idxをpopする時に発生した衝突回数をカウントする変数へのポインタ
 	std::atomic<unsigned int>* p_dealloc_collision_cnt_;                                     //!< idxをpushする時に発生した衝突回数をカウントする変数へのポインタ
 
 	idx_mgr_element*                                             p_idx_mgr_element_array_;   //!< インデックス番号を管理情報を保持する配列
 	idx_element_storage_mgr                                      invalid_element_storage_;   //!< インデックス番号を所持しない要素を管理するストレージ
 	idx_element_storage_mgr                                      valid_element_storage_;     //!< インデックス番号を所持する要素を管理するストレージ
-	dynamic_tls<waiting_idx_list, rcv_idx_by_thread_terminating> tls_waiting_idx_list_;      //!< 滞留インデックスを管理するスレッドローカルリスト
-
-	std::mutex       mtx_rcv_waiting_idx_list_;                                              //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ(rcv_waiting_idx_list_)の排他制御を行う
-	waiting_idx_list rcv_waiting_idx_list_;                                                  //!< スレッドローカルストレージに滞留しているインデックスで、スレッド終了時に受け取るバッファ
+	dynamic_tls<waiting_idx_list, rcv_idx_by_thread_terminating> tls_waiting_idx_list_;      //!< 滞留インデックスを管理するスレッドローカルリスト。dynamic_tlsで指定しているrcv_idx_by_thread_terminatingによって、デストラクタ実行時にrcv_waiting_idx_list_に残留データをpushする。そのため、メンバ変数rcv_waiting_idx_list_よりも後に変数宣言を行っている。
 };
 
 struct slot_chk_result;
@@ -406,14 +408,12 @@ public:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	inline void* allocate_mem_slot(
-		caller_context&& caller_ctx_arg   //!< [in] caller context information
-	)
+	inline void* allocate_mem_slot( void )
 	{
-		void* p_ans = allocate_mem_slot_impl( std::move( caller_ctx_arg ) );
+		void* p_ans = allocate_mem_slot_impl();
 		if ( p_ans != nullptr ) {
 			p_statistics_->free_slot_cnt_--;
-			auto cur     = p_statistics_->consum_cnt_.fetch_add( 1 ) + 1;
+			auto cur     = p_statistics_->consum_cnt_.fetch_add( 1, std::memory_order_acq_rel ) + 1;
 			auto cur_max = p_statistics_->max_consum_cnt_.load( std::memory_order_acquire );
 			if ( cur > cur_max ) {
 				p_statistics_->max_consum_cnt_.compare_exchange_strong( cur_max, cur );
@@ -429,11 +429,10 @@ public:
 	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
 	 */
 	inline bool recycle_mem_slot(
-		void*            p_recycle_slot,   //!< [in] pointer to the memory slot to recycle.
-		caller_context&& caller_ctx_arg    //!< [in] caller context information
+		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
 	)
 	{
-		bool ans = recycle_mem_slot_impl( p_recycle_slot, std::move( caller_ctx_arg ) );
+		bool ans = recycle_mem_slot_impl( p_recycle_slot );
 		if ( ans ) {
 			p_statistics_->free_slot_cnt_++;
 			p_statistics_->consum_cnt_--;
@@ -467,12 +466,11 @@ public:
 	 * @post status_ is chunk_control_status::NORMAL
 	 */
 	inline void* try_allocate_mem_slot_from_reserved_deletion(
-		const unsigned int owner_tl_id_arg,   //!< [in] owner tl_id_
-		caller_context&&   caller_ctx_arg     //!< [in] caller context information
+		const unsigned int owner_tl_id_arg   //!< [in] owner tl_id_
 	)
 	{
 		unsigned int cur_tl_id = owner_tl_id_.load( std::memory_order_acquire );
-		return try_allocate_mem_slot_impl( cur_tl_id, owner_tl_id_arg, std::move( caller_ctx_arg ) );
+		return try_allocate_mem_slot_impl( cur_tl_id, owner_tl_id_arg );
 	}
 
 	/*!
@@ -486,11 +484,10 @@ public:
 	 * @post owner_tl_id_ is owner_tl_id_arg, and status_ is chunk_control_status::NORMAL
 	 */
 	inline void* try_get_ownership_allocate_mem_slot(
-		const unsigned int owner_tl_id_arg,   //!< [in] owner tl_id_
-		caller_context&&   caller_ctx_arg     //!< [in] caller context information
+		const unsigned int owner_tl_id_arg   //!< [in] owner tl_id_
 	)
 	{
-		return try_allocate_mem_slot_impl( NON_OWNERED_TL_ID, owner_tl_id_arg, std::move( caller_ctx_arg ) );
+		return try_allocate_mem_slot_impl( NON_OWNERED_TL_ID, owner_tl_id_arg );
 	}
 
 	bool set_delete_reservation( void );
@@ -543,9 +540,7 @@ private:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	void* allocate_mem_slot_impl(
-		caller_context&& caller_ctx_arg   //!< [in] caller context information
-	);
+	void* allocate_mem_slot_impl( void );
 
 	/*!
 	 * @brief	recycle memory slot
@@ -554,8 +549,7 @@ private:
 	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
 	 */
 	bool recycle_mem_slot_impl(
-		void*            p_recycle_slot,   //!< [in] pointer to the memory slot to recycle.
-		caller_context&& caller_ctx_arg    //!< [in] caller context information
+		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
 	);
 
 	/*!
@@ -570,8 +564,7 @@ private:
 	 */
 	void* try_allocate_mem_slot_impl(
 		const unsigned int expect_tl_id_arg,   //!< [in] owner tl_id_
-		const unsigned int owner_tl_id_arg,    //!< [in] owner tl_id_
-		caller_context&&   caller_ctx_arg      //!< [in] caller context information
+		const unsigned int owner_tl_id_arg     //!< [in] owner tl_id_
 	);
 
 	chunk_list_statistics* p_statistics_;               //!< statistics
@@ -583,6 +576,7 @@ private:
 
 	std::atomic<slot_status_mark>* p_free_slot_mark_;   //!< if slot is free, this is marked as true. This is prior information than free slot idx stack.
 	void*                          p_chunk_;            //!< pointer to an allocated memory as a chunk
+	size_t                         allocated_size_;
 };
 
 struct slot_chk_result {
@@ -591,17 +585,15 @@ struct slot_chk_result {
 };
 
 struct slot_header {
-	std::atomic<chunk_header_multi_slot*> at_p_chms_;    //!< pointer to chunk_header_multi_slot that is an owner of this slot
-	std::atomic<std::uintptr_t>           at_mark_;      //!< checker mark
-	caller_context                        caller_ctx_;   //!< caller context information
+	std::atomic<chunk_header_multi_slot*> at_p_chms_;   //!< pointer to chunk_header_multi_slot that is an owner of this slot
+	std::atomic<std::uintptr_t>           at_mark_;     //!< checker mark
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-	bt_info alloc_bt_info_;                              //!< backtrace information when is allocated
-	bt_info free_bt_info_;                               //!< backtrace information when is free
+	bt_info alloc_bt_info_;                             //!< backtrace information when is allocated
+	bt_info free_bt_info_;                              //!< backtrace information when is free
 #endif
 
 	void set_addr_of_chunk_header_multi_slot(
-		chunk_header_multi_slot* p_chms_arg,      //!< [in] pointer to a parent "chunk_header_multi_slot"
-		caller_context&&         caller_ctx_arg   //!< [in] caller context information
+		chunk_header_multi_slot* p_chms_arg   //!< [in] pointer to a parent "chunk_header_multi_slot"
 	);
 
 	slot_chk_result chk_header_data( void ) const;
@@ -631,9 +623,7 @@ public:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	void* allocate_mem_slot(
-		caller_context&& caller_ctx_arg   //!< [in] caller context information
-	);
+	void* allocate_mem_slot( void );
 
 	/*!
 	 * @brief	recycle memory slot
@@ -642,8 +632,7 @@ public:
 	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
 	 */
 	bool recycle_mem_slot(
-		void*            p_recycle_slot,   //!< [in] pointer to the memory slot to recycle.
-		caller_context&& caller_ctx_arg    //!< [in] caller context information
+		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
 	);
 
 	/*!
@@ -679,22 +668,101 @@ private:
 	 * @brief それぞれのスレッド終了時に実行する処理を担うfunctor
 	 */
 	struct tl_chunk_param_destructor {
-		/*!
-		 * @brief スレッド終了時に呼び出されるI/F
-		 *
-		 * @retval true 呼び出し元に対し、引数のリファレンスの実態が存在するメモリ領域を解放するように指示する。
-		 * @retval false 呼び出し元に対し、引数のリファレンスの実態が存在するメモリ領域を保持するように指示する。
-		 */
-		bool release(
-			tl_chunk_param& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
-		);
+		constexpr tl_chunk_param_destructor( chunk_list* p_chlst_arg )
+		  : p_chlst_( p_chlst_arg )
+		{
+		}
+
+		uintptr_t allocate( void )
+		{
+			return reinterpret_cast<uintptr_t>( new tl_chunk_param( p_chlst_, p_chlst_->chunk_param_.num_of_pieces_ ) );
+		}
 
 		/*!
-		 * @brief インスタンス削除時に呼び出されるI/F
+		 * @brief スレッド終了時等に呼び出されるI/F
 		 */
-		void destruct(
-			tl_chunk_param& data   //!< [in/out] ファンクタの処理対象となるインスタンスへの参照
-		);
+		void deallocate( uintptr_t p_destructing_tls )
+		{
+			tl_chunk_param* p_tmp = reinterpret_cast<tl_chunk_param*>( p_destructing_tls );
+
+			p_tmp->p_owner_chunk_list_->release_all_of_ownership( p_tmp->tl_id_, nullptr );
+
+			delete p_tmp;
+		}
+
+		chunk_list* p_chlst_;
+	};
+
+	// TODO 仮実装
+	class atomic_push_list {
+	public:
+		class forward_iterator {
+		public:
+			constexpr forward_iterator( chunk_header_multi_slot* p_arg )
+			  : p_( p_arg )
+			{
+			}
+
+			chunk_header_multi_slot& operator*( void )
+			{
+				return *p_;
+			}
+			chunk_header_multi_slot& operator->( void )
+			{
+				return *p_;
+			}
+			forward_iterator& operator++( void )
+			{
+				p_ = p_->p_next_chunk_.load( std::memory_order_acquire );
+				return *this;
+			}
+			bool operator!=( const forward_iterator& v )
+			{
+				return p_ != v.p_;
+			}
+
+		private:
+			chunk_header_multi_slot* p_;
+		};
+
+		constexpr atomic_push_list( void )
+		  : p_top_( nullptr )
+		{
+		}
+		~atomic_push_list()
+		{
+			chunk_header_multi_slot* p_chms = p_top_.load( std::memory_order_acquire );
+			while ( p_chms != nullptr ) {
+				chunk_header_multi_slot* p_next_chms = p_chms->p_next_chunk_.load( std::memory_order_acquire );
+				delete p_chms;
+				p_chms = p_next_chms;
+			}
+		}
+
+		chunk_header_multi_slot* load( std::memory_order order )
+		{
+			return p_top_.load( order );
+		}
+
+		void push( chunk_header_multi_slot* p_new_chms )
+		{
+			chunk_header_multi_slot* p_cur_top = p_top_.load( std::memory_order_acquire );
+			do {
+				p_new_chms->p_next_chunk_.store( p_cur_top, std::memory_order_release );
+			} while ( !p_top_.compare_exchange_weak( p_cur_top, p_new_chms ) );
+		}
+
+		inline forward_iterator begin( void )
+		{
+			return forward_iterator( p_top_.load( std::memory_order_acquire ) );
+		}
+		inline forward_iterator end( void )
+		{
+			return forward_iterator( nullptr );
+		}
+
+	private:
+		std::atomic<chunk_header_multi_slot*> p_top_;
 	};
 
 	void mark_as_reserved_deletion(
@@ -713,8 +781,10 @@ private:
 
 	const param_chunk_allocation chunk_param_;
 
-	std::atomic<chunk_header_multi_slot*>                  p_top_chunk_;   //!< pointer to chunk_header that is top of list.
-	dynamic_tls<tl_chunk_param, tl_chunk_param_destructor> tls_hint_;      //!< thread loacal pointer to chunk_header that is success to allocate recently for a thread.
+	atomic_push_list                                       p_top_chunk_;   //!< pointer to chunk_header that is top of list.
+	dynamic_tls<tl_chunk_param, tl_chunk_param_destructor> tls_hint_;      //!< thread local pointer to chunk_header that is success to allocate recently for a thread.
+	                                                                       //!< tls_hint_は、p_top_chunk_を参照しているため、この2つのメンバ変数の宣言順(p_top_chunk_の次にtls_hint_)を入れ替えてはならない。
+	                                                                       //!< 入れ替えてしまった場合、デストラクタでの解放処理で、解放済みのメモリ領域にアクセスしてしまう。
 
 	chunk_list_statistics statistics_;                                     //!< statistics
 };

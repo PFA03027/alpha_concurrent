@@ -23,18 +23,18 @@
             ],
             "group": {
                 "kind": "build",
+                "isDefault": true
             }
         },
         {
-            "label": "make all and build test",
+            "label": "make build-test",
             "type": "shell",
-            "command": "bash make_linux.sh build-test",
+            "command": "make build-test",
             "problemMatcher": [
                 "$gcc"
             ],
             "group": {
                 "kind": "build",
-                "isDefault": true
             }
         },
         {

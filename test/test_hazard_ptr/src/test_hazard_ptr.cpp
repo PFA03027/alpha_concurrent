@@ -116,7 +116,7 @@ void* func_delete_owner( void* data )
 		std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
 	}
 
-	p_target->store( nullptr );
+	p_target->store( nullptr, std::memory_order_release );
 	delete p_test_obj;
 
 	uintptr_t ans = 0;

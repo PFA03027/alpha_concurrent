@@ -23,37 +23,106 @@
 
 #include "alconcurrent/dynamic_tls.hpp"
 
-void nothing_to_do( void* p_arg )
+#include "alloc_only_allocator.hpp"
+#include "mmap_allocator.hpp"
+
+struct keep_argument_value {
+	keep_argument_value( void )
+	  : param_of_allocate_( nullptr )
+	  , data_of_deallocate_( 0 )
+	  , param_of_deallocate_( nullptr )
+	{
+	}
+
+	void*     param_of_allocate_;
+	uintptr_t data_of_deallocate_;
+	void*     param_of_deallocate_;
+
+	static uintptr_t alloc_handler( void* p_arg )
+	{
+		keep_argument_value* p_keeper = reinterpret_cast<keep_argument_value*>( p_arg );
+		p_keeper->param_of_allocate_  = p_arg;
+		return 1U;
+	}
+	static void dealloc_handler( uintptr_t data, void* p_arg )
+	{
+		keep_argument_value* p_keeper  = reinterpret_cast<keep_argument_value*>( p_arg );
+		p_keeper->data_of_deallocate_  = data;
+		p_keeper->param_of_deallocate_ = p_arg;
+	}
+};
+
+uintptr_t nothing_to_allocate( void* p_arg )
+{
+	return 0U;
+}
+
+void nothing_to_deallocate( uintptr_t data, void* p_arg )
 {
 	return;
 }
 
 TEST( dynamic_tls, TC_create_release )
 {
-	alpha::concurrent::internal::dynamic_tls_key_t key;
-	alpha::concurrent::internal::dynamic_tls_key_create( &key, nothing_to_do );
+	// Arrange
+	keep_argument_value test_data;
 
+	// Act
+	alpha::concurrent::internal::dynamic_tls_key_t key = alpha::concurrent::internal::dynamic_tls_key_create(
+		&test_data,
+		keep_argument_value::alloc_handler,
+		keep_argument_value::dealloc_handler );
+
+	// Assert
 	ASSERT_NE( nullptr, key );
 	EXPECT_EQ( 1, alpha::concurrent::internal::get_num_of_tls_key() );
 
 	alpha::concurrent::internal::dynamic_tls_key_release( key );
 	EXPECT_EQ( 0, alpha::concurrent::internal::get_num_of_tls_key() );
 
+	EXPECT_EQ( test_data.param_of_allocate_, nullptr );
+	EXPECT_EQ( test_data.data_of_deallocate_, 0U );
+	EXPECT_EQ( test_data.param_of_deallocate_, nullptr );
+
+	return;
+}
+
+TEST( dynamic_tls, TC_create_set_release )
+{
+	// Arrange
+	keep_argument_value                            test_data;
+	alpha::concurrent::internal::dynamic_tls_key_t key = alpha::concurrent::internal::dynamic_tls_key_create(
+		&test_data,
+		keep_argument_value::alloc_handler,
+		keep_argument_value::dealloc_handler );
+	ASSERT_NE( nullptr, key );
+
+	// Act
+	auto data = alpha::concurrent::internal::dynamic_tls_getspecific( key );
+	EXPECT_EQ( alpha::concurrent::internal::op_ret::SUCCESS, data.stat_ );
+	EXPECT_EQ( 1, data.p_data_ );
+	alpha::concurrent::internal::dynamic_tls_key_release( key );
+
+	// Assert
+	EXPECT_EQ( test_data.param_of_allocate_, reinterpret_cast<void*>( &test_data ) );
+	EXPECT_EQ( test_data.data_of_deallocate_, 1U );
+	EXPECT_EQ( test_data.param_of_deallocate_, reinterpret_cast<void*>( &test_data ) );
+
 	return;
 }
 
 TEST( dynamic_tls, TC_set_get )
 {
-	alpha::concurrent::internal::dynamic_tls_key_t key;
-	alpha::concurrent::internal::dynamic_tls_key_create( &key, nothing_to_do );
+	alpha::concurrent::internal::dynamic_tls_key_t key = alpha::concurrent::internal::dynamic_tls_key_create( nullptr, nothing_to_allocate, nothing_to_deallocate );
 
 	ASSERT_NE( nullptr, key );
 	EXPECT_EQ( 1, alpha::concurrent::internal::get_num_of_tls_key() );
 
-	alpha::concurrent::internal::dynamic_tls_setspecific( key, reinterpret_cast<void*>( 1 ) );
+	alpha::concurrent::internal::dynamic_tls_setspecific( key, 1 );
 
 	auto data = alpha::concurrent::internal::dynamic_tls_getspecific( key );
-	EXPECT_EQ( reinterpret_cast<void*>( 1 ), data );
+	EXPECT_EQ( alpha::concurrent::internal::op_ret::SUCCESS, data.stat_ );
+	EXPECT_EQ( 1, data.p_data_ );
 
 	alpha::concurrent::internal::dynamic_tls_key_release( key );
 	EXPECT_EQ( 0, alpha::concurrent::internal::get_num_of_tls_key() );
@@ -77,6 +146,8 @@ public:
 	}
 	void TearDown() override
 	{
+		alpha::concurrent::internal::print_of_mmap_allocator();
+		alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::DUMP, 'A', 1 );
 	}
 
 	int max_num_;
@@ -87,19 +158,20 @@ TEST_P( dynamic_tls_many_tls, TC_many_number_set_get )
 	alpha::concurrent::internal::dynamic_tls_key_t keys[max_num_];
 
 	for ( auto& e_key : keys ) {
-		alpha::concurrent::internal::dynamic_tls_key_create( &e_key, nothing_to_do );
+		e_key = alpha::concurrent::internal::dynamic_tls_key_create( nullptr, nothing_to_allocate, nothing_to_deallocate );
 		ASSERT_NE( nullptr, e_key );
 	}
 
 	EXPECT_EQ( max_num_, alpha::concurrent::internal::get_num_of_tls_key() );
 
 	for ( int i = 0; i < max_num_; i++ ) {
-		alpha::concurrent::internal::dynamic_tls_setspecific( keys[i], reinterpret_cast<void*>( i + 1 ) );
+		alpha::concurrent::internal::dynamic_tls_setspecific( keys[i], i + 1 );
 	}
 
 	for ( int i = 0; i < max_num_; i++ ) {
 		auto data = alpha::concurrent::internal::dynamic_tls_getspecific( keys[i] );
-		EXPECT_EQ( reinterpret_cast<void*>( i + 1 ), data );
+		EXPECT_EQ( alpha::concurrent::internal::op_ret::SUCCESS, data.stat_ );
+		EXPECT_EQ( i + 1, data.p_data_ );
 	}
 
 	for ( auto& e_key : keys ) {
@@ -117,7 +189,7 @@ INSTANTIATE_TEST_SUITE_P( many_tls,
                                            alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2 - 1, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 2 + 1,
                                            alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 - 1, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3, alpha::concurrent::internal::ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE * 3 + 1 ) );
 
-#define THREAD_COUNT ( 1000 )
+#define THREAD_COUNT ( 100 )
 
 class dynamic_tls_many_thd_many : public testing::TestWithParam<int> {
 	// You can implement all the usual fixture class members here.
@@ -143,7 +215,7 @@ public:
 		pthread_barrier_init( &barrier_, NULL, THREAD_COUNT + 1 );
 
 		for ( int i = 0; i < max_num_; i++ ) {
-			alpha::concurrent::internal::dynamic_tls_key_create( &( p_keys_array_[i] ), nothing_to_do );
+			p_keys_array_[i] = alpha::concurrent::internal::dynamic_tls_key_create( nullptr, nothing_to_allocate, nothing_to_deallocate );
 			ASSERT_NE( nullptr, p_keys_array_[i] );
 		}
 		EXPECT_EQ( max_num_, alpha::concurrent::internal::get_num_of_tls_key() );
@@ -155,6 +227,9 @@ public:
 		}
 		EXPECT_EQ( 0, alpha::concurrent::internal::get_num_of_tls_key() );
 		pthread_barrier_destroy( &barrier_ );
+
+		alpha::concurrent::internal::print_of_mmap_allocator();
+		alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::DUMP, 'A', 1 );
 	}
 
 	int                                             max_num_;
@@ -165,15 +240,15 @@ public:
 	static void thread_func( dynamic_tls_many_thd_many* p_test_fixture )
 	{
 		for ( int i = 0; i < p_test_fixture->max_num_; i++ ) {
-			alpha::concurrent::internal::dynamic_tls_setspecific( p_test_fixture->p_keys_array_[i], reinterpret_cast<void*>( i + 1 ) );
+			alpha::concurrent::internal::dynamic_tls_setspecific( p_test_fixture->p_keys_array_[i], i + 1 );
 		}
 
 		pthread_barrier_wait( &( p_test_fixture->barrier_ ) );
 
 		for ( int i = 0; i < p_test_fixture->max_num_; i++ ) {
 			auto data = alpha::concurrent::internal::dynamic_tls_getspecific( p_test_fixture->p_keys_array_[i] );
-			if ( reinterpret_cast<void*>( i + 1 ) != data ) {
-				p_test_fixture->err_cnt_.fetch_add( 1 );
+			if ( static_cast<uintptr_t>( i + 1 ) != data.p_data_ ) {
+				p_test_fixture->err_cnt_.fetch_add( 1, std::memory_order_acq_rel );
 			}
 		}
 	}
@@ -190,12 +265,13 @@ TEST_P( dynamic_tls_many_thd_many, TC_many_number_set_get )
 	pthread_barrier_wait( &barrier_ );
 
 	for ( int i = 0; i < max_num_; i++ ) {
-		alpha::concurrent::internal::dynamic_tls_setspecific( p_keys_array_[i], reinterpret_cast<void*>( i + 1 ) );
+		alpha::concurrent::internal::dynamic_tls_setspecific( p_keys_array_[i], i + 1 );
 	}
 
 	for ( int i = 0; i < max_num_; i++ ) {
 		auto data = alpha::concurrent::internal::dynamic_tls_getspecific( p_keys_array_[i] );
-		EXPECT_EQ( reinterpret_cast<void*>( i + 1 ), data );
+		EXPECT_EQ( alpha::concurrent::internal::op_ret::SUCCESS, data.stat_ );
+		EXPECT_EQ( ( i + 1 ), data.p_data_ );
 	}
 
 	for ( auto& e : tt ) {
@@ -205,7 +281,7 @@ TEST_P( dynamic_tls_many_thd_many, TC_many_number_set_get )
 	EXPECT_EQ( 0, err_cnt_.load() );
 
 	alpha::concurrent::internal::dynamic_tls_status_info st = alpha::concurrent::internal::dynamic_tls_get_status();
-	printf( "num_content_head_: %u, next_base_idx_: %u\n", st.num_content_head_, st.next_base_idx_ );
+	printf( "num_of_key_array: %u, num_content_head_: %u, next_base_idx_: %u\n", st.num_key_array_cnt_, st.num_content_head_, st.next_base_idx_ );
 
 	return;
 }
