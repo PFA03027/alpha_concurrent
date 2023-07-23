@@ -250,12 +250,6 @@ private:
 			return;
 		}
 
-		static hazard_node_head& get_instance( void )
-		{
-			static hazard_node_head singleton;
-			return singleton;
-		}
-
 		node_for_hazard_ptr* allocate_hazard_ptr_node( void )
 		{
 			// 空きノードを探す。
@@ -314,11 +308,9 @@ private:
 		{
 			node_for_hazard_ptr* p_ans        = new node_for_hazard_ptr();
 			node_for_hazard_ptr* p_next_check = head_.load( std::memory_order_acquire );
-			bool                 cas_success  = false;
 			do {
 				p_ans->set_next( p_next_check );
-				cas_success = head_.compare_exchange_strong( p_next_check, p_ans );
-			} while ( !cas_success );   // CASが成功するまで繰り返す。
+			} while ( !head_.compare_exchange_strong( p_next_check, p_ans ) );   // CASが成功するまで繰り返す。
 			node_count_++;
 
 			internal::LogOutput( log_type::DEBUG, "glist is added by add_one_new_hazard_ptr_node(%p)", p_ans );
