@@ -687,8 +687,7 @@ void idx_mgr::dump( void )
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void slot_header::set_addr_of_chunk_header_multi_slot(
-	chunk_header_multi_slot* p_chms_arg )
+void slot_header::set_addr_of_chunk_header_multi_slot( chunk_header_multi_slot* p_chms_arg )
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 	RECORD_BACKTRACE_GET_BACKTRACE( alloc_bt_info_ );
@@ -950,6 +949,9 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 #endif
 
 	slot_status_mark expect_not_free = slot_status_mark::INUSE;
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	slot_header* p_sh = reinterpret_cast<slot_header*>( p_slot_addr );
+#endif
 #ifdef ALCONCURRENT_CONF_ENABLE_NON_REUSE_MEMORY_SLOT
 	bool result = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, slot_status_mark::DISCARED );
 #else
