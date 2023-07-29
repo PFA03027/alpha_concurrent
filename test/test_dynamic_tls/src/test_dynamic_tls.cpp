@@ -87,7 +87,44 @@ TEST( dynamic_tls, TC_create_release )
 	return;
 }
 
-TEST( dynamic_tls, TC_create_set_release )
+TEST( dynamic_tls, TC_release_with_nullptr )
+{
+	// Arrange
+
+	// Act
+	alpha::concurrent::internal::dynamic_tls_key_release( nullptr );
+
+	// Assert
+
+	return;
+}
+
+TEST( dynamic_tls, TC_create_double_release )
+{
+	// Arrange
+	keep_argument_value                            test_data;
+	alpha::concurrent::internal::dynamic_tls_key_t key = alpha::concurrent::internal::dynamic_tls_key_create(
+		&test_data,
+		keep_argument_value::alloc_handler,
+		keep_argument_value::dealloc_handler );
+	ASSERT_NE( nullptr, key );
+	EXPECT_EQ( 1, alpha::concurrent::internal::get_num_of_tls_key() );
+	alpha::concurrent::internal::dynamic_tls_key_release( key );
+	EXPECT_EQ( 0, alpha::concurrent::internal::get_num_of_tls_key() );
+	EXPECT_EQ( test_data.param_of_allocate_, nullptr );
+	EXPECT_EQ( test_data.data_of_deallocate_, 0U );
+	EXPECT_EQ( test_data.param_of_deallocate_, nullptr );
+
+	// Act
+	alpha::concurrent::internal::dynamic_tls_key_release( key );
+
+	// Assert
+	// should be no crash
+
+	return;
+}
+
+TEST( dynamic_tls, TC_create_get_release )
 {
 	// Arrange
 	keep_argument_value                            test_data;
@@ -107,6 +144,33 @@ TEST( dynamic_tls, TC_create_set_release )
 	EXPECT_EQ( test_data.param_of_allocate_, reinterpret_cast<void*>( &test_data ) );
 	EXPECT_EQ( test_data.data_of_deallocate_, 1U );
 	EXPECT_EQ( test_data.param_of_deallocate_, reinterpret_cast<void*>( &test_data ) );
+
+	return;
+}
+
+TEST( dynamic_tls, TC_get_with_nullptr )
+{
+	// Arrange
+
+	// Act
+	auto data = alpha::concurrent::internal::dynamic_tls_getspecific( nullptr );
+
+	// Assert
+	EXPECT_NE( alpha::concurrent::internal::op_ret::SUCCESS, data.stat_ );
+	EXPECT_EQ( alpha::concurrent::internal::op_ret::INVALID_KEY, data.stat_ );
+
+	return;
+}
+
+TEST( dynamic_tls, TC_set_with_nullptr )
+{
+	// Arrange
+
+	// Act
+	auto ret = alpha::concurrent::internal::dynamic_tls_setspecific( nullptr, 1 );
+
+	// Assert
+	EXPECT_EQ( alpha::concurrent::internal::op_ret::INVALID_KEY, ret );
 
 	return;
 }

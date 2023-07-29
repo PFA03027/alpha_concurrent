@@ -1163,11 +1163,11 @@ op_ret dynamic_tls_setspecific( dynamic_tls_key_t key, uintptr_t tls_data )
 {
 	if ( key == nullptr ) {
 		internal::LogOutput( log_type::ERR, "dynamic_tls_setspecific was called with nullptr" );
-		return op_ret::INVALID;
+		return op_ret::INVALID_KEY;
 	}
 	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) {
 		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p) is not used, why do you call dynamic_tls_setspecific() with %p", key, key );
-		return op_ret::INVALID;
+		return op_ret::INVALID_KEY;
 	}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
@@ -1182,11 +1182,11 @@ get_result dynamic_tls_getspecific( dynamic_tls_key_t key )
 {
 	if ( key == nullptr ) {
 		internal::LogOutput( log_type::ERR, "dynamic_tls_getspecific was called with nullptr" );
-		return get_result();
+		return get_result { op_ret::INVALID_KEY, 0 };
 	}
 	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) {
 		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p) is not used, why do you call dynamic_tls_getspecific() with %p", key, key );
-		return get_result();
+		return get_result { op_ret::INVALID_KEY, 0 };
 	}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
