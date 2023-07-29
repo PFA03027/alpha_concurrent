@@ -1145,9 +1145,6 @@ void dynamic_tls_key_release( dynamic_tls_key_t key )
 		internal::LogOutput( log_type::ERR, "dynamic_tls_key_release was called with nullptr" );
 		return;
 	}
-	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) {
-		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p) is not used, why do you call dynamic_tls_key_release() with %p", key, key );
-	}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
 	scoped_inout_counter_atomic_int cl( key->acc_cnt_ );

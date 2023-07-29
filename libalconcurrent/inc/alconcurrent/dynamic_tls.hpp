@@ -102,6 +102,11 @@ op_ret dynamic_tls_setspecific( dynamic_tls_key_t key, uintptr_t tls_data );
  */
 get_result dynamic_tls_getspecific( dynamic_tls_key_t key );
 
+/**
+ * @brief get dynamic thread local storage status
+ *
+ * @return dynamic_tls_status_info
+ */
 dynamic_tls_status_info dynamic_tls_get_status( void );
 
 /*!
@@ -115,7 +120,7 @@ int get_num_of_tls_key( void );
 /*!
  * @brief	get the max number of dynamic thread local memory
  *
- *　pthread_key_create()での割り当て数を取得する。
+ *　pthread_key_create()での割り当て数の最大値を取得する。
  *　不具合解析など使用する。
  */
 int get_max_num_of_tls_key( void );
