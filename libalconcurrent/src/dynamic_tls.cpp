@@ -141,7 +141,10 @@ public:
 		} else {
 			if ( cur_stat == tls_data_and_stat::stat::UNINITIALIZED ) {
 				// if before initialized
-				cnt_it->tls_data_ = ( *( key->tls_allocator_ ) )( key->tls_p_data_ );
+				auto p_func = key->tls_allocator_.load( std::memory_order_acquire );
+				if ( p_func != nullptr ) {
+					cnt_it->tls_data_ = ( *p_func )( key->tls_p_data_ );
+				}
 				cnt_it->tls_stat_.store( tls_data_and_stat::stat::USED, std::memory_order_release );
 			} else {
 				// cur_stat == tls_data_and_stat::stat::DESTRUCTING or unknown value
@@ -155,7 +158,10 @@ public:
 		switch ( cur_stat ) {
 			case tls_data_and_stat::stat::UNINITIALIZED: {
 				// if before initialized
-				cnt_it->tls_data_ = ( *( key->tls_allocator_ ) )( key->tls_p_data_ );
+				auto p_func = key->tls_allocator_.load( std::memory_order_acquire );
+				if ( p_func != nullptr ) {
+					cnt_it->tls_data_ = ( *p_func )( key->tls_p_data_ );
+				}
 				cnt_it->tls_stat_.store( tls_data_and_stat::stat::USED, std::memory_order_release );
 			} break;
 			case tls_data_and_stat::stat::USED: {
@@ -268,7 +274,10 @@ private:
 			}
 
 			// デストラクト処理の実行権を取得したので、デストラクト処理を開始する
-			( *( key->tls_deallocator_ ) )( tls_data_, key->tls_p_data_ );
+			auto p_func = key->tls_deallocator_.load( std::memory_order_acquire );
+			if ( p_func != nullptr ) {
+				( *p_func )( tls_data_, key->tls_p_data_ );
+			}
 			tls_stat_.store( tls_data_and_stat::stat::UNINITIALIZED, std::memory_order_release );
 			return op_ret::SUCCESS;
 		}
@@ -301,7 +310,10 @@ private:
 			}
 
 			// デストラクト処理の実行権を取得したので、デストラクト処理を開始する
-			( *( key->tls_deallocator_ ) )( tls_data_, key->tls_p_data_ );
+			auto p_func = key->tls_deallocator_.load( std::memory_order_acquire );
+			if ( p_func != nullptr ) {
+				( *p_func )( tls_data_, key->tls_p_data_ );
+			}
 			tls_stat_.store( tls_data_and_stat::stat::UNINITIALIZED, std::memory_order_release );
 			return op_ret::SUCCESS;
 		}
@@ -1015,10 +1027,10 @@ bool dynamic_tls_key_array::release_key( dynamic_tls_key* p_key_arg )
 			internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p) is now unknown status", p_key_arg );
 		}
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p): backtrace when this key is allocated", p_key_arg );
+		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p): backtrace where this key is allocated", p_key_arg );
 		p_key_arg->bt_when_allocate_.dump_to_log( log_type::ERR, 'p', cc );
 #else
-		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p): if you would like to get backtrace when this key is allocated, please compile libalconcurrent with ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE", p_key_arg );
+		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p): if you would like to get backtrace where this key is allocated, please compile libalconcurrent with ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE", p_key_arg );
 #endif
 		return false;
 	}
@@ -1129,7 +1141,13 @@ dynamic_tls_key_t dynamic_tls_key_create( void* p_param, uintptr_t ( *allocator 
 
 void dynamic_tls_key_release( dynamic_tls_key_t key )
 {
-	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) return;
+	if ( key == nullptr ) {
+		internal::LogOutput( log_type::ERR, "dynamic_tls_key_release was called with nullptr" );
+		return;
+	}
+	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) {
+		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p) is not used, why do you call dynamic_tls_key_release() with %p", key, key );
+	}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
 	scoped_inout_counter_atomic_int cl( key->acc_cnt_ );
@@ -1143,7 +1161,14 @@ void dynamic_tls_key_release( dynamic_tls_key_t key )
 
 op_ret dynamic_tls_setspecific( dynamic_tls_key_t key, uintptr_t tls_data )
 {
-	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) return op_ret::INVALID;
+	if ( key == nullptr ) {
+		internal::LogOutput( log_type::ERR, "dynamic_tls_setspecific was called with nullptr" );
+		return op_ret::INVALID;
+	}
+	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) {
+		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p) is not used, why do you call dynamic_tls_setspecific() with %p", key, key );
+		return op_ret::INVALID;
+	}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
 	scoped_inout_counter_atomic_int cl( key->acc_cnt_ );
@@ -1155,7 +1180,14 @@ op_ret dynamic_tls_setspecific( dynamic_tls_key_t key, uintptr_t tls_data )
 
 get_result dynamic_tls_getspecific( dynamic_tls_key_t key )
 {
-	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) return get_result();
+	if ( key == nullptr ) {
+		internal::LogOutput( log_type::ERR, "dynamic_tls_getspecific was called with nullptr" );
+		return get_result();
+	}
+	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) {
+		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p) is not used, why do you call dynamic_tls_getspecific() with %p", key, key );
+		return get_result();
+	}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
 	scoped_inout_counter_atomic_int cl( key->acc_cnt_ );
@@ -1173,8 +1205,7 @@ dynamic_tls_status_info dynamic_tls_get_status( void )
 /*!
  * @brief	get the number of dynamic thread local memory
  *
- *　pthread_key_create()での割り当て数を取得する。
- *　不具合解析など使用する。
+ *　不具合解析や、パラメータの最適化作業などで使用する。
  */
 int get_num_of_tls_key( void )
 {
@@ -1184,8 +1215,7 @@ int get_num_of_tls_key( void )
 /*!
  * @brief	get the max number of dynamic thread local memory
  *
- *　pthread_key_create()での割り当て数を取得する。
- *　不具合解析など使用する。
+ *　不具合解析や、パラメータの最適化作業などで使用する。
  */
 int get_max_num_of_tls_key( void )
 {
