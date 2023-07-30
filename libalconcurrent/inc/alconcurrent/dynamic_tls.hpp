@@ -243,22 +243,22 @@ public:
 	using value_reference = T&;
 	using value_pointer   = T*;
 
-	dynamic_tls( void )
-	  : tls_key_( internal::dynamic_tls_key_create( this, alloc_fn, dealloc_fn ) )
+	constexpr dynamic_tls( void )
+	  : tls_key_( nullptr )
 	  , tl_handler_()
 	  , th_cnt_()
 	{
 	}
 
-	dynamic_tls( const TL_HANDLER& tl_dest_functor_arg )
-	  : tls_key_( internal::dynamic_tls_key_create( this, alloc_fn, dealloc_fn ) )
+	constexpr dynamic_tls( const TL_HANDLER& tl_dest_functor_arg )
+	  : tls_key_( nullptr )
 	  , tl_handler_( tl_dest_functor_arg )
 	  , th_cnt_()
 	{
 	}
 
-	dynamic_tls( TL_HANDLER&& tl_dest_functor_arg )
-	  : tls_key_( internal::dynamic_tls_key_create( this, alloc_fn, dealloc_fn ) )
+	constexpr dynamic_tls( TL_HANDLER&& tl_dest_functor_arg )
+	  : tls_key_( nullptr )
 	  , tl_handler_( std::move( tl_dest_functor_arg ) )
 	  , th_cnt_()
 	{
@@ -270,7 +270,10 @@ public:
 
 		std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
 
-		internal::dynamic_tls_key_release( tls_key_ );
+		auto tmp_key = tls_key_.load( std::memory_order_acquire );
+		if ( tmp_key == nullptr ) return;
+		internal::dynamic_tls_key_release( tmp_key );
+		tls_key_.store( nullptr, std::memory_order_release );
 	}
 
 	/**
@@ -287,7 +290,7 @@ public:
 	 */
 	value_reference get_tls_instance( void )
 	{
-		auto tmp_ret = internal::dynamic_tls_getspecific( tls_key_ );
+		auto tmp_ret = internal::dynamic_tls_getspecific( tls_key_chk_and_get() );
 		if ( tmp_ret.stat_ != internal::op_ret::SUCCESS ) {
 			throw std::bad_alloc();
 		}
@@ -310,6 +313,23 @@ public:
 	}
 
 private:
+	inline internal::dynamic_tls_key_t tls_key_chk_and_get( void )
+	{
+		internal::dynamic_tls_key_t ans = tls_key_.load( std::memory_order_acquire );
+		if ( ans != nullptr ) return ans;
+
+		auto alloc_ans = internal::dynamic_tls_key_create( this, alloc_fn, dealloc_fn );
+		if ( tls_key_.compare_exchange_strong( ans, alloc_ans, std::memory_order_acq_rel ) ) return alloc_ans;
+		dynamic_tls_key_release( alloc_ans );
+
+		ans = tls_key_.load( std::memory_order_acquire );
+		if ( ans != nullptr ) return ans;
+
+		// ans == nullptr
+		internal::LogOutput( log_type::ERR, "dynamic tls key creation and deletion has happened in same time. this will be happened by user side bug." );
+		throw std::runtime_error( "dynamic tls key creation and deletion has happened in same time. this will be happened by user side bug like dynamic_tls::XXX calling and destructing this instance." );
+	}
+
 	static uintptr_t alloc_fn( void* p_param )
 	{
 		internal::LogOutput( log_type::DEBUG, "dynamic_tls::alloc_fn is called              - p_param=%p", p_param );
@@ -343,11 +363,11 @@ private:
 		return;
 	}
 
-	internal::dynamic_tls_key_t tls_key_;       //!<	key for thread local storage of POSIX.
+	std::atomic<internal::dynamic_tls_key_t> tls_key_;   //!<	key for thread local storage of POSIX.
 
-	TL_HANDLER tl_handler_;                     //!< functor to clean-up the resources when thread is terminated.
+	TL_HANDLER tl_handler_;                              //!< functor to clean-up the resources when thread is terminated.
 
-	internal::dynamic_tls_thread_cnt th_cnt_;   //!< thread count information
+	internal::dynamic_tls_thread_cnt th_cnt_;            //!< thread count information
 };
 
 /**
@@ -361,22 +381,22 @@ class dynamic_tls<T*, TL_HANDLER> {
 public:
 	using value_type = T*;
 
-	dynamic_tls( void )
-	  : tls_key_( internal::dynamic_tls_key_create( this, alloc_fn, dealloc_fn ) )
+	constexpr dynamic_tls( void )
+	  : tls_key_( nullptr )
 	  , tl_handler_()
 	  , th_cnt_()
 	{
 	}
 
-	dynamic_tls( const TL_HANDLER& tl_dest_functor_arg )
-	  : tls_key_( internal::dynamic_tls_key_create( this, alloc_fn, dealloc_fn ) )
+	constexpr dynamic_tls( const TL_HANDLER& tl_dest_functor_arg )
+	  : tls_key_( nullptr )
 	  , tl_handler_( tl_dest_functor_arg )
 	  , th_cnt_()
 	{
 	}
 
-	dynamic_tls( TL_HANDLER&& tl_dest_functor_arg )
-	  : tls_key_( internal::dynamic_tls_key_create( this, alloc_fn, dealloc_fn ) )
+	constexpr dynamic_tls( TL_HANDLER&& tl_dest_functor_arg )
+	  : tls_key_( nullptr )
 	  , tl_handler_( std::move( tl_dest_functor_arg ) )
 	  , th_cnt_()
 	{
@@ -388,7 +408,10 @@ public:
 
 		std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
 
-		internal::dynamic_tls_key_release( tls_key_ );
+		auto tmp_key = tls_key_.load( std::memory_order_acquire );
+		if ( tmp_key == nullptr ) return;
+		internal::dynamic_tls_key_release( tmp_key );
+		tls_key_.store( nullptr, std::memory_order_release );
 	}
 
 	/**
@@ -405,7 +428,7 @@ public:
 	 */
 	value_type get_tls_instance( void )
 	{
-		auto tmp_ret = internal::dynamic_tls_getspecific( tls_key_ );
+		auto tmp_ret = internal::dynamic_tls_getspecific( tls_key_chk_and_get() );
 		if ( tmp_ret.stat_ != internal::op_ret::SUCCESS ) {
 			throw std::bad_alloc();
 		}
@@ -428,6 +451,23 @@ public:
 	}
 
 private:
+	inline internal::dynamic_tls_key_t tls_key_chk_and_get( void )
+	{
+		internal::dynamic_tls_key_t ans = tls_key_.load( std::memory_order_acquire );
+		if ( ans != nullptr ) return ans;
+
+		auto alloc_ans = internal::dynamic_tls_key_create( this, alloc_fn, dealloc_fn );
+		if ( tls_key_.compare_exchange_strong( ans, alloc_ans, std::memory_order_acq_rel ) ) return alloc_ans;
+		dynamic_tls_key_release( alloc_ans );
+
+		ans = tls_key_.load( std::memory_order_acquire );
+		if ( ans != nullptr ) return ans;
+
+		// ans == nullptr
+		internal::LogOutput( log_type::ERR, "dynamic tls key creation and deletion has happened in same time. this will be happened by user side bug." );
+		throw std::runtime_error( "dynamic tls key creation and deletion has happened in same time. this will be happened by user side bug like dynamic_tls::XXX calling and destructing this instance." );
+	}
+
 	static uintptr_t alloc_fn( void* p_param )
 	{
 		internal::LogOutput( log_type::DEBUG, "dynamic_tls<T*>::alloc_fn is called              - p_param=%p", p_param );
@@ -461,11 +501,11 @@ private:
 		return;
 	}
 
-	internal::dynamic_tls_key_t tls_key_;       //!<	key for thread local storage of POSIX.
+	std::atomic<internal::dynamic_tls_key_t> tls_key_;   //!<	key for thread local storage of POSIX.
 
-	TL_HANDLER tl_handler_;                     //!< functor to clean-up the resources when thread is terminated.
+	TL_HANDLER tl_handler_;                              //!< functor to clean-up the resources when thread is terminated.
 
-	internal::dynamic_tls_thread_cnt th_cnt_;   //!< thread count information
+	internal::dynamic_tls_thread_cnt th_cnt_;            //!< thread count information
 };
 
 }   // namespace concurrent
