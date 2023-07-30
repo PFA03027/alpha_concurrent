@@ -149,8 +149,17 @@ void* func_test_fifo( void* p_data )
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
 				printf( "fifo size count: %d\n", p_test_obj->get_size() );
-				err_flag.store( true );
-				return nullptr;
+
+				auto local_ret = p_test_obj->pop();
+				pop_flag       = std::get<0>( local_ret );
+				p_tmp_alloc    = std::get<1>( local_ret );
+				if ( !pop_flag ) {
+					printf( "Bugggggggyyyy, then Bugggggggyyyy func_test_fifo()!!!\n" );
+					printf( "fifo size count: %d\n", p_test_obj->get_size() );
+
+					err_flag.store( true );
+					return nullptr;
+				}
 			}
 
 			p_tmg->deallocate( p_tmp_alloc );

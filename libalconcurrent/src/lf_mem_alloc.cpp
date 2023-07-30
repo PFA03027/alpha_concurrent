@@ -19,8 +19,8 @@
 
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
+#include "alconcurrent/lf_mem_alloc_internal.hpp"
 
-#include "lf_mem_alloc_internal.hpp"
 #include "mmap_allocator.hpp"
 #include "utility.hpp"
 
@@ -1279,27 +1279,6 @@ chunk_list::tl_chunk_param::tl_chunk_param(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-chunk_list::chunk_list(
-	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
-	)
-  : chunk_param_( ch_param_arg )
-  , p_top_chunk_()
-  , tls_hint_( this )
-  , statistics_()
-{
-	unsigned int cur_tl_id = tls_hint_.get_tls_instance( /*this, chunk_param_.num_of_pieces_*/ ).tl_id_;
-
-	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( ch_param_arg, cur_tl_id, &statistics_ );
-	p_top_chunk_.push( p_new_chms );
-
-	return;
-}
-
-chunk_list::~chunk_list()
-{
-	return;
-}
-
 void chunk_list::mark_as_reserved_deletion(
 	unsigned int             target_tl_id_arg,    //!< [in] 削除予約対象に変更するtl_id_
 	chunk_header_multi_slot* p_non_deletion_arg   //!< [in] 削除予約対象としないchunk_header_multi_slotへのポインタ
@@ -1519,9 +1498,96 @@ chunk_statistics chunk_list::get_statistics( void ) const
 {
 	chunk_statistics ans = statistics_.get_statistics();
 
-	ans.alloc_conf_ = param_chunk_allocation { chunk_param_.size_of_one_piece_, 0 };
+	ans.alloc_conf_ = chunk_param_;
 
 	return ans;
+}
+
+void* general_mem_allocator_impl_allocate(
+	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
+	internal::chunk_list* p_param_ch_array_arg,   //!< unique pointer to chunk and param array
+	std::size_t           n_arg                   //!< [in] memory size to allocate
+)
+{
+	void* p_ans = nullptr;
+	for ( unsigned int i = 0; i < pr_ch_size_arg; i++ ) {
+		// liner search
+		if ( p_param_ch_array_arg[i].chunk_param_.size_of_one_piece_ >= n_arg ) {
+			p_ans = p_param_ch_array_arg[i].allocate_mem_slot();
+			if ( p_ans != nullptr ) {
+				return p_ans;
+			}
+		}
+	}
+
+	// 対応するサイズのメモリスロットが見つからなかったので、mallocでメモリ領域を確保する。
+	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( std::malloc( n_arg + internal::get_slot_header_size() ) );
+
+	p_sh->set_addr_of_chunk_header_multi_slot( nullptr );
+
+	std::uintptr_t tmp_ans = reinterpret_cast<std::uintptr_t>( p_sh );
+	tmp_ans += internal::get_slot_header_size();
+	p_ans = reinterpret_cast<void*>( tmp_ans );
+
+	return p_ans;
+}
+void general_mem_allocator_impl_deallocate(
+	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
+	internal::chunk_list* p_param_ch_array_arg,   //!< unique pointer to chunk and param array
+	void*                 p_mem                   //!< [in] pointer to allocated memory by allocate()
+)
+{
+	if ( p_mem == nullptr ) return;
+
+	internal::slot_chk_result chk_ret = internal::chunk_header_multi_slot::get_chunk( p_mem );
+
+	if ( chk_ret.correct_ ) {
+		if ( chk_ret.p_chms_ != nullptr ) {
+			chk_ret.p_chms_->recycle_mem_slot( p_mem );
+		} else {
+			std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
+			tmp_addr -= internal::get_slot_header_size();
+			internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( tmp_addr );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+			RECORD_BACKTRACE_GET_BACKTRACE( p_sh->free_bt_info_ );
+			RECORD_BACKTRACE_INVALIDATE_BACKTRACE( p_sh->alloc_bt_info_ );
+#endif
+			std::free( reinterpret_cast<void*>( p_sh ) );
+		}
+	} else {
+		internal::LogOutput( log_type::WARN, "Header is corrupted. full search correct chunk and try free" );
+		for ( unsigned int i = 0; i < pr_ch_size_arg; i++ ) {
+			bool ret = p_param_ch_array_arg[i].recycle_mem_slot( p_mem );
+			if ( ret ) {
+				internal::LogOutput( log_type::WARN, "Header is corrupted, but luckily success to find and free" );
+				return;
+			}
+		}
+
+		// header is corrupted and unknown memory slot deallocation is requested. try to call free()
+		internal::LogOutput( log_type::WARN, "header is corrupted and unknown memory slot deallocation is requested. try to free by calling free()" );
+		std::free( p_mem );   // TODO should not do this ?
+	}
+
+	return;
+}
+void general_mem_allocator_impl_prune(
+	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
+	internal::chunk_list* p_param_ch_array_arg,   //!< unique pointer to chunk and param array
+	std::atomic_bool&     exclusive_ctr_arg       //<! reference to exclusive control for prune
+)
+{
+	bool expected = false;
+	bool ret      = exclusive_ctr_arg.compare_exchange_strong( expected, true );
+
+	if ( !ret ) return;   // other thread/s is executing now
+
+	for ( unsigned int ii = 0; ii < pr_ch_size_arg; ii++ ) {
+		p_param_ch_array_arg[ii].prune();
+	}
+
+	exclusive_ctr_arg.store( false, std::memory_order_release );
+	return;
 }
 
 }   // namespace internal

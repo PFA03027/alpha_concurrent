@@ -15,8 +15,8 @@
 
 #include "gtest/gtest.h"
 
-#include "../src/lf_mem_alloc_internal.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
+#include "alconcurrent/lf_mem_alloc_internal.hpp"
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
 alpha::concurrent::param_chunk_allocation param = { 27, 2 };
@@ -485,4 +485,23 @@ TEST_F( lfmemAlloc, TestBacktrace3 )
 	alpha::concurrent::gmem_deallocate( test_ptr1 );
 
 	return;
+}
+
+TEST( expriment_impl, general_mem_allocator_impl_test )
+{
+	constexpr alpha::concurrent::param_chunk_allocation test_param_array[] = {
+		{ alignof( std::max_align_t ), 32 },       // 1
+		{ alignof( std::max_align_t ) * 2, 32 },   // 2
+	};                                             //!< pointer to default parameter array
+
+	alpha::concurrent::static_general_mem_allocator<2> a(
+		alpha::concurrent::param_chunk_allocation { 24, 32 },      // 1
+		alpha::concurrent::param_chunk_allocation { 24 * 2, 32 }   // 2
+	);
+
+	auto ret_st = a.get_statistics();
+	for ( auto& e : ret_st ) {
+		auto result_str = e.print();
+		printf( "%s\n", result_str.c_str() );
+	}
 }

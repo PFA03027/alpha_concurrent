@@ -11,24 +11,169 @@
 #ifndef INC_ALCONCURRENT_LF_MEM_ALLOC_HPP_
 #define INC_ALCONCURRENT_LF_MEM_ALLOC_HPP_
 
+#include <array>
 #include <atomic>
 #include <cstdlib>
+#include <initializer_list>
 #include <list>
 #include <memory>
 
 #include "conf_logger.hpp"
 
+#include "lf_mem_alloc_internal.hpp"
 #include "lf_mem_alloc_type.hpp"
 
 namespace alpha {
 namespace concurrent {
 
-extern const unsigned int           num_of_default_param_array;   //!< array size of default parameter array
-extern const param_chunk_allocation default_param_array[];        //!< pointer to default parameter array
-
 namespace internal {
 class chunk_list;
-}
+void* general_mem_allocator_impl_allocate(
+	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
+	internal::chunk_list* p_param_ch_array_arg,   //!< unique pointer to chunk and param array
+	std::size_t           n_arg                   //!< [in] memory size to allocate
+);
+void general_mem_allocator_impl_deallocate(
+	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
+	internal::chunk_list* p_param_ch_array_arg,   //!< unique pointer to chunk and param array
+	void*                 p_mem                   //!< [in] pointer to allocated memory by allocate()
+);
+void general_mem_allocator_impl_prune(
+	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
+	internal::chunk_list* p_param_ch_array_arg,   //!< unique pointer to chunk and param array
+	std::atomic_bool&     exclusive_ctr_arg       //<! reference to exclusive control for prune
+);
+}   // namespace internal
+
+/*!
+ * @brief	semi lock-free memory allocator based on multi chunk size list
+ *
+ * If requested size is over max size that parameter has, just call malloc()
+ */
+template <size_t NUM_ENTRY>
+class static_general_mem_allocator {
+public:
+	/*!
+	 * @brief	constructor
+	 */
+	constexpr static_general_mem_allocator( void )
+	  : pr_ch_size_( 0 )
+	  , param_ch_array_impl {}
+	  , param_ch_array_( nullptr )
+	  , exclusive_ctl_of_prune_( false )
+	{
+		return;
+	}
+
+	/*!
+	 * @brief	constructor
+	 */
+	template <typename... Args>
+	constexpr static_general_mem_allocator( Args... args )
+	  : pr_ch_size_( sizeof...( args ) )
+	  , param_ch_array_impl { std::forward<Args>( args )... }
+	  , param_ch_array_( param_ch_array_impl )
+	  , exclusive_ctl_of_prune_( false )
+	{
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+#else
+		static_assert( ( ... && ( std::is_same<typename std::remove_const<Args>::type, param_chunk_allocation>::value ) ), "constructor parameter is not same to param_chunk_allocation" );
+		static_assert( NUM_ENTRY >= sizeof...( args ), "number of constructer paramter is over than NUM_ENTRY" );
+#endif
+		return;
+	}
+
+	/*!
+	 * @brief	destructor
+	 */
+	~static_general_mem_allocator()
+	{
+		if ( ( param_ch_array_ != param_ch_array_impl ) && ( param_ch_array_ != nullptr ) ) {
+			for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
+				param_ch_array_[i].~chunk_list();
+			}
+			unsigned char* p_tmp = reinterpret_cast<unsigned char*>( param_ch_array_ );
+			delete p_tmp;
+		}
+	}
+
+	/*!
+	 * @brief	allocate memory
+	 */
+	void* allocate(
+		std::size_t n   //!< [in] memory size to allocate
+	)
+	{
+		return general_mem_allocator_impl_allocate( pr_ch_size_, param_ch_array_, n );
+	}
+
+	/*!
+	 * @brief	deallocate memory
+	 */
+	void deallocate(
+		void* p_mem   //!< [in] pointer to allocated memory by allocate()
+	)
+	{
+		general_mem_allocator_impl_deallocate( pr_ch_size_, param_ch_array_, p_mem );
+	}
+
+	/*!
+	 * @brief	free the deletable buffers
+	 */
+	void prune( void )
+	{
+		general_mem_allocator_impl_prune( pr_ch_size_, param_ch_array_, exclusive_ctl_of_prune_ );
+	}
+
+	/**
+	 * @brief Setup by argument paramter
+	 *
+	 * If already setup, this call is ignored
+	 */
+	void setup_by_param(
+		const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
+		unsigned int                  num              //!< [in] array size
+	)
+	{
+		if ( param_ch_array_ != nullptr ) {
+			internal::LogOutput( log_type::WARN, "already setup. ignore this request." );
+			return;
+		}
+
+		unsigned char* p_tmp = new unsigned char[sizeof( internal::chunk_list ) * num];
+		param_ch_array_      = reinterpret_cast<internal::chunk_list*>( p_tmp );
+		for ( unsigned int i = 0; i < num; i++ ) {
+			new ( &( param_ch_array_[i] ) ) internal::chunk_list( p_param_array[i] );
+		}
+
+		pr_ch_size_ = num;
+	}
+
+	/*!
+	 * @brief	get statistics
+	 *
+	 * @note
+	 * This I/F does not lock allocat/deallocate itself, but this I/F execution is not lock free.
+	 */
+	std::list<chunk_statistics> get_statistics( void ) const
+	{
+		std::list<chunk_statistics> ans;
+
+		for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
+			chunk_statistics tmp_st = param_ch_array_[i].get_statistics();
+			ans.push_back( tmp_st );
+		}
+
+		return ans;
+	}
+
+private:
+	unsigned int          pr_ch_size_;                      //!< array size of chunk and param array
+	internal::chunk_list  param_ch_array_impl[NUM_ENTRY];   //!< chunk and param array
+	internal::chunk_list* param_ch_array_;                  //!< pointer to chunk and param array
+
+	std::atomic_bool exclusive_ctl_of_prune_;               //!< exclusive control for prune()
+};
 
 /*!
  * @brief	semi lock-free memory allocator based on multi chunk size list
