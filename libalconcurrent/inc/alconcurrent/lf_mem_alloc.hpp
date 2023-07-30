@@ -93,7 +93,7 @@ public:
 				param_ch_array_[i].~chunk_list();
 			}
 			unsigned char* p_tmp = reinterpret_cast<unsigned char*>( param_ch_array_ );
-			delete p_tmp;
+			delete[] p_tmp;
 		}
 	}
 
@@ -185,7 +185,7 @@ public:
 	/*!
 	 * @brief	constructor
 	 */
-	general_mem_allocator( void );
+	constexpr general_mem_allocator( void ) = default;
 
 	/*!
 	 * @brief	constructor
@@ -198,26 +198,35 @@ public:
 	/*!
 	 * @brief	destructor
 	 */
-	~general_mem_allocator();
+	~general_mem_allocator() = default;
 
 	/*!
 	 * @brief	allocate memory
 	 */
 	void* allocate(
 		std::size_t n   //!< [in] memory size to allocate
-	);
+	)
+	{
+		return allocator_impl_.allocate( n );
+	}
 
 	/*!
 	 * @brief	deallocate memory
 	 */
 	void deallocate(
 		void* p_mem   //!< [in] pointer to allocated memory by allocate()
-	);
+	)
+	{
+		allocator_impl_.deallocate( p_mem );
+	}
 
 	/*!
 	 * @brief	free the deletable buffers
 	 */
-	void prune( void );
+	void prune( void )
+	{
+		allocator_impl_.prune();
+	}
 
 	/*!
 	 * @brief	set parameter
@@ -231,7 +240,10 @@ public:
 	void set_param(
 		const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
 		unsigned int                  num              //!< [in] array size
-	);
+	)
+	{
+		allocator_impl_.setup_by_param( p_param_array, num );
+	}
 
 	/*!
 	 * @brief	get statistics
@@ -239,18 +251,13 @@ public:
 	 * @note
 	 * This I/F does not lock allocat/deallocate itself, but this I/F execution is not lock free.
 	 */
-	std::list<chunk_statistics> get_statistics( void ) const;
+	std::list<chunk_statistics> get_statistics( void ) const
+	{
+		return allocator_impl_.get_statistics();
+	}
 
 private:
-	struct param_chunk_comb {
-		param_chunk_allocation                param_;          //!< parametor for chunk
-		std::unique_ptr<internal::chunk_list> up_chunk_lst_;   //!< unique pointer to chunk list
-	};
-
-	unsigned int                        pr_ch_size_;          //!< array size of chunk and param array
-	std::unique_ptr<param_chunk_comb[]> up_param_ch_array_;   //!< unique pointer to chunk and param array
-
-	std::atomic_bool exclusive_ctl_of_prune_;                 //!< exclusive control for prune()
+	static_general_mem_allocator<0> allocator_impl_;
 };
 
 /*!

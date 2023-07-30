@@ -1593,160 +1593,17 @@ void general_mem_allocator_impl_prune(
 }   // namespace internal
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-general_mem_allocator::general_mem_allocator( void )
-  : pr_ch_size_( 0 )
-  , up_param_ch_array_()
-  , exclusive_ctl_of_prune_( false )
-{
-	return;
-}
-
 general_mem_allocator::general_mem_allocator(
 	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
 	unsigned int                  num              //!< [in] array size
 	)
-  : pr_ch_size_( 0 )
-  , up_param_ch_array_()
-  , exclusive_ctl_of_prune_( false )
+  : allocator_impl_()
 {
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else
-	set_param( p_param_array, num );
+	allocator_impl_.setup_by_param( p_param_array, num );
 #endif
 	return;
-}
-
-general_mem_allocator::~general_mem_allocator()
-{
-	return;
-}
-
-void* general_mem_allocator::allocate(
-	std::size_t n   //!< [in] required memory size
-)
-{
-	void* p_ans = nullptr;
-	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
-		// liner search
-		if ( up_param_ch_array_[i].param_.size_of_one_piece_ >= n ) {
-			p_ans = up_param_ch_array_[i].up_chunk_lst_->allocate_mem_slot();
-			if ( p_ans != nullptr ) {
-				return p_ans;
-			}
-		}
-	}
-
-	// 対応するサイズのメモリスロットが見つからなかったので、mallocでメモリ領域を確保する。
-	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( std::malloc( n + internal::get_slot_header_size() ) );
-
-	p_sh->set_addr_of_chunk_header_multi_slot( nullptr );
-
-	std::uintptr_t tmp_ans = reinterpret_cast<std::uintptr_t>( p_sh );
-	tmp_ans += internal::get_slot_header_size();
-	p_ans = reinterpret_cast<void*>( tmp_ans );
-
-	return p_ans;
-}
-
-void general_mem_allocator::deallocate(
-	void* p_mem   //!< [in] pointer to allocated memory by allocate()
-)
-{
-	if ( p_mem == nullptr ) return;
-
-	internal::slot_chk_result chk_ret = internal::chunk_header_multi_slot::get_chunk( p_mem );
-
-	if ( chk_ret.correct_ ) {
-		if ( chk_ret.p_chms_ != nullptr ) {
-			chk_ret.p_chms_->recycle_mem_slot( p_mem );
-		} else {
-			std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
-			tmp_addr -= internal::get_slot_header_size();
-			internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( tmp_addr );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-			RECORD_BACKTRACE_GET_BACKTRACE( p_sh->free_bt_info_ );
-			RECORD_BACKTRACE_INVALIDATE_BACKTRACE( p_sh->alloc_bt_info_ );
-#endif
-			std::free( reinterpret_cast<void*>( p_sh ) );
-		}
-	} else {
-		internal::LogOutput( log_type::WARN, "Header is corrupted. full search correct chunk and try free" );
-		for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
-			bool ret = up_param_ch_array_[i].up_chunk_lst_->recycle_mem_slot( p_mem );
-			if ( ret ) {
-				internal::LogOutput( log_type::WARN, "Header is corrupted, but luckily success to find and free" );
-				return;
-			}
-		}
-
-		// header is corrupted and unknown memory slot deallocation is requested. try to call free()
-		internal::LogOutput( log_type::WARN, "header is corrupted and unknown memory slot deallocation is requested. try to free by calling free()" );
-		std::free( p_mem );   // TODO should not do this ?
-	}
-
-	return;
-}
-
-void general_mem_allocator::prune( void )
-{
-	bool expected = false;
-	bool ret      = exclusive_ctl_of_prune_.compare_exchange_strong( expected, true );
-
-	if ( !ret ) return;   // other thread/s is executing now
-
-	for ( unsigned int ii = 0; ii < pr_ch_size_; ii++ ) {
-		up_param_ch_array_[ii].up_chunk_lst_->prune();
-	}
-
-	exclusive_ctl_of_prune_.store( false, std::memory_order_release );
-	return;
-}
-
-void general_mem_allocator::set_param(
-	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
-	unsigned int                  num              //!< [in] array size
-)
-{
-	if ( pr_ch_size_ > 0 ) {
-		internal::LogOutput( log_type::WARN, "paramter has already set. ignore this request." );
-		return;
-	}
-
-	pr_ch_size_ = num;
-
-	std::vector<int> idx_vec( pr_ch_size_ );
-
-	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
-		idx_vec[i] = i;
-	}
-
-	std::sort( idx_vec.begin(), idx_vec.end(),
-	           [p_param_array]( int a, int b ) {
-				   return p_param_array[a].size_of_one_piece_ < p_param_array[b].size_of_one_piece_;
-			   } );
-
-	up_param_ch_array_ = std::unique_ptr<param_chunk_comb[]>( new param_chunk_comb[pr_ch_size_] );
-	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
-		up_param_ch_array_[i].param_        = p_param_array[idx_vec[i]];
-		up_param_ch_array_[i].up_chunk_lst_ = std::unique_ptr<internal::chunk_list>( new internal::chunk_list( up_param_ch_array_[i].param_ ) );
-	}
-
-	return;
-}
-
-/*!
- * @brief	get statistics
- */
-std::list<chunk_statistics> general_mem_allocator::get_statistics( void ) const
-{
-	std::list<chunk_statistics> ans;
-
-	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
-		chunk_statistics tmp_st = up_param_ch_array_[i].up_chunk_lst_->get_statistics();
-		ans.push_back( tmp_st );
-	}
-
-	return ans;
 }
 
 std::string chunk_statistics::print( void )
