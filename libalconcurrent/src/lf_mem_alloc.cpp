@@ -19,8 +19,8 @@
 
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
+#include "alconcurrent/lf_mem_alloc_internal.hpp"
 
-#include "lf_mem_alloc_internal.hpp"
 #include "mmap_allocator.hpp"
 #include "utility.hpp"
 
@@ -1279,27 +1279,6 @@ chunk_list::tl_chunk_param::tl_chunk_param(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-chunk_list::chunk_list(
-	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
-	)
-  : chunk_param_( ch_param_arg )
-  , p_top_chunk_()
-  , tls_hint_( this )
-  , statistics_()
-{
-	unsigned int cur_tl_id = tls_hint_.get_tls_instance( /*this, chunk_param_.num_of_pieces_*/ ).tl_id_;
-
-	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( ch_param_arg, cur_tl_id, &statistics_ );
-	p_top_chunk_.push( p_new_chms );
-
-	return;
-}
-
-chunk_list::~chunk_list()
-{
-	return;
-}
-
 void chunk_list::mark_as_reserved_deletion(
 	unsigned int             target_tl_id_arg,    //!< [in] 削除予約対象に変更するtl_id_
 	chunk_header_multi_slot* p_non_deletion_arg   //!< [in] 削除予約対象としないchunk_header_multi_slotへのポインタ
@@ -1519,51 +1498,22 @@ chunk_statistics chunk_list::get_statistics( void ) const
 {
 	chunk_statistics ans = statistics_.get_statistics();
 
-	ans.alloc_conf_ = param_chunk_allocation { chunk_param_.size_of_one_piece_, 0 };
+	ans.alloc_conf_ = chunk_param_;
 
 	return ans;
 }
 
-}   // namespace internal
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////
-general_mem_allocator::general_mem_allocator( void )
-  : pr_ch_size_( 0 )
-  , up_param_ch_array_()
-  , exclusive_ctl_of_prune_( false )
-{
-	return;
-}
-
-general_mem_allocator::general_mem_allocator(
-	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
-	unsigned int                  num              //!< [in] array size
-	)
-  : pr_ch_size_( 0 )
-  , up_param_ch_array_()
-  , exclusive_ctl_of_prune_( false )
-{
-#ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
-#else
-	set_param( p_param_array, num );
-#endif
-	return;
-}
-
-general_mem_allocator::~general_mem_allocator()
-{
-	return;
-}
-
-void* general_mem_allocator::allocate(
-	std::size_t n   //!< [in] required memory size
+void* general_mem_allocator_impl_allocate(
+	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
+	internal::chunk_list* p_param_ch_array_arg,   //!< unique pointer to chunk and param array
+	std::size_t           n_arg                   //!< [in] memory size to allocate
 )
 {
 	void* p_ans = nullptr;
-	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
+	for ( unsigned int i = 0; i < pr_ch_size_arg; i++ ) {
 		// liner search
-		if ( up_param_ch_array_[i].param_.size_of_one_piece_ >= n ) {
-			p_ans = up_param_ch_array_[i].up_chunk_lst_->allocate_mem_slot();
+		if ( p_param_ch_array_arg[i].chunk_param_.size_of_one_piece_ >= n_arg ) {
+			p_ans = p_param_ch_array_arg[i].allocate_mem_slot();
 			if ( p_ans != nullptr ) {
 				return p_ans;
 			}
@@ -1571,7 +1521,7 @@ void* general_mem_allocator::allocate(
 	}
 
 	// 対応するサイズのメモリスロットが見つからなかったので、mallocでメモリ領域を確保する。
-	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( std::malloc( n + internal::get_slot_header_size() ) );
+	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( std::malloc( n_arg + internal::get_slot_header_size() ) );
 
 	p_sh->set_addr_of_chunk_header_multi_slot( nullptr );
 
@@ -1581,9 +1531,10 @@ void* general_mem_allocator::allocate(
 
 	return p_ans;
 }
-
-void general_mem_allocator::deallocate(
-	void* p_mem   //!< [in] pointer to allocated memory by allocate()
+void general_mem_allocator_impl_deallocate(
+	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
+	internal::chunk_list* p_param_ch_array_arg,   //!< unique pointer to chunk and param array
+	void*                 p_mem                   //!< [in] pointer to allocated memory by allocate()
 )
 {
 	if ( p_mem == nullptr ) return;
@@ -1605,8 +1556,8 @@ void general_mem_allocator::deallocate(
 		}
 	} else {
 		internal::LogOutput( log_type::WARN, "Header is corrupted. full search correct chunk and try free" );
-		for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
-			bool ret = up_param_ch_array_[i].up_chunk_lst_->recycle_mem_slot( p_mem );
+		for ( unsigned int i = 0; i < pr_ch_size_arg; i++ ) {
+			bool ret = p_param_ch_array_arg[i].recycle_mem_slot( p_mem );
 			if ( ret ) {
 				internal::LogOutput( log_type::WARN, "Header is corrupted, but luckily success to find and free" );
 				return;
@@ -1620,67 +1571,39 @@ void general_mem_allocator::deallocate(
 
 	return;
 }
-
-void general_mem_allocator::prune( void )
+void general_mem_allocator_impl_prune(
+	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
+	internal::chunk_list* p_param_ch_array_arg,   //!< unique pointer to chunk and param array
+	std::atomic_bool&     exclusive_ctr_arg       //<! reference to exclusive control for prune
+)
 {
 	bool expected = false;
-	bool ret      = exclusive_ctl_of_prune_.compare_exchange_strong( expected, true );
+	bool ret      = exclusive_ctr_arg.compare_exchange_strong( expected, true );
 
 	if ( !ret ) return;   // other thread/s is executing now
 
-	for ( unsigned int ii = 0; ii < pr_ch_size_; ii++ ) {
-		up_param_ch_array_[ii].up_chunk_lst_->prune();
+	for ( unsigned int ii = 0; ii < pr_ch_size_arg; ii++ ) {
+		p_param_ch_array_arg[ii].prune();
 	}
 
-	exclusive_ctl_of_prune_.store( false, std::memory_order_release );
+	exclusive_ctr_arg.store( false, std::memory_order_release );
 	return;
 }
 
-void general_mem_allocator::set_param(
+}   // namespace internal
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+general_mem_allocator::general_mem_allocator(
 	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
 	unsigned int                  num              //!< [in] array size
-)
+	)
+  : allocator_impl_()
 {
-	if ( pr_ch_size_ > 0 ) {
-		internal::LogOutput( log_type::WARN, "paramter has already set. ignore this request." );
-		return;
-	}
-
-	pr_ch_size_ = num;
-
-	std::vector<int> idx_vec( pr_ch_size_ );
-
-	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
-		idx_vec[i] = i;
-	}
-
-	std::sort( idx_vec.begin(), idx_vec.end(),
-	           [p_param_array]( int a, int b ) {
-				   return p_param_array[a].size_of_one_piece_ < p_param_array[b].size_of_one_piece_;
-			   } );
-
-	up_param_ch_array_ = std::unique_ptr<param_chunk_comb[]>( new param_chunk_comb[pr_ch_size_] );
-	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
-		up_param_ch_array_[i].param_        = p_param_array[idx_vec[i]];
-		up_param_ch_array_[i].up_chunk_lst_ = std::unique_ptr<internal::chunk_list>( new internal::chunk_list( up_param_ch_array_[i].param_ ) );
-	}
-
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+#else
+	allocator_impl_.setup_by_param( p_param_array, num );
+#endif
 	return;
-}
-
-/*!
- * @brief	get statistics
- */
-std::list<chunk_statistics> general_mem_allocator::get_statistics( void ) const
-{
-	std::list<chunk_statistics> ans;
-
-	for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
-		chunk_statistics tmp_st = up_param_ch_array_[i].up_chunk_lst_->get_statistics();
-		ans.push_back( tmp_st );
-	}
-
-	return ans;
 }
 
 std::string chunk_statistics::print( void )

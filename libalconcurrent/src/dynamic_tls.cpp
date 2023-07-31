@@ -1142,7 +1142,7 @@ dynamic_tls_key_t dynamic_tls_key_create( void* p_param, uintptr_t ( *allocator 
 void dynamic_tls_key_release( dynamic_tls_key_t key )
 {
 	if ( key == nullptr ) {
-		internal::LogOutput( log_type::ERR, "dynamic_tls_key_release was called with nullptr" );
+		internal::LogOutput( log_type::WARN, "dynamic_tls_key_release was called with nullptr" );
 		return;
 	}
 

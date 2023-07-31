@@ -607,14 +607,21 @@ public:
 	/*!
 	 * @brief	constructor
 	 */
-	chunk_list(
+	constexpr chunk_list(
 		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
-	);
+		)
+	  : chunk_param_( ch_param_arg )
+	  , p_top_chunk_()
+	  , tls_hint_( tl_chunk_param_destructor( this ) )
+	  , statistics_()
+	{
+		return;
+	}
 
 	/*!
 	 * @brief	destructor
 	 */
-	~chunk_list();
+	~chunk_list() = default;
 
 	/*!
 	 * @brief	allocate new memory slot
@@ -645,6 +652,8 @@ public:
 	 */
 	chunk_statistics get_statistics( void ) const;
 
+	const param_chunk_allocation chunk_param_;
+
 private:
 	/**
 	 * @brief スレッド毎のチャンク操作のためのヒント情報、および所有者となるchunk_listへの情報を保持する構造体
@@ -668,7 +677,7 @@ private:
 	 * @brief それぞれのスレッド終了時に実行する処理を担うfunctor
 	 */
 	struct tl_chunk_param_destructor {
-		constexpr tl_chunk_param_destructor( chunk_list* p_chlst_arg )
+		constexpr explicit tl_chunk_param_destructor( chunk_list* p_chlst_arg )
 		  : p_chlst_( p_chlst_arg )
 		{
 		}
@@ -778,8 +787,6 @@ private:
 	unsigned int get_cur_max_slot_size(
 		unsigned int target_tl_id_arg   //!< [in] オーナー権を開放する対象のtl_id_
 	);
-
-	const param_chunk_allocation chunk_param_;
 
 	atomic_push_list                                       p_top_chunk_;   //!< pointer to chunk_header that is top of list.
 	dynamic_tls<tl_chunk_param, tl_chunk_param_destructor> tls_hint_;      //!< thread local pointer to chunk_header that is success to allocate recently for a thread.
