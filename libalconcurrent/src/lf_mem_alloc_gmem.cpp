@@ -22,18 +22,21 @@ namespace internal {
 constexpr size_t TMP_MINIMUM_ALLOC_SIZE   = alignof( std::max_align_t );   //!< cache line bytes. This is configurable value
 constexpr size_t TMP_INITIAL_NUM_OF_SLOTS = 32;
 
-static_general_mem_allocator<11> get_g_gm_mem_instance_singleton(
-	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE, TMP_INITIAL_NUM_OF_SLOTS },         // 1
-	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 2, TMP_INITIAL_NUM_OF_SLOTS },     // 2
-	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 4, TMP_INITIAL_NUM_OF_SLOTS },     // 3
-	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 8, TMP_INITIAL_NUM_OF_SLOTS },     // 4
-	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 16, TMP_INITIAL_NUM_OF_SLOTS },    // 5
-	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 32, TMP_INITIAL_NUM_OF_SLOTS },    // 6
-	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 64, TMP_INITIAL_NUM_OF_SLOTS },    // 7
-	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 128, TMP_INITIAL_NUM_OF_SLOTS },   // 8
-	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 256, TMP_INITIAL_NUM_OF_SLOTS },   // 9
-	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 512, TMP_INITIAL_NUM_OF_SLOTS },   // 10
-	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 1024, TMP_INITIAL_NUM_OF_SLOTS }   // 11
+static_general_mem_allocator<14> get_g_gm_mem_instance_singleton(
+	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE, TMP_INITIAL_NUM_OF_SLOTS },          // 1
+	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 2, TMP_INITIAL_NUM_OF_SLOTS },      // 2
+	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 4, TMP_INITIAL_NUM_OF_SLOTS },      // 3
+	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 8, TMP_INITIAL_NUM_OF_SLOTS },      // 4
+	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 16, TMP_INITIAL_NUM_OF_SLOTS },     // 5
+	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 32, TMP_INITIAL_NUM_OF_SLOTS },     // 6
+	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 64, TMP_INITIAL_NUM_OF_SLOTS },     // 7
+	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 128, TMP_INITIAL_NUM_OF_SLOTS },    // 8
+	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 256, TMP_INITIAL_NUM_OF_SLOTS },    // 9
+	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 512, TMP_INITIAL_NUM_OF_SLOTS },    // 10
+	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 1024, TMP_INITIAL_NUM_OF_SLOTS },   // 11
+	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 2048, TMP_INITIAL_NUM_OF_SLOTS },   // 12
+	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 4096, TMP_INITIAL_NUM_OF_SLOTS },   // 13
+	param_chunk_allocation { TMP_MINIMUM_ALLOC_SIZE * 8192, TMP_INITIAL_NUM_OF_SLOTS }    // 14
 );
 
 }   // namespace internal

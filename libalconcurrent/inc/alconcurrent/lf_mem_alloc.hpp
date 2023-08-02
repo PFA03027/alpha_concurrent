@@ -140,7 +140,7 @@ public:
 			return;
 		}
 
-		unsigned char* p_tmp = new unsigned char[sizeof( internal::chunk_list ) * num];
+		unsigned char* p_tmp = new unsigned char[sizeof( internal::chunk_list[num] )];
 		param_ch_array_      = reinterpret_cast<internal::chunk_list*>( p_tmp );
 		for ( unsigned int i = 0; i < num; i++ ) {
 			new ( &( param_ch_array_[i] ) ) internal::chunk_list( p_param_array[i] );
