@@ -1510,10 +1510,21 @@ void* general_mem_allocator_impl_allocate(
 )
 {
 	void* p_ans = nullptr;
-	for ( unsigned int i = 0; i < pr_ch_size_arg; i++ ) {
-		// liner search
-		if ( p_param_ch_array_arg[i].chunk_param_.size_of_one_piece_ >= n_arg ) {
-			p_ans = p_param_ch_array_arg[i].allocate_mem_slot();
+	if ( pr_ch_size_arg > 0 ) {
+		// binary search
+		unsigned int si = 0;
+		unsigned int ei = pr_ch_size_arg - 1;
+		unsigned int mi = si + ( ei - si ) / 2;
+		while ( si != ei ) {
+			if ( n_arg <= p_param_ch_array_arg[mi].chunk_param_.size_of_one_piece_ ) {
+				ei = mi;
+			} else {
+				si = mi + 1;
+			}
+			mi = si + ( ei - si ) / 2;
+		}
+		if ( n_arg <= p_param_ch_array_arg[si].chunk_param_.size_of_one_piece_ ) {
+			p_ans = p_param_ch_array_arg[si].allocate_mem_slot();
 			if ( p_ans != nullptr ) {
 				return p_ans;
 			}
