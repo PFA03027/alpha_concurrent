@@ -6,6 +6,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 #set(CMAKE_CXX_STANDARD 11)	# for test purpose
 #set(CMAKE_CXX_STANDARD 14)	# for test purpose
 #set(CMAKE_CXX_STANDARD 17)	# for test purpose
+# set(CMAKE_CXX_STANDARD 20)	# for test purpose
 
 if("${SANITIZER_TYPE}" EQUAL "1")
  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DTEST_ENABLE_ADDRESSSANITIZER -fno-omit-frame-pointer -fsanitize=address -DALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER")	# for test purpose
