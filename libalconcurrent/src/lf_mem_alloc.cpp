@@ -47,6 +47,17 @@ namespace internal {
 
 constexpr size_t GM_ALIGN_SIZE = alignof( std::max_align_t );
 
+struct basic_mem_allocator {
+	static inline void* allocate( size_t n )
+	{
+		return std::malloc( n );
+	}
+	static inline void deallocate( void* p_mem, size_t n )
+	{
+		std::free( p_mem );
+	}
+};
+
 chunk_statistics chunk_list_statistics::get_statistics( void ) const
 {
 	chunk_statistics ans { 0 };
@@ -1331,7 +1342,7 @@ void* chunk_list::allocate_mem_slot( void )
 	void* p_ans = nullptr;
 
 	// hintに登録されたchunkから空きスロット検索を開始する。
-	tl_chunk_param& hint_params = tls_hint_.get_tls_instance( /*this, chunk_param_.num_of_pieces_*/ );
+	tl_chunk_param& hint_params = tls_hint_.get_tls_instance();
 
 	chunk_header_multi_slot* const p_start_chms = hint_params.tls_p_hint_chunk;
 	chunk_header_multi_slot*       p_cur_chms   = nullptr;
@@ -1532,7 +1543,7 @@ void* general_mem_allocator_impl_allocate(
 	}
 
 	// 対応するサイズのメモリスロットが見つからなかったので、mallocでメモリ領域を確保する。
-	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( std::malloc( n_arg + internal::get_slot_header_size() ) );
+	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( basic_mem_allocator::allocate( n_arg + internal::get_slot_header_size() ) );
 
 	p_sh->set_addr_of_chunk_header_multi_slot( nullptr );
 
@@ -1563,7 +1574,7 @@ void general_mem_allocator_impl_deallocate(
 			RECORD_BACKTRACE_GET_BACKTRACE( p_sh->free_bt_info_ );
 			RECORD_BACKTRACE_INVALIDATE_BACKTRACE( p_sh->alloc_bt_info_ );
 #endif
-			std::free( reinterpret_cast<void*>( p_sh ) );
+			basic_mem_allocator::deallocate( reinterpret_cast<void*>( p_sh ), 0 );
 		}
 	} else {
 		internal::LogOutput( log_type::WARN, "Header is corrupted. full search correct chunk and try free" );
