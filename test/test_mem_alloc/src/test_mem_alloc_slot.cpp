@@ -91,14 +91,36 @@ TEST_P( SlotFunc_FixtureParam, calc_addr_info_of_slot_of_slot_header_of_array )
 		p_tmp, ret_size, cur_param.n_v_, cur_param.align_v_ );
 
 	// Assert
+	EXPECT_TRUE( ret.is_success_ );
 	uintptr_t chk_offset = reinterpret_cast<uintptr_t>( ret.p_back_offset_ ) - reinterpret_cast<uintptr_t>( p_tmp );
 	EXPECT_GE( static_cast<size_t>( chk_offset ), sizeof( alpha::concurrent::internal::slot_header_of_array ) );
-	chk_offset = reinterpret_cast<uintptr_t>( ret.p_allocated_area_ ) - reinterpret_cast<uintptr_t>( ret.p_back_offset_ );
+	EXPECT_EQ( reinterpret_cast<uintptr_t>( p_tmp ), reinterpret_cast<uintptr_t>( ret.p_back_offset_ ) + ret.value_of_back_offset_ );
+	chk_offset = reinterpret_cast<uintptr_t>( ret.p_assignment_area_ ) - reinterpret_cast<uintptr_t>( ret.p_back_offset_ );
 	EXPECT_EQ( static_cast<size_t>( chk_offset ), sizeof( uintptr_t ) );
-	chk_offset = reinterpret_cast<uintptr_t>( ret.p_tail_padding_ ) - reinterpret_cast<uintptr_t>( ret.p_allocated_area_ );
+	EXPECT_EQ( reinterpret_cast<uintptr_t>( ret.p_tail_padding_ ), reinterpret_cast<uintptr_t>( p_tmp ) + ret.value_of_offset_to_tail_padding_ );
+	chk_offset = reinterpret_cast<uintptr_t>( ret.p_tail_padding_ ) - reinterpret_cast<uintptr_t>( ret.p_assignment_area_ );
 	EXPECT_EQ( static_cast<size_t>( chk_offset ), cur_param.n_v_ );
-	EXPECT_GE( ret.padding_size_, 1 );
-	EXPECT_GE( cur_param.align_v_ + alpha::concurrent::internal::default_slot_alignsize, ret.padding_size_ );
+	EXPECT_GE( ret.tail_padding_size_, 1 );
+	EXPECT_GE( cur_param.align_v_ + alpha::concurrent::internal::default_slot_alignsize, ret.tail_padding_size_ );
+}
+
+TEST_P( SlotFunc_FixtureParam, Call_slot_header_of_array_allocate )
+{
+	// Arrange
+	auto   cur_param = GetParam();
+	size_t ret_size  = alpha::concurrent::internal::calc_total_slot_size_of_slot_header_of<
+        alpha::concurrent::internal::slot_header_of_array>(
+		cur_param.n_v_, cur_param.align_v_ );
+	unsigned char*                                     p_tmp = new unsigned char[ret_size];
+	std::unique_ptr<unsigned char[]>                   up_tmp( p_tmp );
+	alpha::concurrent::internal::slot_header_of_array* p_sut = new ( p_tmp ) alpha::concurrent::internal::slot_header_of_array( static_cast<std::uintptr_t>( 0 ) );
+
+	// Act
+	void* p_ret = p_sut->allocate( ret_size, cur_param.n_v_, cur_param.align_v_ );
+
+	// Assert
+	EXPECT_GT( reinterpret_cast<uintptr_t>( p_ret ), reinterpret_cast<uintptr_t>( p_sut ) );
+	EXPECT_GT( reinterpret_cast<uintptr_t>( p_sut ) + ret_size, reinterpret_cast<uintptr_t>( p_ret ) );
 }
 
 TEST_P( SlotFunc_FixtureParam, calc_total_slot_size_of_slot_header_of_slot_header_of_alloc )
@@ -131,14 +153,36 @@ TEST_P( SlotFunc_FixtureParam, calc_addr_info_of_slot_of_slot_header_of_alloc )
 		p_tmp, ret_size, cur_param.n_v_, cur_param.align_v_ );
 
 	// Assert
+	EXPECT_TRUE( ret.is_success_ );
 	uintptr_t chk_offset = reinterpret_cast<uintptr_t>( ret.p_back_offset_ ) - reinterpret_cast<uintptr_t>( p_tmp );
 	EXPECT_GE( static_cast<size_t>( chk_offset ), sizeof( alpha::concurrent::internal::slot_header_of_alloc ) );
-	chk_offset = reinterpret_cast<uintptr_t>( ret.p_allocated_area_ ) - reinterpret_cast<uintptr_t>( ret.p_back_offset_ );
+	EXPECT_EQ( reinterpret_cast<uintptr_t>( p_tmp ), reinterpret_cast<uintptr_t>( ret.p_back_offset_ ) + ret.value_of_back_offset_ );
+	chk_offset = reinterpret_cast<uintptr_t>( ret.p_assignment_area_ ) - reinterpret_cast<uintptr_t>( ret.p_back_offset_ );
 	EXPECT_EQ( static_cast<size_t>( chk_offset ), sizeof( uintptr_t ) );
-	chk_offset = reinterpret_cast<uintptr_t>( ret.p_tail_padding_ ) - reinterpret_cast<uintptr_t>( ret.p_allocated_area_ );
+	EXPECT_EQ( reinterpret_cast<uintptr_t>( ret.p_tail_padding_ ), reinterpret_cast<uintptr_t>( p_tmp ) + ret.value_of_offset_to_tail_padding_ );
+	chk_offset = reinterpret_cast<uintptr_t>( ret.p_tail_padding_ ) - reinterpret_cast<uintptr_t>( ret.p_assignment_area_ );
 	EXPECT_EQ( static_cast<size_t>( chk_offset ), cur_param.n_v_ );
-	EXPECT_GE( ret.padding_size_, 1 );
-	EXPECT_GE( cur_param.align_v_ + alpha::concurrent::internal::default_slot_alignsize, ret.padding_size_ );
+	EXPECT_GE( ret.tail_padding_size_, 1 );
+	EXPECT_GE( cur_param.align_v_ + alpha::concurrent::internal::default_slot_alignsize, ret.tail_padding_size_ );
+}
+
+TEST_P( SlotFunc_FixtureParam, Call_slot_header_of_alloc_allocate )
+{
+	// Arrange
+	auto   cur_param = GetParam();
+	size_t ret_size  = alpha::concurrent::internal::calc_total_slot_size_of_slot_header_of<
+        alpha::concurrent::internal::slot_header_of_alloc>(
+		cur_param.n_v_, cur_param.align_v_ );
+	unsigned char*                                     p_tmp = new unsigned char[ret_size];
+	std::unique_ptr<unsigned char[]>                   up_tmp( p_tmp );
+	alpha::concurrent::internal::slot_header_of_alloc* p_sut = new ( p_tmp ) alpha::concurrent::internal::slot_header_of_alloc( ret_size );
+
+	// Act
+	void* p_ret = p_sut->allocate( ret_size, cur_param.n_v_, cur_param.align_v_ );
+
+	// Assert
+	EXPECT_GT( reinterpret_cast<uintptr_t>( p_ret ), reinterpret_cast<uintptr_t>( p_sut ) );
+	EXPECT_GT( reinterpret_cast<uintptr_t>( p_sut ) + ret_size, reinterpret_cast<uintptr_t>( p_ret ) );
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -250,3 +294,5 @@ INSTANTIATE_TEST_SUITE_P(
 		size_n_and_align { 128, 64 }
 		//
 		) );
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////

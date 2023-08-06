@@ -14,6 +14,9 @@
 
 #include <atomic>
 #include <cstddef>
+#include <cstdint>
+#include <stdexcept>
+#include <string>
 #include <type_traits>
 
 namespace alpha {
@@ -29,16 +32,18 @@ constexpr size_t default_slot_alignsize = sizeof( std::uintptr_t );
  *
  */
 struct slot_mheader {
-	std::atomic<std::uintptr_t> offset_to_mgr_;   //!< offset to slot array manager header
+	std::atomic<std::uintptr_t> offset_to_mgr_;            //!< offset to slot array manager header
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
-	std::atomic<std::uintptr_t> marker_;          //!< check sum maker value
+	std::atomic<std::uintptr_t> marker_;                   //!< check sum maker value
 #endif
+	std::atomic<std::uintptr_t> offset_to_tail_padding_;   //!< offset to tail padding
 
 	constexpr slot_mheader( std::uintptr_t offset_to_mgr_arg = 0 )
 	  : offset_to_mgr_( offset_to_mgr_arg )
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 	  , marker_( make_maker_value( offset_to_mgr_arg ) )
 #endif
+	  , offset_to_tail_padding_( 0 )
 	{
 	}
 
@@ -47,6 +52,7 @@ struct slot_mheader {
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 	  , marker_( make_maker_value( make_offset_mgr_to_value( p_mgr_arg, reinterpret_cast<void*>( this ) ) ) )
 #endif
+	  , offset_to_tail_padding_( 0 )
 	{
 	}
 
@@ -134,6 +140,20 @@ static_assert( std::is_standard_layout<alloc_slot_sheader>::value, "alloc_slot_s
 struct slot_header_of_array {
 	slot_mheader       mh_;   //!< main header
 	array_slot_sheader sh_;   //!< sub header
+
+	constexpr slot_header_of_array( std::uintptr_t offset_to_mgr_arg = 0 )
+	  : mh_( offset_to_mgr_arg )
+	  , sh_()
+	{
+	}
+
+	slot_header_of_array( void* p_mgr_arg )
+	  : mh_( p_mgr_arg )
+	  , sh_()
+	{
+	}
+
+	void* allocate( size_t alloc_size, size_t n, size_t req_alignsize );
 };
 
 static_assert( std::is_standard_layout<slot_header_of_array>::value, "slot_header_of_array should be standard-layout type" );
@@ -145,6 +165,14 @@ static_assert( std::is_standard_layout<slot_header_of_array>::value, "slot_heade
 struct slot_header_of_alloc {
 	slot_mheader       mh_;   //!< main header
 	alloc_slot_sheader sh_;   //!< sub header
+
+	constexpr slot_header_of_alloc( size_t alloc_size_arg )
+	  : mh_( static_cast<std::uintptr_t>( 0 ) )
+	  , sh_( alloc_size_arg )
+	{
+	}
+
+	void* allocate( size_t alloc_size, size_t n, size_t req_alignsize );
 };
 
 static_assert( std::is_standard_layout<slot_header_of_alloc>::value, "slot_header_of_alloc should be standard-layout type" );
@@ -162,6 +190,8 @@ union unified_slot_header {
 	  : mh_()
 	{
 	}
+
+	static unified_slot_header* get_slot_header_from_assignment_p( void* p_mem );
 };
 
 /**
@@ -169,10 +199,13 @@ union unified_slot_header {
  *
  */
 struct addr_info_of_slot {
-	uintptr_t*     p_back_offset_;
-	void*          p_allocated_area_;
-	unsigned char* p_tail_padding_;
-	size_t         padding_size_;
+	bool           is_success_;                        //!< if true, success to calculation
+	uintptr_t*     p_back_offset_;                     //!< pointer to back_offset
+	uintptr_t      value_of_back_offset_;              //!< value of back_offset
+	void*          p_assignment_area_;                 //!< pointer to assignment area
+	uintptr_t      value_of_offset_to_tail_padding_;   //!< value of offset_to_tail_padding_
+	unsigned char* p_tail_padding_;                    //!< pointer to offset_to_tail_padding_
+	size_t         tail_padding_size_;                 //!< tail padding size
 };
 
 /**
@@ -194,22 +227,34 @@ struct addr_info_of_slot {
 template <typename SLOT_H_T>
 inline addr_info_of_slot calc_addr_info_of_slot_of( void* p_alloc_top, size_t alloc_size, size_t n, size_t req_alignsize )
 {
-	size_t    min_base_size         = sizeof( SLOT_H_T ) + sizeof( std::uintptr_t );   // header + back_offset
-	uintptr_t min_base_addr         = reinterpret_cast<uintptr_t>( p_alloc_top ) + min_base_size;
-	uintptr_t tfit_sel_alignsize    = static_cast<uintptr_t>( req_alignsize );
-	uintptr_t mx                    = min_base_addr / tfit_sel_alignsize;
-	uintptr_t rx                    = min_base_addr % tfit_sel_alignsize;
-	uintptr_t ans_addr              = tfit_sel_alignsize * mx + ( ( rx == 0 ) ? 0 : tfit_sel_alignsize );
-	size_t    ans_tail_padding_size = static_cast<size_t>( ( reinterpret_cast<uintptr_t>( p_alloc_top ) + static_cast<uintptr_t>( alloc_size ) ) - ( ans_addr + static_cast<uintptr_t>( n ) ) );
+	size_t    min_base_size      = sizeof( SLOT_H_T ) + sizeof( std::uintptr_t );   // header + back_offset
+	uintptr_t min_base_addr      = reinterpret_cast<uintptr_t>( p_alloc_top ) + min_base_size;
+	uintptr_t tfit_req_alignsize = static_cast<uintptr_t>( req_alignsize );
+	uintptr_t mx                 = min_base_addr / tfit_req_alignsize;
+	uintptr_t rx                 = min_base_addr % tfit_req_alignsize;
+	uintptr_t ans_addr           = tfit_req_alignsize * mx + ( ( rx == 0 ) ? 0 : tfit_req_alignsize );
+	uintptr_t addr_end_of_alloc  = reinterpret_cast<uintptr_t>( p_alloc_top ) + static_cast<uintptr_t>( alloc_size );
+	uintptr_t addr_end_of_assign = ans_addr + static_cast<uintptr_t>( n );
+	if ( addr_end_of_assign >= addr_end_of_alloc ) {
+		// tail_paddingのサイズ分を考慮するために >= で比較している。
+		return addr_info_of_slot { false, nullptr, 0, nullptr, 0, nullptr, 0 };
+	}
+
+	size_t ans_tail_padding_size = static_cast<size_t>( ( reinterpret_cast<uintptr_t>( p_alloc_top ) + static_cast<uintptr_t>( alloc_size ) ) - ( ans_addr + static_cast<uintptr_t>( n ) ) );
 	if ( ans_tail_padding_size > ( req_alignsize + default_slot_alignsize ) ) {
 		std::string errlog = "fail the tail padding size calculation: ";
 		errlog += std::to_string( ans_tail_padding_size );
 		throw std::logic_error( errlog );
 	}
+	uintptr_t*     p_back_offsetX = reinterpret_cast<uintptr_t*>( ans_addr - static_cast<uintptr_t>( sizeof( uintptr_t ) ) );
+	unsigned char* p_tail_padding = reinterpret_cast<unsigned char*>( ans_addr + static_cast<uintptr_t>( n ) );
 	return addr_info_of_slot {
-		reinterpret_cast<uintptr_t*>( ans_addr - static_cast<uintptr_t>( sizeof( uintptr_t ) ) ),
+		true,
+		p_back_offsetX,
+		reinterpret_cast<uintptr_t>( p_alloc_top ) + ( static_cast<uintptr_t>( 0 ) - reinterpret_cast<uintptr_t>( p_back_offsetX ) ),
 		reinterpret_cast<void*>( ans_addr ),
-		reinterpret_cast<unsigned char*>( ans_addr + static_cast<uintptr_t>( n ) ),
+		reinterpret_cast<uintptr_t>( p_tail_padding ) - reinterpret_cast<uintptr_t>( p_alloc_top ),
+		p_tail_padding,
 		ans_tail_padding_size };
 }
 
@@ -228,7 +273,7 @@ inline addr_info_of_slot calc_addr_info_of_slot_of( void* p_alloc_top, size_t al
  * @return size_t slot size
  */
 template <typename SLOT_H_T>
-inline size_t calc_total_slot_size_of_slot_header_of( size_t n, size_t req_alignsize )
+inline constexpr size_t calc_total_slot_size_of_slot_header_of( size_t n, size_t req_alignsize )
 {
 	size_t min_base_size = sizeof( SLOT_H_T ) + sizeof( std::uintptr_t );   // header + back_offset + n + ajusting size of alignment + minimum tail_padding
 	size_t h_n_align     = min_base_size + n + req_alignsize - 1;

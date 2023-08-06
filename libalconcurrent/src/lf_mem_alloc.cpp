@@ -24,6 +24,8 @@
 #include "mmap_allocator.hpp"
 #include "utility.hpp"
 
+#include "lf_mem_alloc_basic_allocator.hpp"
+
 namespace alpha {
 namespace concurrent {
 
@@ -46,17 +48,6 @@ bool test_platform_std_atomic_lockfree_condition( void )
 namespace internal {
 
 constexpr size_t GM_ALIGN_SIZE = alignof( std::max_align_t );
-
-struct basic_mem_allocator {
-	static inline void* allocate( size_t n )
-	{
-		return std::malloc( n );
-	}
-	static inline void deallocate( void* p_mem, size_t n )
-	{
-		std::free( p_mem );
-	}
-};
 
 chunk_statistics chunk_list_statistics::get_statistics( void ) const
 {
