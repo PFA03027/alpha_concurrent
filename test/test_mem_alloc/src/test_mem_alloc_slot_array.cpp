@@ -33,8 +33,9 @@ TEST( slot_array_mgr, Call_get_slot_idx_from_assignment_p )
 	// Arrange
 	alpha::concurrent::internal::slot_array_mgr*                 p_sut = alpha::concurrent::internal::slot_array_mgr::make_instance( nullptr, static_cast<size_t>( 32 ), static_cast<size_t>( 32 ) );
 	std::unique_ptr<alpha::concurrent::internal::slot_array_mgr> up_sut( p_sut );
-	void*                                                        p_mem   = p_sut->allocate( 1, 32, 1 );
-	size_t                                                       ret_idx = 0;
+	void*                                                        p_mem = p_sut->allocate( 1, 32, 1 );
+	ASSERT_NE( p_mem, nullptr );
+	size_t ret_idx = 0;
 
 	// Act
 	ASSERT_NO_THROW( ret_idx = alpha::concurrent::internal::slot_array_mgr::get_slot_idx_from_assignment_p( p_mem ) );

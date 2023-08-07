@@ -254,6 +254,20 @@ inline addr_info_of_slot calc_addr_info_of_slot_of( void* p_alloc_top, size_t al
 	uintptr_t ans_addr           = tfit_req_alignsize * mx + ( ( rx == 0 ) ? 0 : tfit_req_alignsize );
 	uintptr_t addr_end_of_alloc  = reinterpret_cast<uintptr_t>( p_alloc_top ) + static_cast<uintptr_t>( alloc_size );
 	uintptr_t addr_end_of_assign = ans_addr + static_cast<uintptr_t>( n );
+#if 0
+	printf( "p_alloc_top:		%p\n", p_alloc_top );
+	printf( "alloc_size:		%zu, 0x%zx\n", alloc_size, alloc_size );
+	printf( "n:			%zu\n", n );
+	printf( "req_alignsize:		%zu\n", req_alignsize );
+	printf( "min_base_size:		%zu\n", min_base_size );
+	printf( "min_base_addr:		%zx\n", min_base_addr );
+	printf( "tfit_req_alignsize:	%zu\n", tfit_req_alignsize );
+	printf( "mx:			%zu\n", mx );
+	printf( "rx:			%zu\n", rx );
+	printf( "ans_addr: 		%zx\n", ans_addr );
+	printf( "addr_end_of_alloc: 	%zx\n", addr_end_of_alloc );
+	printf( "addr_end_of_assign: 	%zx\n", addr_end_of_assign );
+#endif
 	if ( addr_end_of_assign >= addr_end_of_alloc ) {
 		// tail_paddingのサイズ分を考慮するために >= で比較している。
 		return addr_info_of_slot { false, nullptr, 0, nullptr, 0, nullptr, 0 };
@@ -263,6 +277,8 @@ inline addr_info_of_slot calc_addr_info_of_slot_of( void* p_alloc_top, size_t al
 	if ( ans_tail_padding_size > ( req_alignsize + default_slot_alignsize ) ) {
 		std::string errlog = "fail the tail padding size calculation: ";
 		errlog += std::to_string( ans_tail_padding_size );
+		errlog += std::string( "  expected is smaller or equal to " );
+		errlog += std::to_string( req_alignsize + default_slot_alignsize );
 		throw std::logic_error( errlog );
 	}
 	uintptr_t*     p_back_offsetX = reinterpret_cast<uintptr_t*>( ans_addr - static_cast<uintptr_t>( sizeof( uintptr_t ) ) );
@@ -298,6 +314,12 @@ inline constexpr size_t calc_total_slot_size_of_slot_header_of( size_t n, size_t
 	size_t h_n_align     = min_base_size + n + req_alignsize - 1;
 	size_t mx            = h_n_align / default_slot_alignsize;
 	size_t base_ans      = default_slot_alignsize * ( mx + 1 );   // add tail padding area
+#if 0
+	printf( "min_base_size:		%zu\n", min_base_size );
+	printf( "h_n_align:		%zu\n", h_n_align );
+	printf( "mx:			%zu\n", mx );
+	printf( "base_ans:		%zu\n", base_ans );
+#endif
 	return base_ans;
 }
 
