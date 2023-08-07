@@ -39,6 +39,10 @@ struct slot_mheader {
 	std::atomic<std::uintptr_t> marker_;                   //!< check sum maker value
 #endif
 	std::atomic<std::uintptr_t> offset_to_tail_padding_;   //!< offset to tail padding
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	bt_info alloc_bt_info_;                                //!< backtrace information when is allocated
+	bt_info free_bt_info_;                                 //!< backtrace information when is free
+#endif
 
 	constexpr slot_mheader( std::uintptr_t offset_to_mgr_arg = 0 )
 	  : offset_to_mgr_( offset_to_mgr_arg )
@@ -46,6 +50,10 @@ struct slot_mheader {
 	  , marker_( make_maker_value( offset_to_mgr_arg ) )
 #endif
 	  , offset_to_tail_padding_( 0 )
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	  , alloc_bt_info_()   //!< backtrace information when is allocated
+	  , free_bt_info_()    //!< backtrace information when is free
+#endif
 	{
 	}
 
@@ -55,6 +63,10 @@ struct slot_mheader {
 	  , marker_( make_maker_value( make_offset_mgr_to_value( p_mgr_arg, reinterpret_cast<void*>( this ) ) ) )
 #endif
 	  , offset_to_tail_padding_( 0 )
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	  , alloc_bt_info_()   //!< backtrace information when is allocated
+	  , free_bt_info_()    //!< backtrace information when is free
+#endif
 	{
 	}
 
@@ -95,19 +107,11 @@ static_assert( std::is_standard_layout<slot_mheader>::value, "slot_mheader shoul
  *
  */
 struct array_slot_sheader {
-	std::atomic<slot_header_of_array*> p_next_;   //!< stackリストとして繋がる次のslot_header_of_arrayへのポインタ
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-	bt_info alloc_bt_info_;                       //!< backtrace information when is allocated
-	bt_info free_bt_info_;                        //!< backtrace information when is free
-#endif
-	unsigned char padding_for_alignment_[0];      //!< padding buffer for alignment
+	std::atomic<slot_header_of_array*> p_next_;                     //!< stackリストとして繋がる次のslot_header_of_arrayへのポインタ
+	unsigned char                      padding_for_alignment_[0];   //!< padding buffer for alignment
 
 	constexpr array_slot_sheader( slot_header_of_array* p_next_arg = nullptr )
 	  : p_next_( p_next_arg )
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-	  , alloc_bt_info_()   //!< backtrace information when is allocated
-	  , free_bt_info_()    //!< backtrace information when is free
-#endif
 	  , padding_for_alignment_ {}
 	{
 	}
@@ -120,29 +124,17 @@ static_assert( std::is_standard_layout<array_slot_sheader>::value, "array_slot_s
  *
  */
 struct alloc_slot_sheader {
-	size_t alloc_size_;                        //!< allocation size of this slot
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-	bt_info alloc_bt_info_;                    //!< backtrace information when is allocated
-	bt_info free_bt_info_;                     //!< backtrace information when is free
-#endif
+	size_t        alloc_size_;                 //!< allocation size of this slot
 	unsigned char padding_for_alignment_[0];   //!< padding buffer for alignment
 
 	constexpr alloc_slot_sheader( void )
 	  : alloc_size_( 0 )
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-	  , alloc_bt_info_()   //!< backtrace information when is allocated
-	  , free_bt_info_()    //!< backtrace information when is free
-#endif
 	  , padding_for_alignment_ {}
 	{
 	}
 
 	constexpr alloc_slot_sheader( size_t alloc_size_arg )
 	  : alloc_size_( alloc_size_arg )
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-	  , alloc_bt_info_()   //!< backtrace information when is allocated
-	  , free_bt_info_()    //!< backtrace information when is free
-#endif
 	  , padding_for_alignment_ {}
 	{
 	}
