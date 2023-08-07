@@ -83,6 +83,15 @@ struct slot_array_mgr {
 	slot_info                                                      slot_container_[0];              //!< 以降のアドレスに可変長サイズのslot_infoとslotの配列を保持するメモリ領域が続く。
 
 	/**
+	 * @brief Construct a new slot array mgr object
+	 *
+	 * @param p_owner pointer to chunk_header_multi_slot that is owner of this slot_array_mgr
+	 * @param num_of_slots number of slots to allocate
+	 * @param n expected allocatable memory size of a slot
+	 */
+	slot_array_mgr( chunk_header_multi_slot* p_owner, size_t num_of_slots, size_t n );
+
+	/**
 	 * @brief allocate and generate slot_array_mgr instance
 	 *
 	 * @note
@@ -98,8 +107,14 @@ struct slot_array_mgr {
 		return new ( num_of_slots, n ) alpha::concurrent::internal::slot_array_mgr( p_owner, num_of_slots, n );
 	}
 
-	slot_array_mgr( chunk_header_multi_slot* p_owner, size_t num_of_slots, size_t n );
-
+	/**
+	 * @brief Get the pointer of slot object
+	 *
+	 * @param idx index number
+	 * @return slot_header_of_array* the pointer of slot object
+	 *
+	 * @exception std::out_of_range if idx is over the number of slots of this instance
+	 */
 	inline slot_header_of_array* get_pointer_of_slot( size_t idx ) const
 	{
 		if ( idx >= num_of_slots_ ) {
@@ -136,6 +151,14 @@ struct slot_array_mgr {
 		return reinterpret_cast<slot_header_of_array*>( addr_idxed_slot );
 	}
 
+	/**
+	 * @brief Get the next pointer of slot object
+	 *
+	 * If p_cur is bigger than end_slot_array(), return p_cur.
+	 *
+	 * @param p_cur the current pointer of slot object
+	 * @return slot_header_of_array* the next pointer of slot object
+	 */
 	inline slot_header_of_array* get_next_pointer_of_slot( slot_header_of_array* p_cur ) const
 	{
 		if ( p_cur >= end_slot_array() ) {
@@ -145,6 +168,31 @@ struct slot_array_mgr {
 		return reinterpret_cast<slot_header_of_array*>( addr_idxed_slot );
 	}
 
+	/**
+	 * @brief Get the next pointer of slot object
+	 *
+	 * @warning this I/F does not check the out of range error
+	 *
+	 * @param p_cur the current pointer of slot object
+	 * @return slot_header_of_array* the next pointer of slot object
+	 */
+	inline slot_header_of_array* unchk_get_next_pointer_of_slot( slot_header_of_array* p_cur ) const
+	{
+		uintptr_t addr_idxed_slot = reinterpret_cast<uintptr_t>( p_cur ) + static_cast<uintptr_t>( slot_size_of_this_ );
+		return reinterpret_cast<slot_header_of_array*>( addr_idxed_slot );
+	}
+
+	/**
+	 * @brief 指定されたインデックス番号スロットからメモリ割り当てを行う。
+	 *
+	 * @warning
+	 * 割り当て済みかどうかのチェックは行わない。
+	 *
+	 * @param idx 割り当てを行ってほしいスロットのidx番号
+	 * @param n 割り当ててほしいメモリサイズ
+	 * @param req_alignsize アライメント要求値
+	 * @return void* 割り当てられたメモリへのポインタ。nullptrの場合、スロットのサイズ不足等の理由により割り当て失敗。
+	 */
 	inline void* allocate( size_t idx, size_t n, size_t req_alignsize )
 	{
 		return get_pointer_of_slot( idx )->allocate( slot_size_of_this_, n, req_alignsize );
