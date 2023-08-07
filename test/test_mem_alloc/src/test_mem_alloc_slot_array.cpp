@@ -18,7 +18,7 @@ TEST( slot_array_mgr, construct_destruct )
 	// Arrange
 
 	// Act
-	alpha::concurrent::internal::slot_array_mgr*                 p_sut = new ( static_cast<size_t>( 32 ), static_cast<size_t>( 32 ) ) alpha::concurrent::internal::slot_array_mgr( nullptr, static_cast<size_t>( 32 ), static_cast<size_t>( 32 ) );
+	alpha::concurrent::internal::slot_array_mgr*                 p_sut = alpha::concurrent::internal::slot_array_mgr::make_instance( nullptr, static_cast<size_t>( 32 ), static_cast<size_t>( 32 ) );
 	std::unique_ptr<alpha::concurrent::internal::slot_array_mgr> up_sut( p_sut );
 
 	// Assert
@@ -31,7 +31,7 @@ TEST( slot_array_mgr, construct_destruct )
 TEST( slot_array_mgr, Call_get_slot_idx_from_assignment_p )
 {
 	// Arrange
-	alpha::concurrent::internal::slot_array_mgr*                 p_sut = new ( static_cast<size_t>( 32 ), static_cast<size_t>( 32 ) ) alpha::concurrent::internal::slot_array_mgr( nullptr, static_cast<size_t>( 32 ), static_cast<size_t>( 32 ) );
+	alpha::concurrent::internal::slot_array_mgr*                 p_sut = alpha::concurrent::internal::slot_array_mgr::make_instance( nullptr, static_cast<size_t>( 32 ), static_cast<size_t>( 32 ) );
 	std::unique_ptr<alpha::concurrent::internal::slot_array_mgr> up_sut( p_sut );
 	void*                                                        p_mem   = p_sut->allocate( 1, 32, 1 );
 	size_t                                                       ret_idx = 0;

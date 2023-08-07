@@ -82,6 +82,22 @@ struct slot_array_mgr {
 	slot_header_of_array* const                                    p_top_of_slots_;                 //!< スロット配列の先頭へのポインタ
 	slot_info                                                      slot_container_[0];              //!< 以降のアドレスに可変長サイズのslot_infoとslotの配列を保持するメモリ領域が続く。
 
+	/**
+	 * @brief allocate and generate slot_array_mgr instance
+	 *
+	 * @note
+	 * slot_array_mgrのインスタンスの生成は、直接配置new演算子を使えば構築可能だが、間違えないように構築用のmakeするI/Fを用意する
+	 *
+	 * @param p_owner pointer to chunk_header_multi_slot that is owner of this slot_array_mgr
+	 * @param num_of_slots number of slots to allocate
+	 * @param n expected allocatable memory size of a slot
+	 * @return slot_array_mgr* pointer to slot_array_mgr instance
+	 */
+	static inline slot_array_mgr* make_instance( chunk_header_multi_slot* p_owner, size_t num_of_slots, size_t n )
+	{
+		return new ( num_of_slots, n ) alpha::concurrent::internal::slot_array_mgr( p_owner, num_of_slots, n );
+	}
+
 	slot_array_mgr( chunk_header_multi_slot* p_owner, size_t num_of_slots, size_t n );
 
 	inline slot_header_of_array* get_pointer_of_slot( size_t idx ) const
