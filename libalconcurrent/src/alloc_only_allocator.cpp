@@ -314,6 +314,14 @@ void* allocating_only( size_t req_size, size_t req_align )
 	return alloc_chamber_head::get_inst().allocate( req_size, req_align );
 }
 
+void allocating_only_deallocate( void* p_mem )
+{
+#ifdef ALCONCURRENT_CONF_DETECT_UNEXPECTED_DEALLOC_CALLING
+	throw std::runtime_error( "allocating_only_deallocate is called unexpectedly" );
+#endif
+	return;
+}
+
 }   // namespace internal
 }   // namespace concurrent
 }   // namespace alpha
