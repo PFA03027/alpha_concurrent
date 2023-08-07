@@ -19,6 +19,10 @@
 #include <string>
 #include <type_traits>
 
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#include "alconcurrent/conf_logger.hpp"
+#endif
+
 namespace alpha {
 namespace concurrent {
 
@@ -163,7 +167,7 @@ struct slot_header_of_array {
 	}
 
 	void* allocate( size_t alloc_size, size_t n, size_t req_alignsize );
-	// void  deallocate( void );
+	void  deallocate( void );
 };
 
 static_assert( std::is_standard_layout<slot_header_of_array>::value, "slot_header_of_array should be standard-layout type" );
@@ -183,7 +187,7 @@ struct slot_header_of_alloc {
 	}
 
 	void* allocate( size_t alloc_size, size_t n, size_t req_alignsize );
-	// void  deallocate( void );
+	void  deallocate( void );
 };
 
 static_assert( std::is_standard_layout<slot_header_of_alloc>::value, "slot_header_of_alloc should be standard-layout type" );

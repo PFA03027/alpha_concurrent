@@ -102,8 +102,9 @@ size_t slot_array_mgr::get_slot_idx_from_assignment_p( void* p_mem )
 	}
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 	if ( !p_slot_header->mh_.check_marker() ) {
-		std::string errlog = std::string( "slot header(" ) + std::to_string( p_slot_header ) + std::string( ") is corrupted" );
-		throw std::runtime_error( errlog );
+		char buff[128];
+		snprintf( buff, 128, "slot header(%p) is corrupted", p_slot_header );
+		throw std::runtime_error( buff );
 	}
 #endif
 

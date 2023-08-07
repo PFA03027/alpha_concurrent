@@ -29,7 +29,20 @@ void* slot_header_of_array::allocate( size_t alloc_size, size_t n, size_t req_al
 	mh_.offset_to_tail_padding_ = ret.value_of_offset_to_tail_padding_;
 	*( ret.p_tail_padding_ )    = 1;
 
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	RECORD_BACKTRACE_GET_BACKTRACE( mh_.alloc_bt_info_ );
+#endif
+
 	return ret.p_assignment_area_;
+}
+
+void slot_header_of_array::deallocate( void )
+{
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	RECORD_BACKTRACE_GET_BACKTRACE( mh_.free_bt_info_ );
+#endif
+
+	return;
 }
 
 void* slot_header_of_alloc::allocate( size_t alloc_size, size_t n, size_t req_alignsize )
@@ -44,7 +57,20 @@ void* slot_header_of_alloc::allocate( size_t alloc_size, size_t n, size_t req_al
 	mh_.offset_to_tail_padding_ = ret.value_of_offset_to_tail_padding_;
 	*( ret.p_tail_padding_ )    = 1;
 
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	RECORD_BACKTRACE_GET_BACKTRACE( mh_.alloc_bt_info_ );
+#endif
+
 	return ret.p_assignment_area_;
+}
+
+void slot_header_of_alloc::deallocate( void )
+{
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	RECORD_BACKTRACE_GET_BACKTRACE( mh_.free_bt_info_ );
+#endif
+
+	return;
 }
 
 unified_slot_header* unified_slot_header::get_slot_header_from_assignment_p( void* p_mem )
