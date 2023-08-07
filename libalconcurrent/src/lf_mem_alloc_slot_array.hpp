@@ -98,8 +98,33 @@ struct slot_array_mgr {
 		return reinterpret_cast<slot_header_of_array*>( addr_idxed_slot );
 	}
 
+	inline slot_header_of_array* begin_slot_array( void )
+	{
+		return p_top_of_slots_;
+	}
+
+	inline const slot_header_of_array* begin_slot_array( void ) const
+	{
+		return p_top_of_slots_;
+	}
+
+	inline slot_header_of_array* end_slot_array( void )
+	{
+		uintptr_t addr_idxed_slot = reinterpret_cast<uintptr_t>( p_top_of_slots_ ) + static_cast<uintptr_t>( slot_size_of_this_ * num_of_slots_ );
+		return reinterpret_cast<slot_header_of_array*>( addr_idxed_slot );
+	}
+
+	inline const slot_header_of_array* end_slot_array( void ) const
+	{
+		uintptr_t addr_idxed_slot = reinterpret_cast<uintptr_t>( p_top_of_slots_ ) + static_cast<uintptr_t>( slot_size_of_this_ * num_of_slots_ );
+		return reinterpret_cast<slot_header_of_array*>( addr_idxed_slot );
+	}
+
 	inline slot_header_of_array* get_next_pointer_of_slot( slot_header_of_array* p_cur ) const
 	{
+		if ( p_cur >= end_slot_array() ) {
+			return p_cur;
+		}
 		uintptr_t addr_idxed_slot = reinterpret_cast<uintptr_t>( p_cur ) + static_cast<uintptr_t>( slot_size_of_this_ );
 		return reinterpret_cast<slot_header_of_array*>( addr_idxed_slot );
 	}
