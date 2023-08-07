@@ -48,7 +48,7 @@ void slot_array_mgr::operator delete[]( void* p_mem ) noexcept
 // placement new    可変長部分の領域も確保するnew operator
 void* slot_array_mgr::operator new( std::size_t n_of_slot_array_mgr, size_t num_of_slots_, size_t expected_alloc_n_per_slot )
 {
-	size_t total_size = n_of_slot_array_mgr + calc_total_slot_array_mgr_bytes( num_of_slots_, expected_alloc_n_per_slot );
+	size_t total_size = n_of_slot_array_mgr + calc_total_slot_array_bytes( num_of_slots_, expected_alloc_n_per_slot );
 	auto   alloc_ret  = allocate_by_mmap( total_size, default_slot_alignsize );
 	if ( alloc_ret.p_allocated_addr_ == nullptr ) {
 		throw std::bad_alloc();
@@ -73,26 +73,19 @@ slot_array_mgr::slot_array_mgr( chunk_header_multi_slot* p_owner, size_t num_of_
   , p_free_slot_stack_head_( nullptr )
   , mtx_consignment_stack_()
   , p_consignment_stack_head_( nullptr )
-  , p_top_of_slots_( reinterpret_cast<slot_header_of_array*>( reinterpret_cast<uintptr_t>( this ) + static_cast<uintptr_t>( calc_total_slot_info_array_bytes( num_of_slots ) ) ) )
   , slot_container_ {}
 {
 	if ( num_of_slots_ == 0 ) {
 		return;
 	}
 
-	slot_info* p_pre_slot_info = nullptr;
-	size_t     idx             = num_of_slots_ - 1;
-	for ( size_t i = 0; i < num_of_slots_; i++, idx-- ) {
-		new ( &( slot_container_[idx] ) ) slot_info( p_pre_slot_info );
-		p_pre_slot_info = &( slot_container_[idx] );
-	}
-	p_free_slot_stack_head_.store( p_pre_slot_info, std::memory_order_release );
-
-	slot_header_of_array* p_cur_slot = p_top_of_slots_;
+	slot_header_of_array* p_pre_slot_header_of_array = nullptr;
+	slot_header_of_array* p_cur_slot                 = get_pointer_of_slot( num_of_slots_ - 1 );
 	for ( size_t i = 0; i < num_of_slots_; i++ ) {
-		new ( &( p_cur_slot->mh_ ) ) slot_mheader( reinterpret_cast<void*>( this ) );
-		p_cur_slot = get_next_pointer_of_slot( p_cur_slot );
+		new ( p_cur_slot ) slot_header_of_array( reinterpret_cast<void*>( this ), p_pre_slot_header_of_array );
+		p_cur_slot = unchk_get_pre_pointer_of_slot( p_cur_slot );
 	}
+	p_free_slot_stack_head_.store( p_pre_slot_header_of_array, std::memory_order_release );
 }
 
 size_t slot_array_mgr::get_slot_idx_from_assignment_p( void* p_mem )
@@ -115,7 +108,7 @@ size_t slot_array_mgr::get_slot_idx_from_assignment_p( void* p_mem )
 #endif
 
 	slot_array_mgr* p_mgr       = p_slot_header->arrayh_.mh_.get_mgr_pointer<slot_array_mgr>();
-	uintptr_t       byte_offset = reinterpret_cast<uintptr_t>( p_slot_header ) - reinterpret_cast<uintptr_t>( p_mgr->p_top_of_slots_ );
+	uintptr_t       byte_offset = reinterpret_cast<uintptr_t>( p_slot_header ) - reinterpret_cast<uintptr_t>( p_mgr->slot_container_ );
 	uintptr_t       ans_idx     = byte_offset / p_mgr->slot_size_of_this_;
 
 	return static_cast<size_t>( ans_idx );

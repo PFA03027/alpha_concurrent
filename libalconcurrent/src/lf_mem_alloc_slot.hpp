@@ -27,6 +27,8 @@ namespace internal {
 
 constexpr size_t default_slot_alignsize = sizeof( std::uintptr_t );
 
+class slot_header_of_array;
+
 /**
  * @brief slot main header
  *
@@ -93,7 +95,22 @@ static_assert( std::is_standard_layout<slot_mheader>::value, "slot_mheader shoul
  *
  */
 struct array_slot_sheader {
-	unsigned char padding_for_alignment_[0];   //!< padding buffer for alignment
+	std::atomic<slot_header_of_array*> p_next_;   //!< stackリストとして繋がる次のslot_header_of_arrayへのポインタ
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	bt_info alloc_bt_info_;                       //!< backtrace information when is allocated
+	bt_info free_bt_info_;                        //!< backtrace information when is free
+#endif
+	unsigned char padding_for_alignment_[0];      //!< padding buffer for alignment
+
+	constexpr array_slot_sheader( slot_header_of_array* p_next_arg = nullptr )
+	  : p_next_( p_next_arg )
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+	  , alloc_bt_info_()   //!< backtrace information when is allocated
+	  , free_bt_info_()    //!< backtrace information when is free
+#endif
+	  , padding_for_alignment_ {}
+	{
+	}
 };
 
 static_assert( std::is_standard_layout<array_slot_sheader>::value, "array_slot_sheader should be standard-layout type" );
@@ -147,13 +164,14 @@ struct slot_header_of_array {
 	{
 	}
 
-	slot_header_of_array( void* p_mgr_arg )
+	slot_header_of_array( void* p_mgr_arg, slot_header_of_array* p_next_arg )
 	  : mh_( p_mgr_arg )
-	  , sh_()
+	  , sh_( p_next_arg )
 	{
 	}
 
 	void* allocate( size_t alloc_size, size_t n, size_t req_alignsize );
+	// void  deallocate( void );
 };
 
 static_assert( std::is_standard_layout<slot_header_of_array>::value, "slot_header_of_array should be standard-layout type" );
@@ -173,6 +191,7 @@ struct slot_header_of_alloc {
 	}
 
 	void* allocate( size_t alloc_size, size_t n, size_t req_alignsize );
+	// void  deallocate( void );
 };
 
 static_assert( std::is_standard_layout<slot_header_of_alloc>::value, "slot_header_of_alloc should be standard-layout type" );
