@@ -89,7 +89,7 @@ slot_array_mgr::slot_array_mgr( chunk_header_multi_slot* p_owner, size_t num_of_
 	free_slots_storage_.unchk_push_stack_list_to_head( p_pre_slot_header_of_array );
 }
 
-size_t slot_array_mgr::get_slot_idx_from_assignment_p( void* p_mem )
+slot_header_of_array* slot_array_mgr::get_pointer_of_slot_header_of_array_from_assignment_p( void* p_mem )
 {
 	if ( p_mem == nullptr ) {
 		std::string errlog = "try to get slot idx by nullptr";
@@ -108,7 +108,17 @@ size_t slot_array_mgr::get_slot_idx_from_assignment_p( void* p_mem )
 	}
 #endif
 
-	slot_array_mgr* p_mgr       = p_slot_header->arrayh_.mh_.get_mgr_pointer<slot_array_mgr>();
+	return &( p_slot_header->arrayh_ );
+}
+
+size_t slot_array_mgr::get_slot_idx_from_slot_header_of_array( slot_header_of_array* p_slot_header )
+{
+	if ( p_slot_header == nullptr ) {
+		std::string errlog = "try to get slot idx by nullptr";
+		throw std::out_of_range( errlog );
+	}
+
+	slot_array_mgr* p_mgr       = p_slot_header->mh_.get_mgr_pointer<slot_array_mgr>();
 	uintptr_t       byte_offset = reinterpret_cast<uintptr_t>( p_slot_header ) - reinterpret_cast<uintptr_t>( p_mgr->slot_header_array_ );
 	size_t          ans_idx     = static_cast<size_t>( byte_offset / sizeof( slot_header_of_array ) );
 	if ( ans_idx > p_mgr->num_of_slots_ ) {

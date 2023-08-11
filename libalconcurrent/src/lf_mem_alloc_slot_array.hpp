@@ -32,14 +32,14 @@ namespace internal {
 class chunk_header_multi_slot;
 
 struct slot_array_mgr {
-	const size_t                          alloc_size_;                    //!< 自身のslot_arrayのために確保した領域のバイト数
-	const size_t                          num_of_slots_;                  //!< 自身のslot_arrayで管理しているslot数
-	const size_t                          expected_n_per_slot_;           //!< 自身のslot_arrayで管理しているslotが期待しているallocateサイズ
-	const size_t                          slot_container_size_of_this_;   //!< 自身のslot_arrayで管理しているslot_container1つ分のバイト数
-	std::atomic<chunk_header_multi_slot*> p_owner_chunk_header_;          //!< 自身のslot_arrayの所有権を持っているchunk_header_multi_slotへのポインタ
+	const size_t                          alloc_size_;                    //!< 自身のslot_array_mgrのために確保した領域のバイト数
+	const size_t                          num_of_slots_;                  //!< 自身のslot_array_mgrで管理しているslot数
+	const size_t                          expected_n_per_slot_;           //!< 自身のslot_array_mgrで管理しているslotが期待しているallocateサイズ
+	const size_t                          slot_container_size_of_this_;   //!< 自身のslot_array_mgrで管理しているslot_container1つ分のバイト数
+	std::atomic<chunk_header_multi_slot*> p_owner_chunk_header_;          //!< 自身のslot_array_mgrの所有権を持っているchunk_header_multi_slotへのポインタ
 	free_node_stack<slot_header_of_array> free_slots_storage_;            //!< 割り当てていないslot_header_of_arrayのリストを管理する
 	slot_container* const                 p_slot_container_top;           //!< slot_container配列の先頭へのポインタ
-	slot_header_of_array                  slot_header_array_[0];          //!< 以降のアドレスにslot_header_of_arrayの可変長サイズ配列を保持するメモリ領域が続く。
+	slot_header_of_array                  slot_header_array_[0];          //!< 以降のアドレスにslot_header_of_arrayの可変長サイズ配列とslot_containerを保持するメモリ領域が続く。
 
 	/**
 	 * @brief Construct a new slot array mgr object
@@ -54,7 +54,7 @@ struct slot_array_mgr {
 	 * @brief allocate and generate slot_array_mgr instance
 	 *
 	 * @note
-	 * slot_array_mgrのインスタンスの生成は、直接配置new演算子を使えば構築可能だが、間違えないように構築用のmakeするI/Fを用意する
+	 * slot_array_mgrのインスタンスの生成は、配置new演算子を使えば直接構築可能だが、間違えないように構築用のmakeするI/Fを用意する
 	 *
 	 * @param p_owner pointer to chunk_header_multi_slot that is owner of this slot_array_mgr
 	 * @param num_of_slots number of slots to allocate
@@ -198,7 +198,32 @@ struct slot_array_mgr {
 		return get_pointer_of_slot( idx )->allocate( unchk_get_pointer_of_slot_container( idx ), slot_container_size_of_this_, n, req_alignsize );
 	}
 
-	static size_t get_slot_idx_from_assignment_p( void* p_mem );
+	void* allocate( size_t n, size_t req_alignsize = default_slot_alignsize )
+	{
+		if ( ( expected_n_per_slot_ + default_slot_alignsize ) < ( n + req_alignsize ) ) {
+			// サイズ不足のため、確保に失敗
+			return nullptr;
+		}
+		slot_header_of_array* p_free_slot = free_slots_storage_.pop();
+		if ( p_free_slot == nullptr ) {
+			// フリースロットがないため、確保に失敗
+			return nullptr;
+		}
+
+		size_t free_slot_idx = get_slot_idx_from_slot_header_of_array( p_free_slot );
+
+		return p_free_slot->allocate( unchk_get_pointer_of_slot_container( free_slot_idx ), slot_container_size_of_this_, n, req_alignsize );
+	}
+
+	void deallocate( void* p_mem )
+	{
+		slot_header_of_array* p_used_slot = get_pointer_of_slot_header_of_array_from_assignment_p( p_mem );
+		p_used_slot->deallocate();
+		free_slots_storage_.push( p_used_slot );
+	}
+
+	static slot_header_of_array* get_pointer_of_slot_header_of_array_from_assignment_p( void* p_mem );
+	static size_t                get_slot_idx_from_slot_header_of_array( slot_header_of_array* p_slot_header );
 
 	void* operator new( std::size_t n );                                                                             // usual new...(1)   このクラスでは使用してはならないnew operator
 	void  operator delete( void* p_mem ) noexcept;                                                                   // usual delete...(2)

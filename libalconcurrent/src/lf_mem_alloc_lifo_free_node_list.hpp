@@ -167,9 +167,9 @@ struct free_node_stack {
 	{
 		scoped_hzd_type hzd_refing_p_head( hzd_ptrs_, HZD_IDX_POP_FUNC_HEAD );
 		scoped_hzd_type hzd_refing_p_next( hzd_ptrs_, HZD_IDX_POP_FUNC_NEXT );
-		node_pointer    p_cur_head = nullptr;
-		node_pointer    p_new_head = p_free_node_stack_head_.load( std::memory_order_acquire );   // この処理後、CASの前にp_cur_headに対してABAが発生するとアウト。p_cur_headはハザードポインタに確保し、p_cur_headに対応するnodeがpush経由でこの関数に入ってこないようにしないといけない。
 
+		node_pointer p_new_head = nullptr;
+		node_pointer p_cur_head = p_free_node_stack_head_.load( std::memory_order_acquire );   // この処理後、CASの前にp_cur_headに対してABAが発生するとアウト。p_cur_headはハザードポインタに確保し、p_cur_headに対応するnodeがpush経由でこの関数に入ってこないようにしないといけない。
 		do {
 			hzd_refing_p_head.regist_ptr_as_hazard_ptr( p_cur_head );
 			node_pointer p_node_tmp = p_free_node_stack_head_.load( std::memory_order_acquire );
