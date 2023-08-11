@@ -110,14 +110,13 @@ void* slot_container::construct_slot_container_in_container_buffer( slot_mheader
 
 	slot_container* p_slot_container = reinterpret_cast<slot_container*>( ans_addr - static_cast<uintptr_t>( sizeof( slot_container ) ) );
 	if ( reinterpret_cast<void*>( ans_addr ) != reinterpret_cast<void*>( p_slot_container->mem ) ) {
-		std::string errlog = "does not match assignment address and slot_container::mem[0]";
-		throw std::logic_error( errlog );
+		throw std::logic_error( "does not match assignment address and slot_container::mem[0]" );
 	}
 
 	// p_bind_mh_of_slot の中身とback_offset_へ値を埋め込む
-	std::atomic<uintptr_t>* p_back_offsetX    = &( p_slot_container->back_offset_ );
-	uintptr_t               back_offset_value = reinterpret_cast<uintptr_t>( p_bind_mh_of_slot ) - reinterpret_cast<uintptr_t>( p_back_offsetX );
-	p_slot_container                          = new ( reinterpret_cast<void*>( p_slot_container ) ) slot_container( back_offset_value );
+	const std::atomic<uintptr_t>* p_back_offsetX    = &( p_slot_container->back_offset_ );
+	uintptr_t                     back_offset_value = reinterpret_cast<uintptr_t>( p_bind_mh_of_slot ) - reinterpret_cast<uintptr_t>( p_back_offsetX );
+	p_slot_container                                = new ( reinterpret_cast<void*>( p_slot_container ) ) slot_container( back_offset_value );
 
 	// tail_paddingへ値を埋め込む
 	unsigned char* p_tail_padding = reinterpret_cast<unsigned char*>( ans_addr + static_cast<uintptr_t>( n ) );

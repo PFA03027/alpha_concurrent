@@ -230,12 +230,12 @@ static_assert( std::is_standard_layout<unified_slot_header>::value, "unified_slo
  *
  */
 struct slot_container {
-	std::atomic<uintptr_t> back_offset_;          //!< offset to unified_slot_header
+	const std::atomic<uintptr_t> back_offset_;          //!< offset to unified_slot_header
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
-	std::atomic<uintptr_t> back_offset_marker_;   //!< check sum maker value
+	const std::atomic<uintptr_t> back_offset_marker_;   //!< check sum maker value
 #endif
-	unsigned char mem[0];                         //!< assignment memory area
-	                                              // there is no definition of tail_padding
+	unsigned char mem[0];                               //!< assignment memory area
+	                                                    // there is no definition of tail_padding
 
 	slot_container( uintptr_t back_offset_arg = 0 )
 	  : back_offset_( back_offset_arg )
