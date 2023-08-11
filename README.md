@@ -192,14 +192,14 @@ If you would like to pass through a memory allocation request to malloc() always
 
 This macro loses the lock-free nature of the memory allocation process and is prone to memory fragmentation. Instead, the compiler sanitizer has the benefit of working effectively.
 
-### ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+### ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 If you would like to record the backtrace of allcation and free for debugging, please define this macro.
-If you define this macro, the compilation also needs -g(debug symbol)
+If you define this macro, the compilation also needs -g(debug symbol) and it is better to define  -rdynamic.
 
 ### ALCONCURRENT_CONF_ENABLE_NON_REUSE_MEMORY_SLOT
 Even if an allocated memory via general_mem_allocator is free, it just marks as discared and not re-use it.
 This will makes memory leak. On the other hand, it is effective to analyze double free bug.
-If you use this option, it is recommened to enable ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE also.
+If you use this option, it is recommened to enable ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE also.
 
 # Patent
 ## Hazard pointer algorithm

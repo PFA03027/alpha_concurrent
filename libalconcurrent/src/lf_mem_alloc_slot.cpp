@@ -19,7 +19,7 @@ namespace internal {
 
 void* slot_header_of_array::allocate( slot_container* p_container_top, size_t container_size, size_t n, size_t req_alignsize )
 {
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	RECORD_BACKTRACE_GET_BACKTRACE( mh_.alloc_bt_info_ );
 	RECORD_BACKTRACE_INVALIDATE_BACKTRACE( mh_.free_bt_info_ );
 #endif
@@ -30,7 +30,7 @@ void* slot_header_of_array::allocate( slot_container* p_container_top, size_t co
 
 void slot_header_of_array::deallocate( void )
 {
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	if ( mh_.free_bt_info_.count_ > 0 ) {
 		// double free issue
 	}
@@ -44,7 +44,7 @@ void slot_header_of_array::deallocate( void )
 
 void* slot_header_of_alloc::allocate( size_t n, size_t req_alignsize )
 {
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	RECORD_BACKTRACE_GET_BACKTRACE( mh_.alloc_bt_info_ );
 	RECORD_BACKTRACE_INVALIDATE_BACKTRACE( mh_.free_bt_info_ );
 #endif
@@ -60,7 +60,7 @@ void* slot_header_of_alloc::allocate( size_t n, size_t req_alignsize )
 
 void slot_header_of_alloc::deallocate( void )
 {
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	if ( mh_.free_bt_info_.count_ > 0 ) {
 		// double free issue
 	}

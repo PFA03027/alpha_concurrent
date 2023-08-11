@@ -587,7 +587,7 @@ struct slot_chk_result {
 struct slot_header {
 	std::atomic<chunk_header_multi_slot*> at_p_chms_;   //!< pointer to chunk_header_multi_slot that is an owner of this slot
 	std::atomic<std::uintptr_t>           at_mark_;     //!< checker mark
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	bt_info alloc_bt_info_;                             //!< backtrace information when is allocated
 	bt_info free_bt_info_;                              //!< backtrace information when is free
 #endif

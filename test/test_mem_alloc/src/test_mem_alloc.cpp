@@ -402,7 +402,7 @@ TEST_F( lfmemAlloc, TestBacktrace )
 
 	auto bt_info1 = alpha::concurrent::get_backtrace_info( test_ptr1 );
 	ASSERT_TRUE( std::get<0>( bt_info1 ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	EXPECT_NE( 0, std::get<1>( bt_info1 ).count_ );
 #else
 	EXPECT_EQ( 0, std::get<1>( bt_info1 ).count_ );
@@ -414,7 +414,7 @@ TEST_F( lfmemAlloc, TestBacktrace )
 #else
 	bt_info1 = alpha::concurrent::get_backtrace_info( test_ptr1 );
 	ASSERT_TRUE( std::get<0>( bt_info1 ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	EXPECT_NE( 0, std::get<1>( bt_info1 ).count_ );
 	EXPECT_NE( 0, std::get<2>( bt_info1 ).count_ );
 #else
@@ -428,7 +428,7 @@ TEST_F( lfmemAlloc, TestBacktrace )
 
 	auto bt_info2 = alpha::concurrent::get_backtrace_info( test_ptr2 );
 	ASSERT_TRUE( std::get<0>( bt_info2 ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	EXPECT_NE( 0, std::get<1>( bt_info2 ).count_ );
 #else
 	EXPECT_EQ( 0, std::get<1>( bt_info2 ).count_ );
@@ -441,7 +441,7 @@ TEST_F( lfmemAlloc, TestBacktrace )
 #else
 	bt_info2 = alpha::concurrent::get_backtrace_info( test_ptr2 );
 	ASSERT_TRUE( std::get<0>( bt_info2 ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	EXPECT_NE( 0, std::get<1>( bt_info2 ).count_ );
 	EXPECT_NE( 0, std::get<2>( bt_info2 ).count_ );
 #else
@@ -477,7 +477,7 @@ TEST_F( lfmemAlloc, TestBacktrace3 )
 
 	auto bt_info1 = alpha::concurrent::get_backtrace_info( test_ptr1 );
 	ASSERT_TRUE( std::get<0>( bt_info1 ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	EXPECT_NE( 0, std::get<1>( bt_info1 ).count_ );
 #else
 	EXPECT_EQ( 0, std::get<1>( bt_info1 ).count_ );

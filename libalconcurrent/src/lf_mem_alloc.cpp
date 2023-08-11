@@ -694,7 +694,7 @@ void idx_mgr::dump( void )
 
 void slot_header::set_addr_of_chunk_header_multi_slot( chunk_header_multi_slot* p_chms_arg )
 {
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	RECORD_BACKTRACE_GET_BACKTRACE( alloc_bt_info_ );
 	if ( p_chms_arg != nullptr ) {
 		RECORD_BACKTRACE_INVALIDATE_BACKTRACE( free_bt_info_ );
@@ -954,7 +954,7 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 #endif
 
 	slot_status_mark expect_not_free = slot_status_mark::INUSE;
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	slot_header* p_sh = reinterpret_cast<slot_header*>( p_slot_addr );
 #endif
 #ifdef ALCONCURRENT_CONF_ENABLE_NON_REUSE_MEMORY_SLOT
@@ -966,7 +966,7 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 	if ( !result ) {
 		// double free has occured.
 		internal::LogOutput( log_type::ERR, "double free has occured." );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 		static std::atomic_int double_free_counter( 0 );
 		int                    id_count = double_free_counter.fetch_add( 1, std::memory_order_acq_rel );
 
@@ -989,11 +989,11 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 
 	// OK. correct address
 #ifdef ALCONCURRENT_CONF_ENABLE_NON_REUSE_MEMORY_SLOT
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	RECORD_BACKTRACE_GET_BACKTRACE( p_sh->free_bt_info_ );
 #endif
 #else
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	RECORD_BACKTRACE_GET_BACKTRACE( p_sh->free_bt_info_ );
 	RECORD_BACKTRACE_INVALIDATE_BACKTRACE( p_sh->alloc_bt_info_ );
 #endif
@@ -1561,7 +1561,7 @@ void general_mem_allocator_impl_deallocate(
 			std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
 			tmp_addr -= internal::get_slot_header_size();
 			internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( tmp_addr );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 			RECORD_BACKTRACE_GET_BACKTRACE( p_sh->free_bt_info_ );
 			RECORD_BACKTRACE_INVALIDATE_BACKTRACE( p_sh->alloc_bt_info_ );
 #endif
@@ -1663,7 +1663,7 @@ get_backtrace_info(
 	tmp_addr -= internal::get_slot_header_size();
 	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( tmp_addr );
 
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	return std::tuple<bool,
 	                  alpha::concurrent::bt_info,
 	                  alpha::concurrent::bt_info>(
@@ -1698,13 +1698,13 @@ void output_backtrace_info(
 		"[%d] header check result of %p: correct_=%s, p_chms_=%p",
 		id_count, p_mem, chk_ret.correct_ ? "true" : "false", chk_ret.p_chms_ );
 
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	internal::LogOutput( lt, "[%d-a] alloc_bt_info_ of %p", id_count, p_mem );
 	p_sh->alloc_bt_info_.dump_to_log( lt, 'a', id_count );
 	internal::LogOutput( lt, "[%d-f] free_bt_info_ of %p", id_count, p_mem );
 	p_sh->free_bt_info_.dump_to_log( lt, 'f', id_count );
 #else
-	internal::LogOutput( lt, "[%d] no backtrace information, because the library is not compiled with ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE", id_count );
+	internal::LogOutput( lt, "[%d] no backtrace information, because the library is not compiled with ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE", id_count );
 #endif
 
 	return;

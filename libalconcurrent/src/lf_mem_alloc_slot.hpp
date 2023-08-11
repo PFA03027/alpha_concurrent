@@ -19,7 +19,7 @@
 #include <string>
 #include <type_traits>
 
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 #include "alconcurrent/conf_logger.hpp"
 #endif
 
@@ -60,7 +60,7 @@ struct slot_mheader {
 	const std::atomic<uintptr_t> marker_;             //!< check sum maker value
 #endif
 	std::atomic<uintptr_t> offset_to_tail_padding_;   //!< offset to tail padding
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	bt_info alloc_bt_info_;                           //!< backtrace information when is allocated
 	bt_info free_bt_info_;                            //!< backtrace information when is free
 #endif
@@ -71,7 +71,7 @@ struct slot_mheader {
 	  , marker_( make_maker_value( offset_to_mgr_arg ) )
 #endif
 	  , offset_to_tail_padding_( 0 )
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	  , alloc_bt_info_()   //!< backtrace information when is allocated
 	  , free_bt_info_()    //!< backtrace information when is free
 #endif
@@ -84,7 +84,7 @@ struct slot_mheader {
 	  , marker_( make_maker_value( make_offset_mgr_to_value( p_mgr_arg, reinterpret_cast<void*>( this ) ) ) )
 #endif
 	  , offset_to_tail_padding_( 0 )
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	  , alloc_bt_info_()   //!< backtrace information when is allocated
 	  , free_bt_info_()    //!< backtrace information when is free
 #endif
@@ -156,6 +156,7 @@ static_assert( ( sizeof( alloc_slot_sheader ) % default_slot_alignsize ) == 0, "
 /**
  * @brief slot header of slot array
  *
+ * this class is used for slot_array_mgr
  */
 struct slot_header_of_array {
 	slot_mheader       mh_;   //!< main header
@@ -185,6 +186,31 @@ static_assert( ( sizeof( slot_header_of_array ) % default_slot_alignsize ) == 0,
 
 /**
  * @brief slot header of individual allocated slot
+ *
+ * this class should be constructed by like below;
+ * @code {.cpp}
+ * size_t buff_size = calc_slot_header_and_container_size( allocation required size, alignment required size );
+ * void* p_allocated_slot = malloc(buff_size);
+ * slot_header_of_alloc* p_slot_header_of_alloc = new (p_allocated_slot) slot_header_of_alloc(buff_size);
+ * @endcode
+ *
+ * then, please get the address for allocation memory by like below;
+ * @code {.cpp}
+ * void* p_mem = p_slot_header_of_alloc->allocate( allocation required size, alignment required size );
+ * // using memory
+ * // ...
+ * @endcode
+ *
+ * finish using, then de-allocate memory
+ * @code {.cpp}
+ * p_slot_header_of_alloc->deallocate();
+ * @endcode
+ *
+ * or
+ * @code {.cpp}
+ * unified_slot_header* p_recalc_slot_header_ = slot_container::get_slot_header_from_assignment_p(p_mem);
+ * p_recalc_slot_header_->alloch_.deallocate();
+ * @endcode
  *
  */
 struct slot_header_of_alloc {
