@@ -126,6 +126,65 @@ TEST_P( SlotFunc_FixtureParam, slot_container_calc_slot_container_size3 )
 	EXPECT_EQ( &( p_ush->arrayh_ ), &sha );
 }
 
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_OVERRUN_WRITING
+TEST_P( SlotFunc_FixtureParam, slot_header_of_array_CanDetect_Overrun_Writing )
+{
+	// Arrange
+	// Arrange
+	auto                                              cur_param = GetParam();
+	size_t                                            ret_size  = alpha::concurrent::internal::slot_container::calc_slot_container_size( cur_param.n_v_, cur_param.align_v_ );
+	unsigned char*                                    p_tmp     = new unsigned char[ret_size];
+	std::unique_ptr<unsigned char[]>                  up_tmp( p_tmp );
+	alpha::concurrent::internal::slot_header_of_array sha( static_cast<uintptr_t>( 1 ) );
+	void*                                             p_ret_mem = sha.allocate( reinterpret_cast<alpha::concurrent::internal::slot_container*>( p_tmp ), ret_size, cur_param.n_v_, cur_param.align_v_ );
+	ASSERT_NE( p_ret_mem, nullptr );
+	unsigned char* p_tail_padding_area = reinterpret_cast<unsigned char*>( p_ret_mem ) + cur_param.n_v_;
+	*p_tail_padding_area               = 2;
+
+	// Act
+	try {
+		sha.deallocate();
+		FAIL();
+	} catch ( std::exception& e ) {
+		// Assert
+		std::string exception_log = e.what();
+
+		auto ret = exception_log.find( "overrun" );
+		EXPECT_NE( ret, std::string::npos );
+	}
+
+	// Assert
+}
+#endif
+
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+TEST_P( SlotFunc_FixtureParam, slot_header_of_array_CanDetect_Double_Free )
+{
+	// Arrange
+	// Arrange
+	auto                                              cur_param = GetParam();
+	size_t                                            ret_size  = alpha::concurrent::internal::slot_container::calc_slot_container_size( cur_param.n_v_, cur_param.align_v_ );
+	unsigned char*                                    p_tmp     = new unsigned char[ret_size];
+	std::unique_ptr<unsigned char[]>                  up_tmp( p_tmp );
+	alpha::concurrent::internal::slot_header_of_array sha( static_cast<uintptr_t>( 1 ) );
+	void*                                             p_ret_mem = sha.allocate( reinterpret_cast<alpha::concurrent::internal::slot_container*>( p_tmp ), ret_size, cur_param.n_v_, cur_param.align_v_ );
+	ASSERT_NE( p_ret_mem, nullptr );
+	EXPECT_NO_THROW( sha.deallocate() );
+
+	// Act
+	try {
+		sha.deallocate();
+		FAIL();
+	} catch ( std::exception& e ) {
+		// Assert
+		std::string exception_log = e.what();
+
+		auto ret = exception_log.find( "double" );
+		EXPECT_NE( ret, std::string::npos );
+	}
+}
+#endif
+
 TEST_P( SlotFunc_FixtureParam, calc_total_slot_size_of_slot_header_of_slot_header_of_alloc )
 {
 	// Arrange
@@ -193,6 +252,63 @@ TEST_P( SlotFunc_FixtureParam, Call_slot_header_of_alloc_allocate2 )
 	ASSERT_NE( p_ush, nullptr );
 	EXPECT_EQ( &( p_ush->alloch_ ), p_sut );
 }
+
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_OVERRUN_WRITING
+TEST_P( SlotFunc_FixtureParam, slot_header_of_alloc_CanDetect_Overrun_Writing )
+{
+	// Arrange
+	auto                                               cur_param = GetParam();
+	size_t                                             ret_size  = alpha::concurrent::internal::slot_header_of_alloc::calc_slot_header_and_container_size( cur_param.n_v_, cur_param.align_v_ );
+	unsigned char*                                     p_tmp     = new unsigned char[ret_size];
+	std::unique_ptr<unsigned char[]>                   up_tmp( p_tmp );
+	alpha::concurrent::internal::slot_header_of_alloc* p_sut = new ( p_tmp ) alpha::concurrent::internal::slot_header_of_alloc( ret_size );
+	ASSERT_NE( p_sut, nullptr );
+	void* p_ret = p_sut->allocate( cur_param.n_v_, cur_param.align_v_ );
+	ASSERT_NE( p_ret, nullptr );
+	unsigned char* p_tail_padding_area = reinterpret_cast<unsigned char*>( p_ret ) + cur_param.n_v_;
+	*p_tail_padding_area               = 2;
+
+	// Act
+	try {
+		p_sut->deallocate();
+		FAIL();
+	} catch ( std::exception& e ) {
+		// Assert
+		std::string exception_log = e.what();
+
+		auto ret = exception_log.find( "overrun" );
+		EXPECT_NE( ret, std::string::npos );
+	}
+}
+#endif
+
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+TEST_P( SlotFunc_FixtureParam, slot_header_of_alloc_CanDetect_Double_Free )
+{
+	// Arrange
+	auto                                               cur_param = GetParam();
+	size_t                                             ret_size  = alpha::concurrent::internal::slot_header_of_alloc::calc_slot_header_and_container_size( cur_param.n_v_, cur_param.align_v_ );
+	unsigned char*                                     p_tmp     = new unsigned char[ret_size];
+	std::unique_ptr<unsigned char[]>                   up_tmp( p_tmp );
+	alpha::concurrent::internal::slot_header_of_alloc* p_sut = new ( p_tmp ) alpha::concurrent::internal::slot_header_of_alloc( ret_size );
+	ASSERT_NE( p_sut, nullptr );
+	void* p_ret = p_sut->allocate( cur_param.n_v_, cur_param.align_v_ );
+	ASSERT_NE( p_ret, nullptr );
+	EXPECT_NO_THROW( p_sut->deallocate() );
+
+	// Act
+	try {
+		p_sut->deallocate();
+		FAIL();
+	} catch ( std::exception& e ) {
+		// Assert
+		std::string exception_log = e.what();
+
+		auto ret = exception_log.find( "double" );
+		EXPECT_NE( ret, std::string::npos );
+	}
+}
+#endif
 
 INSTANTIATE_TEST_SUITE_P(
 	alloc_align_comb,

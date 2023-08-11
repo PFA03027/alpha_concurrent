@@ -31,10 +31,34 @@ void* slot_header_of_array::allocate( slot_container* p_container_top, size_t co
 void slot_header_of_array::deallocate( void )
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+	bool xx_free_flag = false;
 	if ( mh_.free_bt_info_.count_ > 0 ) {
-		// double free issue
+		internal::LogOutput( log_type::ERR, "double free is detected" );
+		internal::LogOutput( log_type::ERR, "previous deallocation by below call stack" );
+		mh_.free_bt_info_.dump_to_log( log_type::ERR, 'f', 1 );
+		xx_free_flag = true;
 	}
 	RECORD_BACKTRACE_GET_BACKTRACE( mh_.free_bt_info_ );
+	if ( xx_free_flag ) {
+		internal::LogOutput( log_type::ERR, "second deallocation by below call stack" );
+		mh_.free_bt_info_.dump_to_log( log_type::ERR, 'f', 2 );
+		throw std::runtime_error( "double free is detected." );
+	}
+#endif
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_OVERRUN_WRITING
+	unsigned char* p_tail_padding = reinterpret_cast<unsigned char*>( reinterpret_cast<uintptr_t>( &mh_ ) + mh_.offset_to_tail_padding_ );
+	if ( ( *p_tail_padding ) != tail_padding_byte_v ) {
+		internal::LogOutput( log_type::ERR, "write overrun is detected. tail padding address %p", p_tail_padding );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+		internal::LogOutput( log_type::ERR, "this area is allocated by below call stack" );
+		mh_.alloc_bt_info_.dump_to_log( log_type::ERR, 'a', 1 );
+#endif
+		bt_info cur_bt;
+		RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
+		internal::LogOutput( log_type::ERR, "now deallocation by below call stack" );
+		cur_bt.dump_to_log( log_type::ERR, 'f', 1 );
+		throw std::runtime_error( "detect overrun writing error" );
+	}
 #endif
 
 	mh_.offset_to_tail_padding_ = 0;
@@ -61,10 +85,34 @@ void* slot_header_of_alloc::allocate( size_t n, size_t req_alignsize )
 void slot_header_of_alloc::deallocate( void )
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+	bool xx_free_flag = false;
 	if ( mh_.free_bt_info_.count_ > 0 ) {
-		// double free issue
+		internal::LogOutput( log_type::ERR, "double free is detected" );
+		internal::LogOutput( log_type::ERR, "previous deallocation by below call stack" );
+		mh_.free_bt_info_.dump_to_log( log_type::ERR, 'f', 1 );
+		xx_free_flag = true;
 	}
 	RECORD_BACKTRACE_GET_BACKTRACE( mh_.free_bt_info_ );
+	if ( xx_free_flag ) {
+		internal::LogOutput( log_type::ERR, "second deallocation by below call stack" );
+		mh_.free_bt_info_.dump_to_log( log_type::ERR, 'f', 2 );
+		throw std::runtime_error( "double free is detected." );
+	}
+#endif
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_OVERRUN_WRITING
+	unsigned char* p_tail_padding = reinterpret_cast<unsigned char*>( reinterpret_cast<uintptr_t>( &mh_ ) + mh_.offset_to_tail_padding_ );
+	if ( ( *p_tail_padding ) != tail_padding_byte_v ) {
+		internal::LogOutput( log_type::ERR, "write overrun is detected. tail padding address %p", p_tail_padding );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+		internal::LogOutput( log_type::ERR, "this area is allocated by below call stack" );
+		mh_.alloc_bt_info_.dump_to_log( log_type::ERR, 'a', 1 );
+#endif
+		bt_info cur_bt;
+		RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
+		internal::LogOutput( log_type::ERR, "now deallocation by below call stack" );
+		cur_bt.dump_to_log( log_type::ERR, 'f', 1 );
+		throw std::runtime_error( "detect overrun writing error" );
+	}
 #endif
 
 	mh_.offset_to_tail_padding_ = 0;
