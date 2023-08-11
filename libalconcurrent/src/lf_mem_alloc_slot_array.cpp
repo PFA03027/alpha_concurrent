@@ -72,9 +72,7 @@ slot_array_mgr::slot_array_mgr( chunk_header_multi_slot* p_owner, size_t num_of_
   , expected_n_per_slot_( n )
   , slot_container_size_of_this_( calc_one_slot_container_bytes( n ) )
   , p_owner_chunk_header_( p_owner )
-  , p_free_slot_stack_head_( nullptr )
-  , mtx_consignment_stack_()
-  , p_consignment_stack_head_( nullptr )
+  , free_slots_storage_()
   , p_slot_container_top( reinterpret_cast<slot_container*>( &( slot_header_array_[num_of_slots_] ) ) )
   , slot_header_array_ {}
 {
@@ -85,10 +83,10 @@ slot_array_mgr::slot_array_mgr( chunk_header_multi_slot* p_owner, size_t num_of_
 	slot_header_of_array* p_pre_slot_header_of_array = nullptr;
 	slot_header_of_array* p_cur_slot                 = get_pointer_of_slot( num_of_slots_ - 1 );
 	for ( size_t i = 0; i < num_of_slots_; i++ ) {
-		new ( p_cur_slot ) slot_header_of_array( reinterpret_cast<void*>( this ), p_pre_slot_header_of_array );
-		p_cur_slot = unchk_get_pre_pointer_of_slot( p_cur_slot );
+		p_pre_slot_header_of_array = new ( p_cur_slot ) slot_header_of_array( reinterpret_cast<void*>( this ), p_pre_slot_header_of_array );
+		p_cur_slot                 = unchk_get_pre_pointer_of_slot( p_cur_slot );
 	}
-	p_free_slot_stack_head_.store( p_pre_slot_header_of_array, std::memory_order_release );
+	free_slots_storage_.unchk_push_stack_list_to_head( p_pre_slot_header_of_array );
 }
 
 size_t slot_array_mgr::get_slot_idx_from_assignment_p( void* p_mem )

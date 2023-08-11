@@ -20,6 +20,7 @@
 #include "alconcurrent/dynamic_tls.hpp"
 
 #include "lf_mem_alloc_basic_allocator.hpp"
+#include "lf_mem_alloc_lifo_free_node_list.hpp"
 #include "lf_mem_alloc_slot.hpp"
 
 namespace alpha {
@@ -30,40 +31,15 @@ namespace internal {
 
 class chunk_header_multi_slot;
 
-struct threadlocal_slot_info_pointer_handler {
-	/**
-	 * @brief 型Tのオブジェクトを生成するファクトリ関数
-	 *
-	 * 型Tのオブジェクトはデフォルトコンストラクタで生成される
-	 */
-	uintptr_t allocate( void )
-	{
-		return 0;
-	}
-
-	/*!
-	 * @brief スレッド終了時に、allocateで生成されたオブジェクトの破棄処理を行う関数
-	 */
-	void deallocate(
-		uintptr_t p_data   //!< [in] allocateで生成されたオブジェクトへのポインタ
-	)
-	{
-		return;
-	}
-};
-
 struct slot_array_mgr {
-	const size_t                                                              alloc_size_;                     //!< 自身のslot_arrayのために確保した領域のバイト数
-	const size_t                                                              num_of_slots_;                   //!< 自身のslot_arrayで管理しているslot数
-	const size_t                                                              expected_n_per_slot_;            //!< 自身のslot_arrayで管理しているslotが期待しているallocateサイズ
-	const size_t                                                              slot_container_size_of_this_;    //!< 自身のslot_arrayで管理しているslot_container1つ分のバイト数
-	std::atomic<chunk_header_multi_slot*>                                     p_owner_chunk_header_;           //!< 自身のslot_arrayの所有権を持っているchunk_header_multi_slotへのポインタ
-	std::atomic<slot_header_of_array*>                                        p_free_slot_stack_head_;         //!< 未使用状態のslot_header_of_arrayスタックの、先頭slot_header_of_arrayへのポインタ
-	std::mutex                                                                mtx_consignment_stack_;          //!< スレッド終了時のハザード中のスロットを受け取るスタックの排他制御用mutex
-	slot_header_of_array*                                                     p_consignment_stack_head_;       //!< スレッド終了時のハザード中のスロットを受け取るスタックの、先頭slot_header_of_arrayへのポインタ
-	dynamic_tls<slot_header_of_array*, threadlocal_slot_info_pointer_handler> tls_p_hazard_slot_stack_head_;   //!< ハザード中のスロットを受け取るスレッド毎のスタックの、先頭slot_header_of_arrayへのポインタ
-	slot_container* const                                                     p_slot_container_top;            //!< slot_container配列の先頭へのポインタ
-	slot_header_of_array                                                      slot_header_array_[0];           //!< 以降のアドレスにslot_header_of_arrayの可変長サイズ配列を保持するメモリ領域が続く。
+	const size_t                          alloc_size_;                    //!< 自身のslot_arrayのために確保した領域のバイト数
+	const size_t                          num_of_slots_;                  //!< 自身のslot_arrayで管理しているslot数
+	const size_t                          expected_n_per_slot_;           //!< 自身のslot_arrayで管理しているslotが期待しているallocateサイズ
+	const size_t                          slot_container_size_of_this_;   //!< 自身のslot_arrayで管理しているslot_container1つ分のバイト数
+	std::atomic<chunk_header_multi_slot*> p_owner_chunk_header_;          //!< 自身のslot_arrayの所有権を持っているchunk_header_multi_slotへのポインタ
+	free_node_stack<slot_header_of_array> free_slots_storage_;            //!< 割り当てていないslot_header_of_arrayのリストを管理する
+	slot_container* const                 p_slot_container_top;           //!< slot_container配列の先頭へのポインタ
+	slot_header_of_array                  slot_header_array_[0];          //!< 以降のアドレスにslot_header_of_arrayの可変長サイズ配列を保持するメモリ領域が続く。
 
 	/**
 	 * @brief Construct a new slot array mgr object

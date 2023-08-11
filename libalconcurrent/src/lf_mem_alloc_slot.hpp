@@ -179,6 +179,22 @@ struct slot_header_of_array {
 
 	void* allocate( slot_container* p_container_top, size_t container_size, size_t n, size_t req_alignsize );
 	void  deallocate( void );
+
+	slot_header_of_array* get_next( void )
+	{
+		return sh_.p_next_.load( std::memory_order_acquire );
+	}
+
+	void set_next( slot_header_of_array* p_new_next )
+	{
+		sh_.p_next_.store( p_new_next, std::memory_order_release );
+		return;
+	}
+
+	bool next_CAS( slot_header_of_array** pp_expect_ptr, slot_header_of_array* p_desired_ptr )
+	{
+		return sh_.p_next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
+	}
 };
 
 static_assert( std::is_standard_layout<slot_header_of_array>::value, "slot_header_of_array should be standard-layout type" );
