@@ -100,8 +100,7 @@ size_t slot_array_mgr::get_slot_idx_from_assignment_p( void* p_mem )
 
 	unified_slot_header* p_slot_header = slot_container::get_slot_header_from_assignment_p( p_mem );
 	if ( p_slot_header->mh_.offset_to_mgr_.load( std::memory_order_acquire ) == 0 ) {
-		std::string errlog = "this slot is not slot_header_of_array.";
-		throw std::runtime_error( errlog );
+		throw std::runtime_error( "this slot is not slot_header_of_array." );
 	}
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 	if ( !p_slot_header->mh_.check_marker() ) {

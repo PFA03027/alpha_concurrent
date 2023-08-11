@@ -114,7 +114,7 @@ TEST_P( SlotFunc_FixtureParam, slot_container_calc_slot_container_size3 )
 	size_t                                            ret_size  = alpha::concurrent::internal::slot_container::calc_slot_container_size( cur_param.n_v_, cur_param.align_v_ );
 	unsigned char*                                    p_tmp     = new unsigned char[ret_size];
 	std::unique_ptr<unsigned char[]>                  up_tmp( p_tmp );
-	alpha::concurrent::internal::slot_header_of_array sha;
+	alpha::concurrent::internal::slot_header_of_array sha( static_cast<uintptr_t>( 1 ) );
 	void*                                             p_ret_mem = sha.allocate( reinterpret_cast<alpha::concurrent::internal::slot_container*>( p_tmp ), ret_size, cur_param.n_v_, cur_param.align_v_ );
 	ASSERT_NE( p_ret_mem, nullptr );
 

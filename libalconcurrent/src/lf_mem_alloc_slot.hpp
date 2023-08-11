@@ -55,9 +55,9 @@ class slot_container;
  *
  */
 struct slot_mheader {
-	std::atomic<uintptr_t> offset_to_mgr_;            //!< offset to slot array manager header
+	const std::atomic<uintptr_t> offset_to_mgr_;      //!< offset to slot array manager header
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
-	std::atomic<uintptr_t> marker_;                   //!< check sum maker value
+	const std::atomic<uintptr_t> marker_;             //!< check sum maker value
 #endif
 	std::atomic<uintptr_t> offset_to_tail_padding_;   //!< offset to tail padding
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
@@ -65,7 +65,7 @@ struct slot_mheader {
 	bt_info free_bt_info_;                            //!< backtrace information when is free
 #endif
 
-	constexpr slot_mheader( std::uintptr_t offset_to_mgr_arg = 0 )
+	constexpr slot_mheader( std::uintptr_t offset_to_mgr_arg )
 	  : offset_to_mgr_( offset_to_mgr_arg )
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 	  , marker_( make_maker_value( offset_to_mgr_arg ) )
@@ -161,10 +161,13 @@ struct slot_header_of_array {
 	slot_mheader       mh_;   //!< main header
 	array_slot_sheader sh_;   //!< sub header
 
-	constexpr slot_header_of_array( uintptr_t offset_to_mgr_arg = 0 )
+	constexpr slot_header_of_array( uintptr_t offset_to_mgr_arg )
 	  : mh_( offset_to_mgr_arg )
 	  , sh_()
 	{
+		if ( offset_to_mgr_arg == 0 ) {
+			throw std::runtime_error( "offset_to_mgr_arg must not be 0(Zero)" );
+		}
 	}
 
 	slot_header_of_array( void* p_mgr_arg, slot_header_of_array* p_next_arg )
@@ -215,7 +218,7 @@ union unified_slot_header {
 	slot_header_of_alloc alloch_;   //!< slot header of individual allocated slot type
 
 	unified_slot_header( void )
-	  : mh_()
+	  : mh_( static_cast<std::uintptr_t>( 0 ) )
 	{
 	}
 };
