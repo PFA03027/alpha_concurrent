@@ -29,23 +29,40 @@ namespace concurrent {
 namespace internal {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-constexpr size_t default_slot_alignsize = sizeof( std::uintptr_t );
+constexpr size_t        default_slot_alignsize = sizeof( std::uintptr_t );
+constexpr unsigned char tail_padding_byte_v    = 1U;
+
+#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
+inline constexpr uintptr_t make_maker_value( uintptr_t offset_v )
+{
+	return ( static_cast<uintptr_t>( 0 ) - offset_v - static_cast<uintptr_t>( 1 ) );   // intentionally saturating arithmetic operation
+}
+inline constexpr bool check_marker_func( uintptr_t offset_v, uintptr_t marker_v )
+{
+	// 今は簡単な仕組みで実装する
+	std::uintptr_t tmp = offset_v;
+	tmp += marker_v + 1;   // intentionally saturating arithmetic operation
+
+	return ( tmp == 0 );
+}
+#endif
 
 class slot_header_of_array;
+class slot_container;
 
 /**
  * @brief slot main header
  *
  */
 struct slot_mheader {
-	std::atomic<std::uintptr_t> offset_to_mgr_;            //!< offset to slot array manager header
+	std::atomic<uintptr_t> offset_to_mgr_;            //!< offset to slot array manager header
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
-	std::atomic<std::uintptr_t> marker_;                   //!< check sum maker value
+	std::atomic<uintptr_t> marker_;                   //!< check sum maker value
 #endif
-	std::atomic<std::uintptr_t> offset_to_tail_padding_;   //!< offset to tail padding
+	std::atomic<uintptr_t> offset_to_tail_padding_;   //!< offset to tail padding
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
-	bt_info alloc_bt_info_;                                //!< backtrace information when is allocated
-	bt_info free_bt_info_;                                 //!< backtrace information when is free
+	bt_info alloc_bt_info_;                           //!< backtrace information when is allocated
+	bt_info free_bt_info_;                            //!< backtrace information when is free
 #endif
 
 	constexpr slot_mheader( std::uintptr_t offset_to_mgr_arg = 0 )
@@ -81,13 +98,11 @@ struct slot_mheader {
 	}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
-	bool check_marker( void ) const
+	inline bool check_marker( void ) const
 	{
-		// 今は簡単な仕組みで実装する
-		std::uintptr_t tmp = offset_to_mgr_.load( std::memory_order_acquire );
-		tmp += marker_.load( std::memory_order_acquire ) + 1;   // intentionally saturating arithmetic operation
-
-		return ( tmp == 0 );
+		return check_marker_func(
+			offset_to_mgr_.load( std::memory_order_acquire ),
+			marker_.load( std::memory_order_acquire ) );
 	}
 #endif
 
@@ -96,55 +111,47 @@ private:
 	{
 		return reinterpret_cast<uintptr_t>( p_mgr_arg ) + ( static_cast<uintptr_t>( 0 ) - reinterpret_cast<uintptr_t>( p_this ) );   // intentionally saturating arithmetic operation
 	}
-#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
-	static constexpr std::uintptr_t make_maker_value( std::uintptr_t offset_v )
-	{
-		return ( static_cast<uintptr_t>( 0 ) - offset_v - static_cast<uintptr_t>( 1 ) );   // intentionally saturating arithmetic operation
-	}
-#endif
 };
 
 static_assert( std::is_standard_layout<slot_mheader>::value, "slot_mheader should be standard-layout type" );
+static_assert( ( sizeof( slot_mheader ) % default_slot_alignsize ) == 0, "slot_mheader must be a constant multiple of default_slot_alignsize" );
 
 /**
  * @brief slot sub header for slot array
  *
  */
 struct array_slot_sheader {
-	std::atomic<slot_header_of_array*> p_next_;                     //!< stackリストとして繋がる次のslot_header_of_arrayへのポインタ
-	unsigned char                      padding_for_alignment_[0];   //!< padding buffer for alignment
+	std::atomic<slot_header_of_array*> p_next_;   //!< stackリストとして繋がる次のslot_header_of_arrayへのポインタ
 
 	constexpr array_slot_sheader( slot_header_of_array* p_next_arg = nullptr )
 	  : p_next_( p_next_arg )
-	  , padding_for_alignment_ {}
 	{
 	}
 };
 
 static_assert( std::is_standard_layout<array_slot_sheader>::value, "array_slot_sheader should be standard-layout type" );
+static_assert( ( sizeof( array_slot_sheader ) % default_slot_alignsize ) == 0, "array_slot_sheader must be a constant multiple of default_slot_alignsize" );
 
 /**
  * @brief slot sub header for individual allocated slot
  *
  */
 struct alloc_slot_sheader {
-	size_t        alloc_size_;                 //!< allocation size of this slot
-	unsigned char padding_for_alignment_[0];   //!< padding buffer for alignment
+	size_t alloc_size_;   //!< allocation size of this slot
 
 	constexpr alloc_slot_sheader( void )
 	  : alloc_size_( 0 )
-	  , padding_for_alignment_ {}
 	{
 	}
 
 	constexpr alloc_slot_sheader( size_t alloc_size_arg )
 	  : alloc_size_( alloc_size_arg )
-	  , padding_for_alignment_ {}
 	{
 	}
 };
 
 static_assert( std::is_standard_layout<alloc_slot_sheader>::value, "alloc_slot_sheader should be standard-layout type" );
+static_assert( ( sizeof( alloc_slot_sheader ) % default_slot_alignsize ) == 0, "alloc_slot_sheader must be a constant multiple of default_slot_alignsize" );
 
 /**
  * @brief slot header of slot array
@@ -154,7 +161,7 @@ struct slot_header_of_array {
 	slot_mheader       mh_;   //!< main header
 	array_slot_sheader sh_;   //!< sub header
 
-	constexpr slot_header_of_array( std::uintptr_t offset_to_mgr_arg = 0 )
+	constexpr slot_header_of_array( uintptr_t offset_to_mgr_arg = 0 )
 	  : mh_( offset_to_mgr_arg )
 	  , sh_()
 	{
@@ -166,31 +173,37 @@ struct slot_header_of_array {
 	{
 	}
 
-	void* allocate( size_t alloc_size, size_t n, size_t req_alignsize );
+	void* allocate( slot_container* p_container_top, size_t container_size, size_t n, size_t req_alignsize );
 	void  deallocate( void );
 };
 
 static_assert( std::is_standard_layout<slot_header_of_array>::value, "slot_header_of_array should be standard-layout type" );
+static_assert( ( sizeof( slot_header_of_array ) % default_slot_alignsize ) == 0, "slot_header_of_array must be a constant multiple of default_slot_alignsize" );
 
 /**
  * @brief slot header of individual allocated slot
  *
  */
 struct slot_header_of_alloc {
-	slot_mheader       mh_;   //!< main header
-	alloc_slot_sheader sh_;   //!< sub header
+	slot_mheader       mh_;                         //!< main header
+	alloc_slot_sheader sh_;                         //!< sub header
+	unsigned char      slot_container_buffer_[0];   //!< padding and slot container buffer for alignment
 
 	constexpr slot_header_of_alloc( size_t alloc_size_arg )
 	  : mh_( static_cast<std::uintptr_t>( 0 ) )
 	  , sh_( alloc_size_arg )
+	  , slot_container_buffer_ {}
 	{
 	}
 
-	void* allocate( size_t alloc_size, size_t n, size_t req_alignsize );
+	void* allocate( size_t n, size_t req_alignsize );
 	void  deallocate( void );
+
+	static constexpr size_t calc_slot_header_and_container_size( size_t n, size_t req_alignsize );
 };
 
 static_assert( std::is_standard_layout<slot_header_of_alloc>::value, "slot_header_of_alloc should be standard-layout type" );
+static_assert( ( sizeof( slot_header_of_alloc ) % default_slot_alignsize ) == 0, "slot_header_of_alloc must be a constant multiple of default_slot_alignsize" );
 
 /**
  * @brief union of slot headers
@@ -205,118 +218,62 @@ union unified_slot_header {
 	  : mh_()
 	{
 	}
+};
+
+static_assert( std::is_standard_layout<unified_slot_header>::value, "unified_slot_header should be standard-layout type" );
+
+/**
+ * @brief container structure of slot
+ *
+ */
+struct slot_container {
+	std::atomic<uintptr_t> back_offset_;          //!< offset to unified_slot_header
+#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
+	std::atomic<uintptr_t> back_offset_marker_;   //!< check sum maker value
+#endif
+	unsigned char mem[0];                         //!< assignment memory area
+	                                              // there is no definition of tail_padding
+
+	slot_container( uintptr_t back_offset_arg = 0 )
+	  : back_offset_( back_offset_arg )
+#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
+	  , back_offset_marker_( make_maker_value( back_offset_arg ) )
+#endif
+	  , mem {}
+	{
+	}
+
+#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
+	inline bool check_marker( void ) const
+	{
+		return check_marker_func(
+			back_offset_.load( std::memory_order_acquire ),
+			back_offset_marker_.load( std::memory_order_acquire ) );
+	}
+#endif
 
 	static unified_slot_header* get_slot_header_from_assignment_p( void* p_mem );
+	static constexpr size_t     calc_slot_container_size( size_t n, size_t req_alignsize );
+	static void*                construct_slot_container_in_container_buffer( slot_mheader* p_bind_mh_of_slot, slot_container* p_container_top, size_t container_size, size_t n, size_t req_alignsize );
 };
 
-/**
- * @brief answer value structure of calc_addr_info_of_slot_of()
- *
- */
-struct addr_info_of_slot {
-	bool           is_success_;                        //!< if true, success to calculation
-	uintptr_t*     p_back_offset_;                     //!< pointer to back_offset
-	uintptr_t      value_of_back_offset_;              //!< value of back_offset
-	void*          p_assignment_area_;                 //!< pointer to assignment area
-	uintptr_t      value_of_offset_to_tail_padding_;   //!< value of offset_to_tail_padding_
-	unsigned char* p_tail_padding_;                    //!< pointer to offset_to_tail_padding_
-	size_t         tail_padding_size_;                 //!< tail padding size
-};
+static_assert( std::is_standard_layout<slot_container>::value, "slot_container should be standard-layout type" );
+static_assert( ( sizeof( slot_container ) % default_slot_alignsize ) == 0, "slot_container must be a constant multiple of default_slot_alignsize" );
 
-/**
- * @brief slotを構築する上で必要となる各種のアドレス情報を算出する
- *
- * @warning アライメント要求値は、2のn乗値を暗黙的に期待している。
- *
- * @note
- * 上記のアライメント要求値の期待制約を取り外す場合、アライメント要求値値とsizeof( std::max_align_t )との最小公倍数で、アライメントを行う実装が必要。
- * 具体的には、sel_alignmentsizeの算出において、アライメント要求値値とsizeof( std::max_align_t )との最小公倍数を算出する必要がある。
- *
- * @tparam SLOT_H_T slot header type. slot_header_of_array or slot_header_of_alloc
- * @param p_alloc_top pointer of allocated memory
- * @param alloc_size size of allocated memory
- * @param n size of assignment required
- * @param req_alignsize alignment size of assignment required
- * @return addr_info_of_slot result of the calculation addresses
- */
-template <typename SLOT_H_T>
-inline addr_info_of_slot calc_addr_info_of_slot_of( void* p_alloc_top, size_t alloc_size, size_t n, size_t req_alignsize )
+inline constexpr size_t slot_container::calc_slot_container_size( size_t n, size_t req_alignsize )
 {
-	size_t    min_base_size      = sizeof( SLOT_H_T ) + sizeof( std::uintptr_t );   // header + back_offset
-	uintptr_t min_base_addr      = reinterpret_cast<uintptr_t>( p_alloc_top ) + min_base_size;
-	uintptr_t tfit_req_alignsize = static_cast<uintptr_t>( req_alignsize );
-	uintptr_t mx                 = min_base_addr / tfit_req_alignsize;
-	uintptr_t rx                 = min_base_addr % tfit_req_alignsize;
-	uintptr_t ans_addr           = tfit_req_alignsize * mx + ( ( rx == 0 ) ? 0 : tfit_req_alignsize );
-	uintptr_t addr_end_of_alloc  = reinterpret_cast<uintptr_t>( p_alloc_top ) + static_cast<uintptr_t>( alloc_size );
-	uintptr_t addr_end_of_assign = ans_addr + static_cast<uintptr_t>( n );
-#if 0
-	printf( "p_alloc_top:		%p\n", p_alloc_top );
-	printf( "alloc_size:		%zu, 0x%zx\n", alloc_size, alloc_size );
-	printf( "n:			%zu\n", n );
-	printf( "req_alignsize:		%zu\n", req_alignsize );
-	printf( "min_base_size:		%zu\n", min_base_size );
-	printf( "min_base_addr:		%zx\n", min_base_addr );
-	printf( "tfit_req_alignsize:	%zu\n", tfit_req_alignsize );
-	printf( "mx:			%zu\n", mx );
-	printf( "rx:			%zu\n", rx );
-	printf( "ans_addr: 		%zx\n", ans_addr );
-	printf( "addr_end_of_alloc: 	%zx\n", addr_end_of_alloc );
-	printf( "addr_end_of_assign: 	%zx\n", addr_end_of_assign );
-#endif
-	if ( addr_end_of_assign >= addr_end_of_alloc ) {
-		// tail_paddingのサイズ分を考慮するために >= で比較している。
-		return addr_info_of_slot { false, nullptr, 0, nullptr, 0, nullptr, 0 };
-	}
-
-	size_t ans_tail_padding_size = static_cast<size_t>( ( reinterpret_cast<uintptr_t>( p_alloc_top ) + static_cast<uintptr_t>( alloc_size ) ) - ( ans_addr + static_cast<uintptr_t>( n ) ) );
-	if ( ans_tail_padding_size > ( req_alignsize + default_slot_alignsize ) ) {
-		std::string errlog = "fail the tail padding size calculation: ";
-		errlog += std::to_string( ans_tail_padding_size );
-		errlog += std::string( "  expected is smaller or equal to " );
-		errlog += std::to_string( req_alignsize + default_slot_alignsize );
-		throw std::logic_error( errlog );
-	}
-	uintptr_t*     p_back_offsetX = reinterpret_cast<uintptr_t*>( ans_addr - static_cast<uintptr_t>( sizeof( uintptr_t ) ) );
-	unsigned char* p_tail_padding = reinterpret_cast<unsigned char*>( ans_addr + static_cast<uintptr_t>( n ) );
-	return addr_info_of_slot {
-		true,
-		p_back_offsetX,
-		reinterpret_cast<uintptr_t>( p_alloc_top ) + ( static_cast<uintptr_t>( 0 ) - reinterpret_cast<uintptr_t>( p_back_offsetX ) ),
-		reinterpret_cast<void*>( ans_addr ),
-		reinterpret_cast<uintptr_t>( p_tail_padding ) - reinterpret_cast<uintptr_t>( p_alloc_top ),
-		p_tail_padding,
-		ans_tail_padding_size };
+	// slot container header + tail_padding + n bytes
+	size_t tfit_req_alignsize = ( req_alignsize > default_slot_alignsize ) ? req_alignsize : default_slot_alignsize;
+	size_t base_ans           = sizeof( slot_container ) + tfit_req_alignsize + n;
+	size_t mx                 = base_ans / default_slot_alignsize;   // TODO: ビットマスクを使った演算で多分軽量化できるが、まずは真面目に計算する。
+	size_t rx                 = base_ans % default_slot_alignsize;
+	size_t ans                = mx * default_slot_alignsize + ( ( rx == 0 ) ? 0 : default_slot_alignsize );
+	return ans;
 }
 
-/**
- * @brief 割り当てしてほしいサイズとアライメント要求値をもとに、slotサイズを求める。
- *
- * @warning アライメント要求値は、2のn乗値を暗黙的に期待している。
- *
- * @note
- * 上記のアライメント要求値の期待制約を取り外す場合、アライメント要求値値とsizeof( std::max_align_t )との最小公倍数で、アライメントを行う実装が必要。
- * 具体的には、sel_alignmentsizeの算出において、アライメント要求値値とsizeof( std::max_align_t )との最小公倍数を算出する必要がある。
- *
- * @tparam SLOT_H_T slot header type. slot_header_of_array or slot_header_of_alloc
- * @param n size of assignment required
- * @param req_alignsize alignment size of assignment required
- * @return size_t slot size
- */
-template <typename SLOT_H_T>
-inline constexpr size_t calc_total_slot_size_of_slot_header_of( size_t n, size_t req_alignsize )
+inline constexpr size_t slot_header_of_alloc::calc_slot_header_and_container_size( size_t n, size_t req_alignsize )
 {
-	size_t min_base_size = sizeof( SLOT_H_T ) + sizeof( std::uintptr_t );   // header + back_offset + n + ajusting size of alignment + minimum tail_padding
-	size_t h_n_align     = min_base_size + n + req_alignsize - 1;
-	size_t mx            = h_n_align / default_slot_alignsize;
-	size_t base_ans      = default_slot_alignsize * ( mx + 1 );   // add tail padding area
-#if 0
-	printf( "min_base_size:		%zu\n", min_base_size );
-	printf( "h_n_align:		%zu\n", h_n_align );
-	printf( "mx:			%zu\n", mx );
-	printf( "base_ans:		%zu\n", base_ans );
-#endif
-	return base_ans;
+	return sizeof( slot_header_of_alloc ) + slot_container::calc_slot_container_size( n, req_alignsize );
 }
 
 }   // namespace internal

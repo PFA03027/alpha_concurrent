@@ -48,8 +48,10 @@ void slot_array_mgr::operator delete[]( void* p_mem ) noexcept
 // placement new    可変長部分の領域も確保するnew operator
 void* slot_array_mgr::operator new( std::size_t n_of_slot_array_mgr, size_t num_of_slots_, size_t expected_alloc_n_per_slot )
 {
-	size_t total_size = n_of_slot_array_mgr + calc_total_slot_array_bytes( num_of_slots_, expected_alloc_n_per_slot );
-	auto   alloc_ret  = allocate_by_mmap( total_size, default_slot_alignsize );
+	size_t total_size = n_of_slot_array_mgr;
+	total_size += sizeof( slot_header_of_array[num_of_slots_] );
+	total_size += calc_total_slot_container_array_bytes( num_of_slots_, expected_alloc_n_per_slot );
+	auto alloc_ret = allocate_by_mmap( total_size, default_slot_alignsize );
 	if ( alloc_ret.p_allocated_addr_ == nullptr ) {
 		throw std::bad_alloc();
 	}
@@ -68,12 +70,13 @@ slot_array_mgr::slot_array_mgr( chunk_header_multi_slot* p_owner, size_t num_of_
   : alloc_size_( *( reinterpret_cast<size_t*>( this ) ) )   // ちょっとトリッキーなー方法で確保されたサイズ情報をopertor new()から受け取る。
   , num_of_slots_( num_of_slots )
   , expected_n_per_slot_( n )
-  , slot_size_of_this_( calc_one_slot_bytes( n ) )
+  , slot_container_size_of_this_( calc_one_slot_container_bytes( n ) )
   , p_owner_chunk_header_( p_owner )
   , p_free_slot_stack_head_( nullptr )
   , mtx_consignment_stack_()
   , p_consignment_stack_head_( nullptr )
-  , slot_container_ {}
+  , p_slot_container_top( reinterpret_cast<slot_container*>( &( slot_header_array_[num_of_slots_] ) ) )
+  , slot_header_array_ {}
 {
 	if ( num_of_slots_ == 0 ) {
 		return;
@@ -95,24 +98,29 @@ size_t slot_array_mgr::get_slot_idx_from_assignment_p( void* p_mem )
 		throw std::out_of_range( errlog );
 	}
 
-	unified_slot_header* p_slot_header = unified_slot_header::get_slot_header_from_assignment_p( p_mem );
-	if ( p_slot_header->mh_.offset_to_mgr_ == 0 ) {
+	unified_slot_header* p_slot_header = slot_container::get_slot_header_from_assignment_p( p_mem );
+	if ( p_slot_header->mh_.offset_to_mgr_.load( std::memory_order_acquire ) == 0 ) {
 		std::string errlog = "this slot is not slot_header_of_array.";
 		throw std::runtime_error( errlog );
 	}
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 	if ( !p_slot_header->mh_.check_marker() ) {
 		char buff[128];
-		snprintf( buff, 128, "slot header(%p) is corrupted", p_slot_header );
+		snprintf( buff, 128, "unified_slot_header(%p) is corrupted", p_slot_header );
 		throw std::runtime_error( buff );
 	}
 #endif
 
 	slot_array_mgr* p_mgr       = p_slot_header->arrayh_.mh_.get_mgr_pointer<slot_array_mgr>();
-	uintptr_t       byte_offset = reinterpret_cast<uintptr_t>( p_slot_header ) - reinterpret_cast<uintptr_t>( p_mgr->slot_container_ );
-	uintptr_t       ans_idx     = byte_offset / p_mgr->slot_size_of_this_;
+	uintptr_t       byte_offset = reinterpret_cast<uintptr_t>( p_slot_header ) - reinterpret_cast<uintptr_t>( p_mgr->slot_header_array_ );
+	size_t          ans_idx     = static_cast<size_t>( byte_offset / sizeof( slot_header_of_array ) );
+	if ( ans_idx > p_mgr->num_of_slots_ ) {
+		char buff[128];
+		snprintf( buff, 128, "too big idx: calculated idx is %zu, max_slot is %zu", ans_idx, p_mgr->num_of_slots_ );
+		throw std::out_of_range( buff );
+	}
 
-	return static_cast<size_t>( ans_idx );
+	return ans_idx;
 }
 
 }   // namespace internal

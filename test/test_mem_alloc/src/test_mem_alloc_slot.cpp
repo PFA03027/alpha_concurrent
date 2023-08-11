@@ -42,6 +42,20 @@ TEST( slot_mheader, do_construct_offset )
 #endif
 }
 
+TEST( SlotHeaderOfArray, CanCall_Constructor )
+{
+	// Arrange
+
+	// Act
+	alpha::concurrent::internal::slot_header_of_array sha( static_cast<uintptr_t>( 1 ) );
+
+	// Assert
+	EXPECT_NE( 0, sha.mh_.offset_to_mgr_.load() );
+#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
+	EXPECT_TRUE( sha.mh_.check_marker() );
+#endif
+}
+
 TEST( unified_slot_header, same_address )
 {
 	// Arrange
@@ -61,66 +75,55 @@ struct size_n_and_align {
 class SlotFunc_FixtureParam : public testing::TestWithParam<size_n_and_align> {
 };
 
-TEST_P( SlotFunc_FixtureParam, calc_total_slot_size_of_slot_header_of_slot_header_of_array )
+TEST_P( SlotFunc_FixtureParam, slot_container_calc_slot_container_size )
 {
 	// Arrange
 	auto cur_param = GetParam();
 
 	// Act
-	size_t ret_size = alpha::concurrent::internal::calc_total_slot_size_of_slot_header_of<
-		alpha::concurrent::internal::slot_header_of_array>(
-		cur_param.n_v_, cur_param.align_v_ );
+	size_t ret_size = alpha::concurrent::internal::slot_container::calc_slot_container_size( cur_param.n_v_, cur_param.align_v_ );
 
 	// Assert
-	EXPECT_GE( ret_size, sizeof( alpha::concurrent::internal::slot_header_of_array ) + sizeof( std::uintptr_t ) + cur_param.n_v_ + 1 );
+	EXPECT_GE( ret_size, sizeof( alpha::concurrent::internal::slot_container ) + cur_param.n_v_ + cur_param.align_v_ );
 }
 
-TEST_P( SlotFunc_FixtureParam, calc_addr_info_of_slot_of_slot_header_of_array )
+TEST_P( SlotFunc_FixtureParam, slot_container_calc_slot_container_size2 )
 {
 	// Arrange
-	auto   cur_param = GetParam();
-	size_t ret_size  = alpha::concurrent::internal::calc_total_slot_size_of_slot_header_of<
-        alpha::concurrent::internal::slot_header_of_array>(
-		cur_param.n_v_, cur_param.align_v_ );
-	unsigned char*                   p_tmp = new unsigned char[ret_size];
-	std::unique_ptr<unsigned char[]> up_tmp( p_tmp );
+	auto                                              cur_param = GetParam();
+	size_t                                            ret_size  = alpha::concurrent::internal::slot_container::calc_slot_container_size( cur_param.n_v_, cur_param.align_v_ );
+	unsigned char*                                    p_tmp     = new unsigned char[ret_size];
+	std::unique_ptr<unsigned char[]>                  up_tmp( p_tmp );
+	alpha::concurrent::internal::slot_header_of_array sha( static_cast<uintptr_t>( 1 ) );
+	EXPECT_NE( 0, sha.mh_.offset_to_mgr_.load() );
 
 	// Act
-	alpha::concurrent::internal::addr_info_of_slot ret = alpha::concurrent::internal::calc_addr_info_of_slot_of<
-		alpha::concurrent::internal::slot_header_of_array>(
-		p_tmp, ret_size, cur_param.n_v_, cur_param.align_v_ );
+	void* p_ret_mem = sha.allocate( reinterpret_cast<alpha::concurrent::internal::slot_container*>( p_tmp ), ret_size, cur_param.n_v_, cur_param.align_v_ );
 
 	// Assert
-	EXPECT_TRUE( ret.is_success_ );
-	uintptr_t chk_offset = reinterpret_cast<uintptr_t>( ret.p_back_offset_ ) - reinterpret_cast<uintptr_t>( p_tmp );
-	EXPECT_GE( static_cast<size_t>( chk_offset ), sizeof( alpha::concurrent::internal::slot_header_of_array ) );
-	EXPECT_EQ( reinterpret_cast<uintptr_t>( p_tmp ), reinterpret_cast<uintptr_t>( ret.p_back_offset_ ) + ret.value_of_back_offset_ );
-	chk_offset = reinterpret_cast<uintptr_t>( ret.p_assignment_area_ ) - reinterpret_cast<uintptr_t>( ret.p_back_offset_ );
-	EXPECT_EQ( static_cast<size_t>( chk_offset ), sizeof( uintptr_t ) );
-	EXPECT_EQ( reinterpret_cast<uintptr_t>( ret.p_tail_padding_ ), reinterpret_cast<uintptr_t>( p_tmp ) + ret.value_of_offset_to_tail_padding_ );
-	chk_offset = reinterpret_cast<uintptr_t>( ret.p_tail_padding_ ) - reinterpret_cast<uintptr_t>( ret.p_assignment_area_ );
-	EXPECT_EQ( static_cast<size_t>( chk_offset ), cur_param.n_v_ );
-	EXPECT_GE( ret.tail_padding_size_, 1 );
-	EXPECT_GE( cur_param.align_v_ + alpha::concurrent::internal::default_slot_alignsize, ret.tail_padding_size_ );
+	EXPECT_NE( p_ret_mem, nullptr );
+	EXPECT_EQ( 0, reinterpret_cast<uintptr_t>( p_ret_mem ) % cur_param.align_v_ );
+	EXPECT_GE( reinterpret_cast<uintptr_t>( p_ret_mem ), reinterpret_cast<uintptr_t>( p_tmp ) + sizeof( alpha::concurrent::internal::slot_container ) );
+	EXPECT_GT( reinterpret_cast<uintptr_t>( p_tmp ) + ret_size, reinterpret_cast<uintptr_t>( p_ret_mem ) + cur_param.n_v_ );
 }
 
-TEST_P( SlotFunc_FixtureParam, Call_slot_header_of_array_allocate )
+TEST_P( SlotFunc_FixtureParam, slot_container_calc_slot_container_size3 )
 {
 	// Arrange
-	auto   cur_param = GetParam();
-	size_t ret_size  = alpha::concurrent::internal::calc_total_slot_size_of_slot_header_of<
-        alpha::concurrent::internal::slot_header_of_array>(
-		cur_param.n_v_, cur_param.align_v_ );
-	unsigned char*                                     p_tmp = new unsigned char[ret_size];
-	std::unique_ptr<unsigned char[]>                   up_tmp( p_tmp );
-	alpha::concurrent::internal::slot_header_of_array* p_sut = new ( p_tmp ) alpha::concurrent::internal::slot_header_of_array( static_cast<std::uintptr_t>( 0 ) );
+	auto                                              cur_param = GetParam();
+	size_t                                            ret_size  = alpha::concurrent::internal::slot_container::calc_slot_container_size( cur_param.n_v_, cur_param.align_v_ );
+	unsigned char*                                    p_tmp     = new unsigned char[ret_size];
+	std::unique_ptr<unsigned char[]>                  up_tmp( p_tmp );
+	alpha::concurrent::internal::slot_header_of_array sha;
+	void*                                             p_ret_mem = sha.allocate( reinterpret_cast<alpha::concurrent::internal::slot_container*>( p_tmp ), ret_size, cur_param.n_v_, cur_param.align_v_ );
+	ASSERT_NE( p_ret_mem, nullptr );
 
 	// Act
-	void* p_ret = p_sut->allocate( ret_size, cur_param.n_v_, cur_param.align_v_ );
+	alpha::concurrent::internal::unified_slot_header* p_ush = alpha::concurrent::internal::slot_container::get_slot_header_from_assignment_p( p_ret_mem );
 
 	// Assert
-	EXPECT_GT( reinterpret_cast<uintptr_t>( p_ret ), reinterpret_cast<uintptr_t>( p_sut ) );
-	EXPECT_GT( reinterpret_cast<uintptr_t>( p_sut ) + ret_size, reinterpret_cast<uintptr_t>( p_ret ) );
+	ASSERT_NE( p_ush, nullptr );
+	EXPECT_EQ( &( p_ush->arrayh_ ), &sha );
 }
 
 TEST_P( SlotFunc_FixtureParam, calc_total_slot_size_of_slot_header_of_slot_header_of_alloc )
@@ -129,60 +132,66 @@ TEST_P( SlotFunc_FixtureParam, calc_total_slot_size_of_slot_header_of_slot_heade
 	auto cur_param = GetParam();
 
 	// Act
-	size_t ret_size = alpha::concurrent::internal::calc_total_slot_size_of_slot_header_of<
-		alpha::concurrent::internal::slot_header_of_alloc>(
-		cur_param.n_v_, cur_param.align_v_ );
+	size_t ret_size = alpha::concurrent::internal::slot_header_of_alloc::calc_slot_header_and_container_size( cur_param.n_v_, cur_param.align_v_ );
 
 	// Assert
-	EXPECT_GE( ret_size, sizeof( alpha::concurrent::internal::slot_header_of_alloc ) + sizeof( std::uintptr_t ) + cur_param.n_v_ + cur_param.align_v_ );
+	EXPECT_GE( ret_size, sizeof( alpha::concurrent::internal::slot_header_of_alloc ) + sizeof( alpha::concurrent::internal::slot_container ) + cur_param.n_v_ + cur_param.align_v_ );
 }
 
 TEST_P( SlotFunc_FixtureParam, calc_addr_info_of_slot_of_slot_header_of_alloc )
 {
 	// Arrange
-	auto   cur_param = GetParam();
-	size_t ret_size  = alpha::concurrent::internal::calc_total_slot_size_of_slot_header_of<
-        alpha::concurrent::internal::slot_header_of_alloc>(
-		cur_param.n_v_, cur_param.align_v_ );
-	unsigned char*                   p_tmp = new unsigned char[ret_size];
+	auto                             cur_param = GetParam();
+	size_t                           ret_size  = alpha::concurrent::internal::slot_header_of_alloc::calc_slot_header_and_container_size( cur_param.n_v_, cur_param.align_v_ );
+	unsigned char*                   p_tmp     = new unsigned char[ret_size];
 	std::unique_ptr<unsigned char[]> up_tmp( p_tmp );
 
 	// Act
-	alpha::concurrent::internal::addr_info_of_slot ret = alpha::concurrent::internal::calc_addr_info_of_slot_of<
-		alpha::concurrent::internal::slot_header_of_alloc>(
-		p_tmp, ret_size, cur_param.n_v_, cur_param.align_v_ );
+	alpha::concurrent::internal::slot_header_of_alloc* p_sut = new ( p_tmp ) alpha::concurrent::internal::slot_header_of_alloc( ret_size );
 
 	// Assert
-	EXPECT_TRUE( ret.is_success_ );
-	uintptr_t chk_offset = reinterpret_cast<uintptr_t>( ret.p_back_offset_ ) - reinterpret_cast<uintptr_t>( p_tmp );
-	EXPECT_GE( static_cast<size_t>( chk_offset ), sizeof( alpha::concurrent::internal::slot_header_of_alloc ) );
-	EXPECT_EQ( reinterpret_cast<uintptr_t>( p_tmp ), reinterpret_cast<uintptr_t>( ret.p_back_offset_ ) + ret.value_of_back_offset_ );
-	chk_offset = reinterpret_cast<uintptr_t>( ret.p_assignment_area_ ) - reinterpret_cast<uintptr_t>( ret.p_back_offset_ );
-	EXPECT_EQ( static_cast<size_t>( chk_offset ), sizeof( uintptr_t ) );
-	EXPECT_EQ( reinterpret_cast<uintptr_t>( ret.p_tail_padding_ ), reinterpret_cast<uintptr_t>( p_tmp ) + ret.value_of_offset_to_tail_padding_ );
-	chk_offset = reinterpret_cast<uintptr_t>( ret.p_tail_padding_ ) - reinterpret_cast<uintptr_t>( ret.p_assignment_area_ );
-	EXPECT_EQ( static_cast<size_t>( chk_offset ), cur_param.n_v_ );
-	EXPECT_GE( ret.tail_padding_size_, 1 );
-	EXPECT_GE( cur_param.align_v_ + alpha::concurrent::internal::default_slot_alignsize, ret.tail_padding_size_ );
+	ASSERT_NE( p_sut, nullptr );
+	EXPECT_EQ( 0, p_sut->mh_.offset_to_mgr_.load() );
 }
 
 TEST_P( SlotFunc_FixtureParam, Call_slot_header_of_alloc_allocate )
 {
 	// Arrange
-	auto   cur_param = GetParam();
-	size_t ret_size  = alpha::concurrent::internal::calc_total_slot_size_of_slot_header_of<
-        alpha::concurrent::internal::slot_header_of_alloc>(
-		cur_param.n_v_, cur_param.align_v_ );
-	unsigned char*                                     p_tmp = new unsigned char[ret_size];
+	auto                                               cur_param = GetParam();
+	size_t                                             ret_size  = alpha::concurrent::internal::slot_header_of_alloc::calc_slot_header_and_container_size( cur_param.n_v_, cur_param.align_v_ );
+	unsigned char*                                     p_tmp     = new unsigned char[ret_size];
 	std::unique_ptr<unsigned char[]>                   up_tmp( p_tmp );
 	alpha::concurrent::internal::slot_header_of_alloc* p_sut = new ( p_tmp ) alpha::concurrent::internal::slot_header_of_alloc( ret_size );
+	EXPECT_NE( p_sut, nullptr );
 
 	// Act
-	void* p_ret = p_sut->allocate( ret_size, cur_param.n_v_, cur_param.align_v_ );
+	void* p_ret_mem = p_sut->allocate( cur_param.n_v_, cur_param.align_v_ );
 
 	// Assert
-	EXPECT_GT( reinterpret_cast<uintptr_t>( p_ret ), reinterpret_cast<uintptr_t>( p_sut ) );
-	EXPECT_GT( reinterpret_cast<uintptr_t>( p_sut ) + ret_size, reinterpret_cast<uintptr_t>( p_ret ) );
+	EXPECT_NE( p_ret_mem, nullptr );
+	EXPECT_EQ( 0, reinterpret_cast<uintptr_t>( p_ret_mem ) % cur_param.align_v_ );
+	EXPECT_GE( reinterpret_cast<uintptr_t>( p_ret_mem ), reinterpret_cast<uintptr_t>( p_tmp ) + sizeof( alpha::concurrent::internal::slot_header_of_alloc ) + sizeof( alpha::concurrent::internal::slot_container ) );
+	EXPECT_GT( reinterpret_cast<uintptr_t>( p_tmp ) + ret_size, reinterpret_cast<uintptr_t>( p_ret_mem ) + cur_param.n_v_ );
+}
+
+TEST_P( SlotFunc_FixtureParam, Call_slot_header_of_alloc_allocate2 )
+{
+	// Arrange
+	auto                                               cur_param = GetParam();
+	size_t                                             ret_size  = alpha::concurrent::internal::slot_header_of_alloc::calc_slot_header_and_container_size( cur_param.n_v_, cur_param.align_v_ );
+	unsigned char*                                     p_tmp     = new unsigned char[ret_size];
+	std::unique_ptr<unsigned char[]>                   up_tmp( p_tmp );
+	alpha::concurrent::internal::slot_header_of_alloc* p_sut = new ( p_tmp ) alpha::concurrent::internal::slot_header_of_alloc( ret_size );
+	EXPECT_NE( p_sut, nullptr );
+	void* p_ret = p_sut->allocate( cur_param.n_v_, cur_param.align_v_ );
+	EXPECT_NE( p_ret, nullptr );
+
+	// Act
+	alpha::concurrent::internal::unified_slot_header* p_ush = alpha::concurrent::internal::slot_container::get_slot_header_from_assignment_p( p_ret );
+
+	// Assert
+	ASSERT_NE( p_ush, nullptr );
+	EXPECT_EQ( &( p_ush->alloch_ ), p_sut );
 }
 
 INSTANTIATE_TEST_SUITE_P(
