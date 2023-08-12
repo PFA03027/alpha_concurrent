@@ -130,6 +130,12 @@ size_t slot_array_mgr::get_slot_idx_from_slot_header_of_array( slot_header_of_ar
 	return ans_idx;
 }
 
+void slot_array_mgr::dump( void )
+{
+	internal::LogOutput( log_type::DUMP, "slot_array_mgr(%p)={alloc_size_=%zu,num_of_slots_=%zu,expected_n_per_slot_=%zu,slot_container_size_of_this_=%zu,p_owner_chunk_header_=%p,p_slot_container_top=%p}",
+	                     this, alloc_size_, num_of_slots_, expected_n_per_slot_, slot_container_size_of_this_, p_owner_chunk_header_.load(), p_slot_container_top );
+}
+
 }   // namespace internal
 }   // namespace concurrent
 }   // namespace alpha

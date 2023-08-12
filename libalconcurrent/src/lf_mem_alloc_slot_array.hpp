@@ -222,8 +222,7 @@ struct slot_array_mgr {
 		free_slots_storage_.push( p_used_slot );
 	}
 
-	static slot_header_of_array* get_pointer_of_slot_header_of_array_from_assignment_p( void* p_mem );
-	static size_t                get_slot_idx_from_slot_header_of_array( slot_header_of_array* p_slot_header );
+	void dump( void );
 
 	void* operator new( std::size_t n );                                                                             // usual new...(1)   このクラスでは使用してはならないnew operator
 	void  operator delete( void* p_mem ) noexcept;                                                                   // usual delete...(2)
@@ -233,6 +232,9 @@ struct slot_array_mgr {
 
 	void* operator new( std::size_t n_of_slot_array_mgr, size_t num_of_slots_, size_t expected_alloc_n_per_slot );   // placement new    可変長部分の領域も確保するnew operator
 	void  operator delete( void* p, void* p2 ) noexcept;                                                             // placement delete...(3)   このクラスでは使用してはならないdelete operator。このdelete operator自身は何もしない。
+
+	static slot_header_of_array* get_pointer_of_slot_header_of_array_from_assignment_p( void* p_mem );
+	static size_t                get_slot_idx_from_slot_header_of_array( slot_header_of_array* p_slot_header );
 
 	static constexpr size_t calc_one_slot_container_bytes( size_t n )
 	{
