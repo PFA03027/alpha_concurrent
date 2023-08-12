@@ -100,7 +100,7 @@ struct dynamic_tls_key {
 	std::atomic<void*>                          tls_p_data_;        //!< atomic pointer of the paramter data for thread local storage
 	std::atomic<uintptr_t ( * )( void* )>       tls_allocator_;     //!< atomic pointer of allocator for thread local storage
 	std::atomic<void ( * )( uintptr_t, void* )> tls_deallocator_;   //!< atomic pointer of deallocator for thread local storage
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	bt_info bt_when_allocate_;                                      //!< back trace information when key is allocated
 #endif
 
@@ -110,7 +110,7 @@ struct dynamic_tls_key {
 	  , tls_p_data_( nullptr )
 	  , tls_allocator_( nullptr )
 	  , tls_deallocator_( nullptr )
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	  , bt_when_allocate_()
 #endif
 	{
@@ -552,7 +552,7 @@ public:
 			if ( key_array_[cur_hint].is_used_.compare_exchange_strong( expected_alloc_stat, dynamic_tls_key::alloc_stat::USED ) ) {
 				// 割り当て成功
 				num_of_free_.fetch_sub( 1, std::memory_order_acq_rel );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 				RECORD_BACKTRACE_GET_BACKTRACE( key_array_[cur_hint].bt_when_allocate_ );
 #endif
 				key_array_[cur_hint].tls_p_data_.store( p_param, std::memory_order_release );
@@ -882,13 +882,13 @@ void call_destructor_for_array_and_clear_data( dynamic_tls_key_array* p_key_arra
 			op_ret destuct_result = it_tls_->destruct_tls_by_thread_exit( &cur_key );
 			if ( destuct_result != op_ret::SUCCESS ) {
 				is_finish = false;
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 				static std::atomic<int> ec( 0 );
 				int                     cc = ec.fetch_add( 1, std::memory_order_acq_rel );
 				internal::LogOutput( log_type::WARN, "dynamic_tls_key(%p): backtrace when allocated", &( cur_key ) );
 				cur_key.bt_when_allocate_.dump_to_log( log_type::WARN, 'a', cc );
 #else
-				internal::LogOutput( log_type::WARN, "dynamic_tls_key(%p): if you would like to get previous released backtrace, please compile libalconcurrent with ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE", &( cur_key ) );
+				internal::LogOutput( log_type::WARN, "dynamic_tls_key(%p): if you would like to get previous released backtrace, please compile libalconcurrent with ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE", &( cur_key ) );
 #endif
 			}
 		}
@@ -1026,11 +1026,11 @@ bool dynamic_tls_key_array::release_key( dynamic_tls_key* p_key_arg )
 		} else {
 			internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p) is now unknown status", p_key_arg );
 		}
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p): backtrace where this key is allocated", p_key_arg );
 		p_key_arg->bt_when_allocate_.dump_to_log( log_type::ERR, 'p', cc );
 #else
-		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p): if you would like to get backtrace where this key is allocated, please compile libalconcurrent with ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE", p_key_arg );
+		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p): if you would like to get backtrace where this key is allocated, please compile libalconcurrent with ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE", p_key_arg );
 #endif
 		return false;
 	}
@@ -1071,7 +1071,7 @@ bool dynamic_tls_key_array::release_key( dynamic_tls_key* p_key_arg )
 		p_cur_dtls_c = p_cur_dtls_c->p_next_.load( std::memory_order_acquire );
 	}
 
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	RECORD_BACKTRACE_INVALIDATE_BACKTRACE( p_key_arg->bt_when_allocate_ );
 #endif
 

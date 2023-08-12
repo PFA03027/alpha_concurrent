@@ -39,6 +39,16 @@ constexpr size_t default_align_size = 32;
  */
 void* allocating_only( size_t req_size, size_t req_align = default_align_size );
 
+/**
+ * @brief to detect unexpected deallocation calling
+ *
+ * normally nothing to do
+ * If the library compile with ALCONCURRENT_CONF_DETECT_UNEXPECTED_DEALLOC_CALLING, this function throw std::runtime_error.
+ *
+ * @param p_mem
+ */
+void allocating_only_deallocate( void* p_mem );
+
 // configuration value
 constexpr size_t conf_pre_mmap_size = 1024 * 1024;
 

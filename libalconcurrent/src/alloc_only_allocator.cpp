@@ -29,7 +29,7 @@ namespace internal {
 struct room_boader {
 	const size_t    chopped_size_;                       //!< chopped roomのサイズ。次のroom_boaderへのオフセットも意味する。そのため、次のroom_boaderのアライメント、およびtail_padding領域を含む
 	const uintptr_t offset_into_the_allocated_memory_;   //!< 呼び出し元に渡したメモリアドレスへのオフセット
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	bt_info alloc_bt_info_;                              //!< backtrace information when is allocated
 #endif
 
@@ -66,11 +66,11 @@ inline uintptr_t room_boader::calc_allocated_addr( uintptr_t base_addr, size_t r
 room_boader::room_boader( size_t chopped_size_arg, size_t req_size, size_t req_align )
   : chopped_size_( chopped_size_arg )
   , offset_into_the_allocated_memory_( calc_allocated_addr( reinterpret_cast<uintptr_t>( this ), req_align ) - reinterpret_cast<uintptr_t>( this ) )
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
   , alloc_bt_info_()
 #endif
 {
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	RECORD_BACKTRACE_GET_BACKTRACE( alloc_bt_info_ );
 #endif
 
@@ -96,7 +96,7 @@ void room_boader::dump_to_log( log_type lt, char c, int id )
 		offset_into_the_allocated_memory_,
 		reinterpret_cast<void*>( reinterpret_cast<uintptr_t>( this ) + offset_into_the_allocated_memory_ ) );
 
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	alloc_bt_info_.dump_to_log( lt, c, id );
 #endif
 }
@@ -120,7 +120,7 @@ struct alloc_chamber {
 	const size_t                chamber_size_;   //!< alloc_chamberのサイズ
 	std::atomic<alloc_chamber*> next_;           //!< alloc_chamberのスタックリスト上の次のalloc_chamber
 	std::atomic<uintptr_t>      offset_;         //!< 次のallocateの先頭へのオフセット
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	bt_info alloc_bt_info_;                      //!< backtrace information when is allocated
 #endif
 	unsigned char roomtop_[0];
@@ -149,11 +149,11 @@ alloc_chamber::alloc_chamber( size_t chamber_size_arg )
   : chamber_size_( chamber_size_arg )
   , next_( nullptr )
   , offset_( calc_init_offset() )
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
   , alloc_bt_info_()
 #endif
 {
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	RECORD_BACKTRACE_GET_BACKTRACE( alloc_bt_info_ );
 #endif
 }
@@ -211,7 +211,7 @@ void alloc_chamber::dump_to_log( log_type lt, char c, int id )
 		offset_.load( std::memory_order_acquire ),
 		chamber_size_ - offset_.load( std::memory_order_acquire ) );
 
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	alloc_bt_info_.dump_to_log( lt, c, id );
 #endif
 
@@ -312,6 +312,14 @@ void* allocating_only( size_t req_size, size_t req_align )
 	alloc_chamber_head::get_inst().push_alloc_mem( ret_mmap.p_allocated_addr_, ret_mmap.allocated_size_ );
 
 	return alloc_chamber_head::get_inst().allocate( req_size, req_align );
+}
+
+void allocating_only_deallocate( void* p_mem )
+{
+#ifdef ALCONCURRENT_CONF_DETECT_UNEXPECTED_DEALLOC_CALLING
+	throw std::runtime_error( "allocating_only_deallocate is called unexpectedly" );
+#endif
+	return;
 }
 
 }   // namespace internal

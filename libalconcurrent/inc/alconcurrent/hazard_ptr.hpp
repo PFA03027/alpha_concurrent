@@ -214,7 +214,7 @@ private:
 				return false;
 			}
 
-			return status_.compare_exchange_strong( cur, ocupied_status::USING );
+			return status_.compare_exchange_strong( cur, ocupied_status::USING, std::memory_order_acq_rel );
 		}
 
 		ocupied_status get_status( void )
@@ -310,7 +310,7 @@ private:
 			node_for_hazard_ptr* p_next_check = head_.load( std::memory_order_acquire );
 			do {
 				p_ans->set_next( p_next_check );
-			} while ( !head_.compare_exchange_strong( p_next_check, p_ans ) );   // CASが成功するまで繰り返す。
+			} while ( !head_.compare_exchange_strong( p_next_check, p_ans, std::memory_order_acq_rel ) );   // CASが成功するまで繰り返す。
 			node_count_++;
 
 			internal::LogOutput( log_type::DEBUG, "glist is added by add_one_new_hazard_ptr_node(%p)", p_ans );

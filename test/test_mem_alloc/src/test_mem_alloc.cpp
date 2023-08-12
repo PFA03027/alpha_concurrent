@@ -184,10 +184,33 @@ TEST_F( lfmemAlloc, TestChunkHeaderMultiSlot )
 	EXPECT_EQ( nullptr, test_ptr3 );
 
 	EXPECT_FALSE( p_chms->recycle_mem_slot( test_ptr3 ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 	EXPECT_FALSE( p_chms->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 ) ) );
-
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_GT( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
+#endif
 	EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr1 ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
+#endif
 	EXPECT_TRUE( p_chms->recycle_mem_slot( test_ptr2 ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_EQ( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
+#endif
 
 	alpha::concurrent::chunk_statistics e = p_chms->get_statistics();
 
@@ -239,10 +262,17 @@ TEST_F( lfmemAlloc, TestChunkList_IllegalAddressFree )
 	EXPECT_NE( nullptr, test_ptr2 );
 	EXPECT_NE( nullptr, test_ptr3 );
 
-	EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr3 + 1 ) ) );
-	EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 ) ) );
-
-	EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr2 + 1 ) ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
+	{
+		EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr3 + 1 ) ) );
+		EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 ) ) );
+		EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr2 + 1 ) ) );
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_GT( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
+#endif
 
 	alpha::concurrent::chunk_statistics e = p_ch_lst->get_statistics();
 
@@ -342,8 +372,7 @@ TEST_F( lfmemAlloc, TestGeneralMemAllocator_prune )
 	return;
 }
 
-#define GM_ALIGN_SIZE ( alignof( std::max_align_t ) )
-#define RQ_SIZE       ( GM_ALIGN_SIZE + 1 )
+#define RQ_SIZE ( alpha::concurrent::default_slot_alignsize + 1 )
 
 TEST_F( lfmemAlloc, TestGMemAllocator )
 {
@@ -352,9 +381,9 @@ TEST_F( lfmemAlloc, TestGMemAllocator )
 		void* test_ptr1 = alpha::concurrent::gmem_allocate( rq_size );
 		EXPECT_NE( nullptr, test_ptr1 ) << std::to_string( i ) << ": request size: " << std::to_string( rq_size ) << std::endl;
 
-		// GM_ALIGN_SIZEでメモリがアライメントされていることを確認する
+		// alpha::concurrent::default_slot_alignsizeでメモリがアライメントされていることを確認する
 		std::uintptr_t chk_ptr_align = reinterpret_cast<std::uintptr_t>( test_ptr1 );
-		EXPECT_EQ( chk_ptr_align % GM_ALIGN_SIZE, 0 ) << std::to_string( i ) << ": request size: " << std::to_string( rq_size ) << std::endl;
+		EXPECT_EQ( chk_ptr_align % alpha::concurrent::default_slot_alignsize, 0 ) << std::to_string( i ) << ": request size: " << std::to_string( rq_size ) << std::endl;
 
 		alpha::concurrent::gmem_deallocate( test_ptr1 );
 
@@ -401,11 +430,11 @@ TEST_F( lfmemAlloc, TestBacktrace )
 	ASSERT_NE( nullptr, test_ptr1 );
 
 	auto bt_info1 = alpha::concurrent::get_backtrace_info( test_ptr1 );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	ASSERT_TRUE( std::get<0>( bt_info1 ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 	EXPECT_NE( 0, std::get<1>( bt_info1 ).count_ );
 #else
-	EXPECT_EQ( 0, std::get<1>( bt_info1 ).count_ );
+	ASSERT_FALSE( std::get<0>( bt_info1 ) );
 #endif
 	alpha::concurrent::output_backtrace_info( alpha::concurrent::log_type::TEST, test_ptr1 );
 
@@ -413,13 +442,12 @@ TEST_F( lfmemAlloc, TestBacktrace )
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else
 	bt_info1 = alpha::concurrent::get_backtrace_info( test_ptr1 );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	ASSERT_TRUE( std::get<0>( bt_info1 ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 	EXPECT_NE( 0, std::get<1>( bt_info1 ).count_ );
 	EXPECT_NE( 0, std::get<2>( bt_info1 ).count_ );
 #else
-	EXPECT_EQ( 0, std::get<1>( bt_info1 ).count_ );
-	EXPECT_EQ( 0, std::get<2>( bt_info1 ).count_ );
+	ASSERT_FALSE( std::get<0>( bt_info1 ) );
 #endif
 #endif
 
@@ -427,11 +455,11 @@ TEST_F( lfmemAlloc, TestBacktrace )
 	ASSERT_NE( nullptr, test_ptr2 );
 
 	auto bt_info2 = alpha::concurrent::get_backtrace_info( test_ptr2 );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	ASSERT_TRUE( std::get<0>( bt_info2 ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 	EXPECT_NE( 0, std::get<1>( bt_info2 ).count_ );
 #else
-	EXPECT_EQ( 0, std::get<1>( bt_info2 ).count_ );
+	ASSERT_FALSE( std::get<0>( bt_info2 ) );
 #endif
 
 	alpha::concurrent::output_backtrace_info( alpha::concurrent::log_type::TEST, test_ptr2 );
@@ -440,13 +468,12 @@ TEST_F( lfmemAlloc, TestBacktrace )
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else
 	bt_info2 = alpha::concurrent::get_backtrace_info( test_ptr2 );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	ASSERT_TRUE( std::get<0>( bt_info2 ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 	EXPECT_NE( 0, std::get<1>( bt_info2 ).count_ );
 	EXPECT_NE( 0, std::get<2>( bt_info2 ).count_ );
 #else
-	EXPECT_EQ( 0, std::get<1>( bt_info2 ).count_ );
-	EXPECT_EQ( 0, std::get<2>( bt_info2 ).count_ );
+	ASSERT_FALSE( std::get<0>( bt_info2 ) );
 #endif
 #endif
 
@@ -462,8 +489,18 @@ TEST_F( lfmemAlloc, TestBacktrace2 )
 	ASSERT_NE( nullptr, test_ptr1 );
 
 	auto bt_info1 = alpha::concurrent::get_backtrace_info( test_ptr1 );
-	std::free( test_ptr1 );
 	ASSERT_FALSE( std::get<0>( bt_info1 ) );
+	std::free( test_ptr1 );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
+	{
+		int err_cnt, warn_cnt;
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
+		EXPECT_GT( err_cnt, 0 );
+		EXPECT_EQ( warn_cnt, 0 );
+	}
+#endif
+#endif
 #endif
 
 	return;
@@ -476,11 +513,11 @@ TEST_F( lfmemAlloc, TestBacktrace3 )
 	ASSERT_NE( nullptr, test_ptr1 );
 
 	auto bt_info1 = alpha::concurrent::get_backtrace_info( test_ptr1 );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	ASSERT_TRUE( std::get<0>( bt_info1 ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE
 	EXPECT_NE( 0, std::get<1>( bt_info1 ).count_ );
 #else
-	EXPECT_EQ( 0, std::get<1>( bt_info1 ).count_ );
+	ASSERT_FALSE( std::get<0>( bt_info1 ) );
 #endif
 	alpha::concurrent::gmem_deallocate( test_ptr1 );
 
@@ -489,11 +526,6 @@ TEST_F( lfmemAlloc, TestBacktrace3 )
 
 TEST( expriment_impl, general_mem_allocator_impl_test )
 {
-	constexpr alpha::concurrent::param_chunk_allocation test_param_array[] = {
-		{ alignof( std::max_align_t ), 32 },       // 1
-		{ alignof( std::max_align_t ) * 2, 32 },   // 2
-	};                                             //!< pointer to default parameter array
-
 	alpha::concurrent::static_general_mem_allocator<2> a(
 		alpha::concurrent::param_chunk_allocation { 24, 32 },      // 1
 		alpha::concurrent::param_chunk_allocation { 24 * 2, 32 }   // 2

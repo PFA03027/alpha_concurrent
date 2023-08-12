@@ -145,7 +145,7 @@ struct dynamic_tls_thread_cnt {
 		auto cur     = cur_thread_count_.fetch_add( 1, std::memory_order_acq_rel ) + 1;
 		auto cur_max = max_thread_count_.load( std::memory_order_acquire );
 		if ( cur > cur_max ) {
-			max_thread_count_.compare_exchange_strong( cur_max, cur );
+			max_thread_count_.compare_exchange_strong( cur_max, cur, std::memory_order_acq_rel );
 		}
 	}
 
@@ -435,6 +435,27 @@ public:
 
 		// printf( "YYYYYYYYYYY tmp_ret.p_data_ = %lx\n", tmp_ret.p_data_ );
 		return reinterpret_cast<value_type>( tmp_ret.p_data_ );
+	}
+
+	/**
+	 * @brief gets a reference of thread local data with the constructor paramters for first call of a thread
+	 *
+	 * If a call of this I/F by a thread is first, this I/F will allocate a thread local memory for T and
+	 * construct it by it's constructor with Args and args.
+	 *
+	 * @tparam Args	constructor paramter types of T
+	 *
+	 * @return a reference of thread local data
+	 *
+	 * @exception if fail to allocate thread local data, throw std::bad_alloc
+	 */
+	void set_value_to_tls_instance( value_type p_data )
+	{
+		auto tmp_ret = internal::dynamic_tls_setspecific( tls_key_chk_and_get(), reinterpret_cast<uintptr_t>( p_data ) );
+		if ( tmp_ret != internal::op_ret::SUCCESS ) {
+			throw std::bad_alloc();
+		}
+		return;
 	}
 
 	/**
