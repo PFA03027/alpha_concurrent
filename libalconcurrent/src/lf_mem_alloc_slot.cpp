@@ -61,7 +61,7 @@ void slot_header_of_array::deallocate( void )
 	}
 #endif
 
-	mh_.offset_to_tail_padding_ = 0;
+	mh_.offset_to_tail_padding_ = 0;   // mark as not used
 
 	return;
 }
@@ -115,30 +115,36 @@ void slot_header_of_alloc::deallocate( void )
 	}
 #endif
 
-	mh_.offset_to_tail_padding_ = 0;
+	mh_.offset_to_tail_padding_ = 0;   // mark as not used
 
 	return;
 }
 
-unified_slot_header* slot_container::get_slot_header_from_assignment_p( void* p_mem )
+bool_unified_slot_header_p slot_container::get_slot_header_from_assignment_p( void* p_mem )
 {
 	slot_container* p_slot_container = reinterpret_cast<slot_container*>( reinterpret_cast<uintptr_t>( p_mem ) - static_cast<uintptr_t>( sizeof( slot_container ) ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGICAL_ERROR
 	if ( p_mem != reinterpret_cast<void*>( p_slot_container->mem ) ) {
-		std::string errlog = "does not match p_mem and slot_container::mem[0]";
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
+		std::string errlog = "does not match p_mem and slot_container::mem[0]. This is logical error.";
 		throw std::logic_error( errlog );
+#else
+		internal::LogOutput( log_type::ERR, "does not match p_mem and slot_container::mem[0]. This is logical error." );
+		return { false, nullptr };
+#endif
 	}
+#endif
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 	if ( !p_slot_container->check_marker() ) {
-		char buff[128];
-		snprintf( buff, 128, "slot_container(%p) is corrupted", p_slot_container );
-		throw std::runtime_error( buff );
+		internal::LogOutput( log_type::ERR, "slot_container(%p) is corrupted", p_slot_container );
+		return { false, nullptr };
 	}
 #endif
 
 	uintptr_t addr_back_offsetX = reinterpret_cast<uintptr_t>( &( p_slot_container->back_offset_ ) );
 	uintptr_t addr_ush          = addr_back_offsetX + p_slot_container->back_offset_.load( std::memory_order_acquire );
 
-	return reinterpret_cast<unified_slot_header*>( addr_ush );
+	return bool_unified_slot_header_p { true, reinterpret_cast<unified_slot_header*>( addr_ush ) };
 }
 
 void* slot_container::construct_slot_container_in_container_buffer( slot_mheader* p_bind_mh_of_slot, slot_container* p_container_top, size_t container_size, size_t n, size_t req_alignsize )

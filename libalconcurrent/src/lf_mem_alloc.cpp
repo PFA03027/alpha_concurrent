@@ -25,6 +25,8 @@
 #include "utility.hpp"
 
 #include "lf_mem_alloc_basic_allocator.hpp"
+#include "lf_mem_alloc_slot.hpp"
+#include "lf_mem_alloc_slot_array.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -46,8 +48,6 @@ bool test_platform_std_atomic_lockfree_condition( void )
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 namespace internal {
-
-constexpr size_t GM_ALIGN_SIZE = alignof( std::max_align_t );
 
 chunk_statistics chunk_list_statistics::get_statistics( void ) const
 {
@@ -71,626 +71,19 @@ chunk_statistics chunk_list_statistics::get_statistics( void ) const
 	return ans;
 }
 
-idx_mgr_element::idx_mgr_element( void )
-  : idx_( -1 )
-  , p_invalid_idx_next_element_( nullptr )
-  , p_valid_idx_next_element_( nullptr )
-  , p_waiting_next_element_( nullptr )
-{
-	return;
-}
-
-/*!
- * @brief	dump for debug
- */
-void idx_mgr_element::dump( void ) const
-{
-	internal::LogOutput( log_type::DUMP,
-	                     "object idx_mgr_element_%p as %p {\n"
-	                     "\t idx_ = %d\n"
-	                     "\t p_invalid_idx_next_element_ = %p\n"
-	                     "\t p_valid_idx_next_element_ = %p\n"
-	                     "\t p_waiting_next_element_ = %p\n"
-	                     "}\n",
-	                     this, this,
-	                     idx_,
-	                     p_invalid_idx_next_element_.load( std::memory_order_acquire ),
-	                     p_valid_idx_next_element_.load( std::memory_order_acquire ),
-	                     p_waiting_next_element_ );
-
-	if ( p_invalid_idx_next_element_.load( std::memory_order_acquire ) != nullptr ) {
-		internal::LogOutput( log_type::DUMP,
-		                     "%p --> %p : invalid",
-		                     this, p_invalid_idx_next_element_.load( std::memory_order_acquire ) );
-	}
-
-	if ( p_valid_idx_next_element_.load( std::memory_order_acquire ) != nullptr ) {
-		internal::LogOutput( log_type::DUMP,
-		                     "%p --> %p : valid",
-		                     this, p_valid_idx_next_element_.load( std::memory_order_acquire ) );
-	}
-
-	if ( p_waiting_next_element_ != nullptr ) {
-		internal::LogOutput( log_type::DUMP,
-		                     "%p --> %p : waiting",
-		                     this, p_waiting_next_element_ );
-	}
-
-	return;
-}
-
-waiting_element_list::waiting_element_list( void )
-  : head_( nullptr )
-  , tail_( nullptr )
-{
-	return;
-}
-
-waiting_element_list::~waiting_element_list()
-{
-	head_ = nullptr;
-	tail_ = nullptr;
-}
-
-idx_mgr_element* waiting_element_list::pop( void )
-{
-	idx_mgr_element* p_ans = nullptr;
-
-	if ( head_ == nullptr ) return nullptr;
-
-	p_ans = head_;
-	head_ = head_->p_waiting_next_element_;
-	if ( head_ == nullptr ) {
-		tail_ = nullptr;
-	}
-
-	return p_ans;
-}
-
-void waiting_element_list::push(
-	idx_mgr_element* p_el_arg   //
-)
-{
-	p_el_arg->p_waiting_next_element_ = nullptr;
-
-	if ( tail_ != nullptr ) {
-		tail_->p_waiting_next_element_ = p_el_arg;
-		tail_                          = p_el_arg;
-	} else {
-		head_ = p_el_arg;
-		tail_ = p_el_arg;
-	}
-
-	return;
-}
-
-void waiting_element_list::dump( void ) const
-{
-	internal::LogOutput( log_type::DUMP,
-	                     "object waiting_element_list_%p as %p {\n"
-	                     "\t head_ = %p\n"
-	                     "\t tail_ = %p\n"
-	                     "}",
-	                     this, this,
-	                     head_,
-	                     tail_ );
-
-	if ( head_ != nullptr ) {
-		internal::LogOutput( log_type::DUMP,
-		                     "%p --> %p",
-		                     this, head_ );
-	}
-
-	if ( tail_ != nullptr ) {
-		internal::LogOutput( log_type::DUMP,
-		                     "%p --> %p",
-		                     this, tail_ );
-	}
-
-	return;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
-/*!
- * @brief	インデックス管理スロットのロックフリーストレージクラス
- */
-idx_element_storage_mgr::idx_element_storage_mgr(
-	std::atomic<idx_mgr_element*> idx_mgr_element::*p_next_ptr_offset_arg,   //!< [in] nextポインタを保持しているメンバ変数へのメンバ変数ポインタ
-	std::atomic<unsigned int>*                      p_collition_counter      //!< [in] 衝突が発生した回数を記録するアトミック変数へのポインタ
-	)
-  : mtx_rcv_wait_element_list_()
-  , rcv_wait_element_list_()
-  , tls_waiting_list_( rcv_el_threadlocal_handler( this ) )
-  , hzrd_element_()
-  , head_( nullptr )
-  , tail_( nullptr )
-  , p_next_ptr_offset_( p_next_ptr_offset_arg )
-  , p_collision_cnt_( p_collition_counter )
-{
-	return;
-}
-
-/*!
- * @brief	ストレージから１つの要素を取り出す
- *
- * @return	pointer to the poped element
- * @retval	nullptr	no available element
- */
-idx_mgr_element* idx_element_storage_mgr::pop_element( void )
-{
-	idx_mgr_element*      p_ans     = nullptr;
-	waiting_element_list& wait_list = tls_waiting_list_.get_tls_instance();
-
-	p_ans = wait_list.pop();
-	if ( p_ans != nullptr ) {
-		// スレッドローカルストレージからノードが取り出せたので、さらに1回リサイクルを試みる
-		idx_mgr_element* p_tmp_recycle = wait_list.pop();
-		if ( p_tmp_recycle != nullptr ) {
-			if ( hzrd_element_.check_ptr_in_hazard_list( p_tmp_recycle ) ) {
-				// まだハザードポインタに登録されていたので、スレッドローカルストレージに差し戻す
-				wait_list.push( p_tmp_recycle );
-			} else {
-				// ハザードポインタに登録されていなかったので、共有リストへpush
-				push_element_to_list( p_tmp_recycle );
-			}
-		}
-	} else {
-		// スレッドローカルストレージは空だったので、共有リストから取り出す。
-		p_ans = pop_element_from_list();
-
-		if ( p_ans == nullptr ) {
-			// 共有リストからの取得も出来なかったため、回収されたリストを確認する。
-			std::unique_lock<std::mutex> lk( mtx_rcv_wait_element_list_, std::try_to_lock );
-			if ( lk.owns_lock() ) {
-				p_ans = rcv_wait_element_list_.pop();
-			}
-		}
-	}
-
-	return p_ans;
-}
-
-/*!
- * @brief	ストレージへ１つの要素を戻す
- */
-void idx_element_storage_mgr::push_element(
-	idx_mgr_element* p_push_element   //!< [in] pointer of element to push
-)
-{
-	waiting_element_list& wait_list     = tls_waiting_list_.get_tls_instance();
-	idx_mgr_element*      p_tmp_recycle = wait_list.pop();   // 新たに登録されるポインタとのチェックが重複しないように、先に読みだしておく
-
-	if ( hzrd_element_.check_ptr_in_hazard_list( p_push_element ) ) {
-		// まだハザードポインタに登録されていたので、スレッドローカルストレージに戻す
-		wait_list.push( p_push_element );
-	} else {
-		// ハザードポインタに登録されていなかったので、共有リストへpush
-		push_element_to_list( p_push_element );
-	}
-
-	if ( p_tmp_recycle != nullptr ) {
-		if ( hzrd_element_.check_ptr_in_hazard_list( p_tmp_recycle ) ) {
-			// まだハザードポインタに登録されていたので、スレッドローカルストレージに差し戻す
-			wait_list.push( p_tmp_recycle );
-		} else {
-			// ハザードポインタに登録されていなかったので、共有リストへpush
-			push_element_to_list( p_tmp_recycle );
-		}
-	}
-
-	return;
-}
-
-void idx_element_storage_mgr::clear( void )
-{
-	while ( pop_element() != nullptr ) {}
-	return;
-}
-
-void idx_element_storage_mgr::dump( void ) const
-{
-	rcv_wait_element_list_.dump();
-	return;
-}
-
-idx_mgr_element* idx_element_storage_mgr::pop_element_from_list( void )
-{
-	scoped_hazard_ref scoped_ref_first( hzrd_element_, (int)hazard_ptr_idx::POP_CUR );
-	scoped_hazard_ref scoped_ref_next( hzrd_element_, (int)hazard_ptr_idx::POP_NEXT );
-
-	while ( true ) {
-		idx_mgr_element* p_cur_first = head_.load( std::memory_order_acquire );
-		scoped_ref_first.regist_ptr_as_hazard_ptr( p_cur_first );
-		if ( p_cur_first != head_.load( std::memory_order_acquire ) ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-			( *p_collision_cnt_ )++;
-#endif
-			continue;
-		}
-
-		if ( p_cur_first == nullptr ) {
-			// stackは空。
-			return nullptr;
-		}
-
-		idx_mgr_element* p_cur_next = ( p_cur_first->*p_next_ptr_offset_ ).load( std::memory_order_acquire );
-		scoped_ref_next.regist_ptr_as_hazard_ptr( p_cur_next );
-		if ( p_cur_next != ( p_cur_first->*p_next_ptr_offset_ ).load( std::memory_order_acquire ) ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-			( *p_collision_cnt_ )++;
-#endif
-			continue;
-		}
-
-		// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
-		// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
-		if ( head_.compare_exchange_weak( p_cur_first, p_cur_next ) ) {
-			// ここで、firstの取り出しと所有権確保が完了
-			// ただし、ハザードポインタをチェックしていないため、まだ参照している人がいるかもしれない。
-			return p_cur_first;
-		}
-#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-		( *p_collision_cnt_ )++;
-#endif
-	}
-	return nullptr;
-}
-
-/*!
- * @brief	ストレージへ１つの要素を戻す
- */
-void idx_element_storage_mgr::push_element_to_list(
-	idx_mgr_element* p_push_element   //!< [in] pointer of element to push
-)
-{
-	( p_push_element->*p_next_ptr_offset_ ).store( nullptr, std::memory_order_release );
-
-	scoped_hazard_ref scoped_ref_cur( hzrd_element_, (int)hazard_ptr_idx::PUSH_CUR );
-
-	while ( true ) {
-		idx_mgr_element* p_cur_top = head_.load( std::memory_order_acquire );
-		scoped_ref_cur.regist_ptr_as_hazard_ptr( p_cur_top );
-		if ( p_cur_top != head_.load( std::memory_order_acquire ) ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-			( *p_collision_cnt_ )++;
-#endif
-			continue;
-		}
-
-		( p_push_element->*p_next_ptr_offset_ ).store( p_cur_top, std::memory_order_release );
-
-		// head_を更新する。
-		// ここで、プリエンプションして、tail_がA->B->A'となった時、p_cur_lastが期待値とは異なるが、
-		// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
-		if ( head_.compare_exchange_weak( p_cur_top, p_push_element ) ) {
-			break;   // 追加完了
-		}
-#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-		( *p_collision_cnt_ )++;
-#endif
-	}
-	return;
-}
-
-void idx_element_storage_mgr::rcv_wait_element_by_thread_terminating( waiting_element_list* p_el_list )
-{
-	std::lock_guard<std::mutex> lk( mtx_rcv_wait_element_list_ );
-
-	idx_mgr_element* p_poped_el = p_el_list->pop();
-	while ( p_poped_el != nullptr ) {
-		rcv_wait_element_list_.push( p_poped_el );
-		p_poped_el = p_el_list->pop();
-	}
-
-	return;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-waiting_idx_list::waiting_idx_list( const int idx_buff_size_arg, const int ver_arg )
-  : ver_( ver_arg )
-  , idx_buff_size_( idx_buff_size_arg )
-  , idx_top_idx_( 0 )
-  , p_idx_buff_( nullptr )
-{
-
-	if ( idx_buff_size_arg >= 0 ) {
-		p_idx_buff_ = new int[idx_buff_size_];
-	}
-	return;
-}
-
-waiting_idx_list::~waiting_idx_list()
-{
-#if 0
-	// ハザードポインタの対応の為に一時的に滞留しているだけで、
-	// このクラスのインスタンスが廃棄される時は、idx_mgrクラスの利用者側は、使用済みとして返却済みの為、リークを起こしているわけではない。
-	// よって、ここで残留があったとしても、idx_mgrクラスの観点では、リークしていない。
-	// この点を踏まえると、残留チェックは意味がないので、チェックを無効化する。
-	if ( idx_top_idx_ > 0 ) {
-		char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
-
-		internal::LogOutput( log_type::WARN, "waiting_idx_list_%p is destructed. but it has some index {", this );
-		for ( int i = 0; i < idx_top_idx_; i++ ) {
-			internal::LogOutput( log_type::WARN, "\t%d,", p_idx_buff_[i] );
-		}
-		internal::LogOutput( log_type::WARN, "}" );
-	}
+struct slot_header {
+	std::atomic<chunk_header_multi_slot*> at_p_chms_;   //!< pointer to chunk_header_multi_slot that is an owner of this slot
+	std::atomic<std::uintptr_t>           at_mark_;     //!< checker mark
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+	bt_info alloc_bt_info_;                             //!< backtrace information when is allocated
+	bt_info free_bt_info_;                              //!< backtrace information when is free
 #endif
 
-	delete[] p_idx_buff_;
-	p_idx_buff_ = nullptr;
-}
-
-void waiting_idx_list::chk_reset_and_set_size( const int idx_buff_size_arg, const int ver_arg )
-{
-	if ( ver_ == ver_arg ) return;
-
-	delete[] p_idx_buff_;
-	p_idx_buff_    = nullptr;
-	idx_buff_size_ = idx_buff_size_arg;
-	idx_top_idx_   = 0;
-	ver_           = ver_arg;
-
-	if ( idx_buff_size_ > 0 ) {
-		p_idx_buff_ = new int[idx_buff_size_];
-	}
-
-	return;
-}
-
-int waiting_idx_list::pop_from_tls( const int idx_buff_size_arg, const int ver_arg )
-{
-	chk_reset_and_set_size( idx_buff_size_arg, ver_arg );
-
-	int ans = -1;
-
-	if ( idx_top_idx_ <= 0 ) return ans;
-
-	idx_top_idx_--;
-
-	ans                       = p_idx_buff_[idx_top_idx_];
-	p_idx_buff_[idx_top_idx_] = -1;
-
-	return ans;
-}
-
-void waiting_idx_list::push_to_tls( const int valid_idx, const int idx_buff_size_arg, const int ver_arg )
-{
-	chk_reset_and_set_size( idx_buff_size_arg, ver_arg );
-
-	if ( idx_top_idx_ >= idx_buff_size_ ) {
-		throw std::exception();
-		return;
-	}
-
-	p_idx_buff_[idx_top_idx_] = valid_idx;
-	idx_top_idx_++;
-
-	return;
-}
-
-void waiting_idx_list::dump( void ) const
-{
-	internal::LogOutput( log_type::DUMP,
-	                     "object waiting_idx_list_%p as %p {\n"
-	                     "\t idx_buff_size_ = %d\n"
-	                     "\t idx_top_idx_ = %d\n"
-	                     "\t p_idx_buff_ = %p\n"
-	                     "}",
-	                     this, this,
-	                     idx_buff_size_,
-	                     idx_top_idx_,
-	                     p_idx_buff_ );
-
-	if ( p_idx_buff_ != nullptr ) {
-		internal::LogOutput( log_type::DUMP,
-		                     "object p_idx_buff_%p as %p {",
-		                     this, this );
-
-		for ( int i = 0; i < idx_buff_size_; i++ ) {
-			internal::LogOutput( log_type::DUMP,
-			                     "\t %d => %d",
-			                     i, p_idx_buff_[i] );
-		}
-
-		internal::LogOutput( log_type::DUMP, "}" );
-	}
-
-	return;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/*!
- * @brief	コンストラクタ
- */
-idx_mgr::idx_mgr(
-	const int                  idx_size_arg,                 //!< [in] 用意するインデックス番号の数。-1の場合、割り当てを保留する。
-	std::atomic<unsigned int>* p_alloc_collision_cnt_arg,    //!< [in] 衝突回数をカウントする変数へのポインタ。ポインタ先のインスタンスは、このインスタンス以上のライフタイムを持つこと
-	std::atomic<unsigned int>* p_dealloc_collision_cnt_arg   //!< [in] 衝突回数をカウントする変数へのポインタ。ポインタ先のインスタンスは、このインスタンス以上のライフタイムを持つこと
-	)
-  : idx_size_( idx_size_arg )
-  , idx_size_ver_( 0 )
-  , mtx_rcv_waiting_idx_list_()
-  , rcv_waiting_idx_list_( idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) )
-  , p_alloc_collision_cnt_( p_alloc_collision_cnt_arg )
-  , p_dealloc_collision_cnt_( p_dealloc_collision_cnt_arg )
-  , p_idx_mgr_element_array_( nullptr )
-  , invalid_element_storage_( &idx_mgr_element::p_invalid_idx_next_element_, p_alloc_collision_cnt_ )
-  , valid_element_storage_( &idx_mgr_element::p_valid_idx_next_element_, p_dealloc_collision_cnt_ )
-  , tls_waiting_idx_list_( rcv_idx_by_thread_terminating( this ) )
-{
-	if ( idx_size_.load( std::memory_order_acquire ) <= 0 ) return;
-
-	set_idx_size( idx_size_.load( std::memory_order_acquire ) );
-	return;
-}
-
-idx_mgr::~idx_mgr()
-{
-	delete[] p_idx_mgr_element_array_;
-	p_idx_mgr_element_array_ = nullptr;
-}
-
-void idx_mgr::set_idx_size( const int idx_size_arg )
-{
-	if ( idx_size_arg <= 0 ) {
-		idx_size_.store( -1, std::memory_order_release );
-		return;
-	}
-
-	idx_size_ver_++;
-
-	// idx_mgr_elementのコンストラクタによる初期化を機能させるため、配列の再利用はしない。
-	p_idx_mgr_element_array_ = new idx_mgr_element[idx_size_arg];
-	idx_size_.store( idx_size_arg, std::memory_order_release );
-
-	tls_waiting_idx_list_.get_tls_instance( /*idx_size_.load(std::memory_order_acquire), idx_size_ver_.load(std::memory_order_acquire)*/ );
-
-	for ( int i = 0; i < idx_size_.load( std::memory_order_acquire ); i++ ) {
-		p_idx_mgr_element_array_[i].idx_ = i;
-		valid_element_storage_.push_element( &( p_idx_mgr_element_array_[i] ) );
-	}
-
-	return;
-}
-
-void idx_mgr::clear( void )
-{
-	std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
-
-	invalid_element_storage_.~idx_element_storage_mgr();   // 強引に動的スレッドローカルストレージを含めて破棄する。
-	valid_element_storage_.~idx_element_storage_mgr();     // 強引に動的スレッドローカルストレージを含めて破棄する。
-	tls_waiting_idx_list_.~dynamic_tls();                  // 強引に動的スレッドローカルストレージを含めて破棄する。
-
-	delete[] p_idx_mgr_element_array_;
-	p_idx_mgr_element_array_ = nullptr;
-
-	// 強引に初期化
-	new ( &invalid_element_storage_ ) idx_element_storage_mgr( &idx_mgr_element::p_invalid_idx_next_element_, p_alloc_collision_cnt_ );
-	new ( &valid_element_storage_ ) idx_element_storage_mgr( &idx_mgr_element::p_valid_idx_next_element_, p_dealloc_collision_cnt_ );
-	new ( &tls_waiting_idx_list_ ) dynamic_tls<waiting_idx_list, rcv_idx_by_thread_terminating>( rcv_idx_by_thread_terminating( this ) );
-}
-
-int idx_mgr::pop( void )
-{
-	int               ans       = -1;
-	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( /*idx_size_.load(std::memory_order_acquire), idx_size_ver_.load(std::memory_order_acquire)*/ );
-
-	ans = wait_list.pop_from_tls( idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) );
-	if ( ans != -1 ) {
-		return ans;
-	}
-
-	idx_mgr_element* p_valid_pop_element = valid_element_storage_.pop_element();
-
-	if ( p_valid_pop_element == nullptr ) {
-		std::unique_lock<std::mutex> lk( mtx_rcv_waiting_idx_list_, std::try_to_lock );
-		if ( lk.owns_lock() ) {
-			int tmp_ans = rcv_waiting_idx_list_.pop_from_tls( idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) );
-			if ( tmp_ans >= 0 ) {
-				return tmp_ans;
-			}
-		}
-		return -1;
-	}
-
-	ans                       = p_valid_pop_element->idx_;
-	p_valid_pop_element->idx_ = -1;
-
-	invalid_element_storage_.push_element( p_valid_pop_element );
-
-	return ans;
-}
-
-void idx_mgr::push(
-	const int idx_arg   //!< [in] 返却するインデックス番号
-)
-{
-	waiting_idx_list& wait_list = tls_waiting_idx_list_.get_tls_instance( /*idx_size_.load(std::memory_order_acquire), idx_size_ver_.load(std::memory_order_acquire)*/ );
-
-	idx_mgr_element* p_invalid_element = invalid_element_storage_.pop_element();
-
-	if ( p_invalid_element == nullptr ) {
-		// スロットに空きがないので、ローカルストレージで保持する。
-		wait_list.push_to_tls( idx_arg, idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) );
-	} else {
-
-		p_invalid_element->idx_ = idx_arg;
-
-		valid_element_storage_.push_element( p_invalid_element );
-	}
-
-	return;
-}
-
-void idx_mgr::rcv_wait_idx_by_thread_terminating( waiting_idx_list* p_idx_list )
-{
-	std::lock_guard<std::mutex> lock( mtx_rcv_waiting_idx_list_ );
-
-	int tmp_idx = p_idx_list->pop_from_tls( idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) );
-
-	while ( tmp_idx >= 0 ) {
-		rcv_waiting_idx_list_.push_to_tls( tmp_idx, idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) );
-		tmp_idx = p_idx_list->pop_from_tls( idx_size_.load( std::memory_order_acquire ), idx_size_ver_.load( std::memory_order_acquire ) );
-	}
-
-	return;
-}
-
-void idx_mgr::dump( void )
-{
-	const waiting_idx_list& tmp_wel = tls_waiting_idx_list_.get_tls_instance( /*idx_size_.load(std::memory_order_acquire), idx_size_ver_.load(std::memory_order_acquire)*/ );
-
-	internal::LogOutput( log_type::DUMP,
-	                     "object idx_mgr_%p as %p {\n"
-	                     "\t idx_size_ = %d\n"
-	                     "\t idx_size_ver_ = %d\n"
-	                     "\t p_idx_mgr_element_array_ = %p\n"
-	                     "\t invalid_element_stack_head_ = %p\n"
-	                     "\t valid_element_stack_head_ = %p\n"
-	                     "\t waiting_element_list = %p\n"
-	                     "}",
-	                     this, this,
-	                     idx_size_.load( std::memory_order_acquire ),
-	                     idx_size_ver_.load( std::memory_order_acquire ),
-	                     p_idx_mgr_element_array_,
-	                     &invalid_element_storage_,
-	                     &valid_element_storage_,
-	                     &tmp_wel );
-
-	if ( p_idx_mgr_element_array_ != nullptr ) {
-		internal::LogOutput( log_type::DUMP,
-		                     "%p --> %p ",
-		                     this, p_idx_mgr_element_array_ );
-	}
-
-	internal::LogOutput( log_type::DUMP,
-	                     "%p --> %p ",
-	                     this, &invalid_element_storage_ );
-	invalid_element_storage_.dump();
-
-	internal::LogOutput( log_type::DUMP,
-	                     "%p --> %p ",
-	                     this, &valid_element_storage_ );
-	valid_element_storage_.dump();
-
-	internal::LogOutput( log_type::DUMP,
-	                     "%p --> %p ",
-	                     this, &tmp_wel );
-
-	if ( p_idx_mgr_element_array_ != nullptr ) {
-		for ( int i = 0; i < idx_size_; i++ ) {
-			p_idx_mgr_element_array_[i].dump();
-		}
-	}
-
-	tmp_wel.dump();
-
-	return;
-}
-
-////////////////////////////////////////////////////////////////////////////////
+	void set_addr_of_chunk_header_multi_slot(
+		chunk_header_multi_slot* p_chms_arg   //!< [in] pointer to a parent "chunk_header_multi_slot"
+	);
+};
 
 void slot_header::set_addr_of_chunk_header_multi_slot( chunk_header_multi_slot* p_chms_arg )
 {
@@ -711,19 +104,6 @@ void slot_header::set_addr_of_chunk_header_multi_slot( chunk_header_multi_slot* 
 	return;
 }
 
-slot_chk_result slot_header::chk_header_data( void ) const
-{
-	// 今は簡単な仕組みで実装する
-	chunk_header_multi_slot* p_this_chms = at_p_chms_.load( std::memory_order_acquire );
-	std::uintptr_t           tmp         = reinterpret_cast<std::uintptr_t>( p_this_chms );
-	tmp += at_mark_.load( std::memory_order_acquire ) + 1;
-
-	slot_chk_result ans;
-	ans.correct_ = ( tmp == 0 );
-	ans.p_chms_  = p_this_chms;
-	return ans;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 chunk_header_multi_slot::chunk_header_multi_slot(
 	const param_chunk_allocation& ch_param_arg,      //!< [in] chunk allocation paramter
@@ -736,10 +116,7 @@ chunk_header_multi_slot::chunk_header_multi_slot(
   , num_of_accesser_( 0 )
   , p_statistics_( p_chms_stat_arg )
   , slot_conf_ {}
-  , free_slot_idx_mgr_( -1, &( p_statistics_->alloc_collision_cnt_ ), &( p_statistics_->dealloc_collision_cnt_ ) )
-  , p_free_slot_mark_( nullptr )
-  , p_chunk_( nullptr )
-  , allocated_size_( 0 )
+  , p_slot_array_mgr_( nullptr )
 {
 	assert( p_statistics_ != nullptr );
 
@@ -752,35 +129,18 @@ chunk_header_multi_slot::chunk_header_multi_slot(
 
 chunk_header_multi_slot::~chunk_header_multi_slot()
 {
-	delete[] p_free_slot_mark_;
-	deallocate_by_munmap( p_chunk_, allocated_size_ );
-
-	p_free_slot_mark_ = nullptr;
-	p_chunk_          = nullptr;
-	allocated_size_   = 0U;
-
 	p_statistics_->chunk_num_--;
+
+	delete p_slot_array_mgr_;
 
 	return;
 }
 
 constexpr std::size_t get_slot_header_size( void )
 {
-	std::size_t tmp = sizeof( slot_header ) / GM_ALIGN_SIZE;
+	std::size_t tmp = sizeof( slot_header ) / default_slot_alignsize;
 
-	std::size_t ans = ( tmp + 1 ) * GM_ALIGN_SIZE;
-
-	return ans;
-}
-
-std::size_t chunk_header_multi_slot::get_size_of_one_slot(
-	const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
-)
-{
-	std::size_t tmp = ch_param_arg.size_of_one_piece_ / GM_ALIGN_SIZE;
-
-	std::size_t ans = ( tmp + 1 ) * GM_ALIGN_SIZE;
-	ans += get_slot_header_size();
+	std::size_t ans = ( tmp + 1 ) * default_slot_alignsize;
 
 	return ans;
 }
@@ -792,7 +152,9 @@ void chunk_header_multi_slot::set_slot_allocation_conf(
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
 	scoped_inout_counter_atomic_int cnt_inout( num_of_accesser_ );
 
-	slot_conf_.size_of_one_piece_ = get_size_of_one_slot( ch_param_arg );
+	// 補正を行う
+	std::size_t tmp               = ch_param_arg.size_of_one_piece_ / default_slot_alignsize;
+	slot_conf_.size_of_one_piece_ = ( tmp + 1 ) * default_slot_alignsize;
 	slot_conf_.num_of_pieces_     = ( ch_param_arg.num_of_pieces_ >= 2 ) ? ch_param_arg.num_of_pieces_ : 2;
 
 	return;
@@ -808,42 +170,15 @@ bool chunk_header_multi_slot::alloc_new_chunk(
 
 	// get ownership to allocate a chunk	// access権を取得を試みる
 	chunk_control_status expect = chunk_control_status::EMPTY;
-	bool                 result = status_.compare_exchange_strong( expect, chunk_control_status::RESERVED_ALLOCATION );
+	bool                 result = status_.compare_exchange_strong( expect, chunk_control_status::RESERVED_ALLOCATION, std::memory_order_acq_rel );
 	if ( !result ) return false;
 	// resultが真となったので、以降、このchunkに対する、領域確保の処理実行権を保有。
 
 	set_slot_allocation_conf( ch_param_arg );
 
-	std::size_t tmp_size;
-	tmp_size = (std::size_t)slot_conf_.size_of_one_piece_ * (std::size_t)slot_conf_.num_of_pieces_;
+	// slot_array_mgrの確保
+	p_slot_array_mgr_ = slot_array_mgr::make_instance( this, slot_conf_.num_of_pieces_, slot_conf_.size_of_one_piece_ );
 
-	if ( tmp_size == 0 ) {
-		status_.store( chunk_control_status::EMPTY, std::memory_order_release );
-		return false;
-	}
-
-	p_free_slot_mark_ = new std::atomic<slot_status_mark>[slot_conf_.num_of_pieces_];
-	if ( p_free_slot_mark_ == nullptr ) {
-		status_.store( chunk_control_status::EMPTY, std::memory_order_release );
-		return false;
-	}
-	for ( unsigned int i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
-		p_free_slot_mark_[i].store( slot_status_mark::FREE, std::memory_order_release );
-	}
-
-	auto alloc_ret = allocate_by_mmap( tmp_size, sizeof( uintptr_t ) );
-	if ( alloc_ret.p_allocated_addr_ == nullptr ) {
-		delete[] p_free_slot_mark_;
-		p_free_slot_mark_ = nullptr;
-		status_.store( chunk_control_status::EMPTY, std::memory_order_release );
-		return false;
-	}
-	p_chunk_        = alloc_ret.p_allocated_addr_;
-	allocated_size_ = alloc_ret.allocated_size_;
-
-	size_of_chunk_ = tmp_size;
-
-	free_slot_idx_mgr_.set_idx_size( slot_conf_.num_of_pieces_ );
 	owner_tl_id_.store( owner_tl_id_arg, std::memory_order_release );
 
 	p_statistics_->valid_chunk_num_.fetch_add( 1, std::memory_order_acq_rel );
@@ -870,34 +205,25 @@ void* chunk_header_multi_slot::allocate_mem_slot_impl( void )
 	p_statistics_->alloc_req_cnt_++;
 #endif
 
-	int read_idx = free_slot_idx_mgr_.pop();
-	if ( read_idx == -1 ) {
+	void* p_ans = p_slot_array_mgr_->allocate( slot_conf_.size_of_one_piece_ );
+	if ( p_ans == nullptr ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 		p_statistics_->alloc_req_err_cnt_++;
 #endif
 		return nullptr;
 	}
 
-	// フリースロットからスロットを確保したので、使用中のマークを付ける。
-	// Since we got a slot from a free slot, mark it as in use.
-	p_free_slot_mark_[read_idx].store( slot_status_mark::INUSE, std::memory_order_release );
-
-	// 得たスロットに対応する実際のメモリ領域のアドレス情報を生成する。
-	// Generate the address information of the actual memory area corresponding to the obtained slot.
-	std::uintptr_t p_ans_addr = reinterpret_cast<std::uintptr_t>( p_chunk_ );
-	p_ans_addr += read_idx * slot_conf_.size_of_one_piece_;
-
-	// always overwrite header information to fix a corrupted header
-	slot_header* p_sh = reinterpret_cast<slot_header*>( p_ans_addr );
-	p_sh->set_addr_of_chunk_header_multi_slot( this );
-
-	return reinterpret_cast<void*>( p_ans_addr + get_slot_header_size() );
+	return p_ans;
 }
 
 bool chunk_header_multi_slot::recycle_mem_slot_impl(
 	void* p_recycle_addr   //!< [in] pointer to the memory slot to recycle.
 )
 {
+	if ( p_recycle_addr == nullptr ) {
+		return false;
+	}
+
 	// access可能状態かどうかを事前チェック
 	switch ( status_.load( std::memory_order_acquire ) ) {
 		default:
@@ -932,74 +258,50 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 	}
 
 	// 自分のものかを確認する
-	std::uintptr_t slot_header_addr_tmp = reinterpret_cast<std::uintptr_t>( p_recycle_addr );
-	slot_header_addr_tmp -= get_slot_header_size();
-	void* p_slot_addr = reinterpret_cast<void*>( slot_header_addr_tmp );
-
-	// check correct address or not.
-	if ( p_slot_addr < p_chunk_ ) return false;   // 自分のものではなかった。
-
-	std::uintptr_t p_chking_addr = reinterpret_cast<std::uintptr_t>( p_slot_addr );
-	p_chking_addr -= reinterpret_cast<std::uintptr_t>( p_chunk_ );
-
-	std::uintptr_t idx = p_chking_addr / slot_conf_.size_of_one_piece_;
-	std::uintptr_t adt = p_chking_addr % slot_conf_.size_of_one_piece_;
-
-	if ( idx >= slot_conf_.num_of_pieces_ ) return false;   // 自分のものではなかった。
-	if ( adt != 0 ) return false;                           // 自分のものではなかった。
-		                                                    // ここに到達した時点で、自分のものであること判明
+	auto chk_ret = slot_container::get_slot_header_from_assignment_p( p_recycle_addr );
+	if ( chk_ret.is_ok_ ) {
+		if ( chk_ret.p_ush_->check_type() ) {
+			// allocタイプなので、自分のものではない。
+			return false;
+		}
+		slot_array_mgr* p_rcv_sam = chk_ret.p_ush_->arrayh_.mh_.get_mgr_pointer();
+		if ( p_rcv_sam == nullptr ) {
+			return false;
+		}
+		if ( p_rcv_sam->p_owner_chunk_header_ != this ) {
+			return false;
+		}
+		// ここに到達した時点で、自分のものであること判明
 
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-	p_statistics_->dealloc_req_cnt_++;
+		p_statistics_->dealloc_req_cnt_++;
 #endif
-
-	slot_status_mark expect_not_free = slot_status_mark::INUSE;
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	slot_header* p_sh = reinterpret_cast<slot_header*>( p_slot_addr );
-#endif
-#ifdef ALCONCURRENT_CONF_ENABLE_NON_REUSE_MEMORY_SLOT
-	bool result = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, slot_status_mark::DISCARED );
+		// OK. correct address
+		p_rcv_sam->deallocate( &( chk_ret.p_ush_->arrayh_ ) );
+	} else {
+#if 1
+		return false;
 #else
-	bool result = p_free_slot_mark_[idx].compare_exchange_strong( expect_not_free, slot_status_mark::FREE, std::memory_order_acq_rel );
-#endif
+		// ヘッダが壊れているようなので、アドレス情報から、スロット情報を引き出せるか試す。
+		if ( reinterpret_cast<uintptr_t>( p_recycle_addr ) < reinterpret_cast<uintptr_t>( p_slot_array_mgr_->p_slot_container_top ) ) {
+			// slot_containerの範囲外なので、あきらめる。
+			return false;
+		}
+		uintptr_t addr_diff   = reinterpret_cast<uintptr_t>( p_recycle_addr ) - reinterpret_cast<uintptr_t>( p_slot_array_mgr_->p_slot_container_top );
+		uintptr_t slots_count = addr_diff / p_slot_array_mgr_->slot_container_size_of_this_;
+		if ( slots_count >= p_slot_array_mgr_->num_of_slots_ ) {
+			// slot_containerの範囲外なので、あきらめる。
+			return false;
+		}
+		// ここに到達した時点で、自分のものであること判明
 
-	if ( !result ) {
-		// double free has occured.
-		internal::LogOutput( log_type::ERR, "double free has occured." );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-		static std::atomic_int double_free_counter( 0 );
-		int                    id_count = double_free_counter.fetch_add( 1, std::memory_order_acq_rel );
-
-		internal::LogOutput( log_type::ERR, "[%d-f] backtrace of previous free call", id_count );
-		p_sh->free_bt_info_.dump_to_log( log_type::ERR, 'f', id_count );
-
-		bt_info cur_bt;
-		RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
-		internal::LogOutput( log_type::ERR, "[%d-h] backtrace of current free call", id_count );
-		cur_bt.dump_to_log( log_type::ERR, 'h', id_count );
-
-		internal::LogOutput( log_type::ERR, "[%d-a] backtrace of allocation call", id_count );
-		p_sh->alloc_bt_info_.dump_to_log( log_type::ERR, 'a', id_count );
-#endif
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-		p_statistics_->dealloc_req_err_cnt_++;
+		p_statistics_->dealloc_req_cnt_++;
 #endif
-		return true;
+		// OK. correct address
+		p_slot_array_mgr_->deallocate( p_slot_array_mgr_->get_pointer_of_slot( slots_count ) );
+#endif
 	}
-
-	// OK. correct address
-#ifdef ALCONCURRENT_CONF_ENABLE_NON_REUSE_MEMORY_SLOT
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	RECORD_BACKTRACE_GET_BACKTRACE( p_sh->free_bt_info_ );
-#endif
-#else
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	RECORD_BACKTRACE_GET_BACKTRACE( p_sh->free_bt_info_ );
-	RECORD_BACKTRACE_INVALIDATE_BACKTRACE( p_sh->alloc_bt_info_ );
-#endif
-
-	free_slot_idx_mgr_.push( idx );
-#endif
 
 	return true;
 }
@@ -1045,7 +347,7 @@ void* chunk_header_multi_slot::try_allocate_mem_slot_impl(
 
 	// オーナー権の確認 or 確保を試みる
 	unsigned int expect_tl_id = expect_tl_id_arg;
-	if ( !owner_tl_id_.compare_exchange_strong( expect_tl_id, owner_tl_id_arg ) ) {
+	if ( !owner_tl_id_.compare_exchange_strong( expect_tl_id, owner_tl_id_arg, std::memory_order_acq_rel ) ) {
 		return nullptr;
 	}
 
@@ -1095,7 +397,7 @@ bool chunk_header_multi_slot::exec_deletion( void )
 
 	// 削除予約付けを試みる。
 	expect = chunk_control_status::NORMAL;
-	result = status_.compare_exchange_strong( expect, chunk_control_status::RESERVED_DELETION );
+	result = status_.compare_exchange_strong( expect, chunk_control_status::RESERVED_DELETION, std::memory_order_acq_rel );
 	if ( !result ) {
 		// 削除予約付けに失敗した。ただし、すでに、削除予約付け済みかもしれないため、チェックする。
 		if ( expect != chunk_control_status::RESERVED_DELETION ) {
@@ -1103,8 +405,8 @@ bool chunk_header_multi_slot::exec_deletion( void )
 			return false;
 		}
 	}
-	for ( unsigned int ii = 0; ii < slot_conf_.num_of_pieces_; ii++ ) {
-		if ( p_free_slot_mark_[ii].load( std::memory_order_acquire ) != slot_status_mark::FREE ) {
+	for ( size_t i = 0; i < p_slot_array_mgr_->num_of_slots_; i++ ) {
+		if ( p_slot_array_mgr_->slot_header_array_[i].mh_.offset_to_tail_padding_.load( std::memory_order_acquire ) != 0 ) {
 			// 使用中のslotが見つかったため、削除を取りやめる。
 			return false;
 		}
@@ -1112,11 +414,12 @@ bool chunk_header_multi_slot::exec_deletion( void )
 
 	// DELETEの予告を試みる。
 	expect = chunk_control_status::RESERVED_DELETION;
-	result = status_.compare_exchange_strong( expect, chunk_control_status::ANNOUNCEMENT_DELETION );
-	if ( !result ) return false;
+	if ( !status_.compare_exchange_strong( expect, chunk_control_status::ANNOUNCEMENT_DELETION, std::memory_order_acq_rel ) ) {
+		return false;
+	}
 
-	for ( unsigned int ii = 0; ii < slot_conf_.num_of_pieces_; ii++ ) {
-		if ( p_free_slot_mark_[ii].load( std::memory_order_acquire ) != slot_status_mark::FREE ) {
+	for ( size_t i = 0; i < p_slot_array_mgr_->num_of_slots_; i++ ) {
+		if ( p_slot_array_mgr_->slot_header_array_[i].mh_.offset_to_tail_padding_.load( std::memory_order_acquire ) != 0 ) {
 			// 使用中のslotが見つかったため、削除を取りやめる。
 			status_.store( chunk_control_status::RESERVED_DELETION, std::memory_order_release );
 			return false;
@@ -1132,19 +435,15 @@ bool chunk_header_multi_slot::exec_deletion( void )
 
 	// DELETEの実行権の獲得を試みる。
 	expect = chunk_control_status::ANNOUNCEMENT_DELETION;
-	result = status_.compare_exchange_strong( expect, chunk_control_status::ANNOUNCEMENT_DELETION );
-	if ( !result ) return false;
+	if ( !status_.compare_exchange_strong( expect, chunk_control_status::ANNOUNCEMENT_DELETION, std::memory_order_acq_rel ) ) {
+		return false;
+	}
 
 	std::lock_guard<std::recursive_mutex> lg( dynamic_tls_global_exclusive_control_for_destructions );
 
-	deallocate_by_munmap( p_chunk_, allocated_size_ );
-	delete[] p_free_slot_mark_;
-
-	p_chunk_          = nullptr;
-	allocated_size_   = 0U;
-	p_free_slot_mark_ = nullptr;
+	delete p_slot_array_mgr_;   // スロット配列を削除する
+	p_slot_array_mgr_ = nullptr;
 	owner_tl_id_.store( NON_OWNERED_TL_ID, std::memory_order_release );
-	free_slot_idx_mgr_.clear();
 
 	p_statistics_->valid_chunk_num_.fetch_sub( 1, std::memory_order_acq_rel );
 	p_statistics_->total_slot_cnt_.fetch_sub( slot_conf_.num_of_pieces_, std::memory_order_acq_rel );
@@ -1159,18 +458,22 @@ slot_chk_result chunk_header_multi_slot::get_chunk(
 	void* p_addr   //!< [in] void* address that allocate_mem_slot() returns
 )
 {
-	std::uintptr_t slot_header_addr_tmp = reinterpret_cast<std::uintptr_t>( p_addr );
-	slot_header_addr_tmp -= get_slot_header_size();
-	slot_header* p_slot_addr = reinterpret_cast<slot_header*>( slot_header_addr_tmp );
-
-	slot_chk_result ret = p_slot_addr->chk_header_data();
-	if ( !( ret.correct_ ) ) {
-		internal::LogOutput( log_type::ERR,
-		                     "a header of slot_header is corrupted %p",
-		                     p_addr );
+	auto chk_ret = slot_container::get_slot_header_from_assignment_p( p_addr );
+	if ( !chk_ret.is_ok_ ) {
+		// 多分slot_containerのヘッダが壊れてるか、無関係のアドレスが渡された
+		return slot_chk_result { false, nullptr };
+	}
+	if ( chk_ret.p_ush_->check_type() ) {
+		// allocタイプなので、chunk_header_multi_slotへのポインタ情報はない
+		return slot_chk_result { false, nullptr };
+	}
+	slot_array_mgr* p_rcv_sam = chk_ret.p_ush_->arrayh_.mh_.get_mgr_pointer();
+	if ( p_rcv_sam == nullptr ) {
+		// 多分slot_header_of_arrayヘッダが壊れてる。
+		return slot_chk_result { false, nullptr };
 	}
 
-	return ret;
+	return slot_chk_result { true, p_rcv_sam->p_owner_chunk_header_ };
 }
 
 chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
@@ -1195,58 +498,16 @@ void chunk_header_multi_slot::dump( void )
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
 	scoped_inout_counter_atomic_int cnt_inout( num_of_accesser_ );
 
-	if ( p_chunk_ != nullptr ) {
-		internal::LogOutput( log_type::DUMP,
-		                     "object chunk_%p as %p ",
-		                     p_chunk_, p_chunk_ );
-	}
-
-	if ( p_free_slot_mark_ != nullptr ) {
-		internal::LogOutput( log_type::DUMP,
-		                     "object p_free_slot_mark_%p as %p {",
-		                     p_free_slot_mark_, p_free_slot_mark_ );
-
-		for ( std::size_t i = 0; i < slot_conf_.num_of_pieces_; i++ ) {
-			const char* p_value_str = nullptr;
-			switch ( p_free_slot_mark_[i].load( std::memory_order_acquire ) ) {
-				case slot_status_mark::FREE: {
-					p_value_str = "slot_status_mark::FREE";
-				} break;
-				case slot_status_mark::INUSE: {
-					p_value_str = "slot_status_mark::INUSE";
-				} break;
-				case slot_status_mark::DISCARED: {
-					p_value_str = "slot_status_mark::DISCARED";
-				} break;
-				default: {
-					p_value_str = "slot_status_mark::unknown";
-				} break;
-			}
-			internal::LogOutput( log_type::DUMP,
-			                     "%zu = %s",
-			                     i, p_value_str );
-		}
-		internal::LogOutput( log_type::DUMP, "}" );
-	}
-
 	internal::LogOutput( log_type::DUMP,
 	                     "object chunk_header_multi_slot_%p as %p {\n"
 	                     "\t alloc_conf_.size_of_one_piece_ = %u \n"
 	                     "\t alloc_conf_.num_of_pieces_ = %u \n"
-	                     "\t size_of_chunk_ = %zu \n"
-	                     "\t p_free_slot_mark_ = %p \n"
-	                     "\t p_chunk_ = %p \n"
-	                     "\t free_slot_idx_mgr_ = %p \n"
 	                     "}",
 	                     this, this,
 	                     slot_conf_.size_of_one_piece_,
-	                     slot_conf_.num_of_pieces_,
-	                     size_of_chunk_,
-	                     p_free_slot_mark_,
-	                     p_chunk_,
-	                     &free_slot_idx_mgr_ );
-
-	free_slot_idx_mgr_.dump();
+	                     slot_conf_.num_of_pieces_
+	                     //
+	);
 
 	return;
 }
@@ -1533,14 +794,11 @@ void* general_mem_allocator_impl_allocate(
 		}
 	}
 
-	// 対応するサイズのメモリスロットが見つからなかったので、mallocでメモリ領域を確保する。
-	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( basic_mem_allocator::allocate( n_arg + internal::get_slot_header_size() ) );
-
-	p_sh->set_addr_of_chunk_header_multi_slot( nullptr );
-
-	std::uintptr_t tmp_ans = reinterpret_cast<std::uintptr_t>( p_sh );
-	tmp_ans += internal::get_slot_header_size();
-	p_ans = reinterpret_cast<void*>( tmp_ans );
+	// 対応するサイズのメモリスロットが見つからなかったので、slot_header_of_alloc経由でメモリ領域を確保する。
+	size_t                buff_size              = slot_header_of_alloc::calc_slot_header_and_container_size( n_arg, default_slot_alignsize /* TBD */ );
+	void*                 p_allocated_slot       = basic_mem_allocator::allocate( buff_size );
+	slot_header_of_alloc* p_slot_header_of_alloc = new ( p_allocated_slot ) slot_header_of_alloc( buff_size );
+	p_ans                                        = p_slot_header_of_alloc->allocate( n_arg, default_slot_alignsize /* TBD */ );
 
 	return p_ans;
 }
@@ -1555,19 +813,28 @@ void general_mem_allocator_impl_deallocate(
 	internal::slot_chk_result chk_ret = internal::chunk_header_multi_slot::get_chunk( p_mem );
 
 	if ( chk_ret.correct_ ) {
-		if ( chk_ret.p_chms_ != nullptr ) {
-			chk_ret.p_chms_->recycle_mem_slot( p_mem );
-		} else {
-			std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
-			tmp_addr -= internal::get_slot_header_size();
-			internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( tmp_addr );
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-			RECORD_BACKTRACE_GET_BACKTRACE( p_sh->free_bt_info_ );
-			RECORD_BACKTRACE_INVALIDATE_BACKTRACE( p_sh->alloc_bt_info_ );
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGICAL_ERROR
+		if ( chk_ret.p_chms_ == nullptr ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
+			std::string errlog = "return value of get_chunk() is unexpected";
+			throw std::logic_error( errlog );
+#else
+			internal::LogOutput( log_type::ERR, "return value of get_chunk() is unexpected" );
+			return;
 #endif
-			basic_mem_allocator::deallocate( reinterpret_cast<void*>( p_sh ), 0 );
 		}
+#endif
+		chk_ret.p_chms_->recycle_mem_slot( p_mem );
 	} else {
+		// slot_header_of_allocで確保されているかどうかをチェックする
+		auto check_result = slot_container::get_slot_header_from_assignment_p( p_mem );
+		if ( check_result.is_ok_ ) {
+			if ( check_result.p_ush_->check_type() ) {
+				check_result.p_ush_->alloch_.deallocate();
+				basic_mem_allocator::deallocate( check_result.p_ush_, check_result.p_ush_->alloch_.sh_.alloc_size_ );
+				return;
+			}
+		}
 		internal::LogOutput( log_type::WARN, "Header is corrupted. full search correct chunk and try free" );
 		for ( unsigned int i = 0; i < pr_ch_size_arg; i++ ) {
 			bool ret = p_param_ch_array_arg[i].recycle_mem_slot( p_mem );
@@ -1579,7 +846,7 @@ void general_mem_allocator_impl_deallocate(
 
 		// header is corrupted and unknown memory slot deallocation is requested. try to call free()
 		internal::LogOutput( log_type::WARN, "header is corrupted and unknown memory slot deallocation is requested. try to free by calling free()" );
-		std::free( p_mem );   // TODO should not do this ?
+		std::free( p_mem );
 	}
 
 	return;
@@ -1656,25 +923,41 @@ std::tuple<bool,
            alpha::concurrent::bt_info,
            alpha::concurrent::bt_info>
 get_backtrace_info(
-	const void* p_mem   //!< [in] pointer to allocated memory by allocate()
+	void* p_mem   //!< [in] pointer to allocated memory by allocate()
 )
 {
-	std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
-	tmp_addr -= internal::get_slot_header_size();
-	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( tmp_addr );
-
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+	internal::bool_unified_slot_header_p chk_ret = internal::slot_container::get_slot_header_from_assignment_p( p_mem );
+	if ( !chk_ret.is_ok_ ) {
+		return std::tuple<bool,
+		                  alpha::concurrent::bt_info,
+		                  alpha::concurrent::bt_info>(
+			false,
+			bt_info(),
+			bt_info() );
+	}
+#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
+	if ( !chk_ret.p_ush_->mh_.check_marker() ) {
+		return std::tuple<bool,
+		                  alpha::concurrent::bt_info,
+		                  alpha::concurrent::bt_info>(
+			false,
+			bt_info(),
+			bt_info() );
+	}
+#endif
 	return std::tuple<bool,
 	                  alpha::concurrent::bt_info,
 	                  alpha::concurrent::bt_info>(
-		p_sh->chk_header_data().correct_,
-		p_sh->alloc_bt_info_,
-		p_sh->free_bt_info_ );
+		true,
+		chk_ret.p_ush_->mh_.alloc_bt_info_,
+		chk_ret.p_ush_->mh_.free_bt_info_ );
+
 #else
 	return std::tuple<bool,
 	                  alpha::concurrent::bt_info,
 	                  alpha::concurrent::bt_info>(
-		p_sh->chk_header_data().correct_,
+		false,
 		bt_info(),
 		bt_info() );
 #endif
@@ -1682,27 +965,23 @@ get_backtrace_info(
 
 void output_backtrace_info(
 	const log_type lt,     //!< [in] log type
-	const void*    p_mem   //!< [in] pointer to allocated memory by allocate()
+	void*          p_mem   //!< [in] pointer to allocated memory by allocate()
 )
 {
 	static std::atomic_int counter( 0 );
 	int                    id_count = counter.fetch_add( 1, std::memory_order_acq_rel );
 
-	std::uintptr_t tmp_addr = reinterpret_cast<std::uintptr_t>( p_mem );
-	tmp_addr -= internal::get_slot_header_size();
-	internal::slot_header* p_sh = reinterpret_cast<internal::slot_header*>( tmp_addr );
-
-	auto chk_ret = p_sh->chk_header_data();
+	internal::bool_unified_slot_header_p chk_ret = internal::slot_container::get_slot_header_from_assignment_p( p_mem );
 	internal::LogOutput(
 		lt,
-		"[%d] header check result of %p: correct_=%s, p_chms_=%p",
-		id_count, p_mem, chk_ret.correct_ ? "true" : "false", chk_ret.p_chms_ );
+		"[%d] header check result of %p: correct_=%s, p_ush_=%p",
+		id_count, p_mem, chk_ret.is_ok_ ? "true" : "false", chk_ret.p_ush_ );
 
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	internal::LogOutput( lt, "[%d-a] alloc_bt_info_ of %p", id_count, p_mem );
-	p_sh->alloc_bt_info_.dump_to_log( lt, 'a', id_count );
+	chk_ret.p_ush_->mh_.alloc_bt_info_.dump_to_log( lt, 'a', id_count );
 	internal::LogOutput( lt, "[%d-f] free_bt_info_ of %p", id_count, p_mem );
-	p_sh->free_bt_info_.dump_to_log( lt, 'f', id_count );
+	chk_ret.p_ush_->mh_.free_bt_info_.dump_to_log( lt, 'f', id_count );
 #else
 	internal::LogOutput( lt, "[%d] no backtrace information, because the library is not compiled with ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE", id_count );
 #endif

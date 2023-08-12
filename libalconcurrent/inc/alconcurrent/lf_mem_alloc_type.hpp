@@ -18,6 +18,8 @@
 namespace alpha {
 namespace concurrent {
 
+constexpr size_t default_slot_alignsize = sizeof( std::uintptr_t );
+
 /*!
  * @brief	configuration paramters when allocate chunk
  */

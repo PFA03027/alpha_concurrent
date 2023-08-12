@@ -89,45 +89,36 @@ slot_array_mgr::slot_array_mgr( chunk_header_multi_slot* p_owner, size_t num_of_
 	free_slots_storage_.unchk_push_stack_list_to_head( p_pre_slot_header_of_array );
 }
 
-slot_header_of_array* slot_array_mgr::get_pointer_of_slot_header_of_array_from_assignment_p( void* p_mem )
+bool_size_t slot_array_mgr::get_slot_idx_from_slot_header_of_array( slot_header_of_array* p_slot_header )
 {
-	if ( p_mem == nullptr ) {
-		std::string errlog = "try to get slot idx by nullptr";
-		throw std::out_of_range( errlog );
+	uintptr_t byte_offset = reinterpret_cast<uintptr_t>( p_slot_header ) - reinterpret_cast<uintptr_t>( slot_header_array_ );
+	size_t    ans_idx     = static_cast<size_t>( byte_offset / sizeof( slot_header_of_array ) );
+
+	if ( reinterpret_cast<uintptr_t>( p_slot_header ) < reinterpret_cast<uintptr_t>( slot_header_array_ ) ) {
+		return bool_size_t { false, ans_idx };
+	}
+	if ( ans_idx > num_of_slots_ ) {
+		// char buff[128];
+		// snprintf( buff, 128, "too big idx: calculated idx is %zu, max_slot is %zu", ans_idx, num_of_slots_ );
+		return bool_size_t { false, ans_idx };
 	}
 
-	unified_slot_header* p_slot_header = slot_container::get_slot_header_from_assignment_p( p_mem );
-	if ( p_slot_header->mh_.offset_to_mgr_.load( std::memory_order_acquire ) == 0 ) {
-		throw std::runtime_error( "this slot is not slot_header_of_array." );
-	}
-#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
-	if ( !p_slot_header->mh_.check_marker() ) {
-		char buff[128];
-		snprintf( buff, 128, "unified_slot_header(%p) is corrupted", p_slot_header );
-		throw std::runtime_error( buff );
-	}
-#endif
-
-	return &( p_slot_header->arrayh_ );
+	return bool_size_t { true, ans_idx };
 }
 
-size_t slot_array_mgr::get_slot_idx_from_slot_header_of_array( slot_header_of_array* p_slot_header )
+void slot_array_mgr::dump( int indent )
 {
-	if ( p_slot_header == nullptr ) {
-		std::string errlog = "try to get slot idx by nullptr";
-		throw std::out_of_range( errlog );
+	std::string indent_str;
+	for ( int i = 0; i < indent; i++ ) {
+		indent_str += "\t";
 	}
-
-	slot_array_mgr* p_mgr       = p_slot_header->mh_.get_mgr_pointer<slot_array_mgr>();
-	uintptr_t       byte_offset = reinterpret_cast<uintptr_t>( p_slot_header ) - reinterpret_cast<uintptr_t>( p_mgr->slot_header_array_ );
-	size_t          ans_idx     = static_cast<size_t>( byte_offset / sizeof( slot_header_of_array ) );
-	if ( ans_idx > p_mgr->num_of_slots_ ) {
-		char buff[128];
-		snprintf( buff, 128, "too big idx: calculated idx is %zu, max_slot is %zu", ans_idx, p_mgr->num_of_slots_ );
-		throw std::out_of_range( buff );
-	}
-
-	return ans_idx;
+	internal::LogOutput( log_type::DUMP, "%sslot_array_mgr(%p)={alloc_size_=%zu,num_of_slots_=%zu,expected_n_per_slot_=%zu,slot_container_size_of_this_=%zu,p_owner_chunk_header_=%p,p_slot_container_top=%p",
+	                     indent_str.c_str(),
+	                     this, alloc_size_, num_of_slots_, expected_n_per_slot_, slot_container_size_of_this_, p_owner_chunk_header_.load(), p_slot_container_top );
+	// for ( size_t si = 0; si < num_of_slots_; si++ ) {
+	// 	slot_header_array_[si].dump( indent + 1 );
+	// }
+	internal::LogOutput( log_type::DUMP, "%s}", indent_str.c_str() );
 }
 
 }   // namespace internal
