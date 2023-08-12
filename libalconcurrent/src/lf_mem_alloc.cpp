@@ -170,7 +170,7 @@ bool chunk_header_multi_slot::alloc_new_chunk(
 
 	// get ownership to allocate a chunk	// access権を取得を試みる
 	chunk_control_status expect = chunk_control_status::EMPTY;
-	bool                 result = status_.compare_exchange_strong( expect, chunk_control_status::RESERVED_ALLOCATION );
+	bool                 result = status_.compare_exchange_strong( expect, chunk_control_status::RESERVED_ALLOCATION, std::memory_order_acq_rel );
 	if ( !result ) return false;
 	// resultが真となったので、以降、このchunkに対する、領域確保の処理実行権を保有。
 
@@ -347,7 +347,7 @@ void* chunk_header_multi_slot::try_allocate_mem_slot_impl(
 
 	// オーナー権の確認 or 確保を試みる
 	unsigned int expect_tl_id = expect_tl_id_arg;
-	if ( !owner_tl_id_.compare_exchange_strong( expect_tl_id, owner_tl_id_arg ) ) {
+	if ( !owner_tl_id_.compare_exchange_strong( expect_tl_id, owner_tl_id_arg, std::memory_order_acq_rel ) ) {
 		return nullptr;
 	}
 
@@ -397,7 +397,7 @@ bool chunk_header_multi_slot::exec_deletion( void )
 
 	// 削除予約付けを試みる。
 	expect = chunk_control_status::NORMAL;
-	result = status_.compare_exchange_strong( expect, chunk_control_status::RESERVED_DELETION );
+	result = status_.compare_exchange_strong( expect, chunk_control_status::RESERVED_DELETION, std::memory_order_acq_rel );
 	if ( !result ) {
 		// 削除予約付けに失敗した。ただし、すでに、削除予約付け済みかもしれないため、チェックする。
 		if ( expect != chunk_control_status::RESERVED_DELETION ) {
@@ -414,7 +414,7 @@ bool chunk_header_multi_slot::exec_deletion( void )
 
 	// DELETEの予告を試みる。
 	expect = chunk_control_status::RESERVED_DELETION;
-	if ( !status_.compare_exchange_strong( expect, chunk_control_status::ANNOUNCEMENT_DELETION ) ) {
+	if ( !status_.compare_exchange_strong( expect, chunk_control_status::ANNOUNCEMENT_DELETION, std::memory_order_acq_rel ) ) {
 		return false;
 	}
 
@@ -435,7 +435,7 @@ bool chunk_header_multi_slot::exec_deletion( void )
 
 	// DELETEの実行権の獲得を試みる。
 	expect = chunk_control_status::ANNOUNCEMENT_DELETION;
-	if ( !status_.compare_exchange_strong( expect, chunk_control_status::ANNOUNCEMENT_DELETION ) ) {
+	if ( !status_.compare_exchange_strong( expect, chunk_control_status::ANNOUNCEMENT_DELETION, std::memory_order_acq_rel ) ) {
 		return false;
 	}
 
