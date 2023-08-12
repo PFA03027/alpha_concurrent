@@ -184,8 +184,8 @@ TEST_F( lfmemAlloc, TestChunkHeaderMultiSlot )
 	EXPECT_EQ( nullptr, test_ptr3 );
 
 	EXPECT_FALSE( p_chms->recycle_mem_slot( test_ptr3 ) );
-	EXPECT_FALSE( p_chms->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 ) ) );
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
+	EXPECT_FALSE( p_chms->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 ) ) );
 	{
 		int err_cnt, warn_cnt;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
@@ -262,17 +262,17 @@ TEST_F( lfmemAlloc, TestChunkList_IllegalAddressFree )
 	EXPECT_NE( nullptr, test_ptr2 );
 	EXPECT_NE( nullptr, test_ptr3 );
 
+#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 	{
 		EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr3 + 1 ) ) );
 		EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 ) ) );
 		EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr2 + 1 ) ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 		int err_cnt, warn_cnt;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		EXPECT_GT( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
-#endif
 	}
+#endif
 
 	alpha::concurrent::chunk_statistics e = p_ch_lst->get_statistics();
 
@@ -489,8 +489,9 @@ TEST_F( lfmemAlloc, TestBacktrace2 )
 	ASSERT_NE( nullptr, test_ptr1 );
 
 	auto bt_info1 = alpha::concurrent::get_backtrace_info( test_ptr1 );
-	std::free( test_ptr1 );
 	ASSERT_FALSE( std::get<0>( bt_info1 ) );
+	std::free( test_ptr1 );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 	{
 		int err_cnt, warn_cnt;
@@ -498,6 +499,7 @@ TEST_F( lfmemAlloc, TestBacktrace2 )
 		EXPECT_GT( err_cnt, 0 );
 		EXPECT_EQ( warn_cnt, 0 );
 	}
+#endif
 #endif
 #endif
 
