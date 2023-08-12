@@ -23,7 +23,7 @@ TEST( slot_array_mgr, construct_destruct )
 
 	// Assert
 	for ( int i = 0; i < 32; i++ ) {
-		auto p_ret = p_sut->get_pointer_of_slot( i )->mh_.get_mgr_pointer<alpha::concurrent::internal::slot_array_mgr>();
+		auto p_ret = p_sut->get_pointer_of_slot( i )->mh_.get_mgr_pointer();
 		EXPECT_EQ( p_ret, p_sut );
 	}
 }
@@ -33,18 +33,20 @@ TEST( slot_array_mgr, Call_get_XXX_from_assignment_p )
 	// Arrange
 	alpha::concurrent::internal::slot_array_mgr*                 p_sut = alpha::concurrent::internal::slot_array_mgr::make_instance( nullptr, static_cast<size_t>( 32 ), static_cast<size_t>( 32 ) );
 	std::unique_ptr<alpha::concurrent::internal::slot_array_mgr> up_sut( p_sut );
-	void*                                                        p_mem = p_sut->allocate( 1, 32, 1 );
-	ASSERT_NE( p_mem, nullptr );
-	size_t ret_idx = 0;
 
 	// Act
-	ASSERT_NO_THROW( {
-		auto p_slot = alpha::concurrent::internal::slot_array_mgr::get_pointer_of_slot_header_of_array_from_assignment_p( p_mem );
-		ret_idx     = alpha::concurrent::internal::slot_array_mgr::get_slot_idx_from_slot_header_of_array( p_slot );
-	} );
+	void* p_mem = p_sut->allocate( 1, 32, 1 );
 
 	// Assert
-	EXPECT_EQ( ret_idx, 1 );
+	ASSERT_NE( p_mem, nullptr );
+	auto chk_ret = alpha::concurrent::internal::slot_container::get_slot_header_from_assignment_p( p_mem );
+	ASSERT_TRUE( chk_ret.is_ok_ );
+	ASSERT_FALSE( chk_ret.p_ush_->check_type() );
+	auto p_ret_mgr = chk_ret.p_ush_->arrayh_.mh_.get_mgr_pointer();
+	ASSERT_EQ( p_ret_mgr, p_sut );
+	auto ret_idx = p_ret_mgr->get_slot_idx_from_slot_header_of_array( &( chk_ret.p_ush_->arrayh_ ) );
+	EXPECT_TRUE( ret_idx.is_ok_ );
+	EXPECT_EQ( ret_idx.idx_, 1 );
 }
 
 TEST( slot_array_mgr, Call_Allocate_Deallocate )
@@ -54,9 +56,16 @@ TEST( slot_array_mgr, Call_Allocate_Deallocate )
 	std::unique_ptr<alpha::concurrent::internal::slot_array_mgr> up_sut( p_sut );
 	void*                                                        p_mem = p_sut->allocate( 32 );
 	ASSERT_NE( p_mem, nullptr );
+	auto chk_ret = alpha::concurrent::internal::slot_container::get_slot_header_from_assignment_p( p_mem );
+	ASSERT_TRUE( chk_ret.is_ok_ );
+	ASSERT_FALSE( chk_ret.p_ush_->check_type() );
+	auto p_ret_mgr = chk_ret.p_ush_->arrayh_.mh_.get_mgr_pointer();
+	ASSERT_EQ( p_ret_mgr, p_sut );
+	auto ret_idx = p_ret_mgr->get_slot_idx_from_slot_header_of_array( &( chk_ret.p_ush_->arrayh_ ) );
+	EXPECT_TRUE( ret_idx.is_ok_ );
 
 	// Act
-	ASSERT_NO_THROW( p_sut->deallocate( p_mem ) );
+	ASSERT_NO_THROW( p_sut->deallocate( &( chk_ret.p_ush_->arrayh_ ) ) );
 
 	// Assert
 }

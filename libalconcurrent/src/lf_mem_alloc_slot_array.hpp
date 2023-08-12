@@ -63,28 +63,7 @@ struct slot_array_mgr {
 	 */
 	static inline slot_array_mgr* make_instance( chunk_header_multi_slot* p_owner, size_t num_of_slots, size_t n )
 	{
-		return new ( num_of_slots, n ) alpha::concurrent::internal::slot_array_mgr( p_owner, num_of_slots, n );
-	}
-
-	/**
-	 * @brief Get the pointer of slot_container object
-	 *
-	 * @param idx index number
-	 * @return slot_container* the pointer of slot object
-	 *
-	 * @exception std::out_of_range if idx is over the number of slots of this instance
-	 */
-	inline const slot_container* unchk_get_pointer_of_slot_container( size_t idx ) const
-	{
-		uintptr_t addr_top                = reinterpret_cast<uintptr_t>( p_slot_container_top );
-		uintptr_t addr_idx_slot_container = addr_top + slot_container_size_of_this_ * idx;
-		return reinterpret_cast<const slot_container*>( addr_idx_slot_container );
-	}
-	inline slot_container* unchk_get_pointer_of_slot_container( size_t idx )
-	{
-		uintptr_t addr_top                = reinterpret_cast<uintptr_t>( p_slot_container_top );
-		uintptr_t addr_idx_slot_container = addr_top + slot_container_size_of_this_ * idx;
-		return reinterpret_cast<slot_container*>( addr_idx_slot_container );
+		return new ( num_of_slots, n ) slot_array_mgr( p_owner, num_of_slots, n );
 	}
 
 	/**
@@ -114,16 +93,115 @@ struct slot_array_mgr {
 		return &( slot_header_array_[idx] );
 	}
 
+	/**
+	 * @brief 指定されたインデックス番号スロットからメモリ割り当てを行う。
+	 *
+	 * @warning
+	 * 割り当て済みかどうかのチェックは行わない。
+	 *
+	 * @param idx 割り当てを行ってほしいスロットのidx番号
+	 * @param n 割り当ててほしいメモリサイズ
+	 * @param req_alignsize アライメント要求値
+	 * @return void* 割り当てられたメモリへのポインタ。nullptrの場合、スロットのサイズ不足等の理由により割り当て失敗。
+	 */
+	inline void* allocate( size_t idx, size_t n, size_t req_alignsize )
+	{
+		return get_pointer_of_slot( idx )->allocate( unchk_get_pointer_of_slot_container( idx ), slot_container_size_of_this_, n, req_alignsize );
+	}
+
+	/**
+	 * @brief 空きスロットからメモリ割り当てを試みる
+	 *
+	 * @param n 必要なメモリサイズ
+	 * @param req_alignsize アライメント要求値
+	 * @return void* 割り当てられたメモリへのアドレス。
+	 * @retval nullptr 空きスロットがなく割り当てできなかった。
+	 */
+	void* allocate( size_t n, size_t req_alignsize = default_slot_alignsize )
+	{
+		if ( ( expected_n_per_slot_ + default_slot_alignsize ) < ( n + req_alignsize ) ) {
+			// サイズ不足のため、確保に失敗
+			return nullptr;
+		}
+		slot_header_of_array* p_free_slot = free_slots_storage_.pop();
+		if ( p_free_slot == nullptr ) {
+			// フリースロットがないため、確保に失敗
+			return nullptr;
+		}
+
+		bool_size_t chk_ret_free_slot_idx = get_slot_idx_from_slot_header_of_array( p_free_slot );
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGICAL_ERROR
+		if ( !chk_ret_free_slot_idx.is_ok_ ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
+			std::string errlog = "recieved free slot is not belong to this slot_array_mgr";
+			throw std::logic_error( errlog );
+#else
+			internal::LogOutput( log_type::ERR, "recieved free slot is not belong to this slot_array_mgr" );
+			return nullptr;
+#endif
+		}
+#endif
+
+		return p_free_slot->allocate( unchk_get_pointer_of_slot_container( chk_ret_free_slot_idx.idx_ ), slot_container_size_of_this_, n, req_alignsize );
+	}
+
+	/**
+	 * @brief 割り当てられたメモリに対応するslot_header_of_arrayの解放処理を行う
+	 *
+	 * @warning
+	 * 対応するslot_array_mgrであることが確認済みであること。
+	 *
+	 * @param p_used_slot 割り当てられたメモリに対応するslot_header_of_arrayへのポインタ
+	 */
+	void deallocate( slot_header_of_array* p_used_slot )
+	{
+		p_used_slot->deallocate();
+		free_slots_storage_.push( p_used_slot );
+	}
+
+	bool_size_t get_slot_idx_from_slot_header_of_array( slot_header_of_array* p_slot_header );
+
+	void dump( int indent = 0 );
+
+	void* operator new( std::size_t n );                                                                             // usual new...(1)   このクラスでは使用してはならないnew operator
+	void  operator delete( void* p_mem ) noexcept;                                                                   // usual delete...(2)
+
+	void* operator new[]( std::size_t n );                                                                           // usual new...(1)   このクラスでは使用してはならないnew operator
+	void  operator delete[]( void* p_mem ) noexcept;                                                                 // usual delete...(2)   このクラスでは使用してはならないdelete operator
+
+	void* operator new( std::size_t n_of_slot_array_mgr, size_t num_of_slots_, size_t expected_alloc_n_per_slot );   // placement new    可変長部分の領域も確保するnew operator
+	void  operator delete( void* p, void* p2 ) noexcept;                                                             // placement delete...(3)   このクラスでは使用してはならないdelete operator。このdelete operator自身は何もしない。
+
+private:
+	/**
+	 * @brief Get the pointer of slot_container object
+	 *
+	 * @param idx index number
+	 * @return slot_container* the pointer of slot object
+	 *
+	 * @exception std::out_of_range if idx is over the number of slots of this instance
+	 */
+	inline const slot_container* unchk_get_pointer_of_slot_container( size_t idx ) const
+	{
+		uintptr_t addr_top                = reinterpret_cast<uintptr_t>( p_slot_container_top );
+		uintptr_t addr_idx_slot_container = addr_top + slot_container_size_of_this_ * idx;
+		return reinterpret_cast<const slot_container*>( addr_idx_slot_container );
+	}
+	inline slot_container* unchk_get_pointer_of_slot_container( size_t idx )
+	{
+		uintptr_t addr_top                = reinterpret_cast<uintptr_t>( p_slot_container_top );
+		uintptr_t addr_idx_slot_container = addr_top + slot_container_size_of_this_ * idx;
+		return reinterpret_cast<slot_container*>( addr_idx_slot_container );
+	}
+
 	inline slot_header_of_array* begin_slot_array( void )
 	{
 		return &( slot_header_array_[0] );
-		;
 	}
 
 	inline const slot_header_of_array* begin_slot_array( void ) const
 	{
 		return &( slot_header_array_[0] );
-		;
 	}
 
 	inline slot_header_of_array* end_slot_array( void )
@@ -181,60 +259,6 @@ struct slot_array_mgr {
 		p_cur--;
 		return p_cur;
 	}
-
-	/**
-	 * @brief 指定されたインデックス番号スロットからメモリ割り当てを行う。
-	 *
-	 * @warning
-	 * 割り当て済みかどうかのチェックは行わない。
-	 *
-	 * @param idx 割り当てを行ってほしいスロットのidx番号
-	 * @param n 割り当ててほしいメモリサイズ
-	 * @param req_alignsize アライメント要求値
-	 * @return void* 割り当てられたメモリへのポインタ。nullptrの場合、スロットのサイズ不足等の理由により割り当て失敗。
-	 */
-	inline void* allocate( size_t idx, size_t n, size_t req_alignsize )
-	{
-		return get_pointer_of_slot( idx )->allocate( unchk_get_pointer_of_slot_container( idx ), slot_container_size_of_this_, n, req_alignsize );
-	}
-
-	void* allocate( size_t n, size_t req_alignsize = default_slot_alignsize )
-	{
-		if ( ( expected_n_per_slot_ + default_slot_alignsize ) < ( n + req_alignsize ) ) {
-			// サイズ不足のため、確保に失敗
-			return nullptr;
-		}
-		slot_header_of_array* p_free_slot = free_slots_storage_.pop();
-		if ( p_free_slot == nullptr ) {
-			// フリースロットがないため、確保に失敗
-			return nullptr;
-		}
-
-		size_t free_slot_idx = get_slot_idx_from_slot_header_of_array( p_free_slot );
-
-		return p_free_slot->allocate( unchk_get_pointer_of_slot_container( free_slot_idx ), slot_container_size_of_this_, n, req_alignsize );
-	}
-
-	void deallocate( void* p_mem )
-	{
-		slot_header_of_array* p_used_slot = get_pointer_of_slot_header_of_array_from_assignment_p( p_mem );
-		p_used_slot->deallocate();
-		free_slots_storage_.push( p_used_slot );
-	}
-
-	void dump( void );
-
-	void* operator new( std::size_t n );                                                                             // usual new...(1)   このクラスでは使用してはならないnew operator
-	void  operator delete( void* p_mem ) noexcept;                                                                   // usual delete...(2)
-
-	void* operator new[]( std::size_t n );                                                                           // usual new...(1)   このクラスでは使用してはならないnew operator
-	void  operator delete[]( void* p_mem ) noexcept;                                                                 // usual delete...(2)   このクラスでは使用してはならないdelete operator
-
-	void* operator new( std::size_t n_of_slot_array_mgr, size_t num_of_slots_, size_t expected_alloc_n_per_slot );   // placement new    可変長部分の領域も確保するnew operator
-	void  operator delete( void* p, void* p2 ) noexcept;                                                             // placement delete...(3)   このクラスでは使用してはならないdelete operator。このdelete operator自身は何もしない。
-
-	static slot_header_of_array* get_pointer_of_slot_header_of_array_from_assignment_p( void* p_mem );
-	static size_t                get_slot_idx_from_slot_header_of_array( slot_header_of_array* p_slot_header );
 
 	static constexpr size_t calc_one_slot_container_bytes( size_t n )
 	{

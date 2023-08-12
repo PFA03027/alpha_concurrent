@@ -23,14 +23,15 @@
 #include "alconcurrent/conf_logger.hpp"
 #endif
 
+#include "alconcurrent/lf_mem_alloc_type.hpp"
+
 namespace alpha {
 namespace concurrent {
 
 namespace internal {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-constexpr size_t        default_slot_alignsize = sizeof( std::uintptr_t );
-constexpr unsigned char tail_padding_byte_v    = 1U;
+constexpr unsigned char tail_padding_byte_v = 1U;
 
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 inline constexpr uintptr_t make_maker_value( uintptr_t offset_v )
@@ -48,7 +49,19 @@ inline constexpr bool check_marker_func( uintptr_t offset_v, uintptr_t marker_v 
 #endif
 
 class slot_header_of_array;
+union unified_slot_header;
 class slot_container;
+class slot_array_mgr;
+
+struct bool_size_t {
+	bool   is_ok_;
+	size_t idx_;
+};
+
+struct bool_unified_slot_header_p {
+	bool                 is_ok_;
+	unified_slot_header* p_ush_;
+};
 
 /**
  * @brief slot main header
@@ -59,7 +72,7 @@ struct slot_mheader {
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 	const std::atomic<uintptr_t> marker_;             //!< check sum maker value
 #endif
-	std::atomic<uintptr_t> offset_to_tail_padding_;   //!< offset to tail padding
+	std::atomic<uintptr_t> offset_to_tail_padding_;   //!< offset to tail padding. if this value is zero, it means this slot is not used now.
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	bt_info alloc_bt_info_;                           //!< backtrace information when is allocated
 	bt_info free_bt_info_;                            //!< backtrace information when is free
@@ -91,10 +104,17 @@ struct slot_mheader {
 	{
 	}
 
-	template <typename T>
-	T* get_mgr_pointer( void ) const
+	slot_array_mgr* get_mgr_pointer( void ) const
 	{
-		return reinterpret_cast<T*>( reinterpret_cast<uintptr_t>( this ) + offset_to_mgr_.load( std::memory_order_acquire ) );   // intentionally saturating arithmetic operation
+#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
+		if ( check_marker() ) {
+			return reinterpret_cast<slot_array_mgr*>( reinterpret_cast<uintptr_t>( this ) + offset_to_mgr_.load( std::memory_order_acquire ) );   // intentionally saturating arithmetic operation
+		} else {
+			return nullptr;
+		}
+#else
+		return reinterpret_cast<slot_array_mgr*>( reinterpret_cast<uintptr_t>( this ) + offset_to_mgr_.load( std::memory_order_acquire ) );   // intentionally saturating arithmetic operation
+#endif
 	}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
@@ -105,6 +125,8 @@ struct slot_mheader {
 			marker_.load( std::memory_order_acquire ) );
 	}
 #endif
+
+	std::string dump_string( void );
 
 private:
 	static constexpr std::uintptr_t make_offset_mgr_to_value( void* p_mgr_arg, void* p_this )
@@ -127,6 +149,8 @@ struct array_slot_sheader {
 	  : p_next_( p_next_arg )
 	{
 	}
+
+	std::string dump_string( void );
 };
 
 static_assert( std::is_standard_layout<array_slot_sheader>::value, "array_slot_sheader should be standard-layout type" );
@@ -148,6 +172,8 @@ struct alloc_slot_sheader {
 	  : alloc_size_( alloc_size_arg )
 	{
 	}
+
+	std::string dump_string( void );
 };
 
 static_assert( std::is_standard_layout<alloc_slot_sheader>::value, "alloc_slot_sheader should be standard-layout type" );
@@ -195,6 +221,8 @@ struct slot_header_of_array {
 	{
 		return sh_.p_next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
 	}
+
+	void dump( int indent = 0 );
 };
 
 static_assert( std::is_standard_layout<slot_header_of_array>::value, "slot_header_of_array should be standard-layout type" );
@@ -205,7 +233,7 @@ static_assert( ( sizeof( slot_header_of_array ) % default_slot_alignsize ) == 0,
  *
  * this class should be constructed by like below;
  * @code {.cpp}
- * size_t buff_size = calc_slot_header_and_container_size( allocation required size, alignment required size );
+ * size_t buff_size = slot_header_of_alloc::calc_slot_header_and_container_size( allocation required size, alignment required size );
  * void* p_allocated_slot = malloc(buff_size);
  * slot_header_of_alloc* p_slot_header_of_alloc = new (p_allocated_slot) slot_header_of_alloc(buff_size);
  * @endcode
@@ -224,8 +252,13 @@ static_assert( ( sizeof( slot_header_of_array ) % default_slot_alignsize ) == 0,
  *
  * or
  * @code {.cpp}
- * unified_slot_header* p_recalc_slot_header_ = slot_container::get_slot_header_from_assignment_p(p_mem);
- * p_recalc_slot_header_->alloch_.deallocate();
+ * auto check_result = slot_container::get_slot_header_from_assignment_p(p_mem);
+ * if( check_result.is_ok_ ) {
+ *     if( check_result.p_ush_->check_type() ) {
+ *         check_result.p_ush_->alloch_.deallocate();
+ *         free(check_result.p_ush_);
+ *     }
+ * }
  * @endcode
  *
  */
@@ -243,6 +276,8 @@ struct slot_header_of_alloc {
 
 	void* allocate( size_t n, size_t req_alignsize );
 	void  deallocate( void );
+
+	void dump( int indent = 0 );
 
 	static constexpr size_t calc_slot_header_and_container_size( size_t n, size_t req_alignsize );
 };
@@ -262,6 +297,21 @@ union unified_slot_header {
 	unified_slot_header( void )
 	  : mh_( static_cast<std::uintptr_t>( 0 ) )
 	{
+	}
+
+	/**
+	 * @brief check type
+	 *
+	 * @return true type is slot_header_of_alloc
+	 * @return false type is slot_header_of_array
+	 */
+	bool check_type( void ) const
+	{
+		if ( mh_.offset_to_mgr_.load( std::memory_order_acquire ) == 0 ) {
+			return true;
+		} else {
+			return false;
+		}
 	}
 };
 
@@ -297,9 +347,9 @@ struct slot_container {
 	}
 #endif
 
-	static unified_slot_header* get_slot_header_from_assignment_p( void* p_mem );
-	static constexpr size_t     calc_slot_container_size( size_t n, size_t req_alignsize );
-	static void*                construct_slot_container_in_container_buffer( slot_mheader* p_bind_mh_of_slot, slot_container* p_container_top, size_t container_size, size_t n, size_t req_alignsize );
+	static bool_unified_slot_header_p get_slot_header_from_assignment_p( void* p_mem );
+	static constexpr size_t           calc_slot_container_size( size_t n, size_t req_alignsize );
+	static void*                      construct_slot_container_in_container_buffer( slot_mheader* p_bind_mh_of_slot, slot_container* p_container_top, size_t container_size, size_t n, size_t req_alignsize );
 };
 
 static_assert( std::is_standard_layout<slot_container>::value, "slot_container should be standard-layout type" );

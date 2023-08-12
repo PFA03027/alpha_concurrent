@@ -20,23 +20,6 @@
 namespace alpha {
 namespace concurrent {
 namespace internal {
-/*
-    slot_header_of_array* get_next( void )
-    {
-        return sh_.p_next_.load( std::memory_order_acquire );
-    }
-
-    void set_next( slot_header_of_array* p_new_next )
-    {
-        sh_.p_next_.store( p_new_next, std::memory_order_release );
-        return;
-    }
-
-    bool next_CAS( slot_header_of_array** pp_expect_ptr, slot_header_of_array* p_desired_ptr )
-    {
-        return sh_.p_next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
-    }
-*/
 
 struct is_callable_lifo_free_node_if_impl {
 	template <typename NODE_T>
@@ -146,14 +129,23 @@ struct free_node_stack {
 		}
 
 		scoped_hzd_type hzd_refing_p_head( hzd_ptrs_, HZD_IDX_PUSH_FUNC_HEAD );
-		node_pointer    p_cur_head = nullptr;
-		do {
-			p_cur_head = p_free_node_stack_head_.load( std::memory_order_acquire );
+		node_pointer    p_cur_head = p_free_node_stack_head_.load( std::memory_order_acquire );
+		while ( true ) {
 			hzd_refing_p_head.regist_ptr_as_hazard_ptr( p_cur_head );
-			if ( p_cur_head != p_free_node_stack_head_.load( std::memory_order_acquire ) ) continue;
+			node_pointer p_tmp_head = p_free_node_stack_head_.load( std::memory_order_acquire );
+			if ( p_cur_head != p_tmp_head ) {
+				p_cur_head = p_tmp_head;
+				continue;
+			}
 
-			p_n->set_next( p_cur_head );   // この処理後、別スレッドでset_nextで書き換わるとアウト。そのため、事前にp_nがほかのスレッドで参照されていないことをハザードポインタ経由で確認する必要あり。
-		} while ( !p_free_node_stack_head_.compare_exchange_weak( p_cur_head, p_n ) );
+			p_n->set_next( p_cur_head );
+			// この処理後、別スレッドでset_nextで書き換わるとアウト。
+			// そのため、事前にp_nがほかのスレッドで参照されていないことをハザードポインタ経由で確認する必要あり。
+
+			if ( p_free_node_stack_head_.compare_exchange_weak( p_cur_head, p_n ) ) {
+				break;
+			}
+		}
 
 		return nullptr;
 	}
@@ -170,7 +162,7 @@ struct free_node_stack {
 
 		node_pointer p_new_head = nullptr;
 		node_pointer p_cur_head = p_free_node_stack_head_.load( std::memory_order_acquire );   // この処理後、CASの前にp_cur_headに対してABAが発生するとアウト。p_cur_headはハザードポインタに確保し、p_cur_headに対応するnodeがpush経由でこの関数に入ってこないようにしないといけない。
-		do {
+		while ( true ) {                                                                       // do...while文でcontinueを使うとwhile文の条件式が実行されてしまう。期待した制御にはならないため、while(true)で実装する必要がある。
 			hzd_refing_p_head.regist_ptr_as_hazard_ptr( p_cur_head );
 			node_pointer p_node_tmp = p_free_node_stack_head_.load( std::memory_order_acquire );
 			if ( p_cur_head != p_node_tmp ) {
@@ -181,8 +173,14 @@ struct free_node_stack {
 
 			p_new_head = p_cur_head->get_next();
 			hzd_refing_p_next.regist_ptr_as_hazard_ptr( p_new_head );
-			if ( p_new_head != p_cur_head->get_next() ) continue;
-		} while ( !p_free_node_stack_head_.compare_exchange_weak( p_cur_head, p_new_head ) );
+			if ( p_new_head != p_cur_head->get_next() ) {
+				continue;
+			}
+			if ( p_free_node_stack_head_.compare_exchange_weak( p_cur_head, p_new_head ) ) {
+				// 置き換えに成功したら、p_cur_headを確保できたので、ループを抜ける
+				break;
+			}
+		}
 		p_cur_head->set_next( nullptr );   // p_cur_headが確保できたノードのポインタが入っている。また、p_cur_headが確保できたので、書き換えOK。
 
 		return p_cur_head;

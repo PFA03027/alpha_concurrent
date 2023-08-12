@@ -36,7 +36,7 @@ TEST( slot_mheader, do_construct_offset )
 	alpha::concurrent::internal::slot_mheader sut( reinterpret_cast<void*>( &a ) );
 
 	// Assert
-	EXPECT_EQ( &a, sut.get_mgr_pointer<int>() );
+	EXPECT_EQ( reinterpret_cast<void*>( &a ), reinterpret_cast<void*>( sut.get_mgr_pointer() ) );
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 	EXPECT_TRUE( sut.check_marker() );
 #endif
@@ -119,11 +119,13 @@ TEST_P( SlotFunc_FixtureParam, slot_container_calc_slot_container_size3 )
 	ASSERT_NE( p_ret_mem, nullptr );
 
 	// Act
-	alpha::concurrent::internal::unified_slot_header* p_ush = alpha::concurrent::internal::slot_container::get_slot_header_from_assignment_p( p_ret_mem );
+	auto chk_ret = alpha::concurrent::internal::slot_container::get_slot_header_from_assignment_p( p_ret_mem );
 
 	// Assert
-	ASSERT_NE( p_ush, nullptr );
-	EXPECT_EQ( &( p_ush->arrayh_ ), &sha );
+	ASSERT_TRUE( chk_ret.is_ok_ );
+	ASSERT_NE( chk_ret.p_ush_, nullptr );
+	ASSERT_FALSE( chk_ret.p_ush_->check_type() );
+	EXPECT_EQ( &( chk_ret.p_ush_->arrayh_ ), &sha );
 }
 
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_OVERRUN_WRITING
@@ -246,11 +248,13 @@ TEST_P( SlotFunc_FixtureParam, Call_slot_header_of_alloc_allocate2 )
 	EXPECT_NE( p_ret, nullptr );
 
 	// Act
-	alpha::concurrent::internal::unified_slot_header* p_ush = alpha::concurrent::internal::slot_container::get_slot_header_from_assignment_p( p_ret );
+	auto chk_ret = alpha::concurrent::internal::slot_container::get_slot_header_from_assignment_p( p_ret );
 
 	// Assert
-	ASSERT_NE( p_ush, nullptr );
-	EXPECT_EQ( &( p_ush->alloch_ ), p_sut );
+	ASSERT_TRUE( chk_ret.is_ok_ );
+	ASSERT_NE( chk_ret.p_ush_, nullptr );
+	ASSERT_TRUE( chk_ret.p_ush_->check_type() );
+	EXPECT_EQ( &( chk_ret.p_ush_->alloch_ ), p_sut );
 }
 
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_OVERRUN_WRITING
