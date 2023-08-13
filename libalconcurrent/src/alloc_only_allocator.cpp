@@ -14,6 +14,7 @@
 
 #include <atomic>
 #include <new>
+#include <stdexcept>
 
 #include "alconcurrent/conf_logger.hpp"
 
