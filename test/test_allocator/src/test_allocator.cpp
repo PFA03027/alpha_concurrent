@@ -51,7 +51,8 @@ TEST( Alloc_only_class, Call_push )
 	{
 		// Arrange
 		alpha::concurrent::internal::alloc_chamber_head sut( true, 128 );
-		sut.allocate( 55, 8 );
+		void*                                           p_mem = sut.allocate( 55, 8 );
+		EXPECT_NE( p_mem, nullptr );
 	}
 
 	// Act
@@ -63,45 +64,77 @@ TEST( Alloc_only_class, Call_push )
 
 TEST( Alloc_only_class, Call_dump )
 {
-	// Arrange
-	alpha::concurrent::internal::allocating_only( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	auto pre_status = alpha::concurrent::internal::get_alloc_mmap_status();
 
-	// Act
-	alpha::concurrent::internal::allocating_only_dump_to_log( alpha::concurrent::log_type::TEST, 't', 2 );
+	{
+		// Arrange
+		alpha::concurrent::internal::alloc_chamber_head sut( true, 128 );
+		void*                                           p_mem = sut.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+		EXPECT_NE( p_mem, nullptr );
+
+		// Act
+		sut.dump_to_log( alpha::concurrent::log_type::TEST, 't', 2 );
+	}
 
 	// Assert
+	auto post_status = alpha::concurrent::internal::get_alloc_mmap_status();
+	EXPECT_EQ( pre_status.active_size_, post_status.active_size_ );
 }
 
 TEST( Alloc_only_class, Call_allocating_only )
 {
-	// Arrange
+	auto pre_status = alpha::concurrent::internal::get_alloc_mmap_status();
 
-	// Act
-	alpha::concurrent::internal::allocating_only( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	{
+		// Arrange
+		alpha::concurrent::internal::alloc_chamber_head sut( true, 128 );
 
-	// Assert
-	alpha::concurrent::internal::allocating_only_dump_to_log( alpha::concurrent::log_type::TEST, 't', 3 );
+		// Act
+		void* p_mem = sut.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+
+		// Assert
+		EXPECT_NE( p_mem, nullptr );
+	}
+	auto post_status = alpha::concurrent::internal::get_alloc_mmap_status();
+	EXPECT_EQ( pre_status.active_size_, post_status.active_size_ );
 }
 
 TEST( Alloc_only_class, Do_append_allocation )
 {
-	// Arrange
-	alpha::concurrent::internal::allocating_only( alpha::concurrent::internal::conf_pre_mmap_size / 2, alpha::concurrent::internal::default_align_size );
+	auto pre_status = alpha::concurrent::internal::get_alloc_mmap_status();
 
-	// Act
-	alpha::concurrent::internal::allocating_only( alpha::concurrent::internal::conf_pre_mmap_size / 2, alpha::concurrent::internal::default_align_size );
+	{
+		// Arrange
+		alpha::concurrent::internal::alloc_chamber_head sut( true, alpha::concurrent::internal::conf_pre_mmap_size );
+		void*                                           p_mem = sut.allocate( alpha::concurrent::internal::conf_pre_mmap_size / 2, alpha::concurrent::internal::default_align_size );
+		EXPECT_NE( p_mem, nullptr );
 
-	// Assert
-	alpha::concurrent::internal::allocating_only_dump_to_log( alpha::concurrent::log_type::TEST, 't', 4 );
+		// Act
+		p_mem = sut.allocate( alpha::concurrent::internal::conf_pre_mmap_size / 2, alpha::concurrent::internal::default_align_size );
+
+		// Assert
+		EXPECT_NE( p_mem, nullptr );
+		alpha::concurrent::internal::allocating_only_dump_to_log( alpha::concurrent::log_type::TEST, 't', 4 );
+	}
+	auto post_status = alpha::concurrent::internal::get_alloc_mmap_status();
+	EXPECT_EQ( pre_status.active_size_, post_status.active_size_ );
 }
 
 TEST( Alloc_only_class, Do_allocation_over_pre_mmap_size )
 {
-	// Arrange
+	auto pre_status = alpha::concurrent::internal::get_alloc_mmap_status();
 
-	// Act
-	alpha::concurrent::internal::allocating_only( alpha::concurrent::internal::conf_pre_mmap_size * 2, alpha::concurrent::internal::default_align_size );
+	{
+		// Arrange
+		alpha::concurrent::internal::alloc_chamber_head sut( true, alpha::concurrent::internal::conf_pre_mmap_size );
 
-	// Assert
-	alpha::concurrent::internal::allocating_only_dump_to_log( alpha::concurrent::log_type::TEST, 't', 5 );
+		// Act
+		void* p_mem = sut.allocate( alpha::concurrent::internal::conf_pre_mmap_size * 2, alpha::concurrent::internal::default_align_size );
+
+		// Assert
+		EXPECT_NE( p_mem, nullptr );
+		alpha::concurrent::internal::allocating_only_dump_to_log( alpha::concurrent::log_type::TEST, 't', 4 );
+	}
+	auto post_status = alpha::concurrent::internal::get_alloc_mmap_status();
+	EXPECT_EQ( pre_status.active_size_, post_status.active_size_ );
 }

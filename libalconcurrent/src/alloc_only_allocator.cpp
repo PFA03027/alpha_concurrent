@@ -130,7 +130,8 @@ struct alloc_chamber {
 
 	void* allocate( size_t req_size, size_t req_align );
 
-	void                     dump_to_log( log_type lt, char c, int id );
+	void dump_to_log( log_type lt, char c, int id );
+
 	alloc_chamber_statistics get_statistics( void ) const;
 
 private:
