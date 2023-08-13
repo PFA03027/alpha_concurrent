@@ -795,9 +795,12 @@ void* general_mem_allocator_impl_allocate(
 	}
 
 	// 対応するサイズのメモリスロットが見つからなかったので、slot_header_of_alloc経由でメモリ領域を確保する。
-	size_t                buff_size              = slot_header_of_alloc::calc_slot_header_and_container_size( n_arg, default_slot_alignsize /* TBD */ );
-	void*                 p_allocated_slot       = basic_mem_allocator::allocate( buff_size );
-	slot_header_of_alloc* p_slot_header_of_alloc = new ( p_allocated_slot ) slot_header_of_alloc( buff_size );
+	size_t          buff_size      = slot_header_of_alloc::calc_slot_header_and_container_size( n_arg, default_slot_alignsize /* TBD */ );
+	allocate_result alloc_mem_info = basic_mem_allocator::allocate( buff_size );
+	if ( alloc_mem_info.p_allocated_addr_ == nullptr ) {
+		throw std::bad_alloc();
+	}
+	slot_header_of_alloc* p_slot_header_of_alloc = new ( alloc_mem_info.p_allocated_addr_ ) slot_header_of_alloc( alloc_mem_info.allocated_size_ );
 	p_ans                                        = p_slot_header_of_alloc->allocate( n_arg, default_slot_alignsize /* TBD */ );
 
 	return p_ans;

@@ -12,6 +12,7 @@
 #ifndef LF_MEM_ALLOC_BASIC_ALLOCATOR_HPP_
 #define LF_MEM_ALLOC_BASIC_ALLOCATOR_HPP_
 
+#include "mmap_allocator.hpp"
 #include <cstdlib>
 
 namespace alpha {
@@ -20,9 +21,9 @@ namespace concurrent {
 namespace internal {
 
 struct basic_mem_allocator {
-	static inline void* allocate( size_t n )
+	static inline allocate_result allocate( size_t n )
 	{
-		return std::malloc( n );
+		return allocate_result { std::malloc( n ), n };
 	}
 	static inline void deallocate( void* p_mem, size_t n )
 	{
