@@ -28,8 +28,6 @@
 namespace alpha {
 namespace concurrent {
 
-constexpr size_t NUM_OF_PRE_ALLOCATED_NODES = 0;   //!< 事前に用意する管理ノード数。なお、空きノードがあれば、それを流用するので、mallocが発生しない。
-
 /*!
  * @brief	hazard pointer support class
  *
@@ -250,15 +248,11 @@ private:
 
 	////////////////////////////////////////////////////////////////////////////////
 	struct hazard_node_head {
-		hazard_node_head( void )
+		constexpr hazard_node_head( void )
 		  : allocator_( true, 4 * 1024 )
 		  , head_( nullptr )
 		  , node_count_( 0 )
 		{
-			for ( size_t i = 0; i < NUM_OF_PRE_ALLOCATED_NODES; i++ ) {
-				auto p_hzrd_ptr_node = add_one_new_hazard_ptr_node();
-				p_hzrd_ptr_node->release_owner();
-			}
 		}
 		~hazard_node_head()
 		{
