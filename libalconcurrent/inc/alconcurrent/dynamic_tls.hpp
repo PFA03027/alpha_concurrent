@@ -234,7 +234,7 @@ struct threadlocal_default_handler {
  *
  * @note
  * Because it is used in the lf_mem_alloc class
- * Due to the hierarchical relationship of components, new is not used to allocate memory, only malloc/free and placement new are used.
+ * Due to the hierarchical relationship of components, new is not used to allocate memory, only alloc_only_chamber allocator and placement new are used.
  */
 template <typename T, typename TL_HANDLER = threadlocal_default_handler<T>>
 class dynamic_tls {

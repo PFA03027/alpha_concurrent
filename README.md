@@ -99,10 +99,9 @@ To avoid race condtion b/w dynamic_tls class and thread local storage destructor
 
 # general memory allocator class that is semi lock-free in lf_mem_alloc.hpp
 This is general memory allocator to get lock-free behavior and to avoid memory fragmentation.
-The current implementation requires a small additional overhead compared to malloc()/free().
 
 Configured of memory is kept to re-use.
-If the required size is over the max size of configuration paramter, it allocates directly from malloc() and free it by free() also.
+If the required size is over the max size of configuration paramter, it is allocated directly by mmap() and free it by munmap() also.
 
 general_mem_allocator::prune() and gmem_prune() is introduce to release the allocated memory if that is release by general_mem_allocator::deallocate() or gmem_deallocate().
 
