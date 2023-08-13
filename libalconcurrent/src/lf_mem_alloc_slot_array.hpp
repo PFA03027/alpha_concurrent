@@ -130,7 +130,7 @@ struct slot_array_mgr {
 		}
 
 		bool_size_t chk_ret_free_slot_idx = get_slot_idx_from_slot_header_of_array( p_free_slot );
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGICAL_ERROR
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
 		if ( !chk_ret_free_slot_idx.is_ok_ ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
 			std::string errlog = "recieved free slot is not belong to this slot_array_mgr";

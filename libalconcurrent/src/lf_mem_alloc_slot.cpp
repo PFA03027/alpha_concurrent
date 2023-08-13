@@ -123,7 +123,7 @@ void slot_header_of_alloc::deallocate( void )
 bool_unified_slot_header_p slot_container::get_slot_header_from_assignment_p( void* p_mem )
 {
 	slot_container* p_slot_container = reinterpret_cast<slot_container*>( reinterpret_cast<uintptr_t>( p_mem ) - static_cast<uintptr_t>( sizeof( slot_container ) ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGICAL_ERROR
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
 	if ( p_mem != reinterpret_cast<void*>( p_slot_container->mem ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
 		std::string errlog = "does not match p_mem and slot_container::mem[0]. This is logical error.";
