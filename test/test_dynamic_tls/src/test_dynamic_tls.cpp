@@ -211,7 +211,7 @@ public:
 	void TearDown() override
 	{
 		alpha::concurrent::internal::print_of_mmap_allocator();
-		alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::DUMP, 'A', 1 );
+		alpha::concurrent::internal::allocating_only_dump_to_log( alpha::concurrent::log_type::DUMP, 'A', 1 );
 	}
 
 	int max_num_;
@@ -293,7 +293,7 @@ public:
 		pthread_barrier_destroy( &barrier_ );
 
 		alpha::concurrent::internal::print_of_mmap_allocator();
-		alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::DUMP, 'A', 1 );
+		alpha::concurrent::internal::allocating_only_dump_to_log( alpha::concurrent::log_type::DUMP, 'A', 1 );
 	}
 
 	int                                             max_num_;

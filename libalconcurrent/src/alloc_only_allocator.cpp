@@ -237,8 +237,6 @@ alloc_chamber_statistics alloc_chamber::get_statistics( void ) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-alloc_chamber_head alloc_chamber_head::singleton_;
-
 void alloc_chamber_head::push_alloc_mem( void* p_alloced_mem, size_t allocated_size )
 {
 	if ( p_alloced_mem == nullptr ) return;
@@ -287,11 +285,13 @@ void alloc_chamber_head::dump_to_log( log_type lt, char c, int id )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
+static alloc_chamber_head g_alloc_only_inst;
+
 void* allocating_only( size_t req_size, size_t req_align )
 {
 	static_assert( conf_pre_mmap_size > sizeof( alloc_chamber ), "conf_pre_mmap_size is too small" );
 
-	void* p_ans = alloc_chamber_head::get_inst().allocate( req_size, req_align );
+	void* p_ans = g_alloc_only_inst.allocate( req_size, req_align );
 	if ( p_ans != nullptr ) return p_ans;
 
 	size_t cur_pre_alloc_size = conf_pre_mmap_size;
@@ -308,9 +308,9 @@ void* allocating_only( size_t req_size, size_t req_align )
 	if ( ret_mmap.p_allocated_addr_ == nullptr ) return nullptr;
 	if ( ret_mmap.allocated_size_ == 0 ) return nullptr;
 
-	alloc_chamber_head::get_inst().push_alloc_mem( ret_mmap.p_allocated_addr_, ret_mmap.allocated_size_ );
+	g_alloc_only_inst.push_alloc_mem( ret_mmap.p_allocated_addr_, ret_mmap.allocated_size_ );
 
-	return alloc_chamber_head::get_inst().allocate( req_size, req_align );
+	return g_alloc_only_inst.allocate( req_size, req_align );
 }
 
 void allocating_only_deallocate( void* p_mem )
@@ -319,6 +319,11 @@ void allocating_only_deallocate( void* p_mem )
 	throw std::runtime_error( "allocating_only_deallocate is called unexpectedly" );
 #endif
 	return;
+}
+
+void allocating_only_dump_to_log( log_type lt, char c, int id )
+{
+	g_alloc_only_inst.dump_to_log( lt, c, id );
 }
 
 }   // namespace internal

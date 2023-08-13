@@ -49,6 +49,12 @@ void* allocating_only( size_t req_size, size_t req_align = default_align_size );
  */
 void allocating_only_deallocate( void* p_mem );
 
+/**
+ * @brief dump log of pre-defined global allocating_only()
+ *
+ */
+void allocating_only_dump_to_log( log_type lt, char c, int id );
+
 // configuration value
 constexpr size_t conf_pre_mmap_size = 1024 * 1024;
 
@@ -58,29 +64,20 @@ class alloc_chamber;
 
 class alloc_chamber_head {
 public:
-	static alloc_chamber_head& get_inst( void );
-
 	void push_alloc_mem( void* p_alloced_mem, size_t allocated_size );
 
 	void* allocate( size_t req_size, size_t req_align );
 
 	void dump_to_log( log_type lt, char c, int id );
 
-private:
 	constexpr alloc_chamber_head( void )
 	  : head_( nullptr )
 	{
 	}
 
+private:
 	std::atomic<alloc_chamber*> head_;   //!< alloc_chamberのスタックリスト上のheadのalloc_chamber
-
-	static alloc_chamber_head singleton_;
 };
-
-inline alloc_chamber_head& alloc_chamber_head::get_inst( void )
-{
-	return singleton_;
-}
 
 }   // namespace internal
 }   // namespace concurrent

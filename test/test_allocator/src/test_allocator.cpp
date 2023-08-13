@@ -48,12 +48,18 @@ TEST( Alloc_only_class, Call_push )
 {
 	// Arrange
 	auto mmap_alloc_ret = alpha::concurrent::internal::allocate_by_mmap( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	{
+		alpha::concurrent::internal::alloc_chamber_head sut;
 
-	// Act
-	alpha::concurrent::internal::alloc_chamber_head::get_inst().push_alloc_mem( mmap_alloc_ret.p_allocated_addr_, mmap_alloc_ret.allocated_size_ );
+		// Act
+		sut.push_alloc_mem( mmap_alloc_ret.p_allocated_addr_, mmap_alloc_ret.allocated_size_ );
 
-	// Assert
-	alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::TEST, 't', 1 );
+		// Assert
+		sut.dump_to_log( alpha::concurrent::log_type::TEST, 't', 1 );
+	}
+
+	// Clean-up
+	alpha::concurrent::internal::deallocate_by_munmap( mmap_alloc_ret.p_allocated_addr_, mmap_alloc_ret.allocated_size_ );
 }
 
 TEST( Alloc_only_class, Call_dump )
@@ -62,7 +68,7 @@ TEST( Alloc_only_class, Call_dump )
 	alpha::concurrent::internal::allocating_only( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
 
 	// Act
-	alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::TEST, 't', 2 );
+	alpha::concurrent::internal::allocating_only_dump_to_log( alpha::concurrent::log_type::TEST, 't', 2 );
 
 	// Assert
 }
@@ -75,7 +81,7 @@ TEST( Alloc_only_class, Call_allocating_only )
 	alpha::concurrent::internal::allocating_only( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
 
 	// Assert
-	alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::TEST, 't', 3 );
+	alpha::concurrent::internal::allocating_only_dump_to_log( alpha::concurrent::log_type::TEST, 't', 3 );
 }
 
 TEST( Alloc_only_class, Do_append_allocation )
@@ -87,7 +93,7 @@ TEST( Alloc_only_class, Do_append_allocation )
 	alpha::concurrent::internal::allocating_only( alpha::concurrent::internal::conf_pre_mmap_size / 2, alpha::concurrent::internal::default_align_size );
 
 	// Assert
-	alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::TEST, 't', 4 );
+	alpha::concurrent::internal::allocating_only_dump_to_log( alpha::concurrent::log_type::TEST, 't', 4 );
 }
 
 TEST( Alloc_only_class, Do_allocation_over_pre_mmap_size )
@@ -98,5 +104,5 @@ TEST( Alloc_only_class, Do_allocation_over_pre_mmap_size )
 	alpha::concurrent::internal::allocating_only( alpha::concurrent::internal::conf_pre_mmap_size * 2, alpha::concurrent::internal::default_align_size );
 
 	// Assert
-	alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::TEST, 't', 5 );
+	alpha::concurrent::internal::allocating_only_dump_to_log( alpha::concurrent::log_type::TEST, 't', 5 );
 }
