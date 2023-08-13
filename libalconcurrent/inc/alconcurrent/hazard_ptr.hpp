@@ -47,8 +47,9 @@ public:
 	using hzrd_pointer                 = T*;
 	static constexpr int hzrd_max_slot = N;
 
-	hazard_ptr( void )
-	  : p_hzd_ptr_node_( threadlocal_handler_functor( this ) )
+	constexpr hazard_ptr( void )
+	  : head_()
+	  , p_hzd_ptr_node_( threadlocal_handler_functor( this ) )
 	{
 	}
 
