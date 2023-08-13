@@ -74,8 +74,7 @@ private:
 
 	std::atomic<alloc_chamber*> head_;   //!< alloc_chamberのスタックリスト上のheadのalloc_chamber
 
-	static alloc_chamber_head          singleton_;
-	static thread_local alloc_chamber* p_forcusing_chamber_;
+	static alloc_chamber_head singleton_;
 };
 
 inline alloc_chamber_head& alloc_chamber_head::get_inst( void )

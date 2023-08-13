@@ -237,8 +237,7 @@ alloc_chamber_statistics alloc_chamber::get_statistics( void ) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-alloc_chamber_head          alloc_chamber_head::singleton_;
-thread_local alloc_chamber* alloc_chamber_head::p_forcusing_chamber_ = nullptr;
+alloc_chamber_head alloc_chamber_head::singleton_;
 
 void alloc_chamber_head::push_alloc_mem( void* p_alloced_mem, size_t allocated_size )
 {
@@ -249,24 +248,17 @@ void alloc_chamber_head::push_alloc_mem( void* p_alloced_mem, size_t allocated_s
 	alloc_chamber* p_cur_head = head_.load( std::memory_order_acquire );
 	do {
 		p_new_chamber->next_.store( p_cur_head, std::memory_order_release );
-	} while ( !head_.compare_exchange_strong( p_cur_head, p_new_chamber ) );
-
-	p_forcusing_chamber_ = p_new_chamber;
+	} while ( !head_.compare_exchange_weak( p_cur_head, p_new_chamber, std::memory_order_acq_rel ) );
 
 	return;
 }
 
 void* alloc_chamber_head::allocate( size_t req_size, size_t req_align )
 {
-	alloc_chamber* p_cur_focusing_ch = p_forcusing_chamber_;
+	alloc_chamber* p_cur_focusing_ch = head_.load( std::memory_order_acquire );
 	if ( p_cur_focusing_ch == nullptr ) {
-		p_cur_focusing_ch = head_.load( std::memory_order_acquire );
-		if ( p_cur_focusing_ch == nullptr ) {
-			return nullptr;
-		}
-		p_forcusing_chamber_ = p_cur_focusing_ch;
+		return nullptr;
 	}
-
 	return p_cur_focusing_ch->allocate( req_size, req_align );
 }
 
@@ -285,10 +277,10 @@ void alloc_chamber_head::dump_to_log( log_type lt, char c, int id )
 
 	internal::LogOutput(
 		lt,
-		"[%d-%c] chamber count = %zu, total allocated size = 0x%zx, consumed size = 0x%zx(%.2fM), free size = 0x%zx(%.2fM), used ratio = %2.1f %%",
+		"[%d-%c] chamber count = %zu, total allocated size = 0x%zx(%.2fM), consumed size = 0x%zx(%.2fM), free size = 0x%zx(%.2fM), used ratio = %2.1f %%",
 		id, c,
 		chamber_count,
-		total_statistics.alloc_size_,
+		total_statistics.alloc_size_, (double)total_statistics.alloc_size_ / (double)( 1024 * 1024 ),
 		total_statistics.consum_size_, (double)total_statistics.consum_size_ / (double)( 1024 * 1024 ),
 		total_statistics.free_size_, (double)total_statistics.free_size_ / (double)( 1024 * 1024 ),
 		(double)total_statistics.consum_size_ / (double)total_statistics.alloc_size_ * 100.0f );
@@ -305,6 +297,12 @@ void* allocating_only( size_t req_size, size_t req_align )
 	size_t cur_pre_alloc_size = conf_pre_mmap_size;
 	if ( cur_pre_alloc_size < req_size ) {
 		cur_pre_alloc_size = req_size * 2 + sizeof( alloc_chamber );
+#if 0
+		internal::LogOutput( log_type::DEBUG, "requested size is over pre allocation size: req=0x%zx, therefore try to allocate double size: try=0x%zu", req_size, cur_pre_alloc_size );
+		bt_info tmp_bt;
+		RECORD_BACKTRACE_GET_BACKTRACE( tmp_bt );
+		tmp_bt.dump_to_log( log_type::DEBUG, 'a', 1 );
+#endif
 	}
 	allocate_result ret_mmap = allocate_by_mmap( cur_pre_alloc_size, default_align_size );
 	if ( ret_mmap.p_allocated_addr_ == nullptr ) return nullptr;
