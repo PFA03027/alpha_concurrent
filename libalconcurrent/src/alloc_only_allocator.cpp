@@ -238,7 +238,7 @@ alloc_chamber_statistics alloc_chamber::get_statistics( void ) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-alloc_chamber_head::~alloc_chamber_head()
+alloc_only_chamber::~alloc_only_chamber()
 {
 	if ( !need_release_munmap_ ) {
 		return;
@@ -252,7 +252,7 @@ alloc_chamber_head::~alloc_chamber_head()
 	}
 }
 
-void* alloc_chamber_head::try_allocate( size_t req_size, size_t req_align )
+void* alloc_only_chamber::try_allocate( size_t req_size, size_t req_align )
 {
 	alloc_chamber* p_cur_focusing_ch = head_.load( std::memory_order_acquire );
 	if ( p_cur_focusing_ch == nullptr ) {
@@ -261,7 +261,7 @@ void* alloc_chamber_head::try_allocate( size_t req_size, size_t req_align )
 	return p_cur_focusing_ch->allocate( req_size, req_align );
 }
 
-void alloc_chamber_head::push_alloc_mem( void* p_alloced_mem, size_t allocated_size )
+void alloc_only_chamber::push_alloc_mem( void* p_alloced_mem, size_t allocated_size )
 {
 	if ( p_alloced_mem == nullptr ) return;
 
@@ -275,7 +275,7 @@ void alloc_chamber_head::push_alloc_mem( void* p_alloced_mem, size_t allocated_s
 	return;
 }
 
-void alloc_chamber_head::munmap_alloc_chamber( alloc_chamber* p_ac )
+void alloc_only_chamber::munmap_alloc_chamber( alloc_chamber* p_ac )
 {
 	size_t chamber_size_of_p_ac = p_ac->chamber_size_;
 	int    ret                  = deallocate_by_munmap( p_ac, chamber_size_of_p_ac );
@@ -293,7 +293,7 @@ void alloc_chamber_head::munmap_alloc_chamber( alloc_chamber* p_ac )
 	return;
 }
 
-void* alloc_chamber_head::allocate( size_t req_size, size_t req_align )
+void* alloc_only_chamber::allocate( size_t req_size, size_t req_align )
 {
 	void* p_ans = try_allocate( req_size, req_align );
 
@@ -319,7 +319,7 @@ void* alloc_chamber_head::allocate( size_t req_size, size_t req_align )
 	return p_ans;
 }
 
-void alloc_chamber_head::detect_unexpected_deallocate( void* )
+void alloc_only_chamber::detect_unexpected_deallocate( void* )
 {
 #ifdef ALCONCURRENT_CONF_DETECT_UNEXPECTED_DEALLOC_CALLING
 	throw std::runtime_error( "allocating_only_deallocate is called unexpectedly" );
@@ -327,7 +327,7 @@ void alloc_chamber_head::detect_unexpected_deallocate( void* )
 	return;
 }
 
-void alloc_chamber_head::dump_to_log( log_type lt, char c, int id )
+void alloc_only_chamber::dump_to_log( log_type lt, char c, int id )
 {
 	alloc_chamber_statistics total_statistics { 0 };
 	size_t                   chamber_count = 0;

@@ -51,7 +51,7 @@ TEST( Alloc_only_class, Call_push )
 
 	{
 		// Arrange
-		alpha::concurrent::internal::alloc_chamber_head sut( true, 128 );
+		alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
 		void*                                           p_mem = sut.allocate( 55, 8 );
 		EXPECT_NE( p_mem, nullptr );
 	}
@@ -69,7 +69,7 @@ TEST( Alloc_only_class, Call_dump )
 
 	{
 		// Arrange
-		alpha::concurrent::internal::alloc_chamber_head sut( true, 128 );
+		alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
 		void*                                           p_mem = sut.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
 		EXPECT_NE( p_mem, nullptr );
 
@@ -88,7 +88,7 @@ TEST( Alloc_only_class, Call_allocating_only )
 
 	{
 		// Arrange
-		alpha::concurrent::internal::alloc_chamber_head sut( true, 128 );
+		alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
 
 		// Act
 		void* p_mem = sut.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
@@ -106,7 +106,7 @@ TEST( Alloc_only_class, Do_append_allocation )
 
 	{
 		// Arrange
-		alpha::concurrent::internal::alloc_chamber_head sut( true, test_conf_pre_mmap_size );
+		alpha::concurrent::internal::alloc_only_chamber sut( true, test_conf_pre_mmap_size );
 		void*                                           p_mem = sut.allocate( test_conf_pre_mmap_size / 2, alpha::concurrent::internal::default_align_size );
 		EXPECT_NE( p_mem, nullptr );
 
@@ -126,7 +126,7 @@ TEST( Alloc_only_class, Do_allocation_over_pre_mmap_size )
 
 	{
 		// Arrange
-		alpha::concurrent::internal::alloc_chamber_head sut( true, test_conf_pre_mmap_size );
+		alpha::concurrent::internal::alloc_only_chamber sut( true, test_conf_pre_mmap_size );
 
 		// Act
 		void* p_mem = sut.allocate( test_conf_pre_mmap_size * 2, alpha::concurrent::internal::default_align_size );

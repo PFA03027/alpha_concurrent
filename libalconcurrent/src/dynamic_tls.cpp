@@ -89,7 +89,7 @@ void error_log_output( int errno_arg, const char* p_func_name )
 // configuration value
 constexpr size_t conf_pre_mmap_size = 1024 * 1024;
 
-static alloc_chamber_head g_alloc_only_inst( false, conf_pre_mmap_size );   // グローバルインスタンスは、プロセス終了までメモリ領域を維持するために、デストラクタが呼ばれてもmmapした領域を解放しない。
+static alloc_only_chamber g_alloc_only_inst( false, conf_pre_mmap_size );   // グローバルインスタンスは、プロセス終了までメモリ領域を維持するために、デストラクタが呼ばれてもmmapした領域を解放しない。
 
 /**
  * @brief allocate memory that requester side does not free

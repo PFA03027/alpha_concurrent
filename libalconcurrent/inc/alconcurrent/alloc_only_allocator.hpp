@@ -31,16 +31,16 @@ constexpr size_t default_align_size = 32;
 
 class alloc_chamber;
 
-class alloc_chamber_head {
+class alloc_only_chamber {
 public:
-	constexpr alloc_chamber_head( bool need_release_munmap_arg, size_t pre_alloc_size_arg )
+	constexpr alloc_only_chamber( bool need_release_munmap_arg, size_t pre_alloc_size_arg )
 	  : head_( nullptr )
 	  , need_release_munmap_( need_release_munmap_arg )
 	  , pre_alloc_size_( pre_alloc_size_arg )
 	{
 	}
 
-	~alloc_chamber_head();
+	~alloc_only_chamber();
 
 	void* allocate( size_t req_size, size_t req_align );
 

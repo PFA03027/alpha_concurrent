@@ -233,11 +233,11 @@ private:
 		void* operator new[]( std::size_t n )           = delete;                          // usual new...(1)
 		void  operator delete[]( void* p_mem ) noexcept = delete;                          // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
 
-		void* operator new( std::size_t n, internal::alloc_chamber_head& allocator_arg )   // placement new
+		void* operator new( std::size_t n, internal::alloc_only_chamber& allocator_arg )   // placement new
 		{
 			return allocator_arg.allocate( n, sizeof( uintptr_t ) );
 		}
-		void operator delete( void* p, internal::alloc_chamber_head& allocator_arg ) noexcept   // placement delete...(3)
+		void operator delete( void* p, internal::alloc_only_chamber& allocator_arg ) noexcept   // placement delete...(3)
 		{
 		}
 
@@ -344,7 +344,7 @@ private:
 		hazard_node_head& operator=( const hazard_node_head& ) = delete;
 		hazard_node_head& operator=( hazard_node_head&& )      = delete;
 
-		internal::alloc_chamber_head      allocator_;    //!< ハザードポインタリストに登録されるノードに対する割り当て専用アロケータ
+		internal::alloc_only_chamber      allocator_;    //!< ハザードポインタリストに登録されるノードに対する割り当て専用アロケータ
 		std::atomic<node_for_hazard_ptr*> head_;         //!< ハザードポインタリストの先頭ノードへのポインタ
 		std::atomic<int>                  node_count_;   //!< ハザードポインタリストに登録されているノード数
 	};
