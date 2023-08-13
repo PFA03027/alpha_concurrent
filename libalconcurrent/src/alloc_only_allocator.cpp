@@ -18,7 +18,7 @@
 
 #include "alconcurrent/conf_logger.hpp"
 
-#include "alloc_only_allocator.hpp"
+#include "alconcurrent/alloc_only_allocator.hpp"
 #include "mmap_allocator.hpp"
 
 namespace alpha {
@@ -349,26 +349,6 @@ void alloc_chamber_head::dump_to_log( log_type lt, char c, int id )
 		total_statistics.consum_size_, (double)total_statistics.consum_size_ / (double)( 1024 * 1024 ),
 		total_statistics.free_size_, (double)total_statistics.free_size_ / (double)( 1024 * 1024 ),
 		(double)total_statistics.consum_size_ / (double)total_statistics.alloc_size_ * 100.0f );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////
-static_assert( conf_pre_mmap_size > sizeof( alloc_chamber ), "conf_pre_mmap_size is too small" );
-static alloc_chamber_head g_alloc_only_inst( false, conf_pre_mmap_size );   // グローバルインスタンスは、プロセス終了までメモリ領域を維持するために、デストラクタが呼ばれてもmmapした領域を解放しない。
-
-void* allocating_only( size_t req_size, size_t req_align )
-{
-	return g_alloc_only_inst.allocate( req_size, req_align );
-}
-
-void allocating_only_deallocate( void* p_mem )
-{
-	g_alloc_only_inst.detect_unexpected_deallocate( p_mem );
-	return;
-}
-
-void allocating_only_dump_to_log( log_type lt, char c, int id )
-{
-	g_alloc_only_inst.dump_to_log( lt, c, id );
 }
 
 }   // namespace internal

@@ -25,46 +25,15 @@ namespace concurrent {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 namespace internal {
 
-// external I/F
-constexpr size_t default_align_size = 32;
-
-/**
- * @brief allocate memory that requester side does not free
- *
- * memory allocated by this I/F could not free.
- *
- * @param req_size memory size to allocate
- * @param req_align allocated memory address alignment
- * @return void* pointer to the allocated memory
- */
-void* allocating_only( size_t req_size, size_t req_align = default_align_size );
-
-/**
- * @brief to detect unexpected deallocation calling
- *
- * normally nothing to do
- * If the library compile with ALCONCURRENT_CONF_DETECT_UNEXPECTED_DEALLOC_CALLING, this function throw std::runtime_error.
- *
- * @param p_mem
- */
-void allocating_only_deallocate( void* p_mem );
-
-/**
- * @brief dump log of pre-defined global allocating_only()
- *
- */
-void allocating_only_dump_to_log( log_type lt, char c, int id );
-
-// configuration value
-constexpr size_t conf_pre_mmap_size = 1024 * 1024;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 // internal I/F
+constexpr size_t default_align_size = 32;
+
 class alloc_chamber;
 
 class alloc_chamber_head {
 public:
-	constexpr alloc_chamber_head( bool need_release_munmap_arg, size_t pre_alloc_size_arg = conf_pre_mmap_size )
+	constexpr alloc_chamber_head( bool need_release_munmap_arg, size_t pre_alloc_size_arg )
 	  : head_( nullptr )
 	  , need_release_munmap_( need_release_munmap_arg )
 	  , pre_alloc_size_( pre_alloc_size_arg )

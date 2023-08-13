@@ -21,7 +21,7 @@
 #include "alconcurrent/lf_fifo.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
 
-#include "alloc_only_allocator.hpp"
+#include "alconcurrent/alloc_only_allocator.hpp"
 #include "mmap_allocator.hpp"
 
 static alpha::concurrent::param_chunk_allocation param[] = {
@@ -100,7 +100,6 @@ public:
 		}
 
 		alpha::concurrent::internal::print_of_mmap_allocator();
-		alpha::concurrent::internal::allocating_only_dump_to_log( alpha::concurrent::log_type::DUMP, 'A', 1 );
 		alpha::concurrent::internal::dynamic_tls_status_info st = alpha::concurrent::internal::dynamic_tls_get_status();
 		printf( "num_of_key_array: %u, num_content_head_: %u, next_base_idx_: %u\n", st.num_key_array_cnt_, st.num_content_head_, st.next_base_idx_ );
 	}
