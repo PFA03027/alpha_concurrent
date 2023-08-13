@@ -319,6 +319,14 @@ void* alloc_chamber_head::allocate( size_t req_size, size_t req_align )
 	return p_ans;
 }
 
+void alloc_chamber_head::detect_unexpected_deallocate( void* )
+{
+#ifdef ALCONCURRENT_CONF_DETECT_UNEXPECTED_DEALLOC_CALLING
+	throw std::runtime_error( "allocating_only_deallocate is called unexpectedly" );
+#endif
+	return;
+}
+
 void alloc_chamber_head::dump_to_log( log_type lt, char c, int id )
 {
 	alloc_chamber_statistics total_statistics { 0 };
@@ -354,9 +362,7 @@ void* allocating_only( size_t req_size, size_t req_align )
 
 void allocating_only_deallocate( void* p_mem )
 {
-#ifdef ALCONCURRENT_CONF_DETECT_UNEXPECTED_DEALLOC_CALLING
-	throw std::runtime_error( "allocating_only_deallocate is called unexpectedly" );
-#endif
+	g_alloc_only_inst.detect_unexpected_deallocate( p_mem );
 	return;
 }
 

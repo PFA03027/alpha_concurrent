@@ -75,6 +75,8 @@ public:
 
 	void* allocate( size_t req_size, size_t req_align );
 
+	void detect_unexpected_deallocate( void* );
+
 	void dump_to_log( log_type lt, char c, int id );
 
 private:
