@@ -22,6 +22,7 @@
 #include <mutex>
 #include <thread>
 
+#include "alloc_only_allocator.hpp"
 #include "dynamic_tls.hpp"
 
 namespace alpha {
@@ -120,6 +121,11 @@ public:
 	int debug_get_glist_size( void )
 	{
 		return get_head_instance().get_node_count();
+	}
+
+	void dump_to_log( log_type lt, char c, int id )
+	{
+		head_.dump_to_log( lt, c, id );
 	}
 
 private:
@@ -222,6 +228,20 @@ private:
 			return status_.load( std::memory_order_acquire );
 		}
 
+		void* operator new( std::size_t n )           = delete;                            // usual new...(1)
+		void  operator delete( void* p_mem ) noexcept = delete;                            // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
+
+		void* operator new[]( std::size_t n )           = delete;                          // usual new...(1)
+		void  operator delete[]( void* p_mem ) noexcept = delete;                          // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
+
+		void* operator new( std::size_t n, internal::alloc_chamber_head& allocator_arg )   // placement new
+		{
+			return allocator_arg.allocate( n, sizeof( uintptr_t ) );
+		}
+		void operator delete( void* p, internal::alloc_chamber_head& allocator_arg ) noexcept   // placement delete...(3)
+		{
+		}
+
 	private:
 		std::atomic<ocupied_status>       status_;        //!< status for used or not used yet
 		std::atomic<node_for_hazard_ptr*> next_;          //!< pointer to next node
@@ -231,7 +251,8 @@ private:
 	////////////////////////////////////////////////////////////////////////////////
 	struct hazard_node_head {
 		hazard_node_head( void )
-		  : head_( nullptr )
+		  : allocator_( true, 4 * 1024 )
+		  , head_( nullptr )
 		  , node_count_( 0 )
 		{
 			for ( size_t i = 0; i < NUM_OF_PRE_ALLOCATED_NODES; i++ ) {
@@ -244,7 +265,7 @@ private:
 			node_for_hazard_ptr* p_cur = head_.load( std::memory_order_acquire );
 			while ( p_cur != nullptr ) {
 				node_for_hazard_ptr* p_nxt = p_cur->get_next();
-				delete p_cur;
+				node_for_hazard_ptr::operator delete( p_cur, allocator_ );   // 通常のdelete operatorではなく配置deleteを呼び出すために、operator deleteを直接呼び出す。
 				p_cur = p_nxt;
 			}
 			return;
@@ -296,6 +317,12 @@ private:
 			return node_count_.load( std::memory_order_acquire );
 		}
 
+		void dump_to_log( log_type lt, char c, int id )
+		{
+			allocator_.dump_to_log( lt, c, id );
+			internal::LogOutput( lt, "count of node_for_hazard_ptr of hazard_node_head(%p): %d", this, node_count_.load( std::memory_order_acquire ) );
+		}
+
 	private:
 		/*!
 		 * @brief	新しいノードを用意し、リストに追加する。
@@ -306,7 +333,7 @@ private:
 		 */
 		node_for_hazard_ptr* add_one_new_hazard_ptr_node( void )
 		{
-			node_for_hazard_ptr* p_ans        = new node_for_hazard_ptr();
+			node_for_hazard_ptr* p_ans        = new ( allocator_ ) node_for_hazard_ptr();
 			node_for_hazard_ptr* p_next_check = head_.load( std::memory_order_acquire );
 			do {
 				p_ans->set_next( p_next_check );
@@ -322,8 +349,9 @@ private:
 		hazard_node_head& operator=( const hazard_node_head& ) = delete;
 		hazard_node_head& operator=( hazard_node_head&& )      = delete;
 
-		std::atomic<node_for_hazard_ptr*> head_;
-		std::atomic<int>                  node_count_;
+		internal::alloc_chamber_head      allocator_;    //!< ハザードポインタリストに登録されるノードに対する割り当て専用アロケータ
+		std::atomic<node_for_hazard_ptr*> head_;         //!< ハザードポインタリストの先頭ノードへのポインタ
+		std::atomic<int>                  node_count_;   //!< ハザードポインタリストに登録されているノード数
 	};
 
 	hazard_node_head head_;
