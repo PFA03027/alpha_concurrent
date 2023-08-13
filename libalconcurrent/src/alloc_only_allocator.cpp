@@ -237,6 +237,29 @@ alloc_chamber_statistics alloc_chamber::get_statistics( void ) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
+alloc_chamber_head::~alloc_chamber_head()
+{
+	if ( !need_release_munmap_ ) {
+		return;
+	}
+
+	alloc_chamber* p_cur_head = head_.load( std::memory_order_acquire );
+	while ( p_cur_head != nullptr ) {
+		alloc_chamber* p_nxt_head = p_cur_head->next_.load( std::memory_order_acquire );
+		munmap_alloc_chamber( p_cur_head );
+		p_cur_head = p_nxt_head;
+	}
+}
+
+void* alloc_chamber_head::try_allocate( size_t req_size, size_t req_align )
+{
+	alloc_chamber* p_cur_focusing_ch = head_.load( std::memory_order_acquire );
+	if ( p_cur_focusing_ch == nullptr ) {
+		return nullptr;
+	}
+	return p_cur_focusing_ch->allocate( req_size, req_align );
+}
+
 void alloc_chamber_head::push_alloc_mem( void* p_alloced_mem, size_t allocated_size )
 {
 	if ( p_alloced_mem == nullptr ) return;
@@ -251,13 +274,48 @@ void alloc_chamber_head::push_alloc_mem( void* p_alloced_mem, size_t allocated_s
 	return;
 }
 
+void alloc_chamber_head::munmap_alloc_chamber( alloc_chamber* p_ac )
+{
+	size_t chamber_size_of_p_ac = p_ac->chamber_size_;
+	int    ret                  = deallocate_by_munmap( p_ac, chamber_size_of_p_ac );
+	if ( ret != 0 ) {
+		auto er_errno = errno;
+		char buff[128];
+#if ( _POSIX_C_SOURCE >= 200112L ) && !_GNU_SOURCE
+		strerror_r( er_errno, buff, 128 );
+		internal::LogOutput( log_type::ERR, "munmap is fail with %s", buff );
+#else
+		const char* ret_str = strerror_r( er_errno, buff, 128 );
+		internal::LogOutput( log_type::ERR, "munmap is fail with %s", ret_str );
+#endif
+	}
+	return;
+}
+
 void* alloc_chamber_head::allocate( size_t req_size, size_t req_align )
 {
-	alloc_chamber* p_cur_focusing_ch = head_.load( std::memory_order_acquire );
-	if ( p_cur_focusing_ch == nullptr ) {
-		return nullptr;
+	void* p_ans = try_allocate( req_size, req_align );
+
+	while ( p_ans == nullptr ) {
+		size_t cur_pre_alloc_size = pre_alloc_size_;
+		if ( cur_pre_alloc_size < req_size ) {
+			cur_pre_alloc_size = req_size * 2 + sizeof( alloc_chamber );
+#if 0
+		internal::LogOutput( log_type::DEBUG, "requested size is over pre allocation size: req=0x%zx, therefore try to allocate double size: try=0x%zu", req_size, cur_pre_alloc_size );
+		bt_info tmp_bt;
+		RECORD_BACKTRACE_GET_BACKTRACE( tmp_bt );
+		tmp_bt.dump_to_log( log_type::DEBUG, 'a', 1 );
+#endif
+		}
+		allocate_result ret_mmap = allocate_by_mmap( cur_pre_alloc_size, default_align_size );
+		if ( ret_mmap.p_allocated_addr_ == nullptr ) return nullptr;
+		if ( ret_mmap.allocated_size_ == 0 ) return nullptr;
+
+		push_alloc_mem( ret_mmap.p_allocated_addr_, ret_mmap.allocated_size_ );
+		p_ans = try_allocate( req_size, req_align );
 	}
-	return p_cur_focusing_ch->allocate( req_size, req_align );
+
+	return p_ans;
 }
 
 void alloc_chamber_head::dump_to_log( log_type lt, char c, int id )
@@ -285,31 +343,11 @@ void alloc_chamber_head::dump_to_log( log_type lt, char c, int id )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-static alloc_chamber_head g_alloc_only_inst;
+static_assert( conf_pre_mmap_size > sizeof( alloc_chamber ), "conf_pre_mmap_size is too small" );
+static alloc_chamber_head g_alloc_only_inst( false, conf_pre_mmap_size );   // グローバルインスタンスは、プロセス終了までメモリ領域を維持するために、デストラクタが呼ばれてもmmapした領域を解放しない。
 
 void* allocating_only( size_t req_size, size_t req_align )
 {
-	static_assert( conf_pre_mmap_size > sizeof( alloc_chamber ), "conf_pre_mmap_size is too small" );
-
-	void* p_ans = g_alloc_only_inst.allocate( req_size, req_align );
-	if ( p_ans != nullptr ) return p_ans;
-
-	size_t cur_pre_alloc_size = conf_pre_mmap_size;
-	if ( cur_pre_alloc_size < req_size ) {
-		cur_pre_alloc_size = req_size * 2 + sizeof( alloc_chamber );
-#if 0
-		internal::LogOutput( log_type::DEBUG, "requested size is over pre allocation size: req=0x%zx, therefore try to allocate double size: try=0x%zu", req_size, cur_pre_alloc_size );
-		bt_info tmp_bt;
-		RECORD_BACKTRACE_GET_BACKTRACE( tmp_bt );
-		tmp_bt.dump_to_log( log_type::DEBUG, 'a', 1 );
-#endif
-	}
-	allocate_result ret_mmap = allocate_by_mmap( cur_pre_alloc_size, default_align_size );
-	if ( ret_mmap.p_allocated_addr_ == nullptr ) return nullptr;
-	if ( ret_mmap.allocated_size_ == 0 ) return nullptr;
-
-	g_alloc_only_inst.push_alloc_mem( ret_mmap.p_allocated_addr_, ret_mmap.allocated_size_ );
-
 	return g_alloc_only_inst.allocate( req_size, req_align );
 }
 

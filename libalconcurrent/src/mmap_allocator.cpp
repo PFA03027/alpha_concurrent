@@ -142,10 +142,18 @@ int deallocate_by_munmap( void* p_allocated_addr, size_t allocated_size )
 	return munmap( p_allocated_addr, static_cast<size_t>( allocated_size ) );
 }
 
+alloc_mmap_status get_alloc_mmap_status( void )
+{
+	return alloc_mmap_status {
+		cur_total_allocation_size.load( std::memory_order_acquire ),
+		max_total_allocation_size.load( std::memory_order_acquire ) };
+}
+
 void print_of_mmap_allocator( void )
 {
-	size_t cur_size = cur_total_allocation_size.load( std::memory_order_acquire );
-	size_t cur_max  = max_total_allocation_size.load( std::memory_order_acquire );
+	auto   cur_data = get_alloc_mmap_status();
+	size_t cur_size = cur_data.active_size_;
+	size_t cur_max  = cur_data.max_size_;
 
 	printf( "page_size               = %16zu = 0x%016zx\n", page_size, page_size );
 	printf( "current allocation size = %16zu = 0x%016zx %.2fG %.2fM %.0fK\n", cur_size, cur_size,

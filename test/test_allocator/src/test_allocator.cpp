@@ -46,20 +46,19 @@ TEST( MMAP_Alocator, DO_max_size_plus_one )
 
 TEST( Alloc_only_class, Call_push )
 {
-	// Arrange
-	auto mmap_alloc_ret = alpha::concurrent::internal::allocate_by_mmap( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	auto pre_status = alpha::concurrent::internal::get_alloc_mmap_status();
+
 	{
-		alpha::concurrent::internal::alloc_chamber_head sut;
-
-		// Act
-		sut.push_alloc_mem( mmap_alloc_ret.p_allocated_addr_, mmap_alloc_ret.allocated_size_ );
-
-		// Assert
-		sut.dump_to_log( alpha::concurrent::log_type::TEST, 't', 1 );
+		// Arrange
+		alpha::concurrent::internal::alloc_chamber_head sut( true, 128 );
+		sut.allocate( 55, 8 );
 	}
 
-	// Clean-up
-	alpha::concurrent::internal::deallocate_by_munmap( mmap_alloc_ret.p_allocated_addr_, mmap_alloc_ret.allocated_size_ );
+	// Act
+	auto post_status = alpha::concurrent::internal::get_alloc_mmap_status();
+
+	// Assert
+	EXPECT_EQ( pre_status.active_size_, post_status.active_size_ );
 }
 
 TEST( Alloc_only_class, Call_dump )
