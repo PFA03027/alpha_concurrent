@@ -317,7 +317,7 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 {
 	const int total_thread_num     = 200;
 	const int generated_thread_num = 10;
-	const int gmem_max_alloc_size  = 16000;
+	const int gmem_max_alloc_size  = 17 * 1024;
 	{
 		test_fifo_type          fifo;
 		int                     exit_count( 0 );

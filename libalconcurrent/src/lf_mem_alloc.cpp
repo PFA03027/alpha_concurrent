@@ -798,7 +798,9 @@ void* general_mem_allocator_impl_allocate(
 	size_t          buff_size      = slot_header_of_alloc::calc_slot_header_and_container_size( n_arg, default_slot_alignsize /* TBD */ );
 	allocate_result alloc_mem_info = basic_mem_allocator::allocate( buff_size, default_slot_alignsize );
 	if ( alloc_mem_info.p_allocated_addr_ == nullptr ) {
-		throw std::bad_alloc();
+		internal::LogOutput( log_type::ERR, "fail allocate memory by basic_mem_allocator::allocate(%zu, %zu)", buff_size, default_slot_alignsize );
+		return nullptr;
+		// throw std::bad_alloc();
 	}
 	slot_header_of_alloc* p_slot_header_of_alloc = new ( alloc_mem_info.p_allocated_addr_ ) slot_header_of_alloc( alloc_mem_info.allocated_size_ );
 	p_ans                                        = p_slot_header_of_alloc->allocate( n_arg, default_slot_alignsize /* TBD */ );

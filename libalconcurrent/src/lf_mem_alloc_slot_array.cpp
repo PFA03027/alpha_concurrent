@@ -38,6 +38,7 @@ void* slot_array_mgr::operator new( std::size_t n_of_slot_array_mgr, size_t num_
 	total_size += calc_total_slot_container_array_bytes( num_of_slots_, expected_alloc_n_per_slot );
 	auto alloc_ret = allocate_by_mmap( total_size, default_slot_alignsize );
 	if ( alloc_ret.p_allocated_addr_ == nullptr ) {
+		internal::LogOutput( log_type::ERR, "fail allocate memory by allocate_by_mmap(%zu, %zu)", total_size, default_slot_alignsize );
 		throw std::bad_alloc();
 	}
 
