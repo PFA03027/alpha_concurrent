@@ -21,6 +21,8 @@ namespace internal {
 // usual delete...(2)
 void slot_array_mgr::operator delete( void* p_mem ) noexcept
 {
+	if ( p_mem == nullptr ) return;
+
 	size_t alloc_size  = *( reinterpret_cast<size_t*>( p_mem ) );   // ちょっとトリッキーな方法でmmapで確保したサイズ情報を引き出す。const size_tで宣言されているので、書き換えは発生しないことを利用する。
 	int    dealloc_ret = deallocate_by_munmap( p_mem, alloc_size );
 	if ( dealloc_ret != 0 ) {
@@ -41,6 +43,18 @@ void* slot_array_mgr::operator new( std::size_t n_of_slot_array_mgr, size_t num_
 
 	*( reinterpret_cast<size_t*>( alloc_ret.p_allocated_addr_ ) ) = alloc_ret.allocated_size_;   // ちょっとトリッキーな方法でmmapで確保したサイズ情報をコンストラクタに渡す
 	return alloc_ret.p_allocated_addr_;
+}
+
+void slot_array_mgr::operator delete( void* p, size_t num_of_slots_, size_t expected_alloc_n_per_slot ) noexcept
+{
+	// 配置newに対応するdelete。
+	if ( p == nullptr ) return;
+
+	size_t alloc_size  = *( reinterpret_cast<size_t*>( p ) );   // ちょっとトリッキーな方法でmmapで確保したサイズ情報を引き出す。const size_tで宣言されているので、書き換えは発生しないことを利用する。
+	int    dealloc_ret = deallocate_by_munmap( p, alloc_size );
+	if ( dealloc_ret != 0 ) {
+		LogOutput( log_type::ERR, "fail deallocate_by_munmap(%p, %zu)", p, alloc_size );
+	}
 }
 
 slot_array_mgr::slot_array_mgr( chunk_header_multi_slot* p_owner, size_t num_of_slots, size_t n )

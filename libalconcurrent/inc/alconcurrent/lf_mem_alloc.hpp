@@ -20,6 +20,7 @@
 
 #include "conf_logger.hpp"
 
+#include "alloc_only_allocator.hpp"
 #include "lf_mem_alloc_internal.hpp"
 #include "lf_mem_alloc_type.hpp"
 
@@ -57,7 +58,8 @@ public:
 	 * @brief	constructor
 	 */
 	constexpr static_general_mem_allocator( void )
-	  : pr_ch_size_( 0 )
+	  : allocating_only_allocator_( true, 4 * 1024 )
+	  , pr_ch_size_( 0 )
 	  , param_ch_array_impl {}
 	  , param_ch_array_( nullptr )
 	  , exclusive_ctl_of_prune_( false )
@@ -70,8 +72,9 @@ public:
 	 */
 	template <typename... Args>
 	constexpr static_general_mem_allocator( Args... args )
-	  : pr_ch_size_( sizeof...( args ) )
-	  , param_ch_array_impl { std::forward<Args>( args )... }
+	  : allocating_only_allocator_( true, 4 * 1024 )
+	  , pr_ch_size_( sizeof...( args ) )
+	  , param_ch_array_impl { { std::forward<Args>( args ), &allocating_only_allocator_ }... }
 	  , param_ch_array_( param_ch_array_impl )
 	  , exclusive_ctl_of_prune_( false )
 	{
@@ -92,8 +95,7 @@ public:
 			for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
 				param_ch_array_[i].~chunk_list();
 			}
-			unsigned char* p_tmp = reinterpret_cast<unsigned char*>( param_ch_array_ );
-			delete[] p_tmp;
+			// allocating_only_allocator_.detect_unexpected_deallocate( reinterpret_cast<void*>( param_ch_array_ ) );
 		}
 	}
 
@@ -140,10 +142,10 @@ public:
 			return;
 		}
 
-		unsigned char* p_tmp = new unsigned char[sizeof( internal::chunk_list[num] )];
-		param_ch_array_      = reinterpret_cast<internal::chunk_list*>( p_tmp );
+		void* p_tmp     = allocating_only_allocator_.allocate( sizeof( internal::chunk_list[num] ), sizeof( uintptr_t ) );
+		param_ch_array_ = reinterpret_cast<internal::chunk_list*>( p_tmp );
 		for ( unsigned int i = 0; i < num; i++ ) {
-			new ( &( param_ch_array_[i] ) ) internal::chunk_list( p_param_array[i] );
+			new ( &( param_ch_array_[i] ) ) internal::chunk_list( p_param_array[i], &allocating_only_allocator_ );
 		}
 
 		pr_ch_size_ = num;
@@ -168,11 +170,11 @@ public:
 	}
 
 private:
-	unsigned int          pr_ch_size_;                      //!< array size of chunk and param array
-	internal::chunk_list  param_ch_array_impl[NUM_ENTRY];   //!< chunk and param array
-	internal::chunk_list* param_ch_array_;                  //!< pointer to chunk and param array
-
-	std::atomic_bool exclusive_ctl_of_prune_;               //!< exclusive control for prune()
+	internal::alloc_only_chamber allocating_only_allocator_;       //!< chunk_header_multi_slotのメモリ割り当て用アロケータ
+	unsigned int                 pr_ch_size_;                      //!< array size of chunk and param array
+	internal::chunk_list         param_ch_array_impl[NUM_ENTRY];   //!< chunk and param array
+	internal::chunk_list*        param_ch_array_;                  //!< pointer to chunk and param array
+	std::atomic_bool             exclusive_ctl_of_prune_;          //!< exclusive control for prune()
 };
 
 /*!

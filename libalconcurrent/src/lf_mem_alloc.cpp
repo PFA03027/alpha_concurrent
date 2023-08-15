@@ -76,8 +76,8 @@ struct slot_header {
 	std::atomic<chunk_header_multi_slot*> at_p_chms_;   //!< pointer to chunk_header_multi_slot that is an owner of this slot
 	std::atomic<std::uintptr_t>           at_mark_;     //!< checker mark
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	bt_info alloc_bt_info_;                             //!< backtrace information when is allocated
-	bt_info free_bt_info_;                              //!< backtrace information when is free
+	bt_info alloc_bt_info_;   //!< backtrace information when is allocated
+	bt_info free_bt_info_;    //!< backtrace information when is free
 #endif
 
 	void set_addr_of_chunk_header_multi_slot(
@@ -703,7 +703,7 @@ void* chunk_list::allocate_mem_slot( void )
 
 	// 既存のchunkの再利用に失敗したので、新しいchunkを確保する。
 	// new演算子を使用するため、ここでもロックが発生する可能性がある。
-	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( cur_alloc_conf, hint_params.tl_id_, &statistics_ );
+	chunk_header_multi_slot* p_new_chms = new ( *p_allocator_ ) chunk_header_multi_slot( cur_alloc_conf, hint_params.tl_id_, &statistics_ );
 	if ( p_new_chms == nullptr ) {
 		return nullptr;   // TODO: should throw exception ?
 	}

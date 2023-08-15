@@ -16,6 +16,7 @@
 #include <list>
 #include <memory>
 
+#include "alconcurrent/alloc_only_allocator.hpp"
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/dynamic_tls.hpp"
 
@@ -233,6 +234,20 @@ public:
 	 */
 	void dump( void );
 
+	void* operator new( std::size_t n ) = delete;       // usual new...(1)
+	void  operator delete( void* p_mem ) noexcept {};   // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
+
+	void* operator new[]( std::size_t n )           = delete;   // usual new...(1)
+	void  operator delete[]( void* p_mem ) noexcept = delete;   // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
+
+	void* operator new( std::size_t n, internal::alloc_only_chamber& allocator_arg )   // placement new
+	{
+		return allocator_arg.allocate( n, sizeof( uintptr_t ) );
+	}
+	void operator delete( void* p, internal::alloc_only_chamber& allocator_arg ) noexcept   // placement delete...(3)
+	{
+	}
+
 private:
 	void set_slot_allocation_conf(
 		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
@@ -276,9 +291,6 @@ private:
 
 	param_chunk_allocation slot_conf_;          //!< allocation configuration paramter. value is corrected internally.
 	slot_array_mgr*        p_slot_array_mgr_;   //!< pointer to slot_array_mgr
-
-	// void*                          p_chunk_;            //!< pointer to an allocated memory as a chunk
-	// size_t                         allocated_size_;
 };
 
 /*!
@@ -290,9 +302,11 @@ public:
 	 * @brief	constructor
 	 */
 	constexpr chunk_list(
-		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
+		const param_chunk_allocation& ch_param_arg,     //!< [in] chunk allocation paramter
+		internal::alloc_only_chamber* p_allocator_arg   //!< [in] 割り当て専用アロケータへのポインタ
 		)
 	  : chunk_param_( ch_param_arg )
+	  , p_allocator_( p_allocator_arg )
 	  , p_top_chunk_()
 	  , tls_hint_( tl_chunk_param_destructor( this ) )
 	  , statistics_()
@@ -425,7 +439,7 @@ private:
 			chunk_header_multi_slot* p_chms = p_top_.load( std::memory_order_acquire );
 			while ( p_chms != nullptr ) {
 				chunk_header_multi_slot* p_next_chms = p_chms->p_next_chunk_.load( std::memory_order_acquire );
-				delete p_chms;
+				delete p_chms;   // 実際には削除されない。割り当て専用アロケータのdestructorによって、まとめて破棄される。
 				p_chms = p_next_chms;
 			}
 		}
@@ -470,6 +484,7 @@ private:
 		unsigned int target_tl_id_arg   //!< [in] オーナー権を開放する対象のtl_id_
 	);
 
+	internal::alloc_only_chamber*                          p_allocator_;   //!< 割り当て専用アロケータへのポインタ
 	atomic_push_list                                       p_top_chunk_;   //!< pointer to chunk_header that is top of list.
 	dynamic_tls<tl_chunk_param, tl_chunk_param_destructor> tls_hint_;      //!< thread local pointer to chunk_header that is success to allocate recently for a thread.
 	                                                                       //!< tls_hint_は、p_top_chunk_を参照しているため、この2つのメンバ変数の宣言順(p_top_chunk_の次にtls_hint_)を入れ替えてはならない。

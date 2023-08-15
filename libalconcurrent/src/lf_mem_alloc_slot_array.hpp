@@ -171,7 +171,7 @@ struct slot_array_mgr {
 	void  operator delete[]( void* p_mem ) noexcept = delete;   // usual delete...(2)   このクラスでは使用してはならないdelete operator
 
 	void* operator new( std::size_t n_of_slot_array_mgr, size_t num_of_slots_, size_t expected_alloc_n_per_slot );   // placement new    可変長部分の領域も確保するnew operator
-	void  operator delete( void* p, void* p2 ) noexcept = delete;                                                    // placement delete...(3)   このクラスでは使用してはならないdelete operator。このdelete operator自身は何もしない。
+	void  operator delete( void* p, size_t num_of_slots_, size_t expected_alloc_n_per_slot ) noexcept;               // placement delete...(3)   このクラスでは使用してはならないdelete operator。このdelete operator自身は何もしない。
 
 private:
 	/**

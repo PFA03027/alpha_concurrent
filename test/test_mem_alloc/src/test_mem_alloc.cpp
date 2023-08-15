@@ -55,9 +55,11 @@ public:
 
 TEST_P( ChunkHeaderMultiSlotMaltiThread, TC_one_by_one )
 {
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber       allocator( true, 4 * 1024 );
 	alpha::concurrent::param_chunk_allocation             param = { 27, 2 * num_thread_ };
 	alpha::concurrent::internal::chunk_list_statistics    test_st;
-	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new alpha::concurrent::internal::chunk_header_multi_slot( param, 0, &test_st );
+	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new ( allocator ) alpha::concurrent::internal::chunk_header_multi_slot( param, 0, &test_st );
 
 	for ( unsigned int i = 0; i < num_thread_; i++ ) {
 		std::thread tt( [p_chms]() {
@@ -86,9 +88,10 @@ TEST_P( ChunkHeaderMultiSlotMaltiThread, TC_one_by_one )
 
 TEST_P( ChunkHeaderMultiSlotMaltiThread, TC_at_same_time )
 {
+	alpha::concurrent::internal::alloc_only_chamber       allocator( true, 4 * 1024 );
 	alpha::concurrent::param_chunk_allocation             param = { 27, 2 * num_thread_ };
 	alpha::concurrent::internal::chunk_list_statistics    test_st;
-	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new alpha::concurrent::internal::chunk_header_multi_slot( param, 0, &test_st );
+	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new ( allocator ) alpha::concurrent::internal::chunk_header_multi_slot( param, 0, &test_st );
 	std::thread                                           tt[num_thread_];
 	pthread_barrier_t                                     barrier;
 	pthread_barrier_init( &barrier, NULL, num_thread_ + 1 );
@@ -173,8 +176,9 @@ public:
 
 TEST_F( lfmemAlloc, TestChunkHeaderMultiSlot )
 {
+	alpha::concurrent::internal::alloc_only_chamber       allocator( true, 4 * 1024 );
 	alpha::concurrent::internal::chunk_list_statistics    test_st;
-	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new alpha::concurrent::internal::chunk_header_multi_slot( param, 0, &test_st );
+	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new ( allocator ) alpha::concurrent::internal::chunk_header_multi_slot( param, 0, &test_st );
 
 	void* test_ptr1 = p_chms->allocate_mem_slot();
 	void* test_ptr2 = p_chms->allocate_mem_slot();
@@ -226,8 +230,9 @@ TEST_F( lfmemAlloc, TestChunkHeaderMultiSlot )
 
 TEST_F( lfmemAlloc, TestChunkList_AdditionalAlloc )
 {
+	alpha::concurrent::internal::alloc_only_chamber allocator( true, 4 * 1024 );
 	// max slot数２に対し、３つ目のスロットを要求した場合のテスト
-	alpha::concurrent::internal::chunk_list* p_ch_lst = new alpha::concurrent::internal::chunk_list( param );
+	alpha::concurrent::internal::chunk_list* p_ch_lst = new alpha::concurrent::internal::chunk_list( param, &allocator );
 
 	void* test_ptr1 = p_ch_lst->allocate_mem_slot();
 	void* test_ptr2 = p_ch_lst->allocate_mem_slot();
@@ -252,8 +257,9 @@ TEST_F( lfmemAlloc, TestChunkList_AdditionalAlloc )
 
 TEST_F( lfmemAlloc, TestChunkList_IllegalAddressFree )
 {
+	alpha::concurrent::internal::alloc_only_chamber allocator( true, 4 * 1024 );
 	// max slot数２に対し、３つ目のスロットを要求した場合のテスト
-	alpha::concurrent::internal::chunk_list* p_ch_lst = new alpha::concurrent::internal::chunk_list( param );
+	alpha::concurrent::internal::chunk_list* p_ch_lst = new alpha::concurrent::internal::chunk_list( param, &allocator );
 
 	void* test_ptr1 = p_ch_lst->allocate_mem_slot();
 	void* test_ptr2 = p_ch_lst->allocate_mem_slot();
