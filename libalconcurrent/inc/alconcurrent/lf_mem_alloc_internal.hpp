@@ -18,7 +18,6 @@
 
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/dynamic_tls.hpp"
-#include "alconcurrent/hazard_ptr.hpp"
 
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
@@ -273,12 +272,12 @@ private:
 		const unsigned int owner_tl_id_arg     //!< [in] owner tl_id_
 	);
 
-	chunk_list_statistics* p_statistics_;       //!< statistics
+	chunk_list_statistics* p_statistics_;   //!< statistics
 
 	param_chunk_allocation slot_conf_;          //!< allocation configuration paramter. value is corrected internally.
 	slot_array_mgr*        p_slot_array_mgr_;   //!< pointer to slot_array_mgr
 
-												// void*                          p_chunk_;            //!< pointer to an allocated memory as a chunk
+	// void*                          p_chunk_;            //!< pointer to an allocated memory as a chunk
 	// size_t                         allocated_size_;
 };
 
@@ -476,7 +475,7 @@ private:
 	                                                                       //!< tls_hint_は、p_top_chunk_を参照しているため、この2つのメンバ変数の宣言順(p_top_chunk_の次にtls_hint_)を入れ替えてはならない。
 	                                                                       //!< 入れ替えてしまった場合、デストラクタでの解放処理で、解放済みのメモリ領域にアクセスしてしまう。
 
-	chunk_list_statistics statistics_;                                     //!< statistics
+	chunk_list_statistics statistics_;   //!< statistics
 };
 
 }   // namespace internal

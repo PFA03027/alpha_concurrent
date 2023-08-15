@@ -57,6 +57,7 @@ private:
 	bool                        need_release_munmap_;   //!< true: when destructing, munmap memory
 	size_t                      pre_alloc_size_;        //!< mmapで割り当てる基本サイズ
 };
+static_assert( std::is_standard_layout<alloc_only_chamber>::value, "alloc_only_chamber should be standard-layout type" );
 
 }   // namespace internal
 }   // namespace concurrent

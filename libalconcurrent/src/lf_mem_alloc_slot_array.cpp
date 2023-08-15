@@ -72,7 +72,8 @@ slot_array_mgr::slot_array_mgr( chunk_header_multi_slot* p_owner, size_t num_of_
   , expected_n_per_slot_( n )
   , slot_container_size_of_this_( calc_one_slot_container_bytes( n ) )
   , p_owner_chunk_header_( p_owner )
-  , free_slots_storage_()
+  , allocator_( true, 4 * 1024 )
+  , free_slots_storage_( &allocator_ )
   , p_slot_container_top( reinterpret_cast<slot_container*>( &( slot_header_array_[num_of_slots_] ) ) )
   , slot_header_array_ {}
 {

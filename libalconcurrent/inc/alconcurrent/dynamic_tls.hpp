@@ -248,6 +248,7 @@ public:
 	  , tl_handler_()
 	  , th_cnt_()
 	{
+		static_assert( std::is_standard_layout<dynamic_tls>::value, "dynamic_tls should be standard-layout type" );
 	}
 
 	constexpr dynamic_tls( const TL_HANDLER& tl_dest_functor_arg )
@@ -255,6 +256,7 @@ public:
 	  , tl_handler_( tl_dest_functor_arg )
 	  , th_cnt_()
 	{
+		static_assert( std::is_standard_layout<dynamic_tls>::value, "dynamic_tls should be standard-layout type" );
 	}
 
 	constexpr dynamic_tls( TL_HANDLER&& tl_dest_functor_arg )
@@ -262,6 +264,7 @@ public:
 	  , tl_handler_( std::move( tl_dest_functor_arg ) )
 	  , th_cnt_()
 	{
+		static_assert( std::is_standard_layout<dynamic_tls>::value, "dynamic_tls should be standard-layout type" );
 	}
 
 	~dynamic_tls()
@@ -365,9 +368,9 @@ private:
 
 	std::atomic<internal::dynamic_tls_key_t> tls_key_;   //!<	key for thread local storage of POSIX.
 
-	TL_HANDLER tl_handler_;                              //!< functor to clean-up the resources when thread is terminated.
+	TL_HANDLER tl_handler_;   //!< functor to clean-up the resources when thread is terminated.
 
-	internal::dynamic_tls_thread_cnt th_cnt_;            //!< thread count information
+	internal::dynamic_tls_thread_cnt th_cnt_;   //!< thread count information
 };
 
 /**
@@ -386,6 +389,7 @@ public:
 	  , tl_handler_()
 	  , th_cnt_()
 	{
+		static_assert( std::is_standard_layout<dynamic_tls>::value, "dynamic_tls should be standard-layout type" );
 	}
 
 	constexpr dynamic_tls( const TL_HANDLER& tl_dest_functor_arg )
@@ -393,6 +397,7 @@ public:
 	  , tl_handler_( tl_dest_functor_arg )
 	  , th_cnt_()
 	{
+		static_assert( std::is_standard_layout<dynamic_tls>::value, "dynamic_tls should be standard-layout type" );
 	}
 
 	constexpr dynamic_tls( TL_HANDLER&& tl_dest_functor_arg )
@@ -400,6 +405,7 @@ public:
 	  , tl_handler_( std::move( tl_dest_functor_arg ) )
 	  , th_cnt_()
 	{
+		static_assert( std::is_standard_layout<dynamic_tls>::value, "dynamic_tls should be standard-layout type" );
 	}
 
 	~dynamic_tls()
@@ -524,9 +530,9 @@ private:
 
 	std::atomic<internal::dynamic_tls_key_t> tls_key_;   //!<	key for thread local storage of POSIX.
 
-	TL_HANDLER tl_handler_;                              //!< functor to clean-up the resources when thread is terminated.
+	TL_HANDLER tl_handler_;   //!< functor to clean-up the resources when thread is terminated.
 
-	internal::dynamic_tls_thread_cnt th_cnt_;            //!< thread count information
+	internal::dynamic_tls_thread_cnt th_cnt_;   //!< thread count information
 };
 
 }   // namespace concurrent

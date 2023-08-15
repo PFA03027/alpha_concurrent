@@ -50,7 +50,7 @@ struct is_callable_lifo_free_node_if_set_next : decltype( is_callable_lifo_free_
 template <typename NODE_T>
 struct is_callable_lifo_free_node_if_next_CAS : decltype( is_callable_lifo_free_node_if_impl::check_next_CAS<NODE_T>( std::declval<NODE_T*>() ) ) {};
 template <typename NODE_T>
-struct is_callable_lifo_free_node_if : decltype( is_callable_lifo_free_node_if_impl::check<NODE_T>( std::declval<NODE_T*>() ) ) {};
+struct is_callable_lifo_free_node_if : decltype( is_callable_lifo_free_node_if_impl::check<NODE_T>( std::declval<NODE_T*>() ) ) {};   // ノードクラスTに対するコンセプトチェックメタ関数
 
 /**
  * @brief フリーノードをLIFO(スタック構造)で管理するクラス。
@@ -93,13 +93,14 @@ struct free_node_stack {
 	using hzd_ptr_mgr_type = hazard_ptr<node_type, HZD_IDX_MAX>;
 	using scoped_hzd_type  = hazard_ptr_scoped_ref<node_type, HZD_IDX_MAX>;
 
-	free_node_stack( void )
-	  : hzd_ptrs_()
+	free_node_stack( alloc_only_chamber* p_allocator_arg )
+	  : hzd_ptrs_( p_allocator_arg )
 	  , p_free_node_stack_head_( nullptr )
 	  , mtx_consignment_stack_()
 	  , p_consignment_stack_head_( nullptr )
 	  , tls_p_hazard_slot_stack_head_( threadlocal_no_allocate_handler( this ) )
 	{
+		static_assert( std::is_standard_layout<free_node_stack>::value, "slot_array_mgr should be standard-layout type" );
 	}
 
 	/**

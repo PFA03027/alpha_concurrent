@@ -37,6 +37,7 @@ struct slot_array_mgr {
 	const size_t                          expected_n_per_slot_;           //!< 自身のslot_array_mgrで管理しているslotが期待しているallocateサイズ
 	const size_t                          slot_container_size_of_this_;   //!< 自身のslot_array_mgrで管理しているslot_container1つ分のバイト数
 	std::atomic<chunk_header_multi_slot*> p_owner_chunk_header_;          //!< 自身のslot_array_mgrの所有権を持っているchunk_header_multi_slotへのポインタ
+	alloc_only_chamber                    allocator_;                     //!< 割り当て専用アロケータ
 	free_node_stack<slot_header_of_array> free_slots_storage_;            //!< 割り当てていないslot_header_of_arrayのリストを管理する
 	slot_container* const                 p_slot_container_top;           //!< slot_container配列の先頭へのポインタ
 	slot_header_of_array                  slot_header_array_[0];          //!< 以降のアドレスにslot_header_of_arrayの可変長サイズ配列とslot_containerを保持するメモリ領域が続く。
@@ -163,11 +164,11 @@ struct slot_array_mgr {
 
 	void dump( int indent = 0 );
 
-	void* operator new( std::size_t n );                                                                             // usual new...(1)   このクラスでは使用してはならないnew operator
-	void  operator delete( void* p_mem ) noexcept;                                                                   // usual delete...(2)
+	void* operator new( std::size_t n );             // TODO: usual new...(1)   このクラスでは使用してはならないnew operator
+	void  operator delete( void* p_mem ) noexcept;   // usual delete...(2)
 
-	void* operator new[]( std::size_t n );                                                                           // usual new...(1)   このクラスでは使用してはならないnew operator
-	void  operator delete[]( void* p_mem ) noexcept;                                                                 // usual delete...(2)   このクラスでは使用してはならないdelete operator
+	void* operator new[]( std::size_t n );             // usual new...(1)   このクラスでは使用してはならないnew operator
+	void  operator delete[]( void* p_mem ) noexcept;   // usual delete...(2)   このクラスでは使用してはならないdelete operator
 
 	void* operator new( std::size_t n_of_slot_array_mgr, size_t num_of_slots_, size_t expected_alloc_n_per_slot );   // placement new    可変長部分の領域も確保するnew operator
 	void  operator delete( void* p, void* p2 ) noexcept;                                                             // placement delete...(3)   このクラスでは使用してはならないdelete operator。このdelete operator自身は何もしない。

@@ -48,9 +48,21 @@ public:
 	static constexpr int hzrd_max_slot = N;
 
 	constexpr hazard_ptr( void )
-	  : head_()
+	  : my_allocator_( true, 4 * 1024 )
+	  , p_allocator_( &my_allocator_ )
+	  , head_( p_allocator_ )
 	  , p_hzd_ptr_node_( threadlocal_handler_functor( this ) )
 	{
+		static_assert( std::is_standard_layout<hazard_ptr>::value, "hazard_ptr should be standard-layout type" );
+	}
+
+	constexpr hazard_ptr( internal::alloc_only_chamber* p_allocator_arg )
+	  : my_allocator_( true, 0 )
+	  , p_allocator_( p_allocator_arg )
+	  , head_( p_allocator_ )
+	  , p_hzd_ptr_node_( threadlocal_handler_functor( this ) )
+	{
+		static_assert( std::is_standard_layout<hazard_ptr>::value, "hazard_ptr should be standard-layout type" );
 	}
 
 	~hazard_ptr( void )
@@ -227,11 +239,11 @@ private:
 			return status_.load( std::memory_order_acquire );
 		}
 
-		void* operator new( std::size_t n )           = delete;                            // usual new...(1)
-		void  operator delete( void* p_mem ) noexcept = delete;                            // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
+		void* operator new( std::size_t n )           = delete;   // usual new...(1)
+		void  operator delete( void* p_mem ) noexcept = delete;   // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
 
-		void* operator new[]( std::size_t n )           = delete;                          // usual new...(1)
-		void  operator delete[]( void* p_mem ) noexcept = delete;                          // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
+		void* operator new[]( std::size_t n )           = delete;   // usual new...(1)
+		void  operator delete[]( void* p_mem ) noexcept = delete;   // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
 
 		void* operator new( std::size_t n, internal::alloc_only_chamber& allocator_arg )   // placement new
 		{
@@ -249,18 +261,19 @@ private:
 
 	////////////////////////////////////////////////////////////////////////////////
 	struct hazard_node_head {
-		constexpr hazard_node_head( void )
-		  : allocator_( true, 4 * 1024 )
+		constexpr hazard_node_head( internal::alloc_only_chamber* p_allocator_arg )
+		  : p_allocator_( p_allocator_arg )
 		  , head_( nullptr )
 		  , node_count_( 0 )
 		{
+			static_assert( std::is_standard_layout<hazard_node_head>::value, "hazard_node_head should be standard-layout type" );
 		}
 		~hazard_node_head()
 		{
 			node_for_hazard_ptr* p_cur = head_.load( std::memory_order_acquire );
 			while ( p_cur != nullptr ) {
 				node_for_hazard_ptr* p_nxt = p_cur->get_next();
-				node_for_hazard_ptr::operator delete( p_cur, allocator_ );   // 通常のdelete operatorではなく配置deleteを呼び出すために、operator deleteを直接呼び出す。
+				node_for_hazard_ptr::operator delete( p_cur, *p_allocator_ );   // 通常のdelete operatorではなく配置deleteを呼び出すために、operator deleteを直接呼び出す。
 				p_cur = p_nxt;
 			}
 			return;
@@ -314,7 +327,7 @@ private:
 
 		void dump_to_log( log_type lt, char c, int id )
 		{
-			allocator_.dump_to_log( lt, c, id );
+			p_allocator_->dump_to_log( lt, c, id );
 			internal::LogOutput( lt, "count of node_for_hazard_ptr of hazard_node_head(%p): %d", this, node_count_.load( std::memory_order_acquire ) );
 		}
 
@@ -328,7 +341,7 @@ private:
 		 */
 		node_for_hazard_ptr* add_one_new_hazard_ptr_node( void )
 		{
-			node_for_hazard_ptr* p_ans        = new ( allocator_ ) node_for_hazard_ptr();
+			node_for_hazard_ptr* p_ans        = new ( *p_allocator_ ) node_for_hazard_ptr();
 			node_for_hazard_ptr* p_next_check = head_.load( std::memory_order_acquire );
 			do {
 				p_ans->set_next( p_next_check );
@@ -344,12 +357,10 @@ private:
 		hazard_node_head& operator=( const hazard_node_head& ) = delete;
 		hazard_node_head& operator=( hazard_node_head&& )      = delete;
 
-		internal::alloc_only_chamber      allocator_;    //!< ハザードポインタリストに登録されるノードに対する割り当て専用アロケータ
-		std::atomic<node_for_hazard_ptr*> head_;         //!< ハザードポインタリストの先頭ノードへのポインタ
-		std::atomic<int>                  node_count_;   //!< ハザードポインタリストに登録されているノード数
+		internal::alloc_only_chamber*     p_allocator_;   //!< ハザードポインタリストに登録されるノードに対する割り当て専用アロケータへの参照
+		std::atomic<node_for_hazard_ptr*> head_;          //!< ハザードポインタリストの先頭ノードへのポインタ
+		std::atomic<int>                  node_count_;    //!< ハザードポインタリストに登録されているノード数
 	};
-
-	hazard_node_head head_;
 
 	hazard_node_head& get_head_instance( void )
 	{
@@ -385,6 +396,9 @@ private:
 		hazard_ptr* p_node_list_owner_;
 	};
 
+	internal::alloc_only_chamber                                   my_allocator_;   //!< ハザードポインタリストに登録されるノードに対する割り当て専用アロケータ
+	internal::alloc_only_chamber*                                  p_allocator_;    //!< ハザードポインタリストに登録されるノードに対する割り当て専用アロケータへの参照
+	hazard_node_head                                               head_;
 	dynamic_tls<node_for_hazard_ptr*, threadlocal_handler_functor> p_hzd_ptr_node_;
 };
 
@@ -394,7 +408,7 @@ private:
  * スコープベースでの、参照権の解放制御をサポートするクラスのI/Fクラス
  */
 template <typename T>
-class hazard_ptr_scoped_ref_if {
+class hazard_ptr_scoped_ref_if {   // TODO: このクラスを削除する
 public:
 	virtual void regist_ptr_as_hazard_ptr( T* p_target ) = 0;
 
