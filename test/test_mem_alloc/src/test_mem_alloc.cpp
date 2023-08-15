@@ -63,8 +63,8 @@ TEST_P( ChunkHeaderMultiSlotMaltiThread, TC_one_by_one )
 
 	for ( unsigned int i = 0; i < num_thread_; i++ ) {
 		std::thread tt( [p_chms]() {
-			void* test_ptr1 = p_chms->allocate_mem_slot();
-			void* test_ptr2 = p_chms->allocate_mem_slot();
+			void* test_ptr1 = p_chms->allocate_mem_slot( 27, sizeof( uintptr_t ) );
+			void* test_ptr2 = p_chms->allocate_mem_slot( 27, sizeof( uintptr_t ) );
 
 			EXPECT_NE( nullptr, test_ptr1 );
 			EXPECT_NE( nullptr, test_ptr2 );
@@ -99,8 +99,8 @@ TEST_P( ChunkHeaderMultiSlotMaltiThread, TC_at_same_time )
 	for ( unsigned int i = 0; i < num_thread_; i++ ) {
 		tt[i] = std::thread( [p_chms, &barrier]() {
 			pthread_barrier_wait( &barrier );
-			void* test_ptr1 = p_chms->allocate_mem_slot();
-			void* test_ptr2 = p_chms->allocate_mem_slot();
+			void* test_ptr1 = p_chms->allocate_mem_slot( 27, sizeof( uintptr_t ) );
+			void* test_ptr2 = p_chms->allocate_mem_slot( 27, sizeof( uintptr_t ) );
 
 			EXPECT_NE( nullptr, test_ptr1 );
 			EXPECT_NE( nullptr, test_ptr2 );
@@ -180,9 +180,9 @@ TEST_F( lfmemAlloc, TestChunkHeaderMultiSlot )
 	alpha::concurrent::internal::chunk_list_statistics    test_st;
 	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new ( allocator ) alpha::concurrent::internal::chunk_header_multi_slot( param, 0, &test_st );
 
-	void* test_ptr1 = p_chms->allocate_mem_slot();
-	void* test_ptr2 = p_chms->allocate_mem_slot();
-	void* test_ptr3 = p_chms->allocate_mem_slot();
+	void* test_ptr1 = p_chms->allocate_mem_slot( 27, sizeof( uintptr_t ) );
+	void* test_ptr2 = p_chms->allocate_mem_slot( 27, sizeof( uintptr_t ) );
+	void* test_ptr3 = p_chms->allocate_mem_slot( 27, sizeof( uintptr_t ) );
 
 	EXPECT_NE( nullptr, test_ptr1 );
 	EXPECT_NE( nullptr, test_ptr2 );
@@ -234,9 +234,9 @@ TEST_F( lfmemAlloc, TestChunkList_AdditionalAlloc )
 	// max slot数２に対し、３つ目のスロットを要求した場合のテスト
 	alpha::concurrent::internal::chunk_list* p_ch_lst = new alpha::concurrent::internal::chunk_list( param, &allocator );
 
-	void* test_ptr1 = p_ch_lst->allocate_mem_slot();
-	void* test_ptr2 = p_ch_lst->allocate_mem_slot();
-	void* test_ptr3 = p_ch_lst->allocate_mem_slot();
+	void* test_ptr1 = p_ch_lst->allocate_mem_slot( 27, sizeof( uintptr_t ) );
+	void* test_ptr2 = p_ch_lst->allocate_mem_slot( 27, sizeof( uintptr_t ) );
+	void* test_ptr3 = p_ch_lst->allocate_mem_slot( 27, sizeof( uintptr_t ) );
 
 	EXPECT_NE( nullptr, test_ptr1 );
 	EXPECT_NE( nullptr, test_ptr2 );
@@ -261,9 +261,9 @@ TEST_F( lfmemAlloc, TestChunkList_IllegalAddressFree )
 	// max slot数２に対し、３つ目のスロットを要求した場合のテスト
 	alpha::concurrent::internal::chunk_list* p_ch_lst = new alpha::concurrent::internal::chunk_list( param, &allocator );
 
-	void* test_ptr1 = p_ch_lst->allocate_mem_slot();
-	void* test_ptr2 = p_ch_lst->allocate_mem_slot();
-	void* test_ptr3 = p_ch_lst->allocate_mem_slot();
+	void* test_ptr1 = p_ch_lst->allocate_mem_slot( 27, sizeof( uintptr_t ) );
+	void* test_ptr2 = p_ch_lst->allocate_mem_slot( 27, sizeof( uintptr_t ) );
+	void* test_ptr3 = p_ch_lst->allocate_mem_slot( 27, sizeof( uintptr_t ) );
 
 	EXPECT_NE( nullptr, test_ptr1 );
 	EXPECT_NE( nullptr, test_ptr2 );

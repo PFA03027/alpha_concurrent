@@ -54,7 +54,7 @@ TEST( slot_array_mgr, Call_Allocate_Deallocate )
 	// Arrange
 	alpha::concurrent::internal::slot_array_mgr*                 p_sut = alpha::concurrent::internal::slot_array_mgr::make_instance( nullptr, static_cast<size_t>( 32 ), static_cast<size_t>( 32 ) );
 	std::unique_ptr<alpha::concurrent::internal::slot_array_mgr> up_sut( p_sut );
-	void*                                                        p_mem = p_sut->allocate( 32 );
+	void*                                                        p_mem = p_sut->allocate( 32, 8 );
 	ASSERT_NE( p_mem, nullptr );
 	auto chk_ret = alpha::concurrent::internal::slot_container::get_slot_header_from_assignment_p( p_mem );
 	ASSERT_TRUE( chk_ret.is_ok_ );
@@ -75,11 +75,11 @@ TEST( slot_array_mgr, Call_OverAllocate )
 	// Arrange
 	alpha::concurrent::internal::slot_array_mgr*                 p_sut = alpha::concurrent::internal::slot_array_mgr::make_instance( nullptr, static_cast<size_t>( 1 ), static_cast<size_t>( 32 ) );
 	std::unique_ptr<alpha::concurrent::internal::slot_array_mgr> up_sut( p_sut );
-	void*                                                        p_mem = p_sut->allocate( 32 );   // 1つ目のスロットが割り当てられる。
+	void*                                                        p_mem = p_sut->allocate( 32, 8 );   // 1つ目のスロットが割り当てられる。
 	ASSERT_NE( p_mem, nullptr );
 
 	// Act
-	p_mem = p_sut->allocate( 32 );   // 2つ目のスロットを割り当て用とするが、存在しないため、割り当てに失敗するのをテストする。
+	p_mem = p_sut->allocate( 32, 8 );   // 2つ目のスロットを割り当て用とするが、存在しないため、割り当てに失敗するのをテストする。
 
 	// Assert
 	ASSERT_EQ( p_mem, nullptr );

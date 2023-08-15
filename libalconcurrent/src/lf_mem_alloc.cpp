@@ -190,7 +190,7 @@ bool chunk_header_multi_slot::alloc_new_chunk(
 	return true;
 }
 
-void* chunk_header_multi_slot::allocate_mem_slot_impl( void )
+void* chunk_header_multi_slot::allocate_mem_slot_impl( size_t req_size, size_t req_align )
 {
 	// access可能状態かどうかを事前チェック
 	if ( status_.load( std::memory_order_acquire ) != chunk_control_status::NORMAL ) return nullptr;
@@ -205,7 +205,7 @@ void* chunk_header_multi_slot::allocate_mem_slot_impl( void )
 	p_statistics_->alloc_req_cnt_++;
 #endif
 
-	void* p_ans = p_slot_array_mgr_->allocate( slot_conf_.size_of_one_piece_ );
+	void* p_ans = p_slot_array_mgr_->allocate( req_size, req_align );
 	if ( p_ans == nullptr ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 		p_statistics_->alloc_req_err_cnt_++;
@@ -308,7 +308,9 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 
 void* chunk_header_multi_slot::try_allocate_mem_slot_impl(
 	const unsigned int expect_tl_id_arg,   //!< [in] owner tl_id_
-	const unsigned int owner_tl_id_arg     //!< [in] owner tl_id_
+	const unsigned int owner_tl_id_arg,    //!< [in] owner tl_id_
+	const size_t       req_size,           //!< [in] requested size
+	const size_t       req_align           //!< [in] requested align size
 )
 {
 	// access可能状態かどうかを事前チェック
@@ -359,7 +361,7 @@ void* chunk_header_multi_slot::try_allocate_mem_slot_impl(
 	}
 
 	// オーナー権の確保と、NORMAL状態への復帰に成功したので、メモリスロットの確保を試みる
-	return allocate_mem_slot();
+	return allocate_mem_slot( req_size, req_align );
 }
 
 bool chunk_header_multi_slot::set_delete_reservation( void )
@@ -589,7 +591,7 @@ void chunk_list::release_all_of_ownership(
 	return;
 }
 
-void* chunk_list::allocate_mem_slot( void )
+void* chunk_list::allocate_mem_slot( size_t req_size, size_t req_align )
 {
 	void* p_ans = nullptr;
 
@@ -604,7 +606,7 @@ void* chunk_list::allocate_mem_slot( void )
 		while ( p_cur_chms != nullptr ) {
 			if ( p_cur_chms->owner_tl_id_.load( std::memory_order_acquire ) == hint_params.tl_id_ ) {
 				// tl_id_が一致する場合は、自スレッドの持ち物となる。自スレッドの持ち物のchunk_header_multi_slotからメモリを割り当てる。
-				p_ans = p_cur_chms->allocate_mem_slot();
+				p_ans = p_cur_chms->allocate_mem_slot( req_size, req_align );
 				if ( p_ans != nullptr ) {
 					// 空きスロットが見つかれば終了
 					hint_params.tls_p_hint_chunk = p_cur_chms;
@@ -630,7 +632,7 @@ void* chunk_list::allocate_mem_slot( void )
 		// なお、自スレッドの持ち物だったとしても、処理を行っている最中に、削除ー＞別スレッドに再割り当てー＞削除予約状態となっている可能性もある。
 		// たとえ別スレッドの物になっていても、新たにメモリを割り当てるよりは性能観点でましな可能性が高いため、そのまま割り当てを試みる。
 		for ( auto&& e : p_top_chunk_ ) {
-			p_ans = e.try_allocate_mem_slot_from_reserved_deletion( hint_params.tl_id_ );
+			p_ans = e.try_allocate_mem_slot_from_reserved_deletion( hint_params.tl_id_, req_size, req_align );
 			if ( p_ans != nullptr ) {
 				// スロット確保成功
 				hint_params.tls_p_hint_chunk = &e;   // 別スレッドのものかもしれないが、hintを更新する。次の呼び出しで、是正される。
@@ -641,7 +643,7 @@ void* chunk_list::allocate_mem_slot( void )
 
 	// オーナーなしchunk_header_multi_slotからの割り当てを試みる
 	for ( auto&& e : p_top_chunk_ ) {
-		p_ans = e.try_get_ownership_allocate_mem_slot( hint_params.tl_id_ );
+		p_ans = e.try_get_ownership_allocate_mem_slot( hint_params.tl_id_, req_size, req_align );
 		if ( p_ans != nullptr ) {
 			// オーナー権とスロット確保成功
 			hint_params.tls_p_hint_chunk = &e;   // 別スレッドのものかもしれないが、hintを更新する。次の呼び出しで、是正される。
@@ -674,7 +676,7 @@ void* chunk_list::allocate_mem_slot( void )
 				// 既存のオーナー権を持つチャンクを解放
 				release_all_of_ownership( hint_params.tl_id_, &e );
 				// メモリスロットを確保する。
-				p_ans = e.allocate_mem_slot();
+				p_ans = e.allocate_mem_slot( req_size, req_align );
 				if ( p_ans != nullptr ) {
 					hint_params.tls_p_hint_chunk = &e;
 
@@ -691,7 +693,7 @@ void* chunk_list::allocate_mem_slot( void )
 				if ( e.status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
 					// 自身による再割り当てに失敗はしたが、既に別のスレッドで再割り当て完了済みだった。
 					// たとえ別スレッドの物になっていても、新たにメモリを割り当てるよりは性能観点でましな可能性が高いため、そのまま割り当てを試みる。
-					p_ans = e.allocate_mem_slot();
+					p_ans = e.allocate_mem_slot( req_size, req_align );
 					if ( p_ans != nullptr ) {
 						hint_params.tls_p_hint_chunk = &e;
 						return p_ans;
@@ -705,12 +707,12 @@ void* chunk_list::allocate_mem_slot( void )
 	// new演算子を使用するため、ここでもロックが発生する可能性がある。
 	chunk_header_multi_slot* p_new_chms = new ( *p_allocator_ ) chunk_header_multi_slot( cur_alloc_conf, hint_params.tl_id_, &statistics_ );
 	if ( p_new_chms == nullptr ) {
-		return nullptr;   // TODO: should throw exception ?
+		return nullptr;
 	}
-	p_ans = p_new_chms->allocate_mem_slot();
+	p_ans = p_new_chms->allocate_mem_slot( req_size, req_align );
 	if ( p_ans == nullptr ) {
 		delete p_new_chms;
-		return nullptr;   // TODO: should throw exception ?
+		return nullptr;
 	}
 
 	// 既存のオーナー権を持つチャンクを解放。
@@ -769,7 +771,8 @@ chunk_statistics chunk_list::get_statistics( void ) const
 void* general_mem_allocator_impl_allocate(
 	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
 	internal::chunk_list* p_param_ch_array_arg,   //!< unique pointer to chunk and param array
-	std::size_t           n_arg                   //!< [in] memory size to allocate
+	size_t                n_arg,                  //!< [in] memory size to allocate
+	size_t                req_align               //!< [in] requested align size
 )
 {
 	void* p_ans = nullptr;
@@ -787,7 +790,7 @@ void* general_mem_allocator_impl_allocate(
 			mi = si + ( ei - si ) / 2;
 		}
 		if ( n_arg <= p_param_ch_array_arg[si].chunk_param_.size_of_one_piece_ ) {
-			p_ans = p_param_ch_array_arg[si].allocate_mem_slot();
+			p_ans = p_param_ch_array_arg[si].allocate_mem_slot( n_arg, req_align );
 			if ( p_ans != nullptr ) {
 				return p_ans;
 			}

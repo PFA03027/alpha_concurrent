@@ -16,8 +16,8 @@
 
 #include "gtest/gtest.h"
 
-#include "alconcurrent/lf_mem_alloc_internal.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
+#include "alconcurrent/lf_mem_alloc_internal.hpp"
 
 // #define TEST_WITH_SLEEP
 
@@ -61,7 +61,7 @@ TEST( lfmemAllocOneChunk, TC_Load )
 	for ( int i = 0; i < 1; i++ ) {
 		int cur_alloc_num = 15;
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
-			alloc_addr[j] = chms.allocate_mem_slot();
+			alloc_addr[j] = chms.allocate_mem_slot( 256, sizeof( uintptr_t ) );
 		}
 
 		for ( int j = 0; j < cur_alloc_num; j++ ) {

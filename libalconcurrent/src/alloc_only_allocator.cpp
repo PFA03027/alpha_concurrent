@@ -31,7 +31,7 @@ struct room_boader {
 	const size_t    chopped_size_;                       //!< chopped roomのサイズ。次のroom_boaderへのオフセットも意味する。そのため、次のroom_boaderのアライメント、およびtail_padding領域を含む
 	const uintptr_t offset_into_the_allocated_memory_;   //!< 呼び出し元に渡したメモリアドレスへのオフセット
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	bt_info alloc_bt_info_;                              //!< backtrace information when is allocated
+	bt_info alloc_bt_info_;   //!< backtrace information when is allocated
 #endif
 
 	room_boader( size_t chopped_size_arg, size_t req_size, size_t req_align );
@@ -122,7 +122,7 @@ struct alloc_chamber {
 	std::atomic<alloc_chamber*> next_;           //!< alloc_chamberのスタックリスト上の次のalloc_chamber
 	std::atomic<uintptr_t>      offset_;         //!< 次のallocateの先頭へのオフセット
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	bt_info alloc_bt_info_;                      //!< backtrace information when is allocated
+	bt_info alloc_bt_info_;   //!< backtrace information when is allocated
 #endif
 	unsigned char roomtop_[0];
 
@@ -308,7 +308,7 @@ void* alloc_only_chamber::allocate( size_t req_size, size_t req_align )
 		tmp_bt.dump_to_log( log_type::DEBUG, 'a', 1 );
 #endif
 		}
-		allocate_result ret_mmap = allocate_by_mmap( cur_pre_alloc_size, default_align_size );
+		allocate_result ret_mmap = allocate_by_mmap( cur_pre_alloc_size, req_align );
 		if ( ret_mmap.p_allocated_addr_ == nullptr ) return nullptr;
 		if ( ret_mmap.allocated_size_ == 0 ) return nullptr;
 

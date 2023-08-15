@@ -42,10 +42,10 @@ static_general_mem_allocator<14> get_g_gm_mem_instance_singleton(
 }   // namespace internal
 
 void* gmem_allocate(
-	std::size_t n   //!< [in] memory size to allocate
-)
+	size_t n,   //!< [in] memory size to allocate
+	size_t req_align )
 {
-	return internal::get_g_gm_mem_instance_singleton.allocate( n );
+	return internal::get_g_gm_mem_instance_singleton.allocate( n, req_align );
 }
 
 void gmem_deallocate(

@@ -124,9 +124,9 @@ public:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	inline void* allocate_mem_slot( void )
+	inline void* allocate_mem_slot( size_t req_size, size_t req_align )
 	{
-		void* p_ans = allocate_mem_slot_impl();
+		void* p_ans = allocate_mem_slot_impl( req_size, req_align );
 		if ( p_ans != nullptr ) {
 			p_statistics_->free_slot_cnt_--;
 			auto cur     = p_statistics_->consum_cnt_.fetch_add( 1, std::memory_order_acq_rel ) + 1;
@@ -182,11 +182,13 @@ public:
 	 * @post status_ is chunk_control_status::NORMAL
 	 */
 	inline void* try_allocate_mem_slot_from_reserved_deletion(
-		const unsigned int owner_tl_id_arg   //!< [in] owner tl_id_
+		const unsigned int owner_tl_id_arg,   //!< [in] owner tl_id_
+		const size_t       req_size,          //!< [in] requested size
+		const size_t       req_align          //!< [in] requested align size
 	)
 	{
 		unsigned int cur_tl_id = owner_tl_id_.load( std::memory_order_acquire );
-		return try_allocate_mem_slot_impl( cur_tl_id, owner_tl_id_arg );
+		return try_allocate_mem_slot_impl( cur_tl_id, owner_tl_id_arg, req_size, req_align );
 	}
 
 	/*!
@@ -200,10 +202,12 @@ public:
 	 * @post owner_tl_id_ is owner_tl_id_arg, and status_ is chunk_control_status::NORMAL
 	 */
 	inline void* try_get_ownership_allocate_mem_slot(
-		const unsigned int owner_tl_id_arg   //!< [in] owner tl_id_
+		const unsigned int owner_tl_id_arg,   //!< [in] owner tl_id_
+		const size_t       req_size,          //!< [in] requested size
+		const size_t       req_align          //!< [in] requested align size
 	)
 	{
-		return try_allocate_mem_slot_impl( NON_OWNERED_TL_ID, owner_tl_id_arg );
+		return try_allocate_mem_slot_impl( NON_OWNERED_TL_ID, owner_tl_id_arg, req_size, req_align );
 	}
 
 	bool set_delete_reservation( void );
@@ -260,7 +264,7 @@ private:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	void* allocate_mem_slot_impl( void );
+	void* allocate_mem_slot_impl( size_t req_size, size_t req_align );
 
 	/*!
 	 * @brief	recycle memory slot
@@ -284,7 +288,9 @@ private:
 	 */
 	void* try_allocate_mem_slot_impl(
 		const unsigned int expect_tl_id_arg,   //!< [in] owner tl_id_
-		const unsigned int owner_tl_id_arg     //!< [in] owner tl_id_
+		const unsigned int owner_tl_id_arg,    //!< [in] owner tl_id_
+		const size_t       req_size,           //!< [in] requested size
+		const size_t       req_align           //!< [in] requested align size
 	);
 
 	chunk_list_statistics* p_statistics_;   //!< statistics
@@ -326,7 +332,7 @@ public:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	void* allocate_mem_slot( void );
+	void* allocate_mem_slot( size_t req_size, size_t req_align );
 
 	/*!
 	 * @brief	recycle memory slot

@@ -118,7 +118,7 @@ struct slot_array_mgr {
 	 * @return void* 割り当てられたメモリへのアドレス。
 	 * @retval nullptr 空きスロットがなく割り当てできなかった。
 	 */
-	void* allocate( size_t n, size_t req_alignsize = default_slot_alignsize )
+	void* allocate( size_t n, size_t req_alignsize )
 	{
 		if ( ( expected_n_per_slot_ + default_slot_alignsize ) < ( n + req_alignsize ) ) {
 			// サイズ不足のため、確保に失敗

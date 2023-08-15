@@ -32,7 +32,8 @@ class chunk_list;
 void* general_mem_allocator_impl_allocate(
 	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
 	internal::chunk_list* p_param_ch_array_arg,   //!< unique pointer to chunk and param array
-	std::size_t           n_arg                   //!< [in] memory size to allocate
+	size_t                n_arg,                  //!< [in] memory size to allocate
+	size_t                req_align               //!< [in] requested align size
 );
 void general_mem_allocator_impl_deallocate(
 	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
@@ -103,10 +104,11 @@ public:
 	 * @brief	allocate memory
 	 */
 	void* allocate(
-		std::size_t n   //!< [in] memory size to allocate
+		size_t n_arg,      //!< [in] memory size to allocate
+		size_t req_align   //!< [in] requested align size
 	)
 	{
-		return general_mem_allocator_impl_allocate( pr_ch_size_, param_ch_array_, n );
+		return general_mem_allocator_impl_allocate( pr_ch_size_, param_ch_array_, n_arg, req_align );
 	}
 
 	/*!
@@ -206,10 +208,11 @@ public:
 	 * @brief	allocate memory
 	 */
 	void* allocate(
-		std::size_t n   //!< [in] memory size to allocate
+		size_t n_arg,                               //!< [in] memory size to allocate
+		size_t req_align = default_slot_alignsize   //!< [in] requested align size
 	)
 	{
-		return allocator_impl_.allocate( n );
+		return allocator_impl_.allocate( n_arg, req_align );
 	}
 
 	/*!
@@ -272,7 +275,8 @@ private:
  * This uses default_param_array and num_of_default_param_array as initial allocation parameter
  */
 void* gmem_allocate(
-	std::size_t n   //!< [in] memory size to allocate
+	size_t n,                                   //!< [in] memory size to allocate
+	size_t req_align = default_slot_alignsize   //!< [in] requested align size
 );
 
 /*!
