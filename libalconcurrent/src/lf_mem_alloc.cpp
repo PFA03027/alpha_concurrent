@@ -782,14 +782,14 @@ void* general_mem_allocator_impl_allocate(
 		unsigned int ei = pr_ch_size_arg - 1;
 		unsigned int mi = si + ( ei - si ) / 2;
 		while ( si != ei ) {
-			if ( n_arg <= p_param_ch_array_arg[mi].chunk_param_.size_of_one_piece_ ) {
+			if ( ( n_arg + req_align ) <= ( p_param_ch_array_arg[mi].chunk_param_.size_of_one_piece_ + default_slot_alignsize ) ) {
 				ei = mi;
 			} else {
 				si = mi + 1;
 			}
 			mi = si + ( ei - si ) / 2;
 		}
-		if ( n_arg <= p_param_ch_array_arg[si].chunk_param_.size_of_one_piece_ ) {
+		if ( ( n_arg + req_align ) <= ( p_param_ch_array_arg[si].chunk_param_.size_of_one_piece_ + default_slot_alignsize ) ) {
 			p_ans = p_param_ch_array_arg[si].allocate_mem_slot( n_arg, req_align );
 			if ( p_ans != nullptr ) {
 				return p_ans;
@@ -798,15 +798,15 @@ void* general_mem_allocator_impl_allocate(
 	}
 
 	// 対応するサイズのメモリスロットが見つからなかったので、slot_header_of_alloc経由でメモリ領域を確保する。
-	size_t          buff_size      = slot_header_of_alloc::calc_slot_header_and_container_size( n_arg, default_slot_alignsize /* TBD */ );
-	allocate_result alloc_mem_info = basic_mem_allocator::allocate( buff_size, default_slot_alignsize );
+	size_t          buff_size      = slot_header_of_alloc::calc_slot_header_and_container_size( n_arg, req_align );
+	allocate_result alloc_mem_info = basic_mem_allocator::allocate( buff_size, req_align );
 	if ( alloc_mem_info.p_allocated_addr_ == nullptr ) {
-		internal::LogOutput( log_type::ERR, "fail allocate memory by basic_mem_allocator::allocate(%zu, %zu)", buff_size, default_slot_alignsize );
+		internal::LogOutput( log_type::ERR, "fail allocate memory by basic_mem_allocator::allocate(%zu, %zu)", buff_size, req_align );
 		return nullptr;
 		// throw std::bad_alloc();
 	}
 	slot_header_of_alloc* p_slot_header_of_alloc = new ( alloc_mem_info.p_allocated_addr_ ) slot_header_of_alloc( alloc_mem_info.allocated_size_ );
-	p_ans                                        = p_slot_header_of_alloc->allocate( n_arg, default_slot_alignsize /* TBD */ );
+	p_ans                                        = p_slot_header_of_alloc->allocate( n_arg, req_align );
 
 	return p_ans;
 }
