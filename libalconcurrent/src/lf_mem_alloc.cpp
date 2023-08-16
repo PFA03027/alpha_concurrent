@@ -224,6 +224,55 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 		return false;
 	}
 
+	// 自分のものかを確認する
+	auto chk_ret = slot_container::get_slot_header_from_assignment_p( p_recycle_addr );
+	if ( !chk_ret.is_ok_ ) {
+#if 0
+		// ヘッダが壊れているようなので、アドレス情報から、スロット情報を引き出せるか試す。
+		if ( reinterpret_cast<uintptr_t>( p_recycle_addr ) < reinterpret_cast<uintptr_t>( p_slot_array_mgr_->p_slot_container_top ) ) {
+			// slot_containerの範囲外なので、あきらめる。
+			return false;
+		}
+		uintptr_t addr_diff   = reinterpret_cast<uintptr_t>( p_recycle_addr ) - reinterpret_cast<uintptr_t>( p_slot_array_mgr_->p_slot_container_top );
+		uintptr_t slots_count = addr_diff / p_slot_array_mgr_->slot_container_size_of_this_;
+		if ( slots_count >= p_slot_array_mgr_->num_of_slots_ ) {
+			// slot_containerの範囲外なので、あきらめる。
+			return false;
+		}
+		// ここに到達した時点で、自分のものであること判明
+
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+		p_statistics_->dealloc_req_cnt_.fetch_add( 1, std::memory_order_acq_rel );
+#endif
+		// OK. correct address
+		p_slot_array_mgr_->deallocate( p_slot_array_mgr_->get_pointer_of_slot( slots_count ) );
+		return true;
+#else
+		return false;
+#endif
+	}
+
+	if ( chk_ret.p_ush_->check_type() ) {
+		// allocタイプなので、自分のものではない。
+		return false;
+	}
+	slot_array_mgr* p_rcv_sam = chk_ret.p_ush_->arrayh_.mh_.get_mgr_pointer();
+	if ( p_rcv_sam == nullptr ) {
+		return false;
+	}
+	if ( p_rcv_sam->p_owner_chunk_header_ != this ) {
+		return false;
+	}
+	// ここに到達した時点で、自分のものであること判明
+
+	return unchk_recycle_mem_slot_impl( p_rcv_sam, &( chk_ret.p_ush_->arrayh_ ) );
+}
+
+bool chunk_header_multi_slot::unchk_recycle_mem_slot_impl(
+	slot_array_mgr*       p_rcv_sam,
+	slot_header_of_array* p_recycle_addr   //!< [in] pointer to the memory slot to recycle.
+)
+{
 	// access可能状態かどうかを事前チェック
 	switch ( status_.load( std::memory_order_acquire ) ) {
 		default:
@@ -257,51 +306,11 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 			break;
 	}
 
-	// 自分のものかを確認する
-	auto chk_ret = slot_container::get_slot_header_from_assignment_p( p_recycle_addr );
-	if ( chk_ret.is_ok_ ) {
-		if ( chk_ret.p_ush_->check_type() ) {
-			// allocタイプなので、自分のものではない。
-			return false;
-		}
-		slot_array_mgr* p_rcv_sam = chk_ret.p_ush_->arrayh_.mh_.get_mgr_pointer();
-		if ( p_rcv_sam == nullptr ) {
-			return false;
-		}
-		if ( p_rcv_sam->p_owner_chunk_header_ != this ) {
-			return false;
-		}
-		// ここに到達した時点で、自分のものであること判明
+	// 自分が保持するスロットであることが判明済みのため、即座に解放処理を開始する。
+	p_rcv_sam->deallocate( p_recycle_addr );
 
-#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-		p_statistics_->dealloc_req_cnt_++;
-#endif
-		// OK. correct address
-		p_rcv_sam->deallocate( &( chk_ret.p_ush_->arrayh_ ) );
-	} else {
-#if 1
-		return false;
-#else
-		// ヘッダが壊れているようなので、アドレス情報から、スロット情報を引き出せるか試す。
-		if ( reinterpret_cast<uintptr_t>( p_recycle_addr ) < reinterpret_cast<uintptr_t>( p_slot_array_mgr_->p_slot_container_top ) ) {
-			// slot_containerの範囲外なので、あきらめる。
-			return false;
-		}
-		uintptr_t addr_diff   = reinterpret_cast<uintptr_t>( p_recycle_addr ) - reinterpret_cast<uintptr_t>( p_slot_array_mgr_->p_slot_container_top );
-		uintptr_t slots_count = addr_diff / p_slot_array_mgr_->slot_container_size_of_this_;
-		if ( slots_count >= p_slot_array_mgr_->num_of_slots_ ) {
-			// slot_containerの範囲外なので、あきらめる。
-			return false;
-		}
-		// ここに到達した時点で、自分のものであること判明
-
-#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-		p_statistics_->dealloc_req_cnt_++;
-#endif
-		// OK. correct address
-		p_slot_array_mgr_->deallocate( p_slot_array_mgr_->get_pointer_of_slot( slots_count ) );
-#endif
-	}
+	p_statistics_->free_slot_cnt_.fetch_add( 1, std::memory_order_acq_rel );
+	p_statistics_->consum_cnt_.fetch_sub( 1, std::memory_order_acq_rel );
 
 	return true;
 }
@@ -463,19 +472,19 @@ slot_chk_result chunk_header_multi_slot::get_chunk(
 	auto chk_ret = slot_container::get_slot_header_from_assignment_p( p_addr );
 	if ( !chk_ret.is_ok_ ) {
 		// 多分slot_containerのヘッダが壊れてるか、無関係のアドレスが渡された
-		return slot_chk_result { false, nullptr };
+		return slot_chk_result { false, nullptr, nullptr, nullptr };
 	}
 	if ( chk_ret.p_ush_->check_type() ) {
 		// allocタイプなので、chunk_header_multi_slotへのポインタ情報はない
-		return slot_chk_result { false, nullptr };
+		return slot_chk_result { false, nullptr, nullptr, nullptr };
 	}
 	slot_array_mgr* p_rcv_sam = chk_ret.p_ush_->arrayh_.mh_.get_mgr_pointer();
 	if ( p_rcv_sam == nullptr ) {
 		// 多分slot_header_of_arrayヘッダが壊れてる。
-		return slot_chk_result { false, nullptr };
+		return slot_chk_result { false, nullptr, nullptr, nullptr };
 	}
 
-	return slot_chk_result { true, p_rcv_sam->p_owner_chunk_header_ };
+	return slot_chk_result { true, p_rcv_sam->p_owner_chunk_header_, p_rcv_sam, &( chk_ret.p_ush_->arrayh_ ) };
 }
 
 chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
@@ -832,7 +841,7 @@ void general_mem_allocator_impl_deallocate(
 #endif
 		}
 #endif
-		chk_ret.p_chms_->recycle_mem_slot( p_mem );
+		chk_ret.p_chms_->unchk_recycle_mem_slot( chk_ret.p_sam_, chk_ret.p_sha_ );
 	} else {
 		// slot_header_of_allocで確保されているかどうかをチェックする
 		auto check_result = slot_container::get_slot_header_from_assignment_p( p_mem );

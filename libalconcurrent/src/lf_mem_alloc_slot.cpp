@@ -163,9 +163,15 @@ void* slot_container::construct_slot_container_in_container_buffer( slot_mheader
 	// size_t ans_tail_padding_size = addr_end_of_alloc - addr_end_of_assign;
 
 	slot_container* p_slot_container = reinterpret_cast<slot_container*>( ans_addr - static_cast<uintptr_t>( sizeof( slot_container ) ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
 	if ( reinterpret_cast<void*>( ans_addr ) != reinterpret_cast<void*>( p_slot_container->mem ) ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
 		throw std::logic_error( "does not match assignment address and slot_container::mem[0]" );
+#else
+		internal::LogOutput( log_type::ERR, "does not match assignment address and slot_container::mem[0]" );
+#endif
 	}
+#endif
 
 	// p_bind_mh_of_slot の中身とback_offset_へ値を埋め込む
 	const std::atomic<uintptr_t>* p_back_offsetX    = &( p_slot_container->back_offset_ );
@@ -174,7 +180,9 @@ void* slot_container::construct_slot_container_in_container_buffer( slot_mheader
 
 	// tail_paddingへ値を埋め込む
 	unsigned char* p_tail_padding = reinterpret_cast<unsigned char*>( ans_addr + static_cast<uintptr_t>( n ) );
-	*p_tail_padding               = tail_padding_byte_v;
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_OVERRUN_WRITING
+	*p_tail_padding = tail_padding_byte_v;
+#endif
 
 	// p_bind_mh_of_slot の中身を更新する
 	p_bind_mh_of_slot->offset_to_tail_padding_ = reinterpret_cast<uintptr_t>( p_tail_padding ) - reinterpret_cast<uintptr_t>( p_bind_mh_of_slot );

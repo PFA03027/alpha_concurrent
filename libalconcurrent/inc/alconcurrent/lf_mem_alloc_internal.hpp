@@ -86,9 +86,12 @@ struct chunk_list_statistics {
 };
 
 class chunk_header_multi_slot;
+class slot_header_of_array;
 struct slot_chk_result {
 	bool                     correct_;   //!< slot header check result. true: check result is valid.
 	chunk_header_multi_slot* p_chms_;    //!< pointer to chunk_header_multi_slot. if correct_ is true and this pointer value is nullptr, it is allocated by malloc with slot_header
+	slot_array_mgr*          p_sam_;     //!< pointer to slot array manager
+	slot_header_of_array*    p_sha_;     //!< pointer to slot_header_of_array
 };
 
 /*!
@@ -145,15 +148,32 @@ public:
 	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
 	 */
 	inline bool recycle_mem_slot(
-		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
+		void* p_recycle_mem   //!< [in] pointer to the memory slot to recycle.
 	)
 	{
-		bool ans = recycle_mem_slot_impl( p_recycle_slot );
-		if ( ans ) {
-			p_statistics_->free_slot_cnt_++;
-			p_statistics_->consum_cnt_--;
+		if ( p_recycle_mem == nullptr ) {
+			return false;
 		}
-		return ans;
+
+		return recycle_mem_slot_impl( p_recycle_mem );
+	}
+
+	/*!
+	 * @brief	recycle memory slot
+	 *
+	 * @retval	true	success to recycle.
+	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
+	 */
+	inline bool unchk_recycle_mem_slot(
+		slot_array_mgr*       p_rcv_sam,
+		slot_header_of_array* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
+	)
+	{
+		if ( p_recycle_slot == nullptr ) {
+			return false;
+		}
+
+		return unchk_recycle_mem_slot_impl( p_rcv_sam, p_recycle_slot );
 	}
 
 	/*!
@@ -274,6 +294,17 @@ private:
 	 */
 	bool recycle_mem_slot_impl(
 		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
+	);
+
+	/*!
+	 * @brief	recycle memory slot without checking if p_recycle_slot belongs to this chunk_header_multi_slot.
+	 *
+	 * @retval	true	success to recycle.
+	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
+	 */
+	bool unchk_recycle_mem_slot_impl(
+		slot_array_mgr*       p_rcv_sam,
+		slot_header_of_array* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
 	);
 
 	/*!
