@@ -186,13 +186,13 @@ private:
 		/*!
 		 * @brief	Check whether a pointer is in this hazard
 		 *
+		 * @warning before calling, caller should be check get_status() == ocupied_status::USED
+		 *
 		 * @retval	true	p_chk_ptr is in this hazard.
 		 * @retval	false	p_chk_ptr is not in this hazard.
 		 */
-		inline bool check_hazard_ptr( T* p_chk_ptr )
+		inline bool check_hazard_ptr_in_using_node( T* p_chk_ptr )
 		{
-			if ( get_status() == ocupied_status::UNUSED ) return false;
-
 			for ( auto& e : p_target_ ) {
 				if ( e.load( std::memory_order_acquire ) == p_chk_ptr ) return true;
 			}
@@ -311,7 +311,7 @@ private:
 			node_for_hazard_ptr* p_ans = head_.load( std::memory_order_acquire );
 			while ( p_ans != nullptr ) {
 				if ( p_ans->get_status() == ocupied_status::USING ) {
-					if ( p_ans->check_hazard_ptr( p_chk_ptr ) ) {
+					if ( p_ans->check_hazard_ptr_in_using_node( p_chk_ptr ) ) {
 						return true;
 					}
 				}

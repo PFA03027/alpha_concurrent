@@ -16,6 +16,12 @@ namespace alpha {
 namespace concurrent {
 
 namespace internal {
+
+#ifdef PERFORMANCE_ANALYSIS_LOG1
+std::atomic<size_t> call_count_push_to_free_node_stack( 0 );
+std::atomic<size_t> spin_count_push_to_free_node_stack( 0 );
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // usual delete...(2)

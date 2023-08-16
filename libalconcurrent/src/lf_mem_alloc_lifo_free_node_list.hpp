@@ -52,6 +52,11 @@ struct is_callable_lifo_free_node_if_next_CAS : decltype( is_callable_lifo_free_
 template <typename NODE_T>
 struct is_callable_lifo_free_node_if : decltype( is_callable_lifo_free_node_if_impl::check<NODE_T>( std::declval<NODE_T*>() ) ) {};   // ノードクラスTに対するコンセプトチェックメタ関数
 
+#ifdef PERFORMANCE_ANALYSIS_LOG1
+extern std::atomic<size_t> call_count_push_to_free_node_stack;
+extern std::atomic<size_t> spin_count_push_to_free_node_stack;
+#endif
+
 /**
  * @brief フリーノードをLIFO(スタック構造)で管理するクラス。
  *
@@ -129,9 +134,17 @@ struct free_node_stack {
 			return p_n;
 		}
 
+#ifdef PERFORMANCE_ANALYSIS_LOG1
+		call_count_push_to_free_node_stack.fetch_add( 1, std::memory_order_acq_rel );
+#endif
+
 		scoped_hzd_type hzd_refing_p_head( hzd_ptrs_, HZD_IDX_PUSH_FUNC_HEAD );
 		node_pointer    p_cur_head = p_free_node_stack_head_.load( std::memory_order_acquire );
 		while ( true ) {
+#ifdef PERFORMANCE_ANALYSIS_LOG1
+			spin_count_push_to_free_node_stack.fetch_add( 1, std::memory_order_acq_rel );
+#endif
+
 			hzd_refing_p_head.regist_ptr_as_hazard_ptr( p_cur_head );
 			node_pointer p_tmp_head = p_free_node_stack_head_.load( std::memory_order_acquire );
 			if ( p_cur_head != p_tmp_head ) {

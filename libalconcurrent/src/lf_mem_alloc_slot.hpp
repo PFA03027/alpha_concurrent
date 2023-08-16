@@ -219,7 +219,7 @@ struct slot_header_of_array {
 
 	bool next_CAS( slot_header_of_array** pp_expect_ptr, slot_header_of_array* p_desired_ptr )
 	{
-		return sh_.p_next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
+		return sh_.p_next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr, std::memory_order_acq_rel );
 	}
 
 	void dump( int indent = 0 );

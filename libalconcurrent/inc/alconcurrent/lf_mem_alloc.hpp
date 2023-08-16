@@ -157,6 +157,13 @@ public:
 			return;
 		}
 
+		if ( p_param_array == nullptr ) {
+			return;
+		}
+		if ( num == 0 ) {
+			return;
+		}
+
 		void* p_tmp     = allocating_only_allocator_.allocate( sizeof( internal::chunk_list[num] ), sizeof( uintptr_t ) );
 		param_ch_array_ = reinterpret_cast<internal::chunk_list*>( p_tmp );
 		for ( unsigned int i = 0; i < num; i++ ) {
