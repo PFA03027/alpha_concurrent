@@ -72,7 +72,7 @@ public:
 	 * @brief	constructor
 	 */
 	constexpr static_general_mem_allocator( void )
-	  : allocating_only_allocator_( true, 4 * 1024 )
+	  : allocating_only_allocator_( true, 32 * 1024 )
 	  , pr_ch_size_( 0 )
 	  , param_ch_array_impl {}
 	  , param_ch_array_( nullptr )
@@ -86,7 +86,7 @@ public:
 	 */
 	template <typename... Args>
 	constexpr static_general_mem_allocator( Args... args )
-	  : allocating_only_allocator_( true, 4 * 1024 )
+	  : allocating_only_allocator_( true, 32 * 1024 )
 	  , pr_ch_size_( sizeof...( args ) )
 	  , param_ch_array_impl { { std::forward<Args>( args ), &allocating_only_allocator_ }... }
 	  , param_ch_array_( param_ch_array_impl )
