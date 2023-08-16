@@ -274,36 +274,15 @@ bool chunk_header_multi_slot::unchk_recycle_mem_slot_impl(
 )
 {
 	// access可能状態かどうかを事前チェック
-	switch ( status_.load( std::memory_order_acquire ) ) {
-		default:
-		case chunk_control_status::EMPTY:
-		case chunk_control_status::RESERVED_ALLOCATION:
-		case chunk_control_status::DELETION:
-			return false;   // すでにaccessできない状態になっている。
-			break;
-
-		case chunk_control_status::NORMAL:
-		case chunk_control_status::RESERVED_DELETION:
-		case chunk_control_status::ANNOUNCEMENT_DELETION:
-			break;
+	if ( ( static_cast<unsigned int>( status_.load( std::memory_order_acquire ) ) & RecycleGroupStatusMask ) == 0 ) {
+		return false;   // すでにaccessできない状態になっている。
 	}
 
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
 	scoped_inout_counter_atomic_int cnt_inout( num_of_accesser_ );
 
-	// まだaccess可能状態かどうかを事前チェック
-	switch ( status_.load( std::memory_order_acquire ) ) {
-		default:
-		case chunk_control_status::EMPTY:
-		case chunk_control_status::RESERVED_ALLOCATION:
-		case chunk_control_status::DELETION:
-			return false;   // すでにaccessできない状態になっている。
-			break;
-
-		case chunk_control_status::NORMAL:
-		case chunk_control_status::RESERVED_DELETION:
-		case chunk_control_status::ANNOUNCEMENT_DELETION:
-			break;
+	if ( ( static_cast<unsigned int>( status_.load( std::memory_order_acquire ) ) & RecycleGroupStatusMask ) == 0 ) {
+		return false;   // すでにaccessできない状態になっている。
 	}
 
 	// 自分が保持するスロットであることが判明済みのため、即座に解放処理を開始する。
@@ -323,18 +302,8 @@ void* chunk_header_multi_slot::try_allocate_mem_slot_impl(
 )
 {
 	// access可能状態かどうかを事前チェック
-	switch ( status_.load( std::memory_order_acquire ) ) {
-		default:
-		case chunk_control_status::EMPTY:
-		case chunk_control_status::RESERVED_ALLOCATION:
-		case chunk_control_status::DELETION:
-		case chunk_control_status::ANNOUNCEMENT_DELETION:
-			return nullptr;
-			break;
-
-		case chunk_control_status::NORMAL:
-		case chunk_control_status::RESERVED_DELETION:
-			break;
+	if ( ( static_cast<unsigned int>( status_.load( std::memory_order_acquire ) ) & TryAllocGroupStatusMask ) == 0 ) {
+		return nullptr;   // すでにaccessできない状態になっている。
 	}
 
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
@@ -342,18 +311,8 @@ void* chunk_header_multi_slot::try_allocate_mem_slot_impl(
 
 	// access権を取得を試みる
 	chunk_control_status cur_as_st = status_.load( std::memory_order_acquire );
-	switch ( cur_as_st ) {
-		default:
-		case chunk_control_status::EMPTY:
-		case chunk_control_status::RESERVED_ALLOCATION:
-		case chunk_control_status::DELETION:
-		case chunk_control_status::ANNOUNCEMENT_DELETION:
-			return nullptr;
-			break;
-
-		case chunk_control_status::NORMAL:
-		case chunk_control_status::RESERVED_DELETION:
-			break;
+	if ( ( static_cast<unsigned int>( cur_as_st ) & TryAllocGroupStatusMask ) == 0 ) {
+		return nullptr;   // すでにaccessできない状態になっている。
 	}
 
 	// オーナー権の確認 or 確保を試みる

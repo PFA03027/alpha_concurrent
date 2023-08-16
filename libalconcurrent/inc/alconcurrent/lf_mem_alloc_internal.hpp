@@ -32,16 +32,19 @@ constexpr size_t NON_OWNERED_TL_ID    = 0;
 
 struct slot_array_mgr;
 
+constexpr unsigned int RecycleGroupStatusMask  = 0x10;
+constexpr unsigned int TryAllocGroupStatusMask = 0x20;
+
 /*!
  * @brief	chunk control status
  */
-enum class chunk_control_status : int {
-	EMPTY,                   //!< chunk header has no allocated chunk memory.
-	RESERVED_ALLOCATION,     //!< chunk header has no allocated chunk memory. But some one start to allocation
-	NORMAL,                  //!< allow to allocate the memory from this chunk
-	RESERVED_DELETION,       //!< does not allow to allocate the memory from this chunk. But if needed to reuse this chunk, allow to change NORMAL
-	ANNOUNCEMENT_DELETION,   //!< does not allow to allocate the memory from this chunk. And some one start to deletion trail.
-	DELETION,                //!< does not allow to access any more except GC. After shift to this state, chunk memory will be free after confirmed accesser is zero.
+enum class chunk_control_status : unsigned int {
+	EMPTY                 = 0,                                                      //!< chunk header has no allocated chunk memory.
+	RESERVED_ALLOCATION   = 1,                                                      //!< chunk header has no allocated chunk memory. But some one start to allocation
+	NORMAL                = 2 | RecycleGroupStatusMask | TryAllocGroupStatusMask,   //!< allow to allocate the memory from this chunk
+	RESERVED_DELETION     = 3 | RecycleGroupStatusMask | TryAllocGroupStatusMask,   //!< does not allow to allocate the memory from this chunk. But if needed to reuse this chunk, allow to change NORMAL
+	ANNOUNCEMENT_DELETION = 4 | RecycleGroupStatusMask,                             //!< does not allow to allocate the memory from this chunk. And some one start to deletion trail.
+	DELETION              = 5,                                                      //!< does not allow to access any more except GC. After shift to this state, chunk memory will be free after confirmed accesser is zero.
 };
 
 /*!

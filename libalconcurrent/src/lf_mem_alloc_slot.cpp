@@ -61,7 +61,7 @@ void slot_header_of_array::deallocate( void )
 	}
 #endif
 
-	mh_.offset_to_tail_padding_ = 0;   // mark as not used
+	mh_.offset_to_tail_padding_.store( 0, std::memory_order_release );   // mark as not used
 
 	return;
 }
@@ -115,7 +115,7 @@ void slot_header_of_alloc::deallocate( void )
 	}
 #endif
 
-	mh_.offset_to_tail_padding_ = 0;   // mark as not used
+	mh_.offset_to_tail_padding_.store( 0, std::memory_order_release );   // mark as not used
 
 	return;
 }
@@ -185,7 +185,7 @@ void* slot_container::construct_slot_container_in_container_buffer( slot_mheader
 #endif
 
 	// p_bind_mh_of_slot の中身を更新する
-	p_bind_mh_of_slot->offset_to_tail_padding_ = reinterpret_cast<uintptr_t>( p_tail_padding ) - reinterpret_cast<uintptr_t>( p_bind_mh_of_slot );
+	p_bind_mh_of_slot->offset_to_tail_padding_.store( reinterpret_cast<uintptr_t>( p_tail_padding ) - reinterpret_cast<uintptr_t>( p_bind_mh_of_slot ), std::memory_order_release );
 
 	return reinterpret_cast<void*>( ans_addr );
 }
