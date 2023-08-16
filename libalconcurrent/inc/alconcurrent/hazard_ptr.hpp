@@ -405,30 +405,10 @@ private:
 /*!
  * @brief	scoped reference control support class for hazard_ptr
  *
- * スコープベースでの、参照権の解放制御をサポートするクラスのI/Fクラス
- */
-template <typename T>
-class hazard_ptr_scoped_ref_if {   // TODO: このクラスを削除する
-public:
-	virtual void regist_ptr_as_hazard_ptr( T* p_target ) = 0;
-
-	hazard_ptr_scoped_ref_if( void )    = default;
-	virtual ~hazard_ptr_scoped_ref_if() = default;
-
-private:
-	hazard_ptr_scoped_ref_if( const hazard_ptr_scoped_ref_if& )            = delete;
-	hazard_ptr_scoped_ref_if( hazard_ptr_scoped_ref_if&& )                 = delete;
-	hazard_ptr_scoped_ref_if& operator=( const hazard_ptr_scoped_ref_if& ) = delete;
-	hazard_ptr_scoped_ref_if& operator=( hazard_ptr_scoped_ref_if&& )      = delete;
-};
-
-/*!
- * @brief	scoped reference control support class for hazard_ptr
- *
  * スコープベースでの、参照権の解放制御をサポートするクラスの実体定義クラス
  */
 template <typename T, int N>
-class hazard_ptr_scoped_ref : public hazard_ptr_scoped_ref_if<T> {
+class hazard_ptr_scoped_ref {
 public:
 	hazard_ptr_scoped_ref( hazard_ptr<T, N>& ref, int idx_arg )
 	  : idx_( idx_arg )
@@ -441,7 +421,7 @@ public:
 		monitor_ref_.clear_hazard_ptr( idx_ );
 	}
 
-	void regist_ptr_as_hazard_ptr( T* p_target ) override
+	void regist_ptr_as_hazard_ptr( T* p_target )
 	{
 		monitor_ref_.regist_ptr_as_hazard_ptr( p_target, idx_ );
 	}
