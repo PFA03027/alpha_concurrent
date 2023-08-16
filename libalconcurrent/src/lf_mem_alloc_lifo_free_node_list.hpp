@@ -122,18 +122,14 @@ struct free_node_stack {
 	}
 
 	/**
-	 * @brief free node stackにノードを追加する。
+	 * @brief free node stackにノードを追加する。だたし、引数のp_nに対してハザードポインタチェックを行わない。
 	 *
-	 * @param p_n ノードへのポインタ
-	 * @return node_pointer p_nがまだハザードポインタに登録されている場合、pushできないため、p_nを返す。返されたp_nは、スレッドローカルストレージ一時的に保管する等の対応を行うこと。
+	 * @warning p_nがハザードポインタになっていないことを確認の上、呼び出すこと。
+	 *
+	 * @param p_n ノードへのポインタ。ハザードポインタになっていないこと。
 	 */
-	node_pointer push_to_free_node_stack( node_pointer p_n )
+	void push_to_free_node_stack_wo_hzd_chk( node_pointer p_n )
 	{
-		if ( hzd_ptrs_.check_ptr_in_hazard_list( p_n ) ) {
-			// ハザードポインタに登録されているため、push不可能として、p_nを返す。
-			return p_n;
-		}
-
 #ifdef PERFORMANCE_ANALYSIS_LOG1
 		call_count_push_to_free_node_stack.fetch_add( 1, std::memory_order_acq_rel );
 #endif
@@ -161,7 +157,7 @@ struct free_node_stack {
 			}
 		}
 
-		return nullptr;
+		return;
 	}
 
 	/**
@@ -242,8 +238,7 @@ struct free_node_stack {
 
 			node_pointer p_tmp_ret = pop_from_tls_stack();
 			if ( p_tmp_ret != nullptr ) {
-				p_tmp_ret = push_to_free_node_stack( p_tmp_ret );
-				if ( p_tmp_ret != nullptr ) {
+				if ( hzd_ptrs_.check_ptr_in_hazard_list( p_tmp_ret ) ) {
 					// まだハザードポインタにいるようなので、戻す。
 					if ( ul.try_lock() ) {
 						nonlockchk_push_to_consignment_stack( p_tmp_ret );
@@ -251,6 +246,9 @@ struct free_node_stack {
 						// 共有ノードスタックのロックが確保できなかったので、スレッドローカルに戻す
 						push_to_tls_stack( p_tmp_ret );
 					}
+				} else {
+					// ハザードポインタにはいないので、フリーノードスタックの本体にpushする。
+					push_to_free_node_stack_wo_hzd_chk( p_tmp_ret );
 				}
 			}
 			if ( !ul.owns_lock() ) {
@@ -259,25 +257,27 @@ struct free_node_stack {
 			if ( ul.owns_lock() ) {
 				p_tmp_ret = nonlockchk_pop_from_consignment_stack();
 				if ( p_tmp_ret != nullptr ) {
-					p_tmp_ret = push_to_free_node_stack( p_tmp_ret );
-					if ( p_tmp_ret != nullptr ) {
+					if ( hzd_ptrs_.check_ptr_in_hazard_list( p_tmp_ret ) ) {
 						// まだハザードポインタにいるようなので、戻す。
 						nonlockchk_push_to_consignment_stack( p_tmp_ret );
+					} else {
+						push_to_free_node_stack_wo_hzd_chk( p_tmp_ret );
 					}
 				}
 			}
 		}
 
 		// push作業を開始する。
-		node_pointer p_tmp_ret = push_to_free_node_stack( p_n );
-		if ( p_tmp_ret != nullptr ) {
+		if ( hzd_ptrs_.check_ptr_in_hazard_list( p_n ) ) {
 			// まだハザードポインタにいるようなので、共有スタックリストかスレッドローカルリストに戻す。
 			std::unique_lock<std::mutex> ul( mtx_consignment_stack_, std::try_to_lock );
 			if ( ul.owns_lock() ) {
-				nonlockchk_push_to_consignment_stack( p_tmp_ret );
+				nonlockchk_push_to_consignment_stack( p_n );
 			} else {
-				push_to_tls_stack( p_tmp_ret );
+				push_to_tls_stack( p_n );
 			}
+		} else {
+			push_to_free_node_stack_wo_hzd_chk( p_n );
 		}
 	}
 
@@ -296,10 +296,11 @@ struct free_node_stack {
 						node_pointer p_tmp_ret2 = nonlockchk_pop_from_consignment_stack();
 						nonlockchk_push_to_consignment_stack( p_tmp_ret );   // スレッドローカルリストから取り出されたノードを先に共有ノードスタックに戻しておく。
 						if ( p_tmp_ret2 != nullptr ) {
-							p_tmp_ret2 = push_to_free_node_stack( p_tmp_ret2 );
-							if ( p_tmp_ret2 != nullptr ) {
+							if ( hzd_ptrs_.check_ptr_in_hazard_list( p_tmp_ret2 ) ) {
 								// 共有ノードスタックから取り出したノードはまだハザードポインタにいるので、共有ノードスタックに戻す。
 								nonlockchk_push_to_consignment_stack( p_tmp_ret2 );
+							} else {
+								push_to_free_node_stack_wo_hzd_chk( p_tmp_ret2 );
 							}
 						}
 					} else {

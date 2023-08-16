@@ -56,8 +56,7 @@ TEST( FreeNodeStack, CanCall_PushPop_tofrom_free_node_stack )
 	int                                             test_int;
 	test_free_node                                  sut_node( &test_int, nullptr );
 	test_free_node_stack                            sut( &aoc );
-	auto                                            p_push_ret = sut.push_to_free_node_stack( &sut_node );
-	ASSERT_EQ( p_push_ret, nullptr );
+	sut.push_to_free_node_stack_wo_hzd_chk( &sut_node );
 
 	// Act
 	test_free_node* p_ret = sut.pop_from_free_node_stack();
