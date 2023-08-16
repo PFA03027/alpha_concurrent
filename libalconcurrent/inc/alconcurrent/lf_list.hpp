@@ -38,13 +38,12 @@ namespace internal {
 template <typename T, bool HAS_OWNERSHIP = true>
 class lockfree_list_base {
 public:
-	using node_type                  = one_way_list_node_markable<T, HAS_OWNERSHIP>;   //!< 実際の値を保持するノードクラス。
-	using input_type                 = typename node_type::input_type;                 //!< 入力用の型
-	using value_type                 = typename node_type::value_type;                 //!< 保持対象の型
-	using node_pointer               = node_type*;                                     //!< 実際の値を保持するノードクラスのインスタンスへのポインタ型
-	using find_predicate_t           = std::function<bool( const node_pointer )>;      //!< find関数で使用する述語関数を保持するfunction型
-	using for_each_func_t            = std::function<void( value_type& )>;             //!< for_each関数で各要素の処理を実行するための関数を保持するfunction型
-	using hazard_ptr_scoped_ref_if_t = hazard_ptr_scoped_ref_if<node_type>;            //!< ハザードポインタの参照制御をサポートするI/Fクラスの型
+	using node_type        = one_way_list_node_markable<T, HAS_OWNERSHIP>;   //!< 実際の値を保持するノードクラス。
+	using input_type       = typename node_type::input_type;                 //!< 入力用の型
+	using value_type       = typename node_type::value_type;                 //!< 保持対象の型
+	using node_pointer     = node_type*;                                     //!< 実際の値を保持するノードクラスのインスタンスへのポインタ型
+	using find_predicate_t = std::function<bool( const node_pointer )>;      //!< find関数で使用する述語関数を保持するfunction型
+	using for_each_func_t  = std::function<void( value_type& )>;             //!< for_each関数で各要素の処理を実行するための関数を保持するfunction型
 
 	lockfree_list_base( void )
 	  : head_()
@@ -85,11 +84,12 @@ public:
 	 * @retval	1st-value	番兵ノードより１つ前のノードへのポインタ
 	 * @retval	2nd-value	番兵ノードへのポインタ
 	 */
+	template <typename HPSR_T>
 	std::tuple<node_pointer, node_pointer> find_if(
-		free_nd_storage&            fn_strg,        //!< [in]	削除ノードを差し戻すためのFree node storageへの参照
-		hazard_ptr_scoped_ref_if_t& ans_prev_ref,   //!< [in]	戻り値のprevに対応するnodeポインタを登録するハザードポインタへの参照
-		hazard_ptr_scoped_ref_if_t& ans_curr_ref,   //!< [in]	戻り値のcurrに対応するnodeポインタを登録するハザードポインタへの参照
-		find_predicate_t&           pred            //!< [in]	引数には、const node_pointerが渡される
+		free_nd_storage&  fn_strg,        //!< [in]	削除ノードを差し戻すためのFree node storageへの参照
+		HPSR_T&           ans_prev_ref,   //!< [in]	戻り値のprevに対応するnodeポインタを登録するハザードポインタへの参照
+		HPSR_T&           ans_curr_ref,   //!< [in]	戻り値のcurrに対応するnodeポインタを登録するハザードポインタへの参照
+		find_predicate_t& pred            //!< [in]	引数には、const node_pointerが渡される
 	)
 	{
 		scoped_hazard_ref scoped_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_FUNC_PREV );
@@ -164,7 +164,7 @@ public:
 
 		internal::LogOutput( log_type::ERR, "ERR: find_if_common go into logic error" );
 		return std::tuple<node_pointer, node_pointer>( nullptr, nullptr );   // 到達不可能コード。安全のために残す。
-																			 // TODO ここに到達する場合は、アルゴリズムか実装がおかしいので、例外をスローするか？
+		                                                                     // TODO ここに到達する場合は、アルゴリズムか実装がおかしいので、例外をスローするか？
 	}
 
 	/*!
@@ -378,10 +378,10 @@ private:
 	using hazard_ptr_cp_handling        = hazard_ptr<node_type, 1>;
 	using scoped_hazard_cp_handling_ref = hazard_ptr_scoped_ref<node_type, 1>;
 
-	lockfree_list_base( const lockfree_list_base& ) = delete;
-	lockfree_list_base( lockfree_list_base&& )      = delete;
+	lockfree_list_base( const lockfree_list_base& )           = delete;
+	lockfree_list_base( lockfree_list_base&& )                = delete;
 	lockfree_list_base operator=( const lockfree_list_base& ) = delete;
-	lockfree_list_base operator=( lockfree_list_base&& ) = delete;
+	lockfree_list_base operator=( lockfree_list_base&& )      = delete;
 
 	node_type        head_;
 	node_type        sentinel_node_;
@@ -720,9 +720,9 @@ public:
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 				auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
 #else
-				auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
-				auto p_prev    = std::get<0>( local_ret );
-				auto p_curr    = std::get<1>( local_ret );
+                auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+                auto p_prev    = std::get<0>( local_ret );
+                auto p_curr    = std::get<1>( local_ret );
 #endif
 				if ( !base_list_.is_end_node( p_curr ) ) continue;
 				if ( base_list_.is_head_node( p_prev ) ) {
@@ -805,10 +805,10 @@ public:
 	}
 
 private:
-	lockfree_list( const lockfree_list& ) = delete;
-	lockfree_list( lockfree_list&& )      = delete;
+	lockfree_list( const lockfree_list& )            = delete;
+	lockfree_list( lockfree_list&& )                 = delete;
 	lockfree_list& operator=( const lockfree_list& ) = delete;
-	lockfree_list& operator=( lockfree_list&& ) = delete;
+	lockfree_list& operator=( lockfree_list&& )      = delete;
 
 	using list_node_type       = typename list_type::node_type;
 	using list_node_pointer    = typename list_type::node_pointer;

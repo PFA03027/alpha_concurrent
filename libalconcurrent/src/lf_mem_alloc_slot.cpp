@@ -61,7 +61,7 @@ void slot_header_of_array::deallocate( void )
 	}
 #endif
 
-	mh_.offset_to_tail_padding_ = 0;   // mark as not used
+	mh_.offset_to_tail_padding_.store( 0, std::memory_order_release );   // mark as not used
 
 	return;
 }
@@ -115,7 +115,7 @@ void slot_header_of_alloc::deallocate( void )
 	}
 #endif
 
-	mh_.offset_to_tail_padding_ = 0;   // mark as not used
+	mh_.offset_to_tail_padding_.store( 0, std::memory_order_release );   // mark as not used
 
 	return;
 }
@@ -123,7 +123,7 @@ void slot_header_of_alloc::deallocate( void )
 bool_unified_slot_header_p slot_container::get_slot_header_from_assignment_p( void* p_mem )
 {
 	slot_container* p_slot_container = reinterpret_cast<slot_container*>( reinterpret_cast<uintptr_t>( p_mem ) - static_cast<uintptr_t>( sizeof( slot_container ) ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGICAL_ERROR
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
 	if ( p_mem != reinterpret_cast<void*>( p_slot_container->mem ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
 		std::string errlog = "does not match p_mem and slot_container::mem[0]. This is logical error.";
@@ -163,9 +163,15 @@ void* slot_container::construct_slot_container_in_container_buffer( slot_mheader
 	// size_t ans_tail_padding_size = addr_end_of_alloc - addr_end_of_assign;
 
 	slot_container* p_slot_container = reinterpret_cast<slot_container*>( ans_addr - static_cast<uintptr_t>( sizeof( slot_container ) ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
 	if ( reinterpret_cast<void*>( ans_addr ) != reinterpret_cast<void*>( p_slot_container->mem ) ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
 		throw std::logic_error( "does not match assignment address and slot_container::mem[0]" );
+#else
+		internal::LogOutput( log_type::ERR, "does not match assignment address and slot_container::mem[0]" );
+#endif
 	}
+#endif
 
 	// p_bind_mh_of_slot の中身とback_offset_へ値を埋め込む
 	const std::atomic<uintptr_t>* p_back_offsetX    = &( p_slot_container->back_offset_ );
@@ -174,10 +180,12 @@ void* slot_container::construct_slot_container_in_container_buffer( slot_mheader
 
 	// tail_paddingへ値を埋め込む
 	unsigned char* p_tail_padding = reinterpret_cast<unsigned char*>( ans_addr + static_cast<uintptr_t>( n ) );
-	*p_tail_padding               = tail_padding_byte_v;
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_OVERRUN_WRITING
+	*p_tail_padding = tail_padding_byte_v;
+#endif
 
 	// p_bind_mh_of_slot の中身を更新する
-	p_bind_mh_of_slot->offset_to_tail_padding_ = reinterpret_cast<uintptr_t>( p_tail_padding ) - reinterpret_cast<uintptr_t>( p_bind_mh_of_slot );
+	p_bind_mh_of_slot->offset_to_tail_padding_.store( reinterpret_cast<uintptr_t>( p_tail_padding ) - reinterpret_cast<uintptr_t>( p_bind_mh_of_slot ), std::memory_order_release );
 
 	return reinterpret_cast<void*>( ans_addr );
 }

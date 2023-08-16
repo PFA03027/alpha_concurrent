@@ -16,9 +16,9 @@
 #include <list>
 #include <memory>
 
+#include "alconcurrent/alloc_only_allocator.hpp"
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/dynamic_tls.hpp"
-#include "alconcurrent/hazard_ptr.hpp"
 
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
@@ -32,16 +32,19 @@ constexpr size_t NON_OWNERED_TL_ID    = 0;
 
 struct slot_array_mgr;
 
+constexpr unsigned int RecycleGroupStatusMask  = 0x10;
+constexpr unsigned int TryAllocGroupStatusMask = 0x20;
+
 /*!
  * @brief	chunk control status
  */
-enum class chunk_control_status : int {
-	EMPTY,                   //!< chunk header has no allocated chunk memory.
-	RESERVED_ALLOCATION,     //!< chunk header has no allocated chunk memory. But some one start to allocation
-	NORMAL,                  //!< allow to allocate the memory from this chunk
-	RESERVED_DELETION,       //!< does not allow to allocate the memory from this chunk. But if needed to reuse this chunk, allow to change NORMAL
-	ANNOUNCEMENT_DELETION,   //!< does not allow to allocate the memory from this chunk. And some one start to deletion trail.
-	DELETION,                //!< does not allow to access any more except GC. After shift to this state, chunk memory will be free after confirmed accesser is zero.
+enum class chunk_control_status : unsigned int {
+	EMPTY                 = 0,                                                      //!< chunk header has no allocated chunk memory.
+	RESERVED_ALLOCATION   = 1,                                                      //!< chunk header has no allocated chunk memory. But some one start to allocation
+	NORMAL                = 2 | RecycleGroupStatusMask | TryAllocGroupStatusMask,   //!< allow to allocate the memory from this chunk
+	RESERVED_DELETION     = 3 | RecycleGroupStatusMask | TryAllocGroupStatusMask,   //!< does not allow to allocate the memory from this chunk. But if needed to reuse this chunk, allow to change NORMAL
+	ANNOUNCEMENT_DELETION = 4 | RecycleGroupStatusMask,                             //!< does not allow to allocate the memory from this chunk. And some one start to deletion trail.
+	DELETION              = 5,                                                      //!< does not allow to access any more except GC. After shift to this state, chunk memory will be free after confirmed accesser is zero.
 };
 
 /*!
@@ -86,9 +89,12 @@ struct chunk_list_statistics {
 };
 
 class chunk_header_multi_slot;
+class slot_header_of_array;
 struct slot_chk_result {
 	bool                     correct_;   //!< slot header check result. true: check result is valid.
 	chunk_header_multi_slot* p_chms_;    //!< pointer to chunk_header_multi_slot. if correct_ is true and this pointer value is nullptr, it is allocated by malloc with slot_header
+	slot_array_mgr*          p_sam_;     //!< pointer to slot array manager
+	slot_header_of_array*    p_sha_;     //!< pointer to slot_header_of_array
 };
 
 /*!
@@ -124,9 +130,9 @@ public:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	inline void* allocate_mem_slot( void )
+	inline void* allocate_mem_slot( size_t req_size, size_t req_align )
 	{
-		void* p_ans = allocate_mem_slot_impl();
+		void* p_ans = allocate_mem_slot_impl( req_size, req_align );
 		if ( p_ans != nullptr ) {
 			p_statistics_->free_slot_cnt_--;
 			auto cur     = p_statistics_->consum_cnt_.fetch_add( 1, std::memory_order_acq_rel ) + 1;
@@ -145,15 +151,32 @@ public:
 	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
 	 */
 	inline bool recycle_mem_slot(
-		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
+		void* p_recycle_mem   //!< [in] pointer to the memory slot to recycle.
 	)
 	{
-		bool ans = recycle_mem_slot_impl( p_recycle_slot );
-		if ( ans ) {
-			p_statistics_->free_slot_cnt_++;
-			p_statistics_->consum_cnt_--;
+		if ( p_recycle_mem == nullptr ) {
+			return false;
 		}
-		return ans;
+
+		return recycle_mem_slot_impl( p_recycle_mem );
+	}
+
+	/*!
+	 * @brief	recycle memory slot
+	 *
+	 * @retval	true	success to recycle.
+	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
+	 */
+	inline bool unchk_recycle_mem_slot(
+		slot_array_mgr*       p_rcv_sam,
+		slot_header_of_array* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
+	)
+	{
+		if ( p_recycle_slot == nullptr ) {
+			return false;
+		}
+
+		return unchk_recycle_mem_slot_impl( p_rcv_sam, p_recycle_slot );
 	}
 
 	/*!
@@ -182,11 +205,13 @@ public:
 	 * @post status_ is chunk_control_status::NORMAL
 	 */
 	inline void* try_allocate_mem_slot_from_reserved_deletion(
-		const unsigned int owner_tl_id_arg   //!< [in] owner tl_id_
+		const unsigned int owner_tl_id_arg,   //!< [in] owner tl_id_
+		const size_t       req_size,          //!< [in] requested size
+		const size_t       req_align          //!< [in] requested align size
 	)
 	{
 		unsigned int cur_tl_id = owner_tl_id_.load( std::memory_order_acquire );
-		return try_allocate_mem_slot_impl( cur_tl_id, owner_tl_id_arg );
+		return try_allocate_mem_slot_impl( cur_tl_id, owner_tl_id_arg, req_size, req_align );
 	}
 
 	/*!
@@ -200,10 +225,12 @@ public:
 	 * @post owner_tl_id_ is owner_tl_id_arg, and status_ is chunk_control_status::NORMAL
 	 */
 	inline void* try_get_ownership_allocate_mem_slot(
-		const unsigned int owner_tl_id_arg   //!< [in] owner tl_id_
+		const unsigned int owner_tl_id_arg,   //!< [in] owner tl_id_
+		const size_t       req_size,          //!< [in] requested size
+		const size_t       req_align          //!< [in] requested align size
 	)
 	{
-		return try_allocate_mem_slot_impl( NON_OWNERED_TL_ID, owner_tl_id_arg );
+		return try_allocate_mem_slot_impl( NON_OWNERED_TL_ID, owner_tl_id_arg, req_size, req_align );
 	}
 
 	bool set_delete_reservation( void );
@@ -234,6 +261,20 @@ public:
 	 */
 	void dump( void );
 
+	void* operator new( std::size_t n ) = delete;       // usual new...(1)
+	void  operator delete( void* p_mem ) noexcept {};   // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
+
+	void* operator new[]( std::size_t n )           = delete;   // usual new...(1)
+	void  operator delete[]( void* p_mem ) noexcept = delete;   // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
+
+	void* operator new( std::size_t n, internal::alloc_only_chamber& allocator_arg )   // placement new
+	{
+		return allocator_arg.allocate( n, sizeof( uintptr_t ) );
+	}
+	void operator delete( void* p, internal::alloc_only_chamber& allocator_arg ) noexcept   // placement delete...(3)
+	{
+	}
+
 private:
 	void set_slot_allocation_conf(
 		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
@@ -246,7 +287,7 @@ private:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	void* allocate_mem_slot_impl( void );
+	void* allocate_mem_slot_impl( size_t req_size, size_t req_align );
 
 	/*!
 	 * @brief	recycle memory slot
@@ -256,6 +297,17 @@ private:
 	 */
 	bool recycle_mem_slot_impl(
 		void* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
+	);
+
+	/*!
+	 * @brief	recycle memory slot without checking if p_recycle_slot belongs to this chunk_header_multi_slot.
+	 *
+	 * @retval	true	success to recycle.
+	 * @retval	false	fail to recycle. Normally p_recycle_slot does not belong to this chunk
+	 */
+	bool unchk_recycle_mem_slot_impl(
+		slot_array_mgr*       p_rcv_sam,
+		slot_header_of_array* p_recycle_slot   //!< [in] pointer to the memory slot to recycle.
 	);
 
 	/*!
@@ -270,16 +322,15 @@ private:
 	 */
 	void* try_allocate_mem_slot_impl(
 		const unsigned int expect_tl_id_arg,   //!< [in] owner tl_id_
-		const unsigned int owner_tl_id_arg     //!< [in] owner tl_id_
+		const unsigned int owner_tl_id_arg,    //!< [in] owner tl_id_
+		const size_t       req_size,           //!< [in] requested size
+		const size_t       req_align           //!< [in] requested align size
 	);
 
-	chunk_list_statistics* p_statistics_;       //!< statistics
+	chunk_list_statistics* p_statistics_;   //!< statistics
 
 	param_chunk_allocation slot_conf_;          //!< allocation configuration paramter. value is corrected internally.
 	slot_array_mgr*        p_slot_array_mgr_;   //!< pointer to slot_array_mgr
-
-												// void*                          p_chunk_;            //!< pointer to an allocated memory as a chunk
-	// size_t                         allocated_size_;
 };
 
 /*!
@@ -291,9 +342,11 @@ public:
 	 * @brief	constructor
 	 */
 	constexpr chunk_list(
-		const param_chunk_allocation& ch_param_arg   //!< [in] chunk allocation paramter
+		const param_chunk_allocation& ch_param_arg,     //!< [in] chunk allocation paramter
+		internal::alloc_only_chamber* p_allocator_arg   //!< [in] 割り当て専用アロケータへのポインタ
 		)
 	  : chunk_param_( ch_param_arg )
+	  , p_allocator_( p_allocator_arg )
 	  , p_top_chunk_()
 	  , tls_hint_( tl_chunk_param_destructor( this ) )
 	  , statistics_()
@@ -313,7 +366,7 @@ public:
 	 * @retval	non-nullptr	success to allocate and it is a pointer to an allocated memory
 	 * @retval	nullptr		fail to allocate
 	 */
-	void* allocate_mem_slot( void );
+	void* allocate_mem_slot( size_t req_size, size_t req_align );
 
 	/*!
 	 * @brief	recycle memory slot
@@ -426,7 +479,7 @@ private:
 			chunk_header_multi_slot* p_chms = p_top_.load( std::memory_order_acquire );
 			while ( p_chms != nullptr ) {
 				chunk_header_multi_slot* p_next_chms = p_chms->p_next_chunk_.load( std::memory_order_acquire );
-				delete p_chms;
+				delete p_chms;   // 実際には削除されない。割り当て専用アロケータのdestructorによって、まとめて破棄される。
 				p_chms = p_next_chms;
 			}
 		}
@@ -471,12 +524,13 @@ private:
 		unsigned int target_tl_id_arg   //!< [in] オーナー権を開放する対象のtl_id_
 	);
 
+	internal::alloc_only_chamber*                          p_allocator_;   //!< 割り当て専用アロケータへのポインタ
 	atomic_push_list                                       p_top_chunk_;   //!< pointer to chunk_header that is top of list.
 	dynamic_tls<tl_chunk_param, tl_chunk_param_destructor> tls_hint_;      //!< thread local pointer to chunk_header that is success to allocate recently for a thread.
 	                                                                       //!< tls_hint_は、p_top_chunk_を参照しているため、この2つのメンバ変数の宣言順(p_top_chunk_の次にtls_hint_)を入れ替えてはならない。
 	                                                                       //!< 入れ替えてしまった場合、デストラクタでの解放処理で、解放済みのメモリ領域にアクセスしてしまう。
 
-	chunk_list_statistics statistics_;                                     //!< statistics
+	chunk_list_statistics statistics_;   //!< statistics
 };
 
 }   // namespace internal

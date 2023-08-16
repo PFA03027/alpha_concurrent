@@ -48,6 +48,13 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size );
  */
 int deallocate_by_munmap( void* p_allocated_addr, size_t allocated_size );
 
+struct alloc_mmap_status {
+	size_t active_size_;
+	size_t max_size_;
+};
+
+alloc_mmap_status get_alloc_mmap_status( void );
+
 void print_of_mmap_allocator( void );
 
 // configuration value

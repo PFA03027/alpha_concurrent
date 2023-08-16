@@ -25,9 +25,10 @@ using test_free_node_stack = alpha::concurrent::internal::free_node_stack<test_f
 TEST( FreeNodeStack, CanCall_DefaultConstruct )
 {
 	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber aoc( true, 4 * 1024 );
 
 	// Act
-	test_free_node_stack sut;
+	test_free_node_stack sut( &aoc );
 
 	// Assert
 }
@@ -35,9 +36,10 @@ TEST( FreeNodeStack, CanCall_DefaultConstruct )
 TEST( FreeNodeStack, CanCall_InitPushPop_tofrom_free_node_stack )
 {
 	// Arrange
-	int                  test_int;
-	test_free_node       sut_node( &test_int, nullptr );
-	test_free_node_stack sut;
+	alpha::concurrent::internal::alloc_only_chamber aoc( true, 4 * 1024 );
+	int                                             test_int;
+	test_free_node                                  sut_node( &test_int, nullptr );
+	test_free_node_stack                            sut( &aoc );
 	sut.unchk_push_stack_list_to_head( &sut_node );
 
 	// Act
@@ -50,10 +52,11 @@ TEST( FreeNodeStack, CanCall_InitPushPop_tofrom_free_node_stack )
 TEST( FreeNodeStack, CanCall_PushPop_tofrom_free_node_stack )
 {
 	// Arrange
-	int                  test_int;
-	test_free_node       sut_node( &test_int, nullptr );
-	test_free_node_stack sut;
-	auto                 p_push_ret = sut.push_to_free_node_stack( &sut_node );
+	alpha::concurrent::internal::alloc_only_chamber aoc( true, 4 * 1024 );
+	int                                             test_int;
+	test_free_node                                  sut_node( &test_int, nullptr );
+	test_free_node_stack                            sut( &aoc );
+	auto                                            p_push_ret = sut.push_to_free_node_stack( &sut_node );
 	ASSERT_EQ( p_push_ret, nullptr );
 
 	// Act
@@ -66,9 +69,10 @@ TEST( FreeNodeStack, CanCall_PushPop_tofrom_free_node_stack )
 TEST( FreeNodeStack, CanCall_PushPop_tofrom_tls_stack )
 {
 	// Arrange
-	int                  test_int;
-	test_free_node       sut_node( &test_int, nullptr );
-	test_free_node_stack sut;
+	alpha::concurrent::internal::alloc_only_chamber aoc( true, 4 * 1024 );
+	int                                             test_int;
+	test_free_node                                  sut_node( &test_int, nullptr );
+	test_free_node_stack                            sut( &aoc );
 	sut.push_to_tls_stack( &sut_node );
 
 	// Act
@@ -81,9 +85,10 @@ TEST( FreeNodeStack, CanCall_PushPop_tofrom_tls_stack )
 TEST( FreeNodeStack, CanCall_PushPop_tofrom_consignment_stack )
 {
 	// Arrange
-	int                  test_int;
-	test_free_node       sut_node( &test_int, nullptr );
-	test_free_node_stack sut;
+	alpha::concurrent::internal::alloc_only_chamber aoc( true, 4 * 1024 );
+	int                                             test_int;
+	test_free_node                                  sut_node( &test_int, nullptr );
+	test_free_node_stack                            sut( &aoc );
 	sut.nonlockchk_push_to_consignment_stack( &sut_node );
 
 	// Act
@@ -96,9 +101,10 @@ TEST( FreeNodeStack, CanCall_PushPop_tofrom_consignment_stack )
 TEST( FreeNodeStack, CanCall_PushPop )
 {
 	// Arrange
-	int                  test_int;
-	test_free_node       sut_node( &test_int, nullptr );
-	test_free_node_stack sut;
+	alpha::concurrent::internal::alloc_only_chamber aoc( true, 4 * 1024 );
+	int                                             test_int;
+	test_free_node                                  sut_node( &test_int, nullptr );
+	test_free_node_stack                            sut( &aoc );
 	sut.push( &sut_node );
 
 	// Act

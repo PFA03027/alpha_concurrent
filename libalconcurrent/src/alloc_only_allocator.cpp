@@ -14,10 +14,11 @@
 
 #include <atomic>
 #include <new>
+#include <stdexcept>
 
 #include "alconcurrent/conf_logger.hpp"
 
-#include "alloc_only_allocator.hpp"
+#include "alconcurrent/alloc_only_allocator.hpp"
 #include "mmap_allocator.hpp"
 
 namespace alpha {
@@ -30,7 +31,7 @@ struct room_boader {
 	const size_t    chopped_size_;                       //!< chopped roomのサイズ。次のroom_boaderへのオフセットも意味する。そのため、次のroom_boaderのアライメント、およびtail_padding領域を含む
 	const uintptr_t offset_into_the_allocated_memory_;   //!< 呼び出し元に渡したメモリアドレスへのオフセット
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	bt_info alloc_bt_info_;                              //!< backtrace information when is allocated
+	bt_info alloc_bt_info_;   //!< backtrace information when is allocated
 #endif
 
 	room_boader( size_t chopped_size_arg, size_t req_size, size_t req_align );
@@ -102,26 +103,36 @@ void room_boader::dump_to_log( log_type lt, char c, int id )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-struct alloc_chamber_statistics {
-	size_t alloc_size_;
-	size_t consum_size_;
-	size_t free_size_;
 
-	alloc_chamber_statistics& operator+=( const alloc_chamber_statistics& op )
-	{
-		alloc_size_ += op.alloc_size_;
-		consum_size_ += op.consum_size_;
-		free_size_ += op.free_size_;
-		return *this;
-	}
-};
+alloc_chamber_statistics& alloc_chamber_statistics::operator+=( const alloc_chamber_statistics& op )
+{
+	chamber_count_++;
+	alloc_size_ += op.alloc_size_;
+	consum_size_ += op.consum_size_;
+	free_size_ += op.free_size_;
+	return *this;
+}
+
+std::string alloc_chamber_statistics::print( void ) const
+{
+	char buff[2048];
+	snprintf( buff, 2048,
+	          "chamber count = %zu, total allocated size = 0x%zx(%.2fM), consumed size = 0x%zx(%.2fM), free size = 0x%zx(%.2fM), used ratio = %2.1f %%",
+	          chamber_count_,
+	          alloc_size_, (double)alloc_size_ / (double)( 1024 * 1024 ),
+	          consum_size_, (double)consum_size_ / (double)( 1024 * 1024 ),
+	          free_size_, (double)free_size_ / (double)( 1024 * 1024 ),
+	          ( alloc_size_ > 0 ) ? ( (double)consum_size_ / (double)alloc_size_ * 100.0f ) : 0.0f );
+
+	return std::string( buff );
+}
 
 struct alloc_chamber {
 	const size_t                chamber_size_;   //!< alloc_chamberのサイズ
 	std::atomic<alloc_chamber*> next_;           //!< alloc_chamberのスタックリスト上の次のalloc_chamber
 	std::atomic<uintptr_t>      offset_;         //!< 次のallocateの先頭へのオフセット
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	bt_info alloc_bt_info_;                      //!< backtrace information when is allocated
+	bt_info alloc_bt_info_;   //!< backtrace information when is allocated
 #endif
 	unsigned char roomtop_[0];
 
@@ -129,8 +140,9 @@ struct alloc_chamber {
 
 	void* allocate( size_t req_size, size_t req_align );
 
-	void                     dump_to_log( log_type lt, char c, int id );
 	alloc_chamber_statistics get_statistics( void ) const;
+
+	void dump_to_log( log_type lt, char c, int id );
 
 private:
 	uintptr_t calc_addr_chopped_room_end_by( uintptr_t expected_offset_, size_t req_size, size_t req_align );
@@ -236,10 +248,58 @@ alloc_chamber_statistics alloc_chamber::get_statistics( void ) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-alloc_chamber_head          alloc_chamber_head::singleton_;
-thread_local alloc_chamber* alloc_chamber_head::p_forcusing_chamber_ = nullptr;
+alloc_only_chamber::~alloc_only_chamber()
+{
+	if ( !need_release_munmap_ ) {
+		return;
+	}
 
-void alloc_chamber_head::push_alloc_mem( void* p_alloced_mem, size_t allocated_size )
+	alloc_chamber* p_cur_head = head_.load( std::memory_order_acquire );
+	while ( p_cur_head != nullptr ) {
+		alloc_chamber* p_nxt_head = p_cur_head->next_.load( std::memory_order_acquire );
+		munmap_alloc_chamber( p_cur_head );
+		p_cur_head = p_nxt_head;
+	}
+}
+
+void* alloc_only_chamber::try_allocate( size_t req_size, size_t req_align )
+{
+	alloc_chamber* p_cur_focusing_ch = head_.load( std::memory_order_acquire );
+	if ( p_cur_focusing_ch == nullptr ) {
+		return nullptr;
+	}
+
+	void* p_ans = p_cur_focusing_ch->allocate( req_size, req_align );
+	if ( p_ans != nullptr ) {
+		return p_ans;
+	}
+
+	// メモリを確保できなかった場合、hint情報から一度だけ取得できるか試す。
+	alloc_chamber* p_cur_hint_ch = one_try_hint_.load( std::memory_order_acquire );
+	p_cur_focusing_ch            = p_cur_hint_ch;
+	if ( p_cur_focusing_ch == nullptr ) {
+		p_cur_focusing_ch = head_.load( std::memory_order_acquire );
+		if ( p_cur_focusing_ch == nullptr ) {
+			return nullptr;
+		}
+		p_cur_focusing_ch = p_cur_focusing_ch->next_.load( std::memory_order_acquire );
+		if ( p_cur_focusing_ch == nullptr ) {
+			return nullptr;
+		}
+	}
+	p_ans = p_cur_focusing_ch->allocate( req_size, req_align );
+	if ( p_ans != nullptr ) {
+		return p_ans;
+	}
+
+	// 取得を試みたが、取得できなかったので、hintを一つ動かす。
+	alloc_chamber* p_nxt_hint_ch = p_cur_focusing_ch->next_.load( std::memory_order_acquire );
+	one_try_hint_.compare_exchange_strong( p_cur_hint_ch, p_nxt_hint_ch, std::memory_order_acq_rel );
+
+	return nullptr;
+}
+
+void alloc_only_chamber::push_alloc_mem( void* p_alloced_mem, size_t allocated_size )
 {
 	if ( p_alloced_mem == nullptr ) return;
 
@@ -248,78 +308,88 @@ void alloc_chamber_head::push_alloc_mem( void* p_alloced_mem, size_t allocated_s
 	alloc_chamber* p_cur_head = head_.load( std::memory_order_acquire );
 	do {
 		p_new_chamber->next_.store( p_cur_head, std::memory_order_release );
-	} while ( !head_.compare_exchange_strong( p_cur_head, p_new_chamber ) );
-
-	p_forcusing_chamber_ = p_new_chamber;
+	} while ( !head_.compare_exchange_weak( p_cur_head, p_new_chamber, std::memory_order_acq_rel ) );
 
 	return;
 }
 
-void* alloc_chamber_head::allocate( size_t req_size, size_t req_align )
+void alloc_only_chamber::munmap_alloc_chamber( alloc_chamber* p_ac )
 {
-	alloc_chamber* p_cur_focusing_ch = p_forcusing_chamber_;
-	if ( p_cur_focusing_ch == nullptr ) {
-		p_cur_focusing_ch = head_.load( std::memory_order_acquire );
-		if ( p_cur_focusing_ch == nullptr ) {
-			return nullptr;
+	size_t chamber_size_of_p_ac = p_ac->chamber_size_;
+	int    ret                  = deallocate_by_munmap( p_ac, chamber_size_of_p_ac );
+	if ( ret != 0 ) {
+		auto er_errno = errno;
+		char buff[128];
+#if ( _POSIX_C_SOURCE >= 200112L ) && !_GNU_SOURCE
+		strerror_r( er_errno, buff, 128 );
+		internal::LogOutput( log_type::ERR, "munmap is fail with %s", buff );
+#else
+		const char* ret_str = strerror_r( er_errno, buff, 128 );
+		internal::LogOutput( log_type::ERR, "munmap is fail with %s", ret_str );
+#endif
+	}
+	return;
+}
+
+void* alloc_only_chamber::allocate( size_t req_size, size_t req_align )
+{
+	void* p_ans = try_allocate( req_size, req_align );
+
+	while ( p_ans == nullptr ) {
+		size_t cur_pre_alloc_size = pre_alloc_size_;
+		if ( cur_pre_alloc_size < req_size ) {
+			cur_pre_alloc_size = req_size * 2 + sizeof( alloc_chamber );
+#if 0
+			internal::LogOutput( log_type::DEBUG, "requested size is over pre allocation size: req=0x%zx, therefore try to allocate double size: try=0x%zu", req_size, cur_pre_alloc_size );
+			bt_info tmp_bt;
+			RECORD_BACKTRACE_GET_BACKTRACE( tmp_bt );
+			tmp_bt.dump_to_log( log_type::DEBUG, 'a', 1 );
+#endif
 		}
-		p_forcusing_chamber_ = p_cur_focusing_ch;
+		allocate_result ret_mmap = allocate_by_mmap( cur_pre_alloc_size, req_align );
+		if ( ret_mmap.p_allocated_addr_ == nullptr ) return nullptr;
+		if ( ret_mmap.allocated_size_ == 0 ) return nullptr;
+
+		push_alloc_mem( ret_mmap.p_allocated_addr_, ret_mmap.allocated_size_ );
+		p_ans = try_allocate( req_size, req_align );
 	}
 
-	return p_cur_focusing_ch->allocate( req_size, req_align );
+	return p_ans;
 }
 
-void alloc_chamber_head::dump_to_log( log_type lt, char c, int id )
-{
-	alloc_chamber_statistics total_statistics { 0 };
-	size_t                   chamber_count = 0;
-
-	auto p_cur_chamber = head_.load( std::memory_order_acquire );
-	while ( p_cur_chamber != nullptr ) {
-		p_cur_chamber->dump_to_log( lt, c, id );
-		chamber_count++;
-		total_statistics += p_cur_chamber->get_statistics();
-		p_cur_chamber = p_cur_chamber->next_.load( std::memory_order_acquire );
-	}
-
-	internal::LogOutput(
-		lt,
-		"[%d-%c] chamber count = %zu, total allocated size = 0x%zx, consumed size = 0x%zx(%.2fM), free size = 0x%zx(%.2fM), used ratio = %2.1f %%",
-		id, c,
-		chamber_count,
-		total_statistics.alloc_size_,
-		total_statistics.consum_size_, (double)total_statistics.consum_size_ / (double)( 1024 * 1024 ),
-		total_statistics.free_size_, (double)total_statistics.free_size_ / (double)( 1024 * 1024 ),
-		(double)total_statistics.consum_size_ / (double)total_statistics.alloc_size_ * 100.0f );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////
-void* allocating_only( size_t req_size, size_t req_align )
-{
-	static_assert( conf_pre_mmap_size > sizeof( alloc_chamber ), "conf_pre_mmap_size is too small" );
-
-	void* p_ans = alloc_chamber_head::get_inst().allocate( req_size, req_align );
-	if ( p_ans != nullptr ) return p_ans;
-
-	size_t cur_pre_alloc_size = conf_pre_mmap_size;
-	if ( cur_pre_alloc_size < req_size ) {
-		cur_pre_alloc_size = req_size * 2 + sizeof( alloc_chamber );
-	}
-	allocate_result ret_mmap = allocate_by_mmap( cur_pre_alloc_size, default_align_size );
-	if ( ret_mmap.p_allocated_addr_ == nullptr ) return nullptr;
-	if ( ret_mmap.allocated_size_ == 0 ) return nullptr;
-
-	alloc_chamber_head::get_inst().push_alloc_mem( ret_mmap.p_allocated_addr_, ret_mmap.allocated_size_ );
-
-	return alloc_chamber_head::get_inst().allocate( req_size, req_align );
-}
-
-void allocating_only_deallocate( void* p_mem )
+void alloc_only_chamber::detect_unexpected_deallocate( void* )
 {
 #ifdef ALCONCURRENT_CONF_DETECT_UNEXPECTED_DEALLOC_CALLING
 	throw std::runtime_error( "allocating_only_deallocate is called unexpectedly" );
 #endif
 	return;
+}
+
+alloc_chamber_statistics alloc_only_chamber::get_statistics( void ) const
+{
+	alloc_chamber_statistics total_statistics;
+
+	auto p_cur_chamber = head_.load( std::memory_order_acquire );
+	while ( p_cur_chamber != nullptr ) {
+		total_statistics += p_cur_chamber->get_statistics();
+		p_cur_chamber = p_cur_chamber->next_.load( std::memory_order_acquire );
+	}
+
+	return total_statistics;
+}
+
+void alloc_only_chamber::dump_to_log( log_type lt, char c, int id )
+{
+	alloc_chamber_statistics total_statistics;
+
+	auto p_cur_chamber = head_.load( std::memory_order_acquire );
+	while ( p_cur_chamber != nullptr ) {
+		p_cur_chamber->dump_to_log( lt, c, id );
+		p_cur_chamber = p_cur_chamber->next_.load( std::memory_order_acquire );
+	}
+
+	total_statistics = get_statistics();
+	internal::LogOutput( lt, "[%d-%c] %s", id, c, total_statistics.print().c_str() );
 }
 
 }   // namespace internal

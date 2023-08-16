@@ -76,8 +76,8 @@ struct slot_header {
 	std::atomic<chunk_header_multi_slot*> at_p_chms_;   //!< pointer to chunk_header_multi_slot that is an owner of this slot
 	std::atomic<std::uintptr_t>           at_mark_;     //!< checker mark
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	bt_info alloc_bt_info_;                             //!< backtrace information when is allocated
-	bt_info free_bt_info_;                              //!< backtrace information when is free
+	bt_info alloc_bt_info_;   //!< backtrace information when is allocated
+	bt_info free_bt_info_;    //!< backtrace information when is free
 #endif
 
 	void set_addr_of_chunk_header_multi_slot(
@@ -190,7 +190,7 @@ bool chunk_header_multi_slot::alloc_new_chunk(
 	return true;
 }
 
-void* chunk_header_multi_slot::allocate_mem_slot_impl( void )
+void* chunk_header_multi_slot::allocate_mem_slot_impl( size_t req_size, size_t req_align )
 {
 	// access可能状態かどうかを事前チェック
 	if ( status_.load( std::memory_order_acquire ) != chunk_control_status::NORMAL ) return nullptr;
@@ -205,7 +205,7 @@ void* chunk_header_multi_slot::allocate_mem_slot_impl( void )
 	p_statistics_->alloc_req_cnt_++;
 #endif
 
-	void* p_ans = p_slot_array_mgr_->allocate( slot_conf_.size_of_one_piece_ );
+	void* p_ans = p_slot_array_mgr_->allocate( req_size, req_align );
 	if ( p_ans == nullptr ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 		p_statistics_->alloc_req_err_cnt_++;
@@ -224,64 +224,10 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 		return false;
 	}
 
-	// access可能状態かどうかを事前チェック
-	switch ( status_.load( std::memory_order_acquire ) ) {
-		default:
-		case chunk_control_status::EMPTY:
-		case chunk_control_status::RESERVED_ALLOCATION:
-		case chunk_control_status::DELETION:
-			return false;   // すでにaccessできない状態になっている。
-			break;
-
-		case chunk_control_status::NORMAL:
-		case chunk_control_status::RESERVED_DELETION:
-		case chunk_control_status::ANNOUNCEMENT_DELETION:
-			break;
-	}
-
-	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
-	scoped_inout_counter_atomic_int cnt_inout( num_of_accesser_ );
-
-	// まだaccess可能状態かどうかを事前チェック
-	switch ( status_.load( std::memory_order_acquire ) ) {
-		default:
-		case chunk_control_status::EMPTY:
-		case chunk_control_status::RESERVED_ALLOCATION:
-		case chunk_control_status::DELETION:
-			return false;   // すでにaccessできない状態になっている。
-			break;
-
-		case chunk_control_status::NORMAL:
-		case chunk_control_status::RESERVED_DELETION:
-		case chunk_control_status::ANNOUNCEMENT_DELETION:
-			break;
-	}
-
 	// 自分のものかを確認する
 	auto chk_ret = slot_container::get_slot_header_from_assignment_p( p_recycle_addr );
-	if ( chk_ret.is_ok_ ) {
-		if ( chk_ret.p_ush_->check_type() ) {
-			// allocタイプなので、自分のものではない。
-			return false;
-		}
-		slot_array_mgr* p_rcv_sam = chk_ret.p_ush_->arrayh_.mh_.get_mgr_pointer();
-		if ( p_rcv_sam == nullptr ) {
-			return false;
-		}
-		if ( p_rcv_sam->p_owner_chunk_header_ != this ) {
-			return false;
-		}
-		// ここに到達した時点で、自分のものであること判明
-
-#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-		p_statistics_->dealloc_req_cnt_++;
-#endif
-		// OK. correct address
-		p_rcv_sam->deallocate( &( chk_ret.p_ush_->arrayh_ ) );
-	} else {
-#if 1
-		return false;
-#else
+	if ( !chk_ret.is_ok_ ) {
+#if 0
 		// ヘッダが壊れているようなので、アドレス情報から、スロット情報を引き出せるか試す。
 		if ( reinterpret_cast<uintptr_t>( p_recycle_addr ) < reinterpret_cast<uintptr_t>( p_slot_array_mgr_->p_slot_container_top ) ) {
 			// slot_containerの範囲外なので、あきらめる。
@@ -296,34 +242,68 @@ bool chunk_header_multi_slot::recycle_mem_slot_impl(
 		// ここに到達した時点で、自分のものであること判明
 
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-		p_statistics_->dealloc_req_cnt_++;
+		p_statistics_->dealloc_req_cnt_.fetch_add( 1, std::memory_order_acq_rel );
 #endif
 		// OK. correct address
 		p_slot_array_mgr_->deallocate( p_slot_array_mgr_->get_pointer_of_slot( slots_count ) );
+		return true;
+#else
+		return false;
 #endif
 	}
+
+	if ( chk_ret.p_ush_->check_type() ) {
+		// allocタイプなので、自分のものではない。
+		return false;
+	}
+	slot_array_mgr* p_rcv_sam = chk_ret.p_ush_->arrayh_.mh_.get_mgr_pointer();
+	if ( p_rcv_sam == nullptr ) {
+		return false;
+	}
+	if ( p_rcv_sam->p_owner_chunk_header_ != this ) {
+		return false;
+	}
+	// ここに到達した時点で、自分のものであること判明
+
+	return unchk_recycle_mem_slot_impl( p_rcv_sam, &( chk_ret.p_ush_->arrayh_ ) );
+}
+
+bool chunk_header_multi_slot::unchk_recycle_mem_slot_impl(
+	slot_array_mgr*       p_rcv_sam,
+	slot_header_of_array* p_recycle_addr   //!< [in] pointer to the memory slot to recycle.
+)
+{
+	// access可能状態かどうかを事前チェック
+	if ( ( static_cast<unsigned int>( status_.load( std::memory_order_acquire ) ) & RecycleGroupStatusMask ) == 0 ) {
+		return false;   // すでにaccessできない状態になっている。
+	}
+
+	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
+	scoped_inout_counter_atomic_int cnt_inout( num_of_accesser_ );
+
+	if ( ( static_cast<unsigned int>( status_.load( std::memory_order_acquire ) ) & RecycleGroupStatusMask ) == 0 ) {
+		return false;   // すでにaccessできない状態になっている。
+	}
+
+	// 自分が保持するスロットであることが判明済みのため、即座に解放処理を開始する。
+	p_rcv_sam->deallocate( p_recycle_addr );
+
+	p_statistics_->free_slot_cnt_.fetch_add( 1, std::memory_order_acq_rel );
+	p_statistics_->consum_cnt_.fetch_sub( 1, std::memory_order_acq_rel );
 
 	return true;
 }
 
 void* chunk_header_multi_slot::try_allocate_mem_slot_impl(
 	const unsigned int expect_tl_id_arg,   //!< [in] owner tl_id_
-	const unsigned int owner_tl_id_arg     //!< [in] owner tl_id_
+	const unsigned int owner_tl_id_arg,    //!< [in] owner tl_id_
+	const size_t       req_size,           //!< [in] requested size
+	const size_t       req_align           //!< [in] requested align size
 )
 {
 	// access可能状態かどうかを事前チェック
-	switch ( status_.load( std::memory_order_acquire ) ) {
-		default:
-		case chunk_control_status::EMPTY:
-		case chunk_control_status::RESERVED_ALLOCATION:
-		case chunk_control_status::DELETION:
-		case chunk_control_status::ANNOUNCEMENT_DELETION:
-			return nullptr;
-			break;
-
-		case chunk_control_status::NORMAL:
-		case chunk_control_status::RESERVED_DELETION:
-			break;
+	if ( ( static_cast<unsigned int>( status_.load( std::memory_order_acquire ) ) & TryAllocGroupStatusMask ) == 0 ) {
+		return nullptr;   // すでにaccessできない状態になっている。
 	}
 
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
@@ -331,18 +311,8 @@ void* chunk_header_multi_slot::try_allocate_mem_slot_impl(
 
 	// access権を取得を試みる
 	chunk_control_status cur_as_st = status_.load( std::memory_order_acquire );
-	switch ( cur_as_st ) {
-		default:
-		case chunk_control_status::EMPTY:
-		case chunk_control_status::RESERVED_ALLOCATION:
-		case chunk_control_status::DELETION:
-		case chunk_control_status::ANNOUNCEMENT_DELETION:
-			return nullptr;
-			break;
-
-		case chunk_control_status::NORMAL:
-		case chunk_control_status::RESERVED_DELETION:
-			break;
+	if ( ( static_cast<unsigned int>( cur_as_st ) & TryAllocGroupStatusMask ) == 0 ) {
+		return nullptr;   // すでにaccessできない状態になっている。
 	}
 
 	// オーナー権の確認 or 確保を試みる
@@ -359,7 +329,7 @@ void* chunk_header_multi_slot::try_allocate_mem_slot_impl(
 	}
 
 	// オーナー権の確保と、NORMAL状態への復帰に成功したので、メモリスロットの確保を試みる
-	return allocate_mem_slot();
+	return allocate_mem_slot( req_size, req_align );
 }
 
 bool chunk_header_multi_slot::set_delete_reservation( void )
@@ -461,19 +431,19 @@ slot_chk_result chunk_header_multi_slot::get_chunk(
 	auto chk_ret = slot_container::get_slot_header_from_assignment_p( p_addr );
 	if ( !chk_ret.is_ok_ ) {
 		// 多分slot_containerのヘッダが壊れてるか、無関係のアドレスが渡された
-		return slot_chk_result { false, nullptr };
+		return slot_chk_result { false, nullptr, nullptr, nullptr };
 	}
 	if ( chk_ret.p_ush_->check_type() ) {
 		// allocタイプなので、chunk_header_multi_slotへのポインタ情報はない
-		return slot_chk_result { false, nullptr };
+		return slot_chk_result { false, nullptr, nullptr, nullptr };
 	}
 	slot_array_mgr* p_rcv_sam = chk_ret.p_ush_->arrayh_.mh_.get_mgr_pointer();
 	if ( p_rcv_sam == nullptr ) {
 		// 多分slot_header_of_arrayヘッダが壊れてる。
-		return slot_chk_result { false, nullptr };
+		return slot_chk_result { false, nullptr, nullptr, nullptr };
 	}
 
-	return slot_chk_result { true, p_rcv_sam->p_owner_chunk_header_ };
+	return slot_chk_result { true, p_rcv_sam->p_owner_chunk_header_, p_rcv_sam, &( chk_ret.p_ush_->arrayh_ ) };
 }
 
 chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
@@ -589,7 +559,7 @@ void chunk_list::release_all_of_ownership(
 	return;
 }
 
-void* chunk_list::allocate_mem_slot( void )
+void* chunk_list::allocate_mem_slot( size_t req_size, size_t req_align )
 {
 	void* p_ans = nullptr;
 
@@ -604,7 +574,7 @@ void* chunk_list::allocate_mem_slot( void )
 		while ( p_cur_chms != nullptr ) {
 			if ( p_cur_chms->owner_tl_id_.load( std::memory_order_acquire ) == hint_params.tl_id_ ) {
 				// tl_id_が一致する場合は、自スレッドの持ち物となる。自スレッドの持ち物のchunk_header_multi_slotからメモリを割り当てる。
-				p_ans = p_cur_chms->allocate_mem_slot();
+				p_ans = p_cur_chms->allocate_mem_slot( req_size, req_align );
 				if ( p_ans != nullptr ) {
 					// 空きスロットが見つかれば終了
 					hint_params.tls_p_hint_chunk = p_cur_chms;
@@ -630,7 +600,7 @@ void* chunk_list::allocate_mem_slot( void )
 		// なお、自スレッドの持ち物だったとしても、処理を行っている最中に、削除ー＞別スレッドに再割り当てー＞削除予約状態となっている可能性もある。
 		// たとえ別スレッドの物になっていても、新たにメモリを割り当てるよりは性能観点でましな可能性が高いため、そのまま割り当てを試みる。
 		for ( auto&& e : p_top_chunk_ ) {
-			p_ans = e.try_allocate_mem_slot_from_reserved_deletion( hint_params.tl_id_ );
+			p_ans = e.try_allocate_mem_slot_from_reserved_deletion( hint_params.tl_id_, req_size, req_align );
 			if ( p_ans != nullptr ) {
 				// スロット確保成功
 				hint_params.tls_p_hint_chunk = &e;   // 別スレッドのものかもしれないが、hintを更新する。次の呼び出しで、是正される。
@@ -641,7 +611,7 @@ void* chunk_list::allocate_mem_slot( void )
 
 	// オーナーなしchunk_header_multi_slotからの割り当てを試みる
 	for ( auto&& e : p_top_chunk_ ) {
-		p_ans = e.try_get_ownership_allocate_mem_slot( hint_params.tl_id_ );
+		p_ans = e.try_get_ownership_allocate_mem_slot( hint_params.tl_id_, req_size, req_align );
 		if ( p_ans != nullptr ) {
 			// オーナー権とスロット確保成功
 			hint_params.tls_p_hint_chunk = &e;   // 別スレッドのものかもしれないが、hintを更新する。次の呼び出しで、是正される。
@@ -674,7 +644,7 @@ void* chunk_list::allocate_mem_slot( void )
 				// 既存のオーナー権を持つチャンクを解放
 				release_all_of_ownership( hint_params.tl_id_, &e );
 				// メモリスロットを確保する。
-				p_ans = e.allocate_mem_slot();
+				p_ans = e.allocate_mem_slot( req_size, req_align );
 				if ( p_ans != nullptr ) {
 					hint_params.tls_p_hint_chunk = &e;
 
@@ -691,7 +661,7 @@ void* chunk_list::allocate_mem_slot( void )
 				if ( e.status_.load( std::memory_order_acquire ) == chunk_control_status::NORMAL ) {
 					// 自身による再割り当てに失敗はしたが、既に別のスレッドで再割り当て完了済みだった。
 					// たとえ別スレッドの物になっていても、新たにメモリを割り当てるよりは性能観点でましな可能性が高いため、そのまま割り当てを試みる。
-					p_ans = e.allocate_mem_slot();
+					p_ans = e.allocate_mem_slot( req_size, req_align );
 					if ( p_ans != nullptr ) {
 						hint_params.tls_p_hint_chunk = &e;
 						return p_ans;
@@ -703,14 +673,14 @@ void* chunk_list::allocate_mem_slot( void )
 
 	// 既存のchunkの再利用に失敗したので、新しいchunkを確保する。
 	// new演算子を使用するため、ここでもロックが発生する可能性がある。
-	chunk_header_multi_slot* p_new_chms = new chunk_header_multi_slot( cur_alloc_conf, hint_params.tl_id_, &statistics_ );
+	chunk_header_multi_slot* p_new_chms = new ( *p_allocator_ ) chunk_header_multi_slot( cur_alloc_conf, hint_params.tl_id_, &statistics_ );
 	if ( p_new_chms == nullptr ) {
-		return nullptr;   // TODO: should throw exception ?
+		return nullptr;
 	}
-	p_ans = p_new_chms->allocate_mem_slot();
+	p_ans = p_new_chms->allocate_mem_slot( req_size, req_align );
 	if ( p_ans == nullptr ) {
 		delete p_new_chms;
-		return nullptr;   // TODO: should throw exception ?
+		return nullptr;
 	}
 
 	// 既存のオーナー権を持つチャンクを解放。
@@ -769,7 +739,8 @@ chunk_statistics chunk_list::get_statistics( void ) const
 void* general_mem_allocator_impl_allocate(
 	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
 	internal::chunk_list* p_param_ch_array_arg,   //!< unique pointer to chunk and param array
-	std::size_t           n_arg                   //!< [in] memory size to allocate
+	size_t                n_arg,                  //!< [in] memory size to allocate
+	size_t                req_align               //!< [in] requested align size
 )
 {
 	void* p_ans = nullptr;
@@ -779,15 +750,15 @@ void* general_mem_allocator_impl_allocate(
 		unsigned int ei = pr_ch_size_arg - 1;
 		unsigned int mi = si + ( ei - si ) / 2;
 		while ( si != ei ) {
-			if ( n_arg <= p_param_ch_array_arg[mi].chunk_param_.size_of_one_piece_ ) {
+			if ( ( n_arg + req_align ) <= ( p_param_ch_array_arg[mi].chunk_param_.size_of_one_piece_ + default_slot_alignsize ) ) {
 				ei = mi;
 			} else {
 				si = mi + 1;
 			}
 			mi = si + ( ei - si ) / 2;
 		}
-		if ( n_arg <= p_param_ch_array_arg[si].chunk_param_.size_of_one_piece_ ) {
-			p_ans = p_param_ch_array_arg[si].allocate_mem_slot();
+		if ( ( n_arg + req_align ) <= ( p_param_ch_array_arg[si].chunk_param_.size_of_one_piece_ + default_slot_alignsize ) ) {
+			p_ans = p_param_ch_array_arg[si].allocate_mem_slot( n_arg, req_align );
 			if ( p_ans != nullptr ) {
 				return p_ans;
 			}
@@ -795,10 +766,15 @@ void* general_mem_allocator_impl_allocate(
 	}
 
 	// 対応するサイズのメモリスロットが見つからなかったので、slot_header_of_alloc経由でメモリ領域を確保する。
-	size_t                buff_size              = slot_header_of_alloc::calc_slot_header_and_container_size( n_arg, default_slot_alignsize /* TBD */ );
-	void*                 p_allocated_slot       = basic_mem_allocator::allocate( buff_size );
-	slot_header_of_alloc* p_slot_header_of_alloc = new ( p_allocated_slot ) slot_header_of_alloc( buff_size );
-	p_ans                                        = p_slot_header_of_alloc->allocate( n_arg, default_slot_alignsize /* TBD */ );
+	size_t          buff_size      = slot_header_of_alloc::calc_slot_header_and_container_size( n_arg, req_align );
+	allocate_result alloc_mem_info = basic_mem_allocator::allocate( buff_size, req_align );
+	if ( alloc_mem_info.p_allocated_addr_ == nullptr ) {
+		internal::LogOutput( log_type::ERR, "fail allocate memory by basic_mem_allocator::allocate(%zu, %zu)", buff_size, req_align );
+		return nullptr;
+		// throw std::bad_alloc();
+	}
+	slot_header_of_alloc* p_slot_header_of_alloc = new ( alloc_mem_info.p_allocated_addr_ ) slot_header_of_alloc( alloc_mem_info.allocated_size_ );
+	p_ans                                        = p_slot_header_of_alloc->allocate( n_arg, req_align );
 
 	return p_ans;
 }
@@ -813,7 +789,7 @@ void general_mem_allocator_impl_deallocate(
 	internal::slot_chk_result chk_ret = internal::chunk_header_multi_slot::get_chunk( p_mem );
 
 	if ( chk_ret.correct_ ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGICAL_ERROR
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
 		if ( chk_ret.p_chms_ == nullptr ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
 			std::string errlog = "return value of get_chunk() is unexpected";
@@ -824,7 +800,7 @@ void general_mem_allocator_impl_deallocate(
 #endif
 		}
 #endif
-		chk_ret.p_chms_->recycle_mem_slot( p_mem );
+		chk_ret.p_chms_->unchk_recycle_mem_slot( chk_ret.p_sam_, chk_ret.p_sha_ );
 	} else {
 		// slot_header_of_allocで確保されているかどうかをチェックする
 		auto check_result = slot_container::get_slot_header_from_assignment_p( p_mem );
@@ -886,7 +862,7 @@ general_mem_allocator::general_mem_allocator(
 	return;
 }
 
-std::string chunk_statistics::print( void )
+std::string chunk_statistics::print( void ) const
 {
 	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
@@ -916,6 +892,17 @@ std::string chunk_statistics::print( void )
 	);
 
 	return std::string( buf );
+}
+
+std::string general_mem_allocator_statistics::print( void ) const
+{
+	std::string ans;
+	for ( auto&& e : ch_st_ ) {
+		ans += e.print();
+		ans += "\n";
+	};
+	ans += al_st_.print();
+	return ans;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////

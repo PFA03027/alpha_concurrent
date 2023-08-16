@@ -48,8 +48,8 @@ struct alloc_params {
 
 inline alloc_params calc_cur_system_alloc_params( size_t req_alloc_size, size_t align_size )
 {
-	if ( align_size < sizeof( void* ) ) {
-		align_size = sizeof( void* );   // 最低のアライメントをポインタサイズに制約する
+	if ( align_size < sizeof( uintptr_t ) ) {
+		align_size = sizeof( uintptr_t );   // 最低のアライメントをポインタサイズに制約する
 	}
 
 	size_t num_alloc_pages     = req_alloc_size / page_size;
@@ -81,6 +81,9 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size )
 	printf( "page_aligned_overfit_alloc_size\t=       0x%zx\n", page_aligned_params.page_aligned_request_overfit_alloc_size_ );
 #endif
 
+#ifdef ALCONCURRENT_CONF_ENABLE_MALLOC_INSTEAD_OF_MMAP
+	void* p_alloc_expected = malloc( page_aligned_params.page_aligned_request_overfit_alloc_size_ );
+#else
 	void* p_alloc_by_mmap = mmap( NULL, page_aligned_params.page_aligned_request_overfit_alloc_size_, PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0 );
 	if ( MAP_FAILED == p_alloc_by_mmap ) {
 		// auto cur_errno = errno;
@@ -126,6 +129,7 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size )
 			perror( "munmap of post block is fail." );
 		}
 	}
+#endif
 
 	size_t new_cur_size = cur_total_allocation_size.fetch_add( page_aligned_params.page_aligned_real_alloc_size_, std::memory_order_acq_rel );
 	new_cur_size += page_aligned_params.page_aligned_real_alloc_size_;
@@ -139,13 +143,26 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size )
 int deallocate_by_munmap( void* p_allocated_addr, size_t allocated_size )
 {
 	cur_total_allocation_size.fetch_sub( allocated_size, std::memory_order_acq_rel );
+#ifdef ALCONCURRENT_CONF_ENABLE_MALLOC_INSTEAD_OF_MMAP
+	free( p_allocated_addr );
+	return 0;
+#else
 	return munmap( p_allocated_addr, static_cast<size_t>( allocated_size ) );
+#endif
+}
+
+alloc_mmap_status get_alloc_mmap_status( void )
+{
+	return alloc_mmap_status {
+		cur_total_allocation_size.load( std::memory_order_acquire ),
+		max_total_allocation_size.load( std::memory_order_acquire ) };
 }
 
 void print_of_mmap_allocator( void )
 {
-	size_t cur_size = cur_total_allocation_size.load( std::memory_order_acquire );
-	size_t cur_max  = max_total_allocation_size.load( std::memory_order_acquire );
+	auto   cur_data = get_alloc_mmap_status();
+	size_t cur_size = cur_data.active_size_;
+	size_t cur_max  = cur_data.max_size_;
 
 	printf( "page_size               = %16zu = 0x%016zx\n", page_size, page_size );
 	printf( "current allocation size = %16zu = 0x%016zx %.2fG %.2fM %.0fK\n", cur_size, cur_size,

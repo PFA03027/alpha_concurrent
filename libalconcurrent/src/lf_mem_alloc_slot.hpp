@@ -68,14 +68,14 @@ struct bool_unified_slot_header_p {
  *
  */
 struct slot_mheader {
-	const std::atomic<uintptr_t> offset_to_mgr_;      //!< offset to slot array manager header
+	const std::atomic<uintptr_t> offset_to_mgr_;   //!< offset to slot array manager header
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
-	const std::atomic<uintptr_t> marker_;             //!< check sum maker value
+	const std::atomic<uintptr_t> marker_;   //!< check sum maker value
 #endif
 	std::atomic<uintptr_t> offset_to_tail_padding_;   //!< offset to tail padding. if this value is zero, it means this slot is not used now.
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	bt_info alloc_bt_info_;                           //!< backtrace information when is allocated
-	bt_info free_bt_info_;                            //!< backtrace information when is free
+	bt_info alloc_bt_info_;   //!< backtrace information when is allocated
+	bt_info free_bt_info_;    //!< backtrace information when is free
 #endif
 
 	constexpr slot_mheader( std::uintptr_t offset_to_mgr_arg )
@@ -322,14 +322,14 @@ static_assert( std::is_standard_layout<unified_slot_header>::value, "unified_slo
  *
  */
 struct slot_container {
-	const std::atomic<uintptr_t> back_offset_;          //!< offset to unified_slot_header
+	const std::atomic<uintptr_t> back_offset_;   //!< offset to unified_slot_header
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 	const std::atomic<uintptr_t> back_offset_marker_;   //!< check sum maker value
 #endif
-	unsigned char mem[0];                               //!< assignment memory area
-	                                                    // there is no definition of tail_padding
+	unsigned char mem[0];   //!< assignment memory area
+	                        // there is no definition of tail_padding
 
-	slot_container( uintptr_t back_offset_arg = 0 )
+	constexpr slot_container( uintptr_t back_offset_arg )
 	  : back_offset_( back_offset_arg )
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 	  , back_offset_marker_( make_maker_value( back_offset_arg ) )

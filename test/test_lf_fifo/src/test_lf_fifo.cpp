@@ -39,19 +39,16 @@ static alpha::concurrent::param_chunk_allocation param[] = {
 
 class lffifoTest : public ::testing::Test {
 protected:
-	virtual void SetUp()
+	void SetUp() override
 	{
 		set_param_to_free_nd_mem_alloc( param, 3 );
 		alpha::concurrent::gmem_prune();
 	}
 
-	virtual void TearDown()
+	void TearDown() override
 	{
-		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::internal::node_of_list::get_statistics();
-
-		for ( auto& e : statistics ) {
-			printf( "%s\n", e.print().c_str() );
-		}
+		auto statistics = alpha::concurrent::internal::node_of_list::get_statistics();
+		printf( "%s\n", statistics.print().c_str() );
 
 		printf( "number of keys of dynamic_tls_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
 		printf( "max number of keys of dynamic_tls_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
@@ -189,7 +186,7 @@ TEST_F( lffifoTest, TC1_MultThreadPushPop )
 
 	std::cout << "!!!Ready!!!" << std::endl;   // prints !!!Hello World!!!
 	pthread_barrier_wait( &barrier );
-	std::cout << "!!!GO!!!" << std::endl;      // prints !!!Hello World!!!
+	std::cout << "!!!GO!!!" << std::endl;   // prints !!!Hello World!!!
 
 	std::uintptr_t sum = 0;
 	for ( int i = 0; i < num_thread; i++ ) {
@@ -299,7 +296,7 @@ TEST_F( lffifoTest, TC2 )
 
 	std::cout << "!!!Ready!!!" << std::endl;   // prints !!!Hello World!!!
 	pthread_barrier_wait( &barrier );
-	std::cout << "!!!GO!!!" << std::endl;      // prints !!!Hello World!!!
+	std::cout << "!!!GO!!!" << std::endl;   // prints !!!Hello World!!!
 
 	std::uintptr_t sum = 0;
 	for ( int i = 0; i < num_thread; i++ ) {

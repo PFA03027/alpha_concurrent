@@ -18,31 +18,16 @@ namespace concurrent {
 namespace internal {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// usual new...(1)   このクラスでは使用してはならないnew operator
-void* slot_array_mgr::operator new( std::size_t n )
-{
-	throw std::logic_error( "called prohibit slot_array_mgr::operator new( std::size_t n )" );
-}
 // usual delete...(2)
 void slot_array_mgr::operator delete( void* p_mem ) noexcept
 {
+	if ( p_mem == nullptr ) return;
+
 	size_t alloc_size  = *( reinterpret_cast<size_t*>( p_mem ) );   // ちょっとトリッキーな方法でmmapで確保したサイズ情報を引き出す。const size_tで宣言されているので、書き換えは発生しないことを利用する。
 	int    dealloc_ret = deallocate_by_munmap( p_mem, alloc_size );
 	if ( dealloc_ret != 0 ) {
 		LogOutput( log_type::ERR, "fail deallocate_by_munmap(%p, %zu)", p_mem, alloc_size );
 	}
-}
-
-// usual new...(1)   このクラスでは使用してはならないnew operator
-void* slot_array_mgr::operator new[]( std::size_t n )
-{
-	throw std::logic_error( "called prohibit slot_array_mgr::operator new[]( std::size_t n )" );
-}
-// usual delete...(2)   このクラスでは使用してはならないdelete operator
-void slot_array_mgr::operator delete[]( void* p_mem ) noexcept
-{
-	// throw std::logic_error("called prohibit slot_array_mgr::operator delete[]( std::size_t n )");
-	return;
 }
 
 // placement new    可変長部分の領域も確保するnew operator
@@ -53,17 +38,24 @@ void* slot_array_mgr::operator new( std::size_t n_of_slot_array_mgr, size_t num_
 	total_size += calc_total_slot_container_array_bytes( num_of_slots_, expected_alloc_n_per_slot );
 	auto alloc_ret = allocate_by_mmap( total_size, default_slot_alignsize );
 	if ( alloc_ret.p_allocated_addr_ == nullptr ) {
+		internal::LogOutput( log_type::ERR, "fail allocate memory by allocate_by_mmap(%zu, %zu)", total_size, default_slot_alignsize );
 		throw std::bad_alloc();
 	}
 
 	*( reinterpret_cast<size_t*>( alloc_ret.p_allocated_addr_ ) ) = alloc_ret.allocated_size_;   // ちょっとトリッキーな方法でmmapで確保したサイズ情報をコンストラクタに渡す
 	return alloc_ret.p_allocated_addr_;
 }
-// placement delete...(3)   このクラスでは使用してはならないdelete operator。このdelete operator自身は何もしない。
-void slot_array_mgr::operator delete( void* p, void* p2 ) noexcept
+
+void slot_array_mgr::operator delete( void* p, size_t num_of_slots_, size_t expected_alloc_n_per_slot ) noexcept
 {
-	// throw std::logic_error("called prohibit slot_array_mgr::operator delete( void* p, void* p2 )");
-	return;
+	// 配置newに対応するdelete。
+	if ( p == nullptr ) return;
+
+	size_t alloc_size  = *( reinterpret_cast<size_t*>( p ) );   // ちょっとトリッキーな方法でmmapで確保したサイズ情報を引き出す。const size_tで宣言されているので、書き換えは発生しないことを利用する。
+	int    dealloc_ret = deallocate_by_munmap( p, alloc_size );
+	if ( dealloc_ret != 0 ) {
+		LogOutput( log_type::ERR, "fail deallocate_by_munmap(%p, %zu)", p, alloc_size );
+	}
 }
 
 slot_array_mgr::slot_array_mgr( chunk_header_multi_slot* p_owner, size_t num_of_slots, size_t n )
@@ -72,7 +64,8 @@ slot_array_mgr::slot_array_mgr( chunk_header_multi_slot* p_owner, size_t num_of_
   , expected_n_per_slot_( n )
   , slot_container_size_of_this_( calc_one_slot_container_bytes( n ) )
   , p_owner_chunk_header_( p_owner )
-  , free_slots_storage_()
+  , allocator_( true, 4 * 1024 )
+  , free_slots_storage_( &allocator_ )
   , p_slot_container_top( reinterpret_cast<slot_container*>( &( slot_header_array_[num_of_slots_] ) ) )
   , slot_header_array_ {}
 {
@@ -115,9 +108,8 @@ void slot_array_mgr::dump( int indent )
 	internal::LogOutput( log_type::DUMP, "%sslot_array_mgr(%p)={alloc_size_=%zu,num_of_slots_=%zu,expected_n_per_slot_=%zu,slot_container_size_of_this_=%zu,p_owner_chunk_header_=%p,p_slot_container_top=%p",
 	                     indent_str.c_str(),
 	                     this, alloc_size_, num_of_slots_, expected_n_per_slot_, slot_container_size_of_this_, p_owner_chunk_header_.load(), p_slot_container_top );
-	// for ( size_t si = 0; si < num_of_slots_; si++ ) {
-	// 	slot_header_array_[si].dump( indent + 1 );
-	// }
+	auto total_statistics = allocator_.get_statistics();
+	internal::LogOutput( log_type::DUMP, "%s%s", indent_str.c_str(), total_statistics.print().c_str() );
 	internal::LogOutput( log_type::DUMP, "%s}", indent_str.c_str() );
 }
 

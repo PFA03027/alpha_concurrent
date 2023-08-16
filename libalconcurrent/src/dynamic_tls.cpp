@@ -21,7 +21,7 @@
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/dynamic_tls.hpp"
 
-#include "alloc_only_allocator.hpp"
+#include "alconcurrent/alloc_only_allocator.hpp"
 #include "utility.hpp"
 
 namespace alpha {
@@ -84,6 +84,51 @@ void error_log_output( int errno_arg, const char* p_func_name )
 
 	return;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+// configuration value
+constexpr size_t conf_pre_mmap_size = 1024 * 1024;
+
+static alloc_only_chamber g_alloc_only_inst( false, conf_pre_mmap_size );   // グローバルインスタンスは、プロセス終了までメモリ領域を維持するために、デストラクタが呼ばれてもmmapした領域を解放しない。
+
+/**
+ * @brief allocate memory that requester side does not free
+ *
+ * memory allocated by this I/F could not free.
+ *
+ * @param req_size memory size to allocate
+ * @param req_align allocated memory address alignment
+ * @return void* pointer to the allocated memory
+ */
+inline void* dynamic_tls_key_allocating_only( size_t req_size, size_t req_align = default_align_size )
+{
+	return g_alloc_only_inst.allocate( req_size, req_align );
+}
+
+/**
+ * @brief to detect unexpected deallocation calling
+ *
+ * normally nothing to do
+ * If the library compile with ALCONCURRENT_CONF_DETECT_UNEXPECTED_DEALLOC_CALLING, this function throw std::runtime_error.
+ *
+ * @param p_mem
+ */
+inline void dynamic_tls_key_allocating_only_deallocate( void* p_mem )
+{
+	g_alloc_only_inst.detect_unexpected_deallocate( p_mem );
+	return;
+}
+
+/**
+ * @brief dump log of pre-defined global dynamic_tls_key_allocating_only()
+ *
+ */
+void dynamic_tls_key_allocating_only_dump_to_log( log_type lt, char c, int id )
+{
+	g_alloc_only_inst.dump_to_log( lt, c, id );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct dynamic_tls_key {
 	enum class alloc_stat {
@@ -921,7 +966,7 @@ void dynamic_tls_content_head::call_destructor_and_release_ownership( void )
 void* dynamic_tls_content_head::operator new( std::size_t n )   // usual new...(1)
 {
 	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
-	void* p_ans = allocating_only( n );
+	void* p_ans = dynamic_tls_key_allocating_only( n );
 	if ( p_ans == nullptr ) {
 		throw std::bad_alloc();
 	}
@@ -937,7 +982,7 @@ void* dynamic_tls_content_head::operator new[]( std::size_t n )   // usual new..
 {
 	// dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
 	// が、このクラスが配列形式で使用する想定はされていない。
-	void* p_ans = allocating_only( n );
+	void* p_ans = dynamic_tls_key_allocating_only( n );
 	if ( p_ans == nullptr ) {
 		throw std::bad_alloc();
 	}
@@ -964,7 +1009,7 @@ void dynamic_tls_content_head::operator delete( void* p, void* p2 ) noexcept   /
 void* dynamic_tls_content_array::operator new( std::size_t n )   // usual new...(1)
 {
 	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
-	void* p_ans = allocating_only( n );
+	void* p_ans = dynamic_tls_key_allocating_only( n );
 	if ( p_ans == nullptr ) {
 		throw std::bad_alloc();
 	}
@@ -980,7 +1025,7 @@ void* dynamic_tls_content_array::operator new[]( std::size_t n )   // usual new.
 {
 	// dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
 	// が、このクラスが配列形式で使用する想定はされていない。
-	void* p_ans = allocating_only( n );
+	void* p_ans = dynamic_tls_key_allocating_only( n );
 	if ( p_ans == nullptr ) {
 		throw std::bad_alloc();
 	}
@@ -1086,7 +1131,7 @@ bool dynamic_tls_key_array::release_key( dynamic_tls_key* p_key_arg )
 void* dynamic_tls_key_array::operator new( std::size_t n )   // usual new...(1)
 {
 	// 	dynamic_tls_key_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
-	void* p_ans = allocating_only( n );
+	void* p_ans = dynamic_tls_key_allocating_only( n );
 	if ( p_ans == nullptr ) {
 		throw std::bad_alloc();
 	}
@@ -1102,7 +1147,7 @@ void* dynamic_tls_key_array::operator new[]( std::size_t n )   // usual new...(1
 {
 	// dynamic_tls_key_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
 	// が、このクラスが配列形式で使用する想定はされていない。
-	void* p_ans = allocating_only( n );
+	void* p_ans = dynamic_tls_key_allocating_only( n );
 	if ( p_ans == nullptr ) {
 		throw std::bad_alloc();
 	}

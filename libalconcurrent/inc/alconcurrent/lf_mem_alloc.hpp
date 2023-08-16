@@ -15,11 +15,12 @@
 #include <atomic>
 #include <cstdlib>
 #include <initializer_list>
-#include <list>
 #include <memory>
+#include <vector>
 
 #include "conf_logger.hpp"
 
+#include "alloc_only_allocator.hpp"
 #include "lf_mem_alloc_internal.hpp"
 #include "lf_mem_alloc_type.hpp"
 
@@ -31,7 +32,8 @@ class chunk_list;
 void* general_mem_allocator_impl_allocate(
 	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
 	internal::chunk_list* p_param_ch_array_arg,   //!< unique pointer to chunk and param array
-	std::size_t           n_arg                   //!< [in] memory size to allocate
+	size_t                n_arg,                  //!< [in] memory size to allocate
+	size_t                req_align               //!< [in] requested align size
 );
 void general_mem_allocator_impl_deallocate(
 	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
@@ -45,6 +47,19 @@ void general_mem_allocator_impl_prune(
 );
 }   // namespace internal
 
+struct general_mem_allocator_statistics {
+	std::vector<chunk_statistics>      ch_st_;
+	internal::alloc_chamber_statistics al_st_;
+
+	general_mem_allocator_statistics( void )
+	  : ch_st_()
+	  , al_st_()
+	{
+	}
+
+	std::string print( void ) const;
+};
+
 /*!
  * @brief	semi lock-free memory allocator based on multi chunk size list
  *
@@ -57,7 +72,8 @@ public:
 	 * @brief	constructor
 	 */
 	constexpr static_general_mem_allocator( void )
-	  : pr_ch_size_( 0 )
+	  : allocating_only_allocator_( true, 32 * 1024 )
+	  , pr_ch_size_( 0 )
 	  , param_ch_array_impl {}
 	  , param_ch_array_( nullptr )
 	  , exclusive_ctl_of_prune_( false )
@@ -70,8 +86,9 @@ public:
 	 */
 	template <typename... Args>
 	constexpr static_general_mem_allocator( Args... args )
-	  : pr_ch_size_( sizeof...( args ) )
-	  , param_ch_array_impl { std::forward<Args>( args )... }
+	  : allocating_only_allocator_( true, 32 * 1024 )
+	  , pr_ch_size_( sizeof...( args ) )
+	  , param_ch_array_impl { { std::forward<Args>( args ), &allocating_only_allocator_ }... }
 	  , param_ch_array_( param_ch_array_impl )
 	  , exclusive_ctl_of_prune_( false )
 	{
@@ -92,8 +109,7 @@ public:
 			for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
 				param_ch_array_[i].~chunk_list();
 			}
-			unsigned char* p_tmp = reinterpret_cast<unsigned char*>( param_ch_array_ );
-			delete[] p_tmp;
+			// allocating_only_allocator_.detect_unexpected_deallocate( reinterpret_cast<void*>( param_ch_array_ ) );
 		}
 	}
 
@@ -101,10 +117,11 @@ public:
 	 * @brief	allocate memory
 	 */
 	void* allocate(
-		std::size_t n   //!< [in] memory size to allocate
+		size_t n_arg,      //!< [in] memory size to allocate
+		size_t req_align   //!< [in] requested align size
 	)
 	{
-		return general_mem_allocator_impl_allocate( pr_ch_size_, param_ch_array_, n );
+		return general_mem_allocator_impl_allocate( pr_ch_size_, param_ch_array_, n_arg, req_align );
 	}
 
 	/*!
@@ -140,10 +157,10 @@ public:
 			return;
 		}
 
-		unsigned char* p_tmp = new unsigned char[sizeof( internal::chunk_list[num] )];
-		param_ch_array_      = reinterpret_cast<internal::chunk_list*>( p_tmp );
+		void* p_tmp     = allocating_only_allocator_.allocate( sizeof( internal::chunk_list[num] ), sizeof( uintptr_t ) );
+		param_ch_array_ = reinterpret_cast<internal::chunk_list*>( p_tmp );
 		for ( unsigned int i = 0; i < num; i++ ) {
-			new ( &( param_ch_array_[i] ) ) internal::chunk_list( p_param_array[i] );
+			new ( &( param_ch_array_[i] ) ) internal::chunk_list( p_param_array[i], &allocating_only_allocator_ );
 		}
 
 		pr_ch_size_ = num;
@@ -155,24 +172,27 @@ public:
 	 * @note
 	 * This I/F does not lock allocat/deallocate itself, but this I/F execution is not lock free.
 	 */
-	std::list<chunk_statistics> get_statistics( void ) const
+	general_mem_allocator_statistics get_statistics( void ) const
 	{
-		std::list<chunk_statistics> ans;
+		general_mem_allocator_statistics ans;
 
+		ans.ch_st_.reserve( static_cast<size_t>( pr_ch_size_ ) );
 		for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
 			chunk_statistics tmp_st = param_ch_array_[i].get_statistics();
-			ans.push_back( tmp_st );
+			ans.ch_st_.push_back( tmp_st );
 		}
+
+		ans.al_st_ = allocating_only_allocator_.get_statistics();
 
 		return ans;
 	}
 
 private:
-	unsigned int          pr_ch_size_;                      //!< array size of chunk and param array
-	internal::chunk_list  param_ch_array_impl[NUM_ENTRY];   //!< chunk and param array
-	internal::chunk_list* param_ch_array_;                  //!< pointer to chunk and param array
-
-	std::atomic_bool exclusive_ctl_of_prune_;               //!< exclusive control for prune()
+	internal::alloc_only_chamber allocating_only_allocator_;       //!< chunk_header_multi_slotのメモリ割り当て用アロケータ
+	unsigned int                 pr_ch_size_;                      //!< array size of chunk and param array
+	internal::chunk_list         param_ch_array_impl[NUM_ENTRY];   //!< chunk and param array
+	internal::chunk_list*        param_ch_array_;                  //!< pointer to chunk and param array
+	std::atomic_bool             exclusive_ctl_of_prune_;          //!< exclusive control for prune()
 };
 
 /*!
@@ -204,10 +224,11 @@ public:
 	 * @brief	allocate memory
 	 */
 	void* allocate(
-		std::size_t n   //!< [in] memory size to allocate
+		size_t n_arg,                               //!< [in] memory size to allocate
+		size_t req_align = default_slot_alignsize   //!< [in] requested align size
 	)
 	{
-		return allocator_impl_.allocate( n );
+		return allocator_impl_.allocate( n_arg, req_align );
 	}
 
 	/*!
@@ -251,7 +272,7 @@ public:
 	 * @note
 	 * This I/F does not lock allocat/deallocate itself, but this I/F execution is not lock free.
 	 */
-	std::list<chunk_statistics> get_statistics( void ) const
+	general_mem_allocator_statistics get_statistics( void ) const
 	{
 		return allocator_impl_.get_statistics();
 	}
@@ -270,7 +291,8 @@ private:
  * This uses default_param_array and num_of_default_param_array as initial allocation parameter
  */
 void* gmem_allocate(
-	std::size_t n   //!< [in] memory size to allocate
+	size_t n,                                   //!< [in] memory size to allocate
+	size_t req_align = default_slot_alignsize   //!< [in] requested align size
 );
 
 /*!
@@ -296,7 +318,7 @@ void gmem_prune( void );
  * @note
  * This I/F does not lock allocat/deallocate itself, but this I/F execution is not lock free.
  */
-std::list<chunk_statistics> gmem_get_statistics( void );
+general_mem_allocator_statistics gmem_get_statistics( void );
 
 /*!
  * @brief get backtrace information

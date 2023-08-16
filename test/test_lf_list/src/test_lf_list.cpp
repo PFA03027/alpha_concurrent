@@ -43,11 +43,8 @@ protected:
 
 	virtual void TearDown()
 	{
-		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::internal::node_of_list::get_statistics();
-
-		for ( auto& e : statistics ) {
-			printf( "%s\n", e.print().c_str() );
-		}
+		auto statistics = alpha::concurrent::internal::node_of_list::get_statistics();
+		printf( "%s\n", statistics.print().c_str() );
 
 		printf( "number of keys of dynamic_tls_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
 		printf( "max number of keys of dynamic_tls_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );

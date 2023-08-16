@@ -62,6 +62,12 @@ coverage: clean
 	lcov --rc lcov_branch_coverage=1 -b -c -d . -r tmp2.info  '*/test/*' -o output.info; \
 	genhtml --branch-coverage -o OUTPUT -p . -f output.info
 
+profile: clean
+	set -e; \
+	make BUILDTARGET=gprof BUILDTYPE=Release test;  \
+	cd ${BUILD_DIR}; \
+	find . -type f -executable -name "test_*" | xargs -P${JOBS} -I@ sh ../gprof_exec.sh @
+
 sanitizer:
 	set -e; \
 	for i in `seq 1 21`; do \

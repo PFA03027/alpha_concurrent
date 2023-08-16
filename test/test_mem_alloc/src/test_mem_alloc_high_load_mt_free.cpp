@@ -21,7 +21,7 @@
 #include "alconcurrent/lf_fifo.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
 
-#include "alloc_only_allocator.hpp"
+#include "alconcurrent/alloc_only_allocator.hpp"
 #include "mmap_allocator.hpp"
 
 static alpha::concurrent::param_chunk_allocation param[] = {
@@ -91,16 +91,13 @@ public:
 
 		EXPECT_FALSE( err_flag.load() );
 
-		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::gmem_get_statistics();
-
-		printf( "gmem Statistics is;\n" );
-		for ( auto& e : statistics ) {
+		auto statistics = alpha::concurrent::gmem_get_statistics();
+		for ( auto& e : statistics.ch_st_ ) {
 			EXPECT_EQ( 0, e.consum_cnt_ );
-			printf( "%s\n", e.print().c_str() );
 		}
+		printf( "gmem Statistics is;\n%s\n", statistics.print().c_str() );
 
 		alpha::concurrent::internal::print_of_mmap_allocator();
-		alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::DUMP, 'A', 1 );
 		alpha::concurrent::internal::dynamic_tls_status_info st = alpha::concurrent::internal::dynamic_tls_get_status();
 		printf( "num_of_key_array: %u, num_content_head_: %u, next_base_idx_: %u\n", st.num_key_array_cnt_, st.num_content_head_, st.next_base_idx_ );
 	}
@@ -205,12 +202,8 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 	EXPECT_EQ( 0, fifo.get_size() );
 	EXPECT_FALSE( err_flag.load() );
 
-	std::list<alpha::concurrent::chunk_statistics> statistics = p_tmg_arg->get_statistics();
-
-	printf( "Statistics is;\n" );
-	for ( auto& e : statistics ) {
-		printf( "%s\n", e.print().c_str() );
-	}
+	auto statistics = p_tmg_arg->get_statistics();
+	printf( "Statistics is;\n%s\n", statistics.print().c_str() );
 
 	delete[] threads;
 }
@@ -255,13 +248,9 @@ void load_test_lockfree_bw_mult_thread_startstop( int num_of_thd, alpha::concurr
 	EXPECT_EQ( 0, fifo.get_size() );
 	EXPECT_FALSE( err_flag.load() );
 
-	std::list<alpha::concurrent::chunk_statistics> statistics = p_tmg_arg->get_statistics();
-
-	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 1, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+	auto statistics = p_tmg_arg->get_statistics();
 	printf( "Statistics is;\n" );
-	for ( auto& e : statistics ) {
-		printf( "%s\n", e.print().c_str() );
-	}
+	printf( "%s\n", statistics.print().c_str() );
 
 	return;
 }
@@ -318,7 +307,7 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 {
 	const int total_thread_num     = 200;
 	const int generated_thread_num = 10;
-	const int gmem_max_alloc_size  = 16000;
+	const int gmem_max_alloc_size  = 17 * 1024;
 	{
 		test_fifo_type          fifo;
 		int                     exit_count( 0 );
@@ -437,13 +426,12 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 
 		EXPECT_FALSE( err_flag.load() );
 
-		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::gmem_get_statistics();
+		auto statistics = alpha::concurrent::gmem_get_statistics();
 
-		printf( "gmem Statistics is;\n" );
-		for ( auto& e : statistics ) {
+		for ( auto& e : statistics.ch_st_ ) {
 			// EXPECT_EQ( 0, e.valid_chunk_num_ );
 			EXPECT_EQ( 0, e.consum_cnt_ );
-			printf( "%s\n", e.print().c_str() );
 		}
+		printf( "gmem Statistics is;\n%s\n", statistics.print().c_str() );
 	}
 }

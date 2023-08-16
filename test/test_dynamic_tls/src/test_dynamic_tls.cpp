@@ -23,7 +23,7 @@
 
 #include "alconcurrent/dynamic_tls.hpp"
 
-#include "alloc_only_allocator.hpp"
+#include "alconcurrent/alloc_only_allocator.hpp"
 #include "mmap_allocator.hpp"
 
 struct keep_argument_value {
@@ -211,7 +211,6 @@ public:
 	void TearDown() override
 	{
 		alpha::concurrent::internal::print_of_mmap_allocator();
-		alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::DUMP, 'A', 1 );
 	}
 
 	int max_num_;
@@ -293,7 +292,6 @@ public:
 		pthread_barrier_destroy( &barrier_ );
 
 		alpha::concurrent::internal::print_of_mmap_allocator();
-		alpha::concurrent::internal::alloc_chamber_head::get_inst().dump_to_log( alpha::concurrent::log_type::DUMP, 'A', 1 );
 	}
 
 	int                                             max_num_;

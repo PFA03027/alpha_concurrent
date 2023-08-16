@@ -72,6 +72,7 @@ struct size_n_and_align {
 	size_t n_v_;       // allocating request size
 	size_t align_v_;   // alignment request size
 };
+
 class SlotFunc_FixtureParam : public testing::TestWithParam<size_n_and_align> {
 };
 
