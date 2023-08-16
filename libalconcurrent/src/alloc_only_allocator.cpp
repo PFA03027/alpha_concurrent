@@ -140,9 +140,9 @@ struct alloc_chamber {
 
 	void* allocate( size_t req_size, size_t req_align );
 
-	void dump_to_log( log_type lt, char c, int id );
-
 	alloc_chamber_statistics get_statistics( void ) const;
+
+	void dump_to_log( log_type lt, char c, int id );
 
 private:
 	uintptr_t calc_addr_chopped_room_end_by( uintptr_t expected_offset_, size_t req_size, size_t req_align );
@@ -268,7 +268,35 @@ void* alloc_only_chamber::try_allocate( size_t req_size, size_t req_align )
 	if ( p_cur_focusing_ch == nullptr ) {
 		return nullptr;
 	}
-	return p_cur_focusing_ch->allocate( req_size, req_align );
+
+	void* p_ans = p_cur_focusing_ch->allocate( req_size, req_align );
+	if ( p_ans != nullptr ) {
+		return p_ans;
+	}
+
+	// メモリを確保できなかった場合、hint情報から一度だけ取得できるか試す。
+	alloc_chamber* p_cur_hint_ch = one_try_hint_.load( std::memory_order_acquire );
+	p_cur_focusing_ch            = p_cur_hint_ch;
+	if ( p_cur_focusing_ch == nullptr ) {
+		p_cur_focusing_ch = head_.load( std::memory_order_acquire );
+		if ( p_cur_focusing_ch == nullptr ) {
+			return nullptr;
+		}
+		p_cur_focusing_ch = p_cur_focusing_ch->next_.load( std::memory_order_acquire );
+		if ( p_cur_focusing_ch == nullptr ) {
+			return nullptr;
+		}
+	}
+	p_ans = p_cur_focusing_ch->allocate( req_size, req_align );
+	if ( p_ans != nullptr ) {
+		return p_ans;
+	}
+
+	// 取得を試みたが、取得できなかったので、hintを一つ動かす。
+	alloc_chamber* p_nxt_hint_ch = p_cur_focusing_ch->next_.load( std::memory_order_acquire );
+	one_try_hint_.compare_exchange_strong( p_cur_hint_ch, p_nxt_hint_ch, std::memory_order_acq_rel );
+
+	return nullptr;
 }
 
 void alloc_only_chamber::push_alloc_mem( void* p_alloced_mem, size_t allocated_size )
@@ -312,10 +340,10 @@ void* alloc_only_chamber::allocate( size_t req_size, size_t req_align )
 		if ( cur_pre_alloc_size < req_size ) {
 			cur_pre_alloc_size = req_size * 2 + sizeof( alloc_chamber );
 #if 0
-		internal::LogOutput( log_type::DEBUG, "requested size is over pre allocation size: req=0x%zx, therefore try to allocate double size: try=0x%zu", req_size, cur_pre_alloc_size );
-		bt_info tmp_bt;
-		RECORD_BACKTRACE_GET_BACKTRACE( tmp_bt );
-		tmp_bt.dump_to_log( log_type::DEBUG, 'a', 1 );
+			internal::LogOutput( log_type::DEBUG, "requested size is over pre allocation size: req=0x%zx, therefore try to allocate double size: try=0x%zu", req_size, cur_pre_alloc_size );
+			bt_info tmp_bt;
+			RECORD_BACKTRACE_GET_BACKTRACE( tmp_bt );
+			tmp_bt.dump_to_log( log_type::DEBUG, 'a', 1 );
 #endif
 		}
 		allocate_result ret_mmap = allocate_by_mmap( cur_pre_alloc_size, req_align );

@@ -55,6 +55,7 @@ class alloc_only_chamber {
 public:
 	constexpr alloc_only_chamber( bool need_release_munmap_arg, size_t pre_alloc_size_arg )
 	  : head_( nullptr )
+	  , one_try_hint_( nullptr )
 	  , need_release_munmap_( need_release_munmap_arg )
 	  , pre_alloc_size_( pre_alloc_size_arg )
 	{
@@ -75,6 +76,7 @@ private:
 	void  munmap_alloc_chamber( alloc_chamber* p_ac );
 
 	std::atomic<alloc_chamber*> head_;                  //!< alloc_chamberのスタックリスト上のheadのalloc_chamber
+	std::atomic<alloc_chamber*> one_try_hint_;          //!< alloc_chamberのスタックリスト上、一度だけチェックを行う先を示すポインタ。
 	bool                        need_release_munmap_;   //!< true: when destructing, munmap memory
 	size_t                      pre_alloc_size_;        //!< mmapで割り当てる基本サイズ
 };
