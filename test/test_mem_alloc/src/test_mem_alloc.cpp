@@ -542,8 +542,11 @@ TEST_P( TestGeneralMemAllocator_SizeAlignParam, Boarder_check_of_alignment )
 	for ( auto&& e : st.ch_st_ ) {
 		printf( "{%zu, %zu} -> {.size_=%zu, .num_=%zu} consum count=%zu\n", GetParam().n_v_, GetParam().align_v_, e.alloc_conf_.size_of_one_piece_, e.alloc_conf_.num_of_pieces_, e.consum_cnt_ );
 	}
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+#else
 	EXPECT_EQ( st.ch_st_[0].consum_cnt_, GetParam().consum_count1_ );
 	EXPECT_EQ( st.ch_st_[1].consum_cnt_, GetParam().consum_count2_ );
+#endif
 
 	// Cleanup
 	p_mem_allocator->deallocate( test_ptr1 );
