@@ -232,112 +232,79 @@ struct free_node_stack {
 
 	void push( node_pointer p_n )
 	{
-		// いったんリサイクルトライをしてから、、、
-		{
-			std::unique_lock<std::mutex> ul( mtx_consignment_stack_, std::defer_lock );
-
-			node_pointer p_tmp_ret = pop_from_tls_stack();
-			if ( p_tmp_ret != nullptr ) {
-				if ( hzd_ptrs_.check_ptr_in_hazard_list( p_tmp_ret ) ) {
-					// まだハザードポインタにいるようなので、戻す。
-					if ( ul.try_lock() ) {
-						nonlockchk_push_to_consignment_stack( p_tmp_ret );
-					} else {
-						// 共有ノードスタックのロックが確保できなかったので、スレッドローカルに戻す
-						push_to_tls_stack( p_tmp_ret );
-					}
-				} else {
-					// ハザードポインタにはいないので、フリーノードスタックの本体にpushする。
-					push_to_free_node_stack_wo_hzd_chk( p_tmp_ret );
-				}
-			}
-			if ( !ul.owns_lock() ) {
-				ul.try_lock();
-			}
-			if ( ul.owns_lock() ) {
-				p_tmp_ret = nonlockchk_pop_from_consignment_stack();
-				if ( p_tmp_ret != nullptr ) {
-					if ( hzd_ptrs_.check_ptr_in_hazard_list( p_tmp_ret ) ) {
-						// まだハザードポインタにいるようなので、戻す。
-						nonlockchk_push_to_consignment_stack( p_tmp_ret );
-					} else {
-						push_to_free_node_stack_wo_hzd_chk( p_tmp_ret );
-					}
-				}
-			}
-		}
-
-		// push作業を開始する。
-		if ( hzd_ptrs_.check_ptr_in_hazard_list( p_n ) ) {
-			// まだハザードポインタにいるようなので、共有スタックリストかスレッドローカルリストに戻す。
-			std::unique_lock<std::mutex> ul( mtx_consignment_stack_, std::try_to_lock );
-			if ( ul.owns_lock() ) {
-				nonlockchk_push_to_consignment_stack( p_n );
-			} else {
-				push_to_tls_stack( p_n );
-			}
+		std::unique_lock<std::mutex> ul( mtx_consignment_stack_, std::defer_lock );
+		if ( ul.try_lock() ) {
+			// ロックが確保できたので、push先優先順位1位の共有ノードスタックにプッシュ
+			nonlockchk_push_to_consignment_stack( p_n );
 		} else {
-			push_to_free_node_stack_wo_hzd_chk( p_n );
+			if ( hzd_ptrs_.check_ptr_in_hazard_list( p_n ) ) {
+				// 共有ノードスタックのロックが確保できなかった
+				// p_nをスレッドローカルに戻す前に、フリーノードスタックにリサイクルを行う。
+				// スレッドローカルからリサイクルウ候補を1つ取り出す。
+				node_pointer p_rcy = pop_from_tls_stack();
+				// 次にpush先優先順位2位スレッドローカルに戻す
+				push_to_tls_stack( p_n );
+				if ( p_rcy != nullptr ) {
+					if ( hzd_ptrs_.check_ptr_in_hazard_list( p_rcy ) ) {
+						// まだハザードポインタに残っているので、元に戻す
+						push_to_tls_stack( p_rcy );
+					} else {
+						// ハザードポインタに乗っていないので、即座にpush先優先順位3位のフリーノードスタックにプッシュ。
+						push_to_free_node_stack_wo_hzd_chk( p_rcy );
+					}
+				}
+			} else {
+				// ハザードポインタに乗っていないので、即座にpush先優先順位3位のフリーノードスタックにプッシュ。
+				push_to_free_node_stack_wo_hzd_chk( p_n );
+			}
 		}
 	}
 
 	node_pointer pop( void )
 	{
-		// いったんリサイクルトライをしてから、、、
+		// push先優先順位3位のスレッドローカルリストからノードを取り出し、フリーノードとして返せるかどうかをチェックする。
+		node_pointer p_tls_tmp = pop_from_tls_stack();   // スレッドローカルリストからノードを取り出す
+		if ( p_tls_tmp != nullptr ) {
+			// ノードが取り出せたので、フリーノードとして返す。
+			return p_tls_tmp;
+		}
 		{
+			// push先優先順位2位の共有ノードスタックから取り出し、フリーノードとして返せるかどうかをチェックする。
 			std::unique_lock<std::mutex> ul( mtx_consignment_stack_, std::defer_lock );
-
-			node_pointer p_tmp_ret = pop_from_tls_stack();   // スレッドローカルリストからノードを取り出す
-			if ( p_tmp_ret != nullptr ) {
-				if ( hzd_ptrs_.check_ptr_in_hazard_list( p_tmp_ret ) ) {
-					// まだハザードポインタにいるようなので、戻す。
-					if ( ul.try_lock() ) {
-						// 共有ノードスタックのロックが取得できたので、共有ノードスタックからフリーノードリストに戻せるか試す。
-						node_pointer p_tmp_ret2 = nonlockchk_pop_from_consignment_stack();
-						nonlockchk_push_to_consignment_stack( p_tmp_ret );   // スレッドローカルリストから取り出されたノードを先に共有ノードスタックに戻しておく。
-						if ( p_tmp_ret2 != nullptr ) {
-							if ( hzd_ptrs_.check_ptr_in_hazard_list( p_tmp_ret2 ) ) {
-								// 共有ノードスタックから取り出したノードはまだハザードポインタにいるので、共有ノードスタックに戻す。
-								nonlockchk_push_to_consignment_stack( p_tmp_ret2 );
-							} else {
-								push_to_free_node_stack_wo_hzd_chk( p_tmp_ret2 );
-							}
-						}
-					} else {
-						// 共有ノードスタックのロックが確保できなかったので、スレッドローカルに戻す
-						push_to_tls_stack( p_tmp_ret );
-					}
-				} else {
-					// ハザードポインタにいないので、すでにfree_nodeとなっている。
-					return p_tmp_ret;
-				}
-			}
-
-			if ( !ul.owns_lock() ) {
-				ul.try_lock();
-			}
-			if ( ul.owns_lock() ) {
-				p_tmp_ret = nonlockchk_pop_from_consignment_stack();   // 共有ノードスタックからノードを取り出す。
-				if ( p_tmp_ret != nullptr ) {
-					if ( hzd_ptrs_.check_ptr_in_hazard_list( p_tmp_ret ) ) {
-						// まだハザードポインタにいるようなので、戻す。
-						nonlockchk_push_to_consignment_stack( p_tmp_ret );
-					} else {
-						// ハザードポインタにいないので、p_tmp_retはfree_nodeとなっている。
-						return p_tmp_ret;
-					}
+			if ( ul.try_lock() ) {
+				node_pointer p_con_tmp = nonlockchk_pop_from_consignment_stack();
+				if ( p_con_tmp != nullptr ) {
+					// ノードが取り出せたので、フリーノードとして返す。
+					return p_con_tmp;
 				}
 			}
 		}
 
-		// free nodeからpop作業を開始する。
-		return pop_from_free_node_stack();
+		// push先優先順位1位のフリーノードスタックからフリーノードを取り出す。
+		node_pointer p_ans_cnd = pop_from_free_node_stack();
+		if ( p_ans_cnd != nullptr ) {
+			return p_ans_cnd;
+		}
+
+		{
+			// push先優先順位2位の共有ノードスタックから取り出し、フリーノードとして返せるかどうか、再度をチェックする。
+			std::unique_lock<std::mutex> ul( mtx_consignment_stack_, std::defer_lock );
+			if ( ul.try_lock() ) {
+				node_pointer p_con_tmp = nonlockchk_pop_from_consignment_stack();
+				if ( p_con_tmp != nullptr ) {
+					// ノードが取り出せたので、フリーノードとして返す。
+					return p_con_tmp;
+				}
+			}
+		}
+
+		return nullptr;   // 結局取り出しには失敗した。
 	}
 
 	hzd_ptr_mgr_type                                           hzd_ptrs_;                       //!< ハザードポインタ管理構造体
 	std::atomic<node_pointer>                                  p_free_node_stack_head_;         //!< 未使用状態のslot_header_of_arrayスタックの、先頭slot_header_of_arrayへのポインタ
 	std::mutex                                                 mtx_consignment_stack_;          //!< スレッド終了時のハザード中のスロットを受け取るスタックの排他制御用mutex
-	node_pointer                                               p_consignment_stack_head_;       //!< スレッド終了時のハザード中のスロットを受け取るスタックの、先頭slot_header_of_arrayへのポインタ
+	node_pointer                                               p_consignment_stack_head_;       //!< スレッド終了時のハザード中のスロットを受け取るスタックの、先頭slot_header_of_arrayへのポインタ。mutexロックの内側でアクセスするので、atomic変数にはしない。
 	dynamic_tls<node_pointer, threadlocal_no_allocate_handler> tls_p_hazard_slot_stack_head_;   //!< ハザード中のスロットを受け取るスレッド毎のスタックの、先頭slot_header_of_arrayへのポインタ
 };
 
