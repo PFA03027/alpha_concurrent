@@ -672,7 +672,6 @@ void* chunk_list::allocate_mem_slot( size_t req_size, size_t req_align )
 	}
 
 	// 既存のchunkの再利用に失敗したので、新しいchunkを確保する。
-	// new演算子を使用するため、ここでもロックが発生する可能性がある。
 	chunk_header_multi_slot* p_new_chms = new ( *p_allocator_ ) chunk_header_multi_slot( cur_alloc_conf, hint_params.tl_id_, &statistics_ );
 	if ( p_new_chms == nullptr ) {
 		return nullptr;

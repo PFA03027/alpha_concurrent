@@ -47,99 +47,6 @@ public:
 	using hzrd_pointer                 = T*;
 	static constexpr int hzrd_max_slot = N;
 
-	constexpr hazard_ptr( void )
-	  : my_allocator_( true, 4 * 1024 )
-	  , p_allocator_( &my_allocator_ )
-	  , head_( p_allocator_ )
-	  , p_hzd_ptr_node_( threadlocal_handler_functor( this ) )
-	{
-		static_assert( std::is_standard_layout<hazard_ptr>::value, "hazard_ptr should be standard-layout type" );
-	}
-
-	constexpr hazard_ptr( internal::alloc_only_chamber* p_allocator_arg )
-	  : my_allocator_( true, 0 )
-	  , p_allocator_( p_allocator_arg )
-	  , head_( p_allocator_ )
-	  , p_hzd_ptr_node_( threadlocal_handler_functor( this ) )
-	{
-		static_assert( std::is_standard_layout<hazard_ptr>::value, "hazard_ptr should be standard-layout type" );
-	}
-
-	~hazard_ptr( void )
-	{
-	}
-
-	/*!
-	 * @brief	Make a reservation to acquire the reference right.
-	 *
-	 * 参照権を獲得予約をするために、ハザードポインタに登録する。
-	 *
-	 * 本I/Fを呼び出しただけでは、参照権を獲得したことにはならない。 @n
-	 * 本I/Fを呼び出した後に、登録したポインタがまだ有効であるかどうかを確認すること。 @n
-	 * @li	確認の結果、有効である場合は、参照権を獲得したとみなせる。
-	 * @li	確認の結果、有効ではなかった場合、clear_hazard_ptr()を呼び出すか、新しいポインタを新たなハザードポインタとして本I/Fで再設定し、現在保持しているハザードポインタを解放すること。
-	 *
-	 * @note
-	 * 確実なclear_hazard_ptr()呼び出しをサポートするクラスとして、 hazard_ptr_scoped_ref<T> を用意している。
-	 */
-	inline void regist_ptr_as_hazard_ptr( T* p_target, int idx )
-	{
-		if ( idx >= N ) {
-			internal::LogOutput( log_type::ERR, "Error: the requested index is over max index." );
-			return;
-		}
-
-		node_for_hazard_ptr* p_hzd_ptr_node_ = check_local_storage();
-
-		p_hzd_ptr_node_->set_hazard_ptr( p_target, idx );
-	}
-
-	/*!
-	 * @brief	Release a reservation to acquire the reference right or the reference right itself.
-	 *
-	 * @note
-	 * 確実なclear_hazard_ptr()呼び出しをサポートするクラスとして、 hazard_ptr_scoped_ref<T> を用意している。
-	 */
-	inline void clear_hazard_ptr( int idx )
-	{
-		node_for_hazard_ptr* p_hzd_ptr_node_ = check_local_storage();
-		p_hzd_ptr_node_->clear_hazard_ptr( idx );
-	}
-
-	/*!
-	 * @brief	Release a reservation to acquire the reference right or the reference right itself.
-	 *
-	 * @note
-	 * 確実なclear_hazard_ptr()呼び出しをサポートするクラスとして、 hazard_ptr_scoped_ref<T> を用意している。
-	 */
-	inline void clear_hazard_ptr_all( void )
-	{
-		node_for_hazard_ptr* p_hzd_ptr_node_ = check_local_storage();
-		p_hzd_ptr_node_->clear_hazard_ptr_all();
-	}
-
-	/*!
-	 * @brief	Check whether a pointer is in this hazard list
-	 *
-	 * @retval	true	p_chk_ptr is in this hazard list.
-	 * @retval	false	p_chk_ptr is not in this hazard list.
-	 */
-	bool check_ptr_in_hazard_list( T* p_chk_ptr )
-	{
-		return get_head_instance().check_ptr_in_hazard_list( p_chk_ptr );
-	}
-
-	int debug_get_glist_size( void )
-	{
-		return get_head_instance().get_node_count();
-	}
-
-	void dump_to_log( log_type lt, char c, int id )
-	{
-		head_.dump_to_log( lt, c, id );
-	}
-
-private:
 	enum class ocupied_status : int {
 		UNUSED,
 		USING
@@ -163,12 +70,31 @@ private:
 			clear_hazard_ptr_all();
 		}
 
+		/*!
+		 * @brief	Make a reservation to acquire the reference right.
+		 *
+		 * 参照権を獲得予約をするために、ハザードポインタに登録する。
+		 *
+		 * 本I/Fを呼び出しただけでは、参照権を獲得したことにはならない。 @n
+		 * 本I/Fを呼び出した後に、登録したポインタがまだ有効であるかどうかを確認すること。 @n
+		 * @li	確認の結果、有効である場合は、参照権を獲得したとみなせる。
+		 * @li	確認の結果、有効ではなかった場合、clear_hazard_ptr()を呼び出すか、新しいポインタを新たなハザードポインタとして本I/Fで再設定し、現在保持しているハザードポインタを解放すること。
+		 *
+		 * @note
+		 * 確実なclear_hazard_ptr()呼び出しをサポートするクラスとして、 hazard_ptr_scoped_ref<T> を用意している。
+		 */
 		void set_hazard_ptr( T* p_target_arg, int idx )
 		{
 			p_target_[idx].store( p_target_arg, std::memory_order_release );
 			return;
 		}
 
+		/*!
+		 * @brief	Release a reservation to acquire the reference right or the reference right itself.
+		 *
+		 * @note
+		 * 確実なclear_hazard_ptr()呼び出しをサポートするクラスとして、 hazard_ptr_scoped_ref<T> を用意している。
+		 */
 		void clear_hazard_ptr( int idx )
 		{
 			p_target_[idx].store( nullptr, std::memory_order_release );
@@ -259,6 +185,55 @@ private:
 		std::atomic<T*>                   p_target_[N];   //!< hazard pointer strage
 	};
 
+	constexpr hazard_ptr( void )
+	  : my_allocator_( true, 4 * 1024 )
+	  , p_allocator_( &my_allocator_ )
+	  , head_( p_allocator_ )
+	  , p_hzd_ptr_node_( threadlocal_handler_functor( this ) )
+	{
+		static_assert( std::is_standard_layout<hazard_ptr>::value, "hazard_ptr should be standard-layout type" );
+	}
+
+	constexpr hazard_ptr( internal::alloc_only_chamber* p_allocator_arg )
+	  : my_allocator_( true, 0 )
+	  , p_allocator_( p_allocator_arg )
+	  , head_( p_allocator_ )
+	  , p_hzd_ptr_node_( threadlocal_handler_functor( this ) )
+	{
+		static_assert( std::is_standard_layout<hazard_ptr>::value, "hazard_ptr should be standard-layout type" );
+	}
+
+	~hazard_ptr( void )
+	{
+	}
+
+	inline node_for_hazard_ptr* get_tls_node_for_hazard_ptr( void )
+	{
+		return check_local_storage();
+	}
+
+	/*!
+	 * @brief	Check whether a pointer is in this hazard list
+	 *
+	 * @retval	true	p_chk_ptr is in this hazard list.
+	 * @retval	false	p_chk_ptr is not in this hazard list.
+	 */
+	bool check_ptr_in_hazard_list( T* p_chk_ptr )
+	{
+		return get_head_instance().check_ptr_in_hazard_list( p_chk_ptr );
+	}
+
+	int debug_get_glist_size( void )
+	{
+		return get_head_instance().get_node_count();
+	}
+
+	void dump_to_log( log_type lt, char c, int id )
+	{
+		head_.dump_to_log( lt, c, id );
+	}
+
+private:
 	////////////////////////////////////////////////////////////////////////////////
 	struct hazard_node_head {
 		constexpr hazard_node_head( internal::alloc_only_chamber* p_allocator_arg )
@@ -412,23 +387,37 @@ class hazard_ptr_scoped_ref {
 public:
 	hazard_ptr_scoped_ref( hazard_ptr<T, N>& ref, int idx_arg )
 	  : idx_( idx_arg )
-	  , monitor_ref_( ref )
+	  , p_node_hzd_ptr_( ref.get_tls_node_for_hazard_ptr() )
 	{
+		if ( idx_arg >= N ) {
+			internal::LogOutput( log_type::ERR, "Error: the requested index is over max index." );
+			throw std::logic_error( "Error: the requested index is over max index." );
+		}
+	}
+
+	hazard_ptr_scoped_ref( const hazard_ptr_scoped_ref& orig, int idx_arg )
+	  : idx_( idx_arg )
+	  , p_node_hzd_ptr_( orig.p_node_hzd_ptr_ )
+	{
+		if ( idx_arg >= N ) {
+			internal::LogOutput( log_type::ERR, "Error: the requested index is over max index." );
+			throw std::logic_error( "Error: the requested index is over max index." );
+		}
 	}
 
 	~hazard_ptr_scoped_ref()
 	{
-		monitor_ref_.clear_hazard_ptr( idx_ );
+		p_node_hzd_ptr_->clear_hazard_ptr( idx_ );
 	}
 
 	void regist_ptr_as_hazard_ptr( T* p_target )
 	{
-		monitor_ref_.regist_ptr_as_hazard_ptr( p_target, idx_ );
+		p_node_hzd_ptr_->set_hazard_ptr( p_target, idx_ );
 	}
 
 private:
-	int               idx_;
-	hazard_ptr<T, N>& monitor_ref_;
+	int                                             idx_;
+	typename hazard_ptr<T, N>::node_for_hazard_ptr* p_node_hzd_ptr_;
 };
 
 #if 0

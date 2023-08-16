@@ -60,7 +60,7 @@ void* func_refarencing( void* data )
 	//	printf( "p_target: %p\n", p_target );
 
 	delete_test* p_test_obj = p_target->load();
-	hazard_ptr_to.regist_ptr_as_hazard_ptr( p_test_obj, 0 );
+	hzrd_ref.regist_ptr_as_hazard_ptr( p_test_obj );
 
 	//	std::cout << "!!!Ready!!!" << std::endl;   // prints !!!Hello World!!!
 	pthread_barrier_wait( &barrier );
@@ -101,7 +101,7 @@ void* func_delete_owner( void* data )
 
 		// printf( "p_target: %p\n", p_test_obj );
 
-		hazard_ptr_to.regist_ptr_as_hazard_ptr( p_test_obj, 0 );
+		hzrd_ref.regist_ptr_as_hazard_ptr( p_test_obj );
 
 		// std::cout << "!!!Ready!!!" << std::endl;   // prints !!!Hello World!!!
 		pthread_barrier_wait( &barrier );

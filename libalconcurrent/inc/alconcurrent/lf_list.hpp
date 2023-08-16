@@ -93,8 +93,8 @@ public:
 	)
 	{
 		scoped_hazard_ref scoped_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_FUNC_PREV );
-		scoped_hazard_ref scoped_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FIND_FUNC_CURR );
-		scoped_hazard_ref scoped_ref_next( hzrd_ptr_, (int)hazard_ptr_idx::FIND_FUNC_NEXT );
+		scoped_hazard_ref scoped_ref_curr( scoped_ref_prev, (int)hazard_ptr_idx::FIND_FUNC_CURR );
+		scoped_hazard_ref scoped_ref_next( scoped_ref_prev, (int)hazard_ptr_idx::FIND_FUNC_NEXT );
 
 		ans_prev_ref.regist_ptr_as_hazard_ptr( nullptr );
 		ans_curr_ref.regist_ptr_as_hazard_ptr( nullptr );
@@ -289,7 +289,7 @@ public:
 		for_each_func_t internal_func = std::move( f );
 
 		scoped_hazard_ref scoped_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FOR_EACH_PREV );
-		scoped_hazard_ref scoped_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FOR_EACH_CURR );
+		scoped_hazard_ref scoped_ref_curr( scoped_ref_prev, (int)hazard_ptr_idx::FOR_EACH_CURR );
 
 		node_pointer p_prev = &head_;
 
@@ -706,8 +706,8 @@ public:
 	std::tuple<bool, value_type> pop_back( void )
 	{
 		scoped_hazard_ref hzrd_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_PREV );
-		scoped_hazard_ref hzrd_ref_curr( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_CURR );
-		scoped_hazard_ref hzrd_ref_last( hzrd_ptr_, (int)hazard_ptr_idx::POP_BACK_LAST );
+		scoped_hazard_ref hzrd_ref_curr( hzrd_ref_prev, (int)hazard_ptr_idx::FIND_ANS_CURR );
+		scoped_hazard_ref hzrd_ref_last( hzrd_ref_prev, (int)hazard_ptr_idx::POP_BACK_LAST );
 
 		typename list_type::find_predicate_t pred_common = []( const list_node_pointer a ) { return false; };
 

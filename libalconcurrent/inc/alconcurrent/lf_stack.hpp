@@ -110,7 +110,7 @@ public:
 	node_pointer pop( void )
 	{
 		scoped_hazard_ref scoped_ref_first( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_FIRST );
-		scoped_hazard_ref scoped_ref_next( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_NEXT );
+		scoped_hazard_ref scoped_ref_next( scoped_ref_first, (int)hazard_ptr_idx::POP_FUNC_NEXT );
 
 		while ( true ) {
 			node_pointer p_cur_first = head_.load( std::memory_order_acquire );
@@ -155,10 +155,10 @@ public:
 	}
 
 private:
-	lifo_nd_list( const lifo_nd_list& ) = delete;
-	lifo_nd_list( lifo_nd_list&& )      = delete;
+	lifo_nd_list( const lifo_nd_list& )           = delete;
+	lifo_nd_list( lifo_nd_list&& )                = delete;
 	lifo_nd_list operator=( const lifo_nd_list& ) = delete;
-	lifo_nd_list operator=( lifo_nd_list&& ) = delete;
+	lifo_nd_list operator=( lifo_nd_list&& )      = delete;
 
 	using scoped_hazard_ref = hazard_ptr_scoped_ref<node_type, hzrd_max_slot_>;
 
@@ -317,10 +317,10 @@ public:
 	}
 
 private:
-	stack_list( const stack_list& ) = delete;
-	stack_list( stack_list&& )      = delete;
+	stack_list( const stack_list& )            = delete;
+	stack_list( stack_list&& )                 = delete;
 	stack_list& operator=( const stack_list& ) = delete;
-	stack_list& operator=( stack_list&& ) = delete;
+	stack_list& operator=( stack_list&& )      = delete;
 
 	using free_nd_storage_type = internal::free_nd_storage;
 	using free_node_type       = typename free_nd_storage_type::node_type;

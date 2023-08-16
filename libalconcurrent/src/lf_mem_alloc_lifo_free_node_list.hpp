@@ -168,32 +168,32 @@ struct free_node_stack {
 	node_pointer pop_from_free_node_stack( void )
 	{
 		scoped_hzd_type hzd_refing_p_head( hzd_ptrs_, HZD_IDX_POP_FUNC_HEAD );
-		scoped_hzd_type hzd_refing_p_next( hzd_ptrs_, HZD_IDX_POP_FUNC_NEXT );
+		scoped_hzd_type hzd_refing_p_next( hzd_refing_p_head, HZD_IDX_POP_FUNC_NEXT );
 
 		node_pointer p_new_head = nullptr;
 		node_pointer p_cur_head = p_free_node_stack_head_.load( std::memory_order_acquire );   // この処理後、CASの前にp_cur_headに対してABAが発生するとアウト。p_cur_headはハザードポインタに確保し、p_cur_headに対応するnodeがpush経由でこの関数に入ってこないようにしないといけない。
-		while ( true ) {                                                                       // do...while文でcontinueを使うとwhile文の条件式が実行されてしまう。期待した制御にはならないため、while(true)で実装する必要がある。
+		while ( p_cur_head != nullptr ) {                                                      // do...while文でcontinueを使うとwhile文の条件式が実行されてしまう。期待した制御にはならないため、while(true)で実装する必要がある。
 			hzd_refing_p_head.regist_ptr_as_hazard_ptr( p_cur_head );
 			node_pointer p_node_tmp = p_free_node_stack_head_.load( std::memory_order_acquire );
 			if ( p_cur_head != p_node_tmp ) {
 				p_cur_head = p_node_tmp;
 				continue;
 			}
-			if ( p_cur_head == nullptr ) return nullptr;
 
 			p_new_head = p_cur_head->get_next();
 			hzd_refing_p_next.regist_ptr_as_hazard_ptr( p_new_head );
 			if ( p_new_head != p_cur_head->get_next() ) {
+				p_cur_head = p_free_node_stack_head_.load( std::memory_order_acquire );
 				continue;
 			}
 			if ( p_free_node_stack_head_.compare_exchange_weak( p_cur_head, p_new_head ) ) {
 				// 置き換えに成功したら、p_cur_headを確保できたので、ループを抜ける
-				break;
+				p_cur_head->set_next( nullptr );   // p_cur_headが確保できたノードのポインタが入っている。また、p_cur_headが確保できたので、書き換えOK。
+				return p_cur_head;
 			}
 		}
-		p_cur_head->set_next( nullptr );   // p_cur_headが確保できたノードのポインタが入っている。また、p_cur_headが確保できたので、書き換えOK。
 
-		return p_cur_head;
+		return nullptr;
 	}
 
 	void push_to_tls_stack( node_pointer p_n )
@@ -222,9 +222,9 @@ struct free_node_stack {
 
 	node_pointer nonlockchk_pop_from_consignment_stack( void )
 	{
-		if ( p_consignment_stack_head_ == nullptr ) return nullptr;
+		node_pointer p_ans = p_consignment_stack_head_;
+		if ( p_ans == nullptr ) return p_ans;
 
-		node_pointer p_ans        = p_consignment_stack_head_;
 		p_consignment_stack_head_ = p_ans->get_next();
 		p_ans->set_next( nullptr );
 		return p_ans;
@@ -236,6 +236,10 @@ struct free_node_stack {
 		if ( ul.try_lock() ) {
 			// ロックが確保できたので、push先優先順位1位の共有ノードスタックにプッシュ
 			nonlockchk_push_to_consignment_stack( p_n );
+			node_pointer p_rcy = pop_from_tls_stack();
+			if ( p_rcy != nullptr ) {
+				nonlockchk_push_to_consignment_stack( p_rcy );
+			}
 		} else {
 			if ( hzd_ptrs_.check_ptr_in_hazard_list( p_n ) ) {
 				// 共有ノードスタックのロックが確保できなかった
