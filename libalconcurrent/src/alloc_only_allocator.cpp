@@ -103,19 +103,29 @@ void room_boader::dump_to_log( log_type lt, char c, int id )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-struct alloc_chamber_statistics {
-	size_t alloc_size_;
-	size_t consum_size_;
-	size_t free_size_;
 
-	alloc_chamber_statistics& operator+=( const alloc_chamber_statistics& op )
-	{
-		alloc_size_ += op.alloc_size_;
-		consum_size_ += op.consum_size_;
-		free_size_ += op.free_size_;
-		return *this;
-	}
-};
+alloc_chamber_statistics& alloc_chamber_statistics::operator+=( const alloc_chamber_statistics& op )
+{
+	chamber_count_++;
+	alloc_size_ += op.alloc_size_;
+	consum_size_ += op.consum_size_;
+	free_size_ += op.free_size_;
+	return *this;
+}
+
+std::string alloc_chamber_statistics::print( void ) const
+{
+	char buff[2048];
+	snprintf( buff, 2048,
+	          "chamber count = %zu, total allocated size = 0x%zx(%.2fM), consumed size = 0x%zx(%.2fM), free size = 0x%zx(%.2fM), used ratio = %2.1f %%",
+	          chamber_count_,
+	          alloc_size_, (double)alloc_size_ / (double)( 1024 * 1024 ),
+	          consum_size_, (double)consum_size_ / (double)( 1024 * 1024 ),
+	          free_size_, (double)free_size_ / (double)( 1024 * 1024 ),
+	          ( alloc_size_ > 0 ) ? ( (double)consum_size_ / (double)alloc_size_ * 100.0f ) : 0.0f );
+
+	return std::string( buff );
+}
 
 struct alloc_chamber {
 	const size_t                chamber_size_;   //!< alloc_chamberのサイズ
@@ -327,28 +337,31 @@ void alloc_only_chamber::detect_unexpected_deallocate( void* )
 	return;
 }
 
-void alloc_only_chamber::dump_to_log( log_type lt, char c, int id )
+alloc_chamber_statistics alloc_only_chamber::get_statistics( void ) const
 {
-	alloc_chamber_statistics total_statistics { 0 };
-	size_t                   chamber_count = 0;
+	alloc_chamber_statistics total_statistics;
 
 	auto p_cur_chamber = head_.load( std::memory_order_acquire );
 	while ( p_cur_chamber != nullptr ) {
-		p_cur_chamber->dump_to_log( lt, c, id );
-		chamber_count++;
 		total_statistics += p_cur_chamber->get_statistics();
 		p_cur_chamber = p_cur_chamber->next_.load( std::memory_order_acquire );
 	}
 
-	internal::LogOutput(
-		lt,
-		"[%d-%c] chamber count = %zu, total allocated size = 0x%zx(%.2fM), consumed size = 0x%zx(%.2fM), free size = 0x%zx(%.2fM), used ratio = %2.1f %%",
-		id, c,
-		chamber_count,
-		total_statistics.alloc_size_, (double)total_statistics.alloc_size_ / (double)( 1024 * 1024 ),
-		total_statistics.consum_size_, (double)total_statistics.consum_size_ / (double)( 1024 * 1024 ),
-		total_statistics.free_size_, (double)total_statistics.free_size_ / (double)( 1024 * 1024 ),
-		(double)total_statistics.consum_size_ / (double)total_statistics.alloc_size_ * 100.0f );
+	return total_statistics;
+}
+
+void alloc_only_chamber::dump_to_log( log_type lt, char c, int id )
+{
+	alloc_chamber_statistics total_statistics;
+
+	auto p_cur_chamber = head_.load( std::memory_order_acquire );
+	while ( p_cur_chamber != nullptr ) {
+		p_cur_chamber->dump_to_log( lt, c, id );
+		p_cur_chamber = p_cur_chamber->next_.load( std::memory_order_acquire );
+	}
+
+	total_statistics = get_statistics();
+	internal::LogOutput( lt, "[%d-%c] %s", id, c, total_statistics.print().c_str() );
 }
 
 }   // namespace internal

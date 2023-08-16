@@ -62,7 +62,7 @@ void gmem_prune( void )
 	return;
 }
 
-std::list<chunk_statistics> gmem_get_statistics( void )
+general_mem_allocator_statistics gmem_get_statistics( void )
 {
 	return internal::get_g_gm_mem_instance_singleton.get_statistics();
 }

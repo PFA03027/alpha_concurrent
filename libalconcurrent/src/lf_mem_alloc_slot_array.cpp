@@ -108,9 +108,8 @@ void slot_array_mgr::dump( int indent )
 	internal::LogOutput( log_type::DUMP, "%sslot_array_mgr(%p)={alloc_size_=%zu,num_of_slots_=%zu,expected_n_per_slot_=%zu,slot_container_size_of_this_=%zu,p_owner_chunk_header_=%p,p_slot_container_top=%p",
 	                     indent_str.c_str(),
 	                     this, alloc_size_, num_of_slots_, expected_n_per_slot_, slot_container_size_of_this_, p_owner_chunk_header_.load(), p_slot_container_top );
-	// for ( size_t si = 0; si < num_of_slots_; si++ ) {
-	// 	slot_header_array_[si].dump( indent + 1 );
-	// }
+	auto total_statistics = allocator_.get_statistics();
+	internal::LogOutput( log_type::DUMP, "%s%s", indent_str.c_str(), total_statistics.print().c_str() );
 	internal::LogOutput( log_type::DUMP, "%s}", indent_str.c_str() );
 }
 

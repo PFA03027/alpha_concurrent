@@ -15,8 +15,8 @@
 #include <atomic>
 #include <cstdlib>
 #include <initializer_list>
-#include <list>
 #include <memory>
+#include <vector>
 
 #include "conf_logger.hpp"
 
@@ -46,6 +46,19 @@ void general_mem_allocator_impl_prune(
 	std::atomic_bool&     exclusive_ctr_arg       //<! reference to exclusive control for prune
 );
 }   // namespace internal
+
+struct general_mem_allocator_statistics {
+	std::vector<chunk_statistics>      ch_st_;
+	internal::alloc_chamber_statistics al_st_;
+
+	general_mem_allocator_statistics( void )
+	  : ch_st_()
+	  , al_st_()
+	{
+	}
+
+	std::string print( void ) const;
+};
 
 /*!
  * @brief	semi lock-free memory allocator based on multi chunk size list
@@ -159,14 +172,17 @@ public:
 	 * @note
 	 * This I/F does not lock allocat/deallocate itself, but this I/F execution is not lock free.
 	 */
-	std::list<chunk_statistics> get_statistics( void ) const
+	general_mem_allocator_statistics get_statistics( void ) const
 	{
-		std::list<chunk_statistics> ans;
+		general_mem_allocator_statistics ans;
 
+		ans.ch_st_.reserve( static_cast<size_t>( pr_ch_size_ ) );
 		for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
 			chunk_statistics tmp_st = param_ch_array_[i].get_statistics();
-			ans.push_back( tmp_st );
+			ans.ch_st_.push_back( tmp_st );
 		}
+
+		ans.al_st_ = allocating_only_allocator_.get_statistics();
 
 		return ans;
 	}
@@ -256,7 +272,7 @@ public:
 	 * @note
 	 * This I/F does not lock allocat/deallocate itself, but this I/F execution is not lock free.
 	 */
-	std::list<chunk_statistics> get_statistics( void ) const
+	general_mem_allocator_statistics get_statistics( void ) const
 	{
 		return allocator_impl_.get_statistics();
 	}
@@ -302,7 +318,7 @@ void gmem_prune( void );
  * @note
  * This I/F does not lock allocat/deallocate itself, but this I/F execution is not lock free.
  */
-std::list<chunk_statistics> gmem_get_statistics( void );
+general_mem_allocator_statistics gmem_get_statistics( void );
 
 /*!
  * @brief get backtrace information

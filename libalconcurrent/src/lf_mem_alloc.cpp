@@ -894,7 +894,7 @@ general_mem_allocator::general_mem_allocator(
 	return;
 }
 
-std::string chunk_statistics::print( void )
+std::string chunk_statistics::print( void ) const
 {
 	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
 	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
@@ -924,6 +924,17 @@ std::string chunk_statistics::print( void )
 	);
 
 	return std::string( buf );
+}
+
+std::string general_mem_allocator_statistics::print( void ) const
+{
+	std::string ans;
+	for ( auto&& e : ch_st_ ) {
+		ans += e.print();
+		ans += "\n";
+	};
+	ans += al_st_.print();
+	return ans;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////

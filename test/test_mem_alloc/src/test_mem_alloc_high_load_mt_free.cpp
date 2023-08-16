@@ -91,13 +91,11 @@ public:
 
 		EXPECT_FALSE( err_flag.load() );
 
-		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::gmem_get_statistics();
-
-		printf( "gmem Statistics is;\n" );
-		for ( auto& e : statistics ) {
+		auto statistics = alpha::concurrent::gmem_get_statistics();
+		for ( auto& e : statistics.ch_st_ ) {
 			EXPECT_EQ( 0, e.consum_cnt_ );
-			printf( "%s\n", e.print().c_str() );
 		}
+		printf( "gmem Statistics is;\n%s\n", statistics.print().c_str() );
 
 		alpha::concurrent::internal::print_of_mmap_allocator();
 		alpha::concurrent::internal::dynamic_tls_status_info st = alpha::concurrent::internal::dynamic_tls_get_status();
@@ -204,12 +202,8 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 	EXPECT_EQ( 0, fifo.get_size() );
 	EXPECT_FALSE( err_flag.load() );
 
-	std::list<alpha::concurrent::chunk_statistics> statistics = p_tmg_arg->get_statistics();
-
-	printf( "Statistics is;\n" );
-	for ( auto& e : statistics ) {
-		printf( "%s\n", e.print().c_str() );
-	}
+	auto statistics = p_tmg_arg->get_statistics();
+	printf( "Statistics is;\n%s\n", statistics.print().c_str() );
 
 	delete[] threads;
 }
@@ -254,13 +248,9 @@ void load_test_lockfree_bw_mult_thread_startstop( int num_of_thd, alpha::concurr
 	EXPECT_EQ( 0, fifo.get_size() );
 	EXPECT_FALSE( err_flag.load() );
 
-	std::list<alpha::concurrent::chunk_statistics> statistics = p_tmg_arg->get_statistics();
-
-	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 1, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+	auto statistics = p_tmg_arg->get_statistics();
 	printf( "Statistics is;\n" );
-	for ( auto& e : statistics ) {
-		printf( "%s\n", e.print().c_str() );
-	}
+	printf( "%s\n", statistics.print().c_str() );
 
 	return;
 }
@@ -436,13 +426,12 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 
 		EXPECT_FALSE( err_flag.load() );
 
-		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::gmem_get_statistics();
+		auto statistics = alpha::concurrent::gmem_get_statistics();
 
-		printf( "gmem Statistics is;\n" );
-		for ( auto& e : statistics ) {
+		for ( auto& e : statistics.ch_st_ ) {
 			// EXPECT_EQ( 0, e.valid_chunk_num_ );
 			EXPECT_EQ( 0, e.consum_cnt_ );
-			printf( "%s\n", e.print().c_str() );
 		}
+		printf( "gmem Statistics is;\n%s\n", statistics.print().c_str() );
 	}
 }

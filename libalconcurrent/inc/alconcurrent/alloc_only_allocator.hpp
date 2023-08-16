@@ -16,6 +16,7 @@
 #include <cstdlib>
 
 #include <atomic>
+#include <string>
 
 #include "alconcurrent/conf_logger.hpp"
 
@@ -30,6 +31,25 @@ namespace internal {
 constexpr size_t default_align_size = 32;
 
 class alloc_chamber;
+
+struct alloc_chamber_statistics {
+	size_t chamber_count_;
+	size_t alloc_size_;
+	size_t consum_size_;
+	size_t free_size_;
+
+	constexpr alloc_chamber_statistics( void )
+	  : chamber_count_( 0 )
+	  , alloc_size_( 0 )
+	  , consum_size_( 0 )
+	  , free_size_( 0 )
+	{
+	}
+
+	alloc_chamber_statistics& operator+=( const alloc_chamber_statistics& op );
+
+	std::string print( void ) const;
+};
 
 class alloc_only_chamber {
 public:
@@ -46,7 +66,8 @@ public:
 
 	void detect_unexpected_deallocate( void* );
 
-	void dump_to_log( log_type lt, char c, int id );
+	alloc_chamber_statistics get_statistics( void ) const;
+	void                     dump_to_log( log_type lt, char c, int id );
 
 private:
 	void* try_allocate( size_t req_size, size_t req_align );

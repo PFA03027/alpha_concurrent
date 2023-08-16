@@ -289,21 +289,19 @@ public:
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		alpha::concurrent::gmem_prune();
 
-		printf( "gmem Statistics is;\n" );
-		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::gmem_get_statistics();
-		for ( auto& e : statistics ) {
+		auto statistics = alpha::concurrent::gmem_get_statistics();
+		for ( auto& e : statistics.ch_st_ ) {
 			EXPECT_EQ( 0, e.consum_cnt_ );
-			printf( "%s\n", e.print().c_str() );
 		}
 	}
 	void TearDown() override
 	{
 		printf( "gmem Statistics is;\n" );
-		std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::gmem_get_statistics();
-		for ( auto& e : statistics ) {
+		auto statistics = alpha::concurrent::gmem_get_statistics();
+		for ( auto& e : statistics.ch_st_ ) {
 			EXPECT_EQ( 0, e.consum_cnt_ );
-			printf( "%s\n", e.print().c_str() );
 		}
+		printf( "%s\n", statistics.print().c_str() );
 
 		int err_cnt, warn_cnt;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
@@ -364,20 +362,12 @@ TEST_F( TestGeneralMemAllocator, TestGeneralMemAllocator_prune )
 	p_mem_allocator->deallocate( test_ptr2 );
 
 	auto ret_st = p_mem_allocator->get_statistics();
-	printf( "before prune\n" );
-	for ( auto& e : ret_st ) {
-		auto result_str = e.print();
-		printf( "%s\n", result_str.c_str() );
-	}
+	printf( "before prune\n%s\n", ret_st.print().c_str() );
 
 	p_mem_allocator->prune();
 
 	ret_st = p_mem_allocator->get_statistics();
-	printf( "after prune\n" );
-	for ( auto& e : ret_st ) {
-		auto result_str = e.print();
-		printf( "%s\n", result_str.c_str() );
-	}
+	printf( "after prune\n%s\n", ret_st.print().c_str() );
 
 	test_ptr1       = p_mem_allocator->allocate( 10 );
 	test_ptr2       = p_mem_allocator->allocate( 10 );
@@ -386,11 +376,7 @@ TEST_F( TestGeneralMemAllocator, TestGeneralMemAllocator_prune )
 	void* test_ptr5 = p_mem_allocator->allocate( 10 );
 
 	ret_st = p_mem_allocator->get_statistics();
-	printf( "after prune\n" );
-	for ( auto& e : ret_st ) {
-		auto result_str = e.print();
-		printf( "%s\n", result_str.c_str() );
-	}
+	printf( "after prune\n%s\n", ret_st.print().c_str() );
 
 	p_mem_allocator->deallocate( test_ptr3 );
 	p_mem_allocator->deallocate( test_ptr1 );
@@ -553,13 +539,11 @@ TEST_P( TestGeneralMemAllocator_SizeAlignParam, Boarder_check_of_alignment )
 	// Assert
 	EXPECT_NE( nullptr, test_ptr1 );
 	auto st = p_mem_allocator->get_statistics();
-	for ( auto&& e : st ) {
+	for ( auto&& e : st.ch_st_ ) {
 		printf( "{%zu, %zu} -> {.size_=%zu, .num_=%zu} consum count=%zu\n", GetParam().n_v_, GetParam().align_v_, e.alloc_conf_.size_of_one_piece_, e.alloc_conf_.num_of_pieces_, e.consum_cnt_ );
 	}
-	auto it = st.begin();
-	EXPECT_EQ( it->consum_cnt_, GetParam().consum_count1_ );
-	it++;
-	EXPECT_EQ( it->consum_cnt_, GetParam().consum_count2_ );
+	EXPECT_EQ( st.ch_st_[0].consum_cnt_, GetParam().consum_count1_ );
+	EXPECT_EQ( st.ch_st_[1].consum_cnt_, GetParam().consum_count2_ );
 
 	// Cleanup
 	p_mem_allocator->deallocate( test_ptr1 );
@@ -599,8 +583,5 @@ TEST( expriment_impl, general_mem_allocator_impl_test )
 	);
 
 	auto ret_st = a.get_statistics();
-	for ( auto& e : ret_st ) {
-		auto result_str = e.print();
-		printf( "%s\n", result_str.c_str() );
-	}
+	printf( "%s\n", ret_st.print().c_str() );
 }

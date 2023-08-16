@@ -366,10 +366,10 @@ void node_of_list::operator delete( void* p, void* p2 ) noexcept   // placement 
 	return;
 }
 
-std::list<chunk_statistics> node_of_list::get_statistics( void )
+general_mem_allocator_statistics node_of_list::get_statistics( void )
 {
 #ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
-	return std::list<chunk_statistics> {};
+	return general_mem_allocator_statistics {};
 #else
 #ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
 	return get_gma().get_statistics();

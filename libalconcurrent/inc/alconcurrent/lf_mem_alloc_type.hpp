@@ -53,7 +53,7 @@ struct chunk_statistics {
 	/*!
 	 * @brief	make std::string of statistics information
 	 */
-	std::string print( void );
+	std::string print( void ) const;
 };
 
 }   // namespace concurrent

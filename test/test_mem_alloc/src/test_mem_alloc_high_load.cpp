@@ -76,12 +76,12 @@ TEST( lfmemAllocOneChunk, TC_Load )
 	alpha::concurrent::chunk_statistics e = chms.get_statistics();
 	printf( "%s\n", e.print().c_str() );
 
-	printf( "gmem Statistics is;\n" );
-	std::list<alpha::concurrent::chunk_statistics> statistics = alpha::concurrent::gmem_get_statistics();
-	for ( auto& e : statistics ) {
+	auto statistics = alpha::concurrent::gmem_get_statistics();
+	for ( auto& e : statistics.ch_st_ ) {
 		EXPECT_EQ( 0, e.consum_cnt_ );
-		printf( "%s\n", e.print().c_str() );
 	}
+	printf( "gmem Statistics is;\n" );
+	printf( "%s\n", statistics.print().c_str() );
 
 	chms.dump();
 
@@ -290,11 +290,8 @@ void load_test_lockfree( int num_of_thd )
 	std::cout << "thread is " << num_of_thd
 			  << " one_load_lock_free() Exec time: " << diff.count() << " msec" << std::endl;
 
-	std::list<alpha::concurrent::chunk_statistics> statistics = test_gma.get_statistics();
-
-	for ( auto& e : statistics ) {
-		printf( "%s\n", e.print().c_str() );
-	}
+	auto statistics = test_gma.get_statistics();
+	printf( "%s\n", statistics.print().c_str() );
 
 	delete[] threads;
 }
@@ -326,11 +323,8 @@ void load_test_lockfree_actual_behavior( int num_of_thd )
 	std::cout << "thread is " << num_of_thd
 			  << " one_load_lock_free_actual_behavior() Exec time: " << diff.count() << " msec" << std::endl;
 
-	std::list<alpha::concurrent::chunk_statistics> statistics = test_gma.get_statistics();
-
-	for ( auto& e : statistics ) {
-		printf( "%s\n", e.print().c_str() );
-	}
+	auto statistics = test_gma.get_statistics();
+	printf( "%s\n", statistics.print().c_str() );
 
 	delete[] threads;
 }
@@ -366,11 +360,8 @@ void load_test_lockfree_min2( int num_of_thd )
 			  << " one_load_lock_free_min2() Exec time: " << diff.count() << " msec" << std::endl;
 
 	for ( int i = 0; i < num_of_thd; i++ ) {
-		std::list<alpha::concurrent::chunk_statistics> statistics = free_gma_array[i]->get_statistics();
-
-		for ( auto& e : statistics ) {
-			printf( "%s\n", e.print().c_str() );
-		}
+		auto statistics = free_gma_array[i]->get_statistics();
+		printf( "%s\n", statistics.print().c_str() );
 	}
 
 	for ( int i = 0; i < num_of_thd; i++ ) {
@@ -410,11 +401,8 @@ void load_test_lockfree_min2_actual_behavior( int num_of_thd )
 			  << " one_load_lock_free_actual_behavior() Exec time: " << diff.count() << " msec" << std::endl;
 
 	for ( int i = 0; i < num_of_thd; i++ ) {
-		std::list<alpha::concurrent::chunk_statistics> statistics = free_gma_array[i]->get_statistics();
-
-		for ( auto& e : statistics ) {
-			printf( "%s\n", e.print().c_str() );
-		}
+		auto statistics = free_gma_array[i]->get_statistics();
+		printf( "%s\n", statistics.print().c_str() );
 	}
 
 	for ( int i = 0; i < num_of_thd; i++ ) {
