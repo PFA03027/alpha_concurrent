@@ -26,7 +26,7 @@
 #include "mmap_allocator.hpp"
 
 #ifdef PERFORMANCE_ANALYSIS_LOG1
-#include "lf_mem_alloc_lifo_free_node_list.hpp"
+#include "alconcurrent/lifo_free_node_stack.hpp"
 #endif
 
 static alpha::concurrent::param_chunk_allocation param[] = {

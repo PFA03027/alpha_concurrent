@@ -1,5 +1,5 @@
 /**
- * @file lf_mem_alloc_lifo_free_node_list.hpp
+ * @file lifo_free_node_stack.hpp
  * @author Teruaki Ata <PFA03027@nifty.com>
  * @brief header file of lock-free free node strage(LIFO type)
  * @version 0.1
@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef LF_MEM_ALLOC_LIFO_FREE_NODE_LIST_HPP_
-#define LF_MEM_ALLOC_LIFO_FREE_NODE_LIST_HPP_
+#ifndef LIFO_FREE_NODE_STACK_HPP_
+#define LIFO_FREE_NODE_STACK_HPP_
 
 #include <mutex>
 #include <type_traits>

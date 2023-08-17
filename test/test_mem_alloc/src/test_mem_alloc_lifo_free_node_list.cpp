@@ -11,7 +11,8 @@
 
 #include "gtest/gtest.h"
 
-#include "../src/lf_mem_alloc_lifo_free_node_list.hpp"
+#include "alconcurrent/lifo_free_node_stack.hpp"
+
 #include "../src/lf_mem_alloc_slot.hpp"
 
 static_assert( alpha::concurrent::internal::is_callable_lifo_free_node_if_get_next<alpha::concurrent::internal::slot_header_of_array>::value, "T should have T::get_next() I/F" );
