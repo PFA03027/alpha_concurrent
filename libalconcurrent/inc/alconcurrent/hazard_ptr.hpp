@@ -28,6 +28,9 @@
 namespace alpha {
 namespace concurrent {
 
+template <typename T, int N>
+class hazard_ptr_scoped_ref;
+
 /*!
  * @brief	hazard pointer support class
  *
@@ -47,6 +50,51 @@ public:
 	using hzrd_pointer                 = T*;
 	static constexpr int hzrd_max_slot = N;
 
+	constexpr hazard_ptr( void )
+	  : my_allocator_( true, 4 * 1024 )
+	  , p_allocator_( &my_allocator_ )
+	  , head_( p_allocator_ )
+	  , p_hzd_ptr_node_( threadlocal_handler_functor( this ) )
+	{
+		static_assert( std::is_standard_layout<hazard_ptr>::value, "hazard_ptr should be standard-layout type" );
+	}
+
+	constexpr hazard_ptr( internal::alloc_only_chamber* p_allocator_arg )
+	  : my_allocator_( true, 0 )
+	  , p_allocator_( p_allocator_arg )
+	  , head_( p_allocator_ )
+	  , p_hzd_ptr_node_( threadlocal_handler_functor( this ) )
+	{
+		static_assert( std::is_standard_layout<hazard_ptr>::value, "hazard_ptr should be standard-layout type" );
+	}
+
+	~hazard_ptr( void )
+	{
+	}
+
+	/*!
+	 * @brief	Check whether a pointer is in this hazard list
+	 *
+	 * @retval	true	p_chk_ptr is in this hazard list.
+	 * @retval	false	p_chk_ptr is not in this hazard list.
+	 */
+	bool check_ptr_in_hazard_list( T* p_chk_ptr )
+	{
+		return get_head_instance().check_ptr_in_hazard_list( p_chk_ptr );
+	}
+
+	int debug_get_glist_size( void )
+	{
+		return get_head_instance().get_node_count();
+	}
+
+	void dump_to_log( log_type lt, char c, int id )
+	{
+		head_.dump_to_log( lt, c, id );
+	}
+
+private:
+	////////////////////////////////////////////////////////////////////////////////
 	enum class ocupied_status : int {
 		UNUSED,
 		USING
@@ -185,56 +233,6 @@ public:
 		std::atomic<T*>                   p_target_[N];   //!< hazard pointer strage
 	};
 
-	constexpr hazard_ptr( void )
-	  : my_allocator_( true, 4 * 1024 )
-	  , p_allocator_( &my_allocator_ )
-	  , head_( p_allocator_ )
-	  , p_hzd_ptr_node_( threadlocal_handler_functor( this ) )
-	{
-		static_assert( std::is_standard_layout<hazard_ptr>::value, "hazard_ptr should be standard-layout type" );
-	}
-
-	constexpr hazard_ptr( internal::alloc_only_chamber* p_allocator_arg )
-	  : my_allocator_( true, 0 )
-	  , p_allocator_( p_allocator_arg )
-	  , head_( p_allocator_ )
-	  , p_hzd_ptr_node_( threadlocal_handler_functor( this ) )
-	{
-		static_assert( std::is_standard_layout<hazard_ptr>::value, "hazard_ptr should be standard-layout type" );
-	}
-
-	~hazard_ptr( void )
-	{
-	}
-
-	inline node_for_hazard_ptr* get_tls_node_for_hazard_ptr( void )
-	{
-		return check_local_storage();
-	}
-
-	/*!
-	 * @brief	Check whether a pointer is in this hazard list
-	 *
-	 * @retval	true	p_chk_ptr is in this hazard list.
-	 * @retval	false	p_chk_ptr is not in this hazard list.
-	 */
-	bool check_ptr_in_hazard_list( T* p_chk_ptr )
-	{
-		return get_head_instance().check_ptr_in_hazard_list( p_chk_ptr );
-	}
-
-	int debug_get_glist_size( void )
-	{
-		return get_head_instance().get_node_count();
-	}
-
-	void dump_to_log( log_type lt, char c, int id )
-	{
-		head_.dump_to_log( lt, c, id );
-	}
-
-private:
-	////////////////////////////////////////////////////////////////////////////////
 	struct hazard_node_head {
 		constexpr hazard_node_head( internal::alloc_only_chamber* p_allocator_arg )
 		  : p_allocator_( p_allocator_arg )
@@ -337,17 +335,6 @@ private:
 		std::atomic<int>                  node_count_;    //!< ハザードポインタリストに登録されているノード数
 	};
 
-	hazard_node_head& get_head_instance( void )
-	{
-		return head_;
-	}
-
-	inline node_for_hazard_ptr* check_local_storage( void )
-	{
-		node_for_hazard_ptr* p_ans = p_hzd_ptr_node_.get_tls_instance();
-		return p_ans;
-	}
-
 	struct threadlocal_handler_functor {
 		threadlocal_handler_functor( hazard_ptr* p_node_list_owner_arg )
 		  : p_node_list_owner_( p_node_list_owner_arg )
@@ -371,10 +358,22 @@ private:
 		hazard_ptr* p_node_list_owner_;
 	};
 
+	inline hazard_node_head& get_head_instance( void )
+	{
+		return head_;
+	}
+
+	inline node_for_hazard_ptr* get_tls_node_for_hazard_ptr( void )
+	{
+		return p_hzd_ptr_node_.get_tls_instance();
+	}
+
 	internal::alloc_only_chamber                                   my_allocator_;   //!< ハザードポインタリストに登録されるノードに対する割り当て専用アロケータ
 	internal::alloc_only_chamber*                                  p_allocator_;    //!< ハザードポインタリストに登録されるノードに対する割り当て専用アロケータへの参照
 	hazard_node_head                                               head_;
 	dynamic_tls<node_for_hazard_ptr*, threadlocal_handler_functor> p_hzd_ptr_node_;
+
+	friend hazard_ptr_scoped_ref<T, N>;
 };
 
 /*!
