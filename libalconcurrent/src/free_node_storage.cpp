@@ -118,17 +118,17 @@ void fifo_free_nd_list::push( fifo_free_nd_list::node_pointer const p_push_node 
 	p_push_node->set_next( nullptr, next_slot_idx_ );
 
 	scoped_hazard_ref scoped_ref_cur( hzrd_ptr_, (int)hazard_ptr_idx::PUSH_FUNC_LAST );
-	scoped_hazard_ref scoped_ref_nxt( hzrd_ptr_, (int)hazard_ptr_idx::PUSH_FUNC_NEXT );
+	scoped_hazard_ref scoped_ref_nxt( scoped_ref_cur, (int)hazard_ptr_idx::PUSH_FUNC_NEXT );
 
 	while ( true ) {
 		node_pointer p_cur_last = tail_.load( std::memory_order_acquire );
 
-		hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_last, (int)hazard_ptr_idx::PUSH_FUNC_LAST );
+		scoped_ref_cur.regist_ptr_as_hazard_ptr( p_cur_last );
 
 		if ( p_cur_last != tail_.load( std::memory_order_acquire ) ) continue;
 
 		node_pointer p_cur_next = p_cur_last->get_next( next_slot_idx_ );
-		hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_next, (int)hazard_ptr_idx::PUSH_FUNC_NEXT );
+		scoped_ref_nxt.regist_ptr_as_hazard_ptr( p_cur_next );
 		if ( p_cur_next != p_cur_last->get_next( next_slot_idx_ ) ) continue;
 
 		if ( p_cur_next == nullptr ) {
@@ -154,21 +154,21 @@ void fifo_free_nd_list::push( fifo_free_nd_list::node_pointer const p_push_node 
 fifo_free_nd_list::node_pointer fifo_free_nd_list::pop( void )
 {
 	scoped_hazard_ref scoped_ref_first( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_FIRST );
-	scoped_hazard_ref scoped_ref_last( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_LAST );
-	scoped_hazard_ref scoped_ref_next( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_NEXT );
+	scoped_hazard_ref scoped_ref_last( scoped_ref_first, (int)hazard_ptr_idx::POP_FUNC_LAST );
+	scoped_hazard_ref scoped_ref_next( scoped_ref_first, (int)hazard_ptr_idx::POP_FUNC_NEXT );
 
 	while ( true ) {
 		node_pointer p_cur_first = head_.load( std::memory_order_acquire );
 		node_pointer p_cur_last  = tail_.load( std::memory_order_acquire );
 
-		hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_first, (int)hazard_ptr_idx::POP_FUNC_FIRST );
+		scoped_ref_first.regist_ptr_as_hazard_ptr( p_cur_first );
 		if ( p_cur_first != head_.load( std::memory_order_acquire ) ) continue;
 
-		hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_last, (int)hazard_ptr_idx::POP_FUNC_LAST );
+		scoped_ref_last.regist_ptr_as_hazard_ptr( p_cur_last );
 		if ( p_cur_last != tail_.load( std::memory_order_acquire ) ) continue;
 
 		node_pointer p_cur_next = p_cur_first->get_next( next_slot_idx_ );
-		hzrd_ptr_.regist_ptr_as_hazard_ptr( p_cur_next, (int)hazard_ptr_idx::POP_FUNC_NEXT );
+		scoped_ref_next.regist_ptr_as_hazard_ptr( p_cur_next );
 		if ( p_cur_next != p_cur_first->get_next( next_slot_idx_ ) ) continue;
 
 		if ( p_cur_first == p_cur_last ) {

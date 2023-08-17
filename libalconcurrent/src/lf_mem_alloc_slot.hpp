@@ -219,7 +219,7 @@ struct slot_header_of_array {
 
 	bool next_CAS( slot_header_of_array** pp_expect_ptr, slot_header_of_array* p_desired_ptr )
 	{
-		return sh_.p_next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
+		return sh_.p_next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr, std::memory_order_acq_rel );
 	}
 
 	void dump( int indent = 0 );
@@ -349,7 +349,7 @@ struct slot_container {
 
 	static bool_unified_slot_header_p get_slot_header_from_assignment_p( void* p_mem );
 	static constexpr size_t           calc_slot_container_size( size_t n, size_t req_alignsize );
-	static void*                      construct_slot_container_in_container_buffer( slot_mheader* p_bind_mh_of_slot, slot_container* p_container_top, size_t container_size, size_t n, size_t req_alignsize );
+	static void*                      construct_slot_container_in_container_buffer( slot_mheader* p_bind_mh_of_slot, slot_container* p_container_top, size_t container_size, size_t n, size_t req_align );
 };
 
 static_assert( std::is_standard_layout<slot_container>::value, "slot_container should be standard-layout type" );
@@ -361,7 +361,7 @@ inline constexpr size_t slot_container::calc_slot_container_size( size_t n, size
 	size_t tfit_req_alignsize = ( req_alignsize > default_slot_alignsize ) ? req_alignsize : default_slot_alignsize;
 	size_t base_ans           = sizeof( slot_container ) + tfit_req_alignsize + n;
 	size_t mx                 = base_ans / default_slot_alignsize;   // TODO: ビットマスクを使った演算で多分軽量化できるが、まずは真面目に計算する。
-	size_t rx                 = base_ans % default_slot_alignsize;
+	size_t rx                 = base_ans % default_slot_alignsize;   // ただ、ここは、default_slot_alignsizeは定数かつ2^n上である数値なので、コンパイラの最適化がかかっていると思われる。
 	size_t ans                = mx * default_slot_alignsize + ( ( rx == 0 ) ? 0 : default_slot_alignsize );
 	return ans;
 }

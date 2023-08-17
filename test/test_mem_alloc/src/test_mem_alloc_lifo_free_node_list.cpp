@@ -11,7 +11,8 @@
 
 #include "gtest/gtest.h"
 
-#include "../src/lf_mem_alloc_lifo_free_node_list.hpp"
+#include "alconcurrent/lifo_free_node_stack.hpp"
+
 #include "../src/lf_mem_alloc_slot.hpp"
 
 static_assert( alpha::concurrent::internal::is_callable_lifo_free_node_if_get_next<alpha::concurrent::internal::slot_header_of_array>::value, "T should have T::get_next() I/F" );
@@ -56,8 +57,7 @@ TEST( FreeNodeStack, CanCall_PushPop_tofrom_free_node_stack )
 	int                                             test_int;
 	test_free_node                                  sut_node( &test_int, nullptr );
 	test_free_node_stack                            sut( &aoc );
-	auto                                            p_push_ret = sut.push_to_free_node_stack( &sut_node );
-	ASSERT_EQ( p_push_ret, nullptr );
+	sut.push_to_free_node_stack_wo_hzd_chk( &sut_node );
 
 	// Act
 	test_free_node* p_ret = sut.pop_from_free_node_stack();

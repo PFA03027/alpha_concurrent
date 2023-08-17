@@ -17,14 +17,14 @@ namespace concurrent {
 namespace internal {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void* slot_header_of_array::allocate( slot_container* p_container_top, size_t container_size, size_t n, size_t req_alignsize )
+void* slot_header_of_array::allocate( slot_container* p_container_top, size_t container_size, size_t n, size_t req_align )
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	RECORD_BACKTRACE_GET_BACKTRACE( mh_.alloc_bt_info_ );
 	RECORD_BACKTRACE_INVALIDATE_BACKTRACE( mh_.free_bt_info_ );
 #endif
 
-	void* p_ans = slot_container::construct_slot_container_in_container_buffer( &mh_, p_container_top, container_size, n, req_alignsize );
+	void* p_ans = slot_container::construct_slot_container_in_container_buffer( &mh_, p_container_top, container_size, n, req_align );
 	return p_ans;
 }
 
@@ -66,7 +66,7 @@ void slot_header_of_array::deallocate( void )
 	return;
 }
 
-void* slot_header_of_alloc::allocate( size_t n, size_t req_alignsize )
+void* slot_header_of_alloc::allocate( size_t n, size_t req_align )
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	RECORD_BACKTRACE_GET_BACKTRACE( mh_.alloc_bt_info_ );
@@ -78,7 +78,7 @@ void* slot_header_of_alloc::allocate( size_t n, size_t req_alignsize )
 		reinterpret_cast<slot_container*>( slot_container_buffer_ ),
 		sh_.alloc_size_ - sizeof( slot_header_of_alloc ),
 		n,
-		req_alignsize );
+		req_align );
 	return p_ans;
 }
 
@@ -147,12 +147,27 @@ bool_unified_slot_header_p slot_container::get_slot_header_from_assignment_p( vo
 	return bool_unified_slot_header_p { true, reinterpret_cast<unified_slot_header*>( addr_ush ) };
 }
 
-void* slot_container::construct_slot_container_in_container_buffer( slot_mheader* p_bind_mh_of_slot, slot_container* p_container_top, size_t container_size, size_t n, size_t req_alignsize )
+void* slot_container::construct_slot_container_in_container_buffer( slot_mheader* p_bind_mh_of_slot, slot_container* p_container_top, size_t container_size, size_t n, size_t req_align )
 {
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+	if ( !is_power_of_2( req_align ) ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
+		char buff[128];
+		snprintf( buff, 128, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
+		throw std::logic_error( buff );
+#else
+		internal::LogOutput( log_type::ERR, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
+#endif
+	}
+#endif
 	uintptr_t min_base_addr      = reinterpret_cast<uintptr_t>( p_container_top ) + static_cast<uintptr_t>( sizeof( slot_container ) );
-	uintptr_t tfit_req_alignsize = ( req_alignsize > sizeof( uintptr_t ) ) ? static_cast<uintptr_t>( req_alignsize ) : static_cast<uintptr_t>( sizeof( uintptr_t ) );
+	uintptr_t tfit_req_alignsize = ( req_align > sizeof( uintptr_t ) ) ? static_cast<uintptr_t>( req_align ) : static_cast<uintptr_t>( sizeof( uintptr_t ) );
 	uintptr_t mx                 = min_base_addr / tfit_req_alignsize;   // TODO: ビットマスクを使った演算で多分軽量化できるが、まずは真面目に計算する。
-	uintptr_t rx                 = min_base_addr % tfit_req_alignsize;
+#ifdef ALCONCURRENT_CONF_ENABLE_MODULO_OPERATION_BY_BITMASK
+	uintptr_t rx = min_base_addr & ( tfit_req_alignsize - 1 );   // 剰余計算をビットマスク演算に変更。この時点で、tfit_req_alignsizeが2のn乗でなければならない。
+#else
+	uintptr_t rx = min_base_addr % tfit_req_alignsize;
+#endif
 	uintptr_t ans_addr           = tfit_req_alignsize * mx + ( ( rx == 0 ) ? 0 : tfit_req_alignsize );
 	uintptr_t addr_end_of_alloc  = reinterpret_cast<uintptr_t>( p_container_top ) + static_cast<uintptr_t>( container_size );
 	uintptr_t addr_end_of_assign = ans_addr + static_cast<uintptr_t>( n );

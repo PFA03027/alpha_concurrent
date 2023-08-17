@@ -672,7 +672,6 @@ void* chunk_list::allocate_mem_slot( size_t req_size, size_t req_align )
 	}
 
 	// 既存のchunkの再利用に失敗したので、新しいchunkを確保する。
-	// new演算子を使用するため、ここでもロックが発生する可能性がある。
 	chunk_header_multi_slot* p_new_chms = new ( *p_allocator_ ) chunk_header_multi_slot( cur_alloc_conf, hint_params.tl_id_, &statistics_ );
 	if ( p_new_chms == nullptr ) {
 		return nullptr;
@@ -771,7 +770,6 @@ void* general_mem_allocator_impl_allocate(
 	if ( alloc_mem_info.p_allocated_addr_ == nullptr ) {
 		internal::LogOutput( log_type::ERR, "fail allocate memory by basic_mem_allocator::allocate(%zu, %zu)", buff_size, req_align );
 		return nullptr;
-		// throw std::bad_alloc();
 	}
 	slot_header_of_alloc* p_slot_header_of_alloc = new ( alloc_mem_info.p_allocated_addr_ ) slot_header_of_alloc( alloc_mem_info.allocated_size_ );
 	p_ans                                        = p_slot_header_of_alloc->allocate( n_arg, req_align );

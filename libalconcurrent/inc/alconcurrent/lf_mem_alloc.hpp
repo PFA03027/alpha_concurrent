@@ -33,7 +33,7 @@ void* general_mem_allocator_impl_allocate(
 	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
 	internal::chunk_list* p_param_ch_array_arg,   //!< unique pointer to chunk and param array
 	size_t                n_arg,                  //!< [in] memory size to allocate
-	size_t                req_align               //!< [in] requested align size
+	size_t                req_align               //!< [in] requested align size. req_align should be the power of 2
 );
 void general_mem_allocator_impl_deallocate(
 	unsigned int          pr_ch_size_arg,         //!< array size of chunk and param array
@@ -117,10 +117,28 @@ public:
 	 * @brief	allocate memory
 	 */
 	void* allocate(
-		size_t n_arg,      //!< [in] memory size to allocate
-		size_t req_align   //!< [in] requested align size
+		size_t n_arg   //!< [in] memory size to allocate
 	)
 	{
+		return general_mem_allocator_impl_allocate( pr_ch_size_, param_ch_array_, n_arg, default_slot_alignsize );
+	}
+
+	/*!
+	 * @brief	allocate memory
+	 *
+	 * @exception
+	 * If req_align is not power of 2, throw std::logic_error.
+	 */
+	void* allocate(
+		size_t n_arg,      //!< [in] memory size to allocate
+		size_t req_align   //!< [in] requested align size. req_align should be the power of 2
+	)
+	{
+		if ( !internal::is_power_of_2<decltype( req_align )>( req_align ) ) {
+			char buff[128];
+			snprintf( buff, 128, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
+			throw std::logic_error( buff );
+		}
 		return general_mem_allocator_impl_allocate( pr_ch_size_, param_ch_array_, n_arg, req_align );
 	}
 
@@ -154,6 +172,13 @@ public:
 	{
 		if ( param_ch_array_ != nullptr ) {
 			internal::LogOutput( log_type::WARN, "already setup. ignore this request." );
+			return;
+		}
+
+		if ( p_param_array == nullptr ) {
+			return;
+		}
+		if ( num == 0 ) {
 			return;
 		}
 
@@ -224,8 +249,21 @@ public:
 	 * @brief	allocate memory
 	 */
 	void* allocate(
-		size_t n_arg,                               //!< [in] memory size to allocate
-		size_t req_align = default_slot_alignsize   //!< [in] requested align size
+		size_t n_arg   //!< [in] memory size to allocate
+	)
+	{
+		return allocator_impl_.allocate( n_arg );
+	}
+
+	/*!
+	 * @brief	allocate memory
+	 *
+	 * @exception
+	 * If req_align is not power of 2, throw std::logic_error.
+	 */
+	void* allocate(
+		size_t n_arg,      //!< [in] memory size to allocate
+		size_t req_align   //!< [in] requested align size. req_align should be the power of 2
 	)
 	{
 		return allocator_impl_.allocate( n_arg, req_align );
@@ -291,8 +329,24 @@ private:
  * This uses default_param_array and num_of_default_param_array as initial allocation parameter
  */
 void* gmem_allocate(
-	size_t n,                                   //!< [in] memory size to allocate
-	size_t req_align = default_slot_alignsize   //!< [in] requested align size
+	size_t n   //!< [in] memory size to allocate
+);
+
+/*!
+ * @brief	allocate memory
+ *
+ * This I/F allocates a memory from a global general_mem_allocator instance. @n
+ * The allocated memory must free by gmem_deallocate().
+ *
+ * @note
+ * This uses default_param_array and num_of_default_param_array as initial allocation parameter
+ *
+ * @exception
+ * If req_align is not power of 2, throw std::logic_error.
+ */
+void* gmem_allocate(
+	size_t n,          //!< [in] memory size to allocate
+	size_t req_align   //!< [in] requested align size. req_align should be the power of 2
 );
 
 /*!

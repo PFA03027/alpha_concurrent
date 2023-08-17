@@ -18,9 +18,9 @@
 #include <type_traits>
 
 #include "alconcurrent/dynamic_tls.hpp"
+#include "alconcurrent/lifo_free_node_stack.hpp"
 
 #include "lf_mem_alloc_basic_allocator.hpp"
-#include "lf_mem_alloc_lifo_free_node_list.hpp"
 #include "lf_mem_alloc_slot.hpp"
 
 namespace alpha {

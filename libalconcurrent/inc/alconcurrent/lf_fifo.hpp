@@ -92,7 +92,7 @@ public:
 		p_push_node->set_next( nullptr );
 
 		scoped_hazard_ref scoped_ref_lst( hzrd_ptr_, (int)hazard_ptr_idx::PUSH_FUNC_LAST );
-		scoped_hazard_ref scoped_ref_nxt( hzrd_ptr_, (int)hazard_ptr_idx::PUSH_FUNC_NEXT );
+		scoped_hazard_ref scoped_ref_nxt( scoped_ref_lst, (int)hazard_ptr_idx::PUSH_FUNC_NEXT );
 
 		while ( true ) {
 			node_pointer p_cur_last = tail_.load( std::memory_order_acquire );
@@ -133,8 +133,8 @@ public:
 	std::tuple<node_pointer, value_type> pop( void )
 	{
 		scoped_hazard_ref scoped_ref_first( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_FIRST );
-		scoped_hazard_ref scoped_ref_last( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_LAST );
-		scoped_hazard_ref scoped_ref_next( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_NEXT );
+		scoped_hazard_ref scoped_ref_last( scoped_ref_first, (int)hazard_ptr_idx::POP_FUNC_LAST );
+		scoped_hazard_ref scoped_ref_next( scoped_ref_first, (int)hazard_ptr_idx::POP_FUNC_NEXT );
 
 		while ( true ) {
 			node_pointer p_cur_first = head_.load( std::memory_order_acquire );
@@ -199,10 +199,10 @@ public:
 	}
 
 private:
-	fifo_nd_list( const fifo_nd_list& ) = delete;
-	fifo_nd_list( fifo_nd_list&& )      = delete;
+	fifo_nd_list( const fifo_nd_list& )           = delete;
+	fifo_nd_list( fifo_nd_list&& )                = delete;
 	fifo_nd_list operator=( const fifo_nd_list& ) = delete;
-	fifo_nd_list operator=( fifo_nd_list&& ) = delete;
+	fifo_nd_list operator=( fifo_nd_list&& )      = delete;
 
 	using scoped_hazard_ref = hazard_ptr_scoped_ref<node_type, hzrd_max_slot_>;
 
@@ -373,10 +373,10 @@ public:
 	}
 
 private:
-	fifo_list( const fifo_list& ) = delete;
-	fifo_list( fifo_list&& )      = delete;
+	fifo_list( const fifo_list& )            = delete;
+	fifo_list( fifo_list&& )                 = delete;
 	fifo_list& operator=( const fifo_list& ) = delete;
-	fifo_list& operator=( fifo_list&& ) = delete;
+	fifo_list& operator=( fifo_list&& )      = delete;
 
 	using free_nd_storage_type = internal::free_nd_storage;
 	using free_node_type       = typename free_nd_storage_type::node_type;

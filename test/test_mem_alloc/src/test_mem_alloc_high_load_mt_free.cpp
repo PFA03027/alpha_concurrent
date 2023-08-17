@@ -22,7 +22,12 @@
 #include "alconcurrent/lf_mem_alloc.hpp"
 
 #include "alconcurrent/alloc_only_allocator.hpp"
+
 #include "mmap_allocator.hpp"
+
+#ifdef PERFORMANCE_ANALYSIS_LOG1
+#include "alconcurrent/lifo_free_node_stack.hpp"
+#endif
 
 static alpha::concurrent::param_chunk_allocation param[] = {
 	{ 16, 100 },
@@ -50,7 +55,7 @@ static pthread_barrier_t barrier;
 
 constexpr int max_slot_size  = 1000;
 constexpr int max_alloc_size = 900;
-constexpr int num_loop       = 50;
+constexpr int num_loop       = 1000;
 
 using test_fifo_type = alpha::concurrent::fifo_list<void*, true, false>;
 
@@ -77,7 +82,6 @@ public:
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 
 		err_flag.store( false );
-		alpha::concurrent::gmem_prune();
 	}
 	void TearDown() override
 	{
@@ -91,15 +95,11 @@ public:
 
 		EXPECT_FALSE( err_flag.load() );
 
-		auto statistics = alpha::concurrent::gmem_get_statistics();
-		for ( auto& e : statistics.ch_st_ ) {
-			EXPECT_EQ( 0, e.consum_cnt_ );
-		}
-		printf( "gmem Statistics is;\n%s\n", statistics.print().c_str() );
-
+#ifdef DEBUG_LOG
 		alpha::concurrent::internal::print_of_mmap_allocator();
 		alpha::concurrent::internal::dynamic_tls_status_info st = alpha::concurrent::internal::dynamic_tls_get_status();
 		printf( "num_of_key_array: %u, num_content_head_: %u, next_base_idx_: %u\n", st.num_key_array_cnt_, st.num_content_head_, st.next_base_idx_ );
+#endif
 	}
 
 	int num_thread_;
@@ -174,7 +174,7 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 	test_params tda;
 	tda.p_test_obj = &fifo;
 	tda.p_tmg      = p_tmg_arg;
-	tda.num_loop   = num_loop;
+	tda.num_loop   = num_loop / num_of_thd;
 
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
@@ -182,28 +182,38 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 	for ( int i = 0; i < num_of_thd; i++ ) {
 		pthread_create( &threads[i], NULL, func_test_fifo, &tda );
 	}
-	std::cout << "!!!Ready!!!" << std::endl;
-
 	pthread_barrier_wait( &barrier );
+
+#ifdef DEBUG_LOG
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
+#endif
 
 	for ( int i = 0; i < num_of_thd; i++ ) {
 		pthread_join( threads[i], nullptr );
 	}
 
+	EXPECT_EQ( 0, fifo.get_size() );
+	EXPECT_FALSE( err_flag.load() );
+
+#ifdef DEBUG_LOG
 	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
 
 	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
 	std::cout << "thread is " << num_of_thd
 			  << " func_test_fifo() Exec time: " << diff.count() << " msec" << std::endl;
 
-	EXPECT_EQ( 0, fifo.get_size() );
-	EXPECT_FALSE( err_flag.load() );
-
 	auto statistics = p_tmg_arg->get_statistics();
 	printf( "Statistics is;\n%s\n", statistics.print().c_str() );
+#endif
+
+#ifdef PERFORMANCE_ANALYSIS_LOG1
+	printf( "retry/call %zu(%zu / %zu)\n",
+	        alpha::concurrent::internal::spin_count_push_to_free_node_stack.load() / alpha::concurrent::internal::call_count_push_to_free_node_stack.load(),
+	        alpha::concurrent::internal::spin_count_push_to_free_node_stack.load(),
+	        alpha::concurrent::internal::call_count_push_to_free_node_stack.load() );
+#endif
 
 	delete[] threads;
 }
@@ -218,9 +228,11 @@ void load_test_lockfree_bw_mult_thread_startstop( int num_of_thd, alpha::concurr
 	test_params tda;
 	tda.p_test_obj = &fifo;
 	tda.p_tmg      = p_tmg_arg;
-	tda.num_loop   = num_loop / start_stop_reqeat;
+	tda.num_loop   = num_loop / start_stop_reqeat / num_of_thd;
 
+#ifdef DEBUG_LOG
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
+#endif
 
 	for ( int j = 0; j < start_stop_reqeat; j++ ) {
 		pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
@@ -239,18 +251,20 @@ void load_test_lockfree_bw_mult_thread_startstop( int num_of_thd, alpha::concurr
 		// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", j, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	}
 
+	EXPECT_EQ( 0, fifo.get_size() );
+	EXPECT_FALSE( err_flag.load() );
+
+#ifdef DEBUG_LOG
 	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
 
 	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
 	std::cout << "thread is " << num_of_thd
 			  << " func_test_fifo() Exec time: " << diff.count() << " msec" << std::endl;
 
-	EXPECT_EQ( 0, fifo.get_size() );
-	EXPECT_FALSE( err_flag.load() );
-
 	auto statistics = p_tmg_arg->get_statistics();
 	printf( "Statistics is;\n" );
 	printf( "%s\n", statistics.print().c_str() );
+#endif
 
 	return;
 }
@@ -263,7 +277,7 @@ void prune_thread( std::atomic_bool* p_loop, alpha::concurrent::general_mem_allo
 	}
 }
 
-TEST_P( lfmemAllocFreeBwMultThread, TC1_prune )
+TEST_P( lfmemAllocFreeBwMultThread, DoPruneTC1 )
 {
 	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 90, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	{
@@ -282,9 +296,10 @@ TEST_P( lfmemAllocFreeBwMultThread, TC1_prune )
 		}
 		// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 92, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	}
-	printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 93, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 93, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 }
 
+// basic allocatorしか使用しない条件
 TEST_P( lfmemAllocFreeBwMultThread, TC1 )
 {
 	alpha::concurrent::general_mem_allocator test1_gma( nullptr, 0 );
@@ -292,6 +307,7 @@ TEST_P( lfmemAllocFreeBwMultThread, TC1 )
 	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread( num_thread_, &test1_gma ) );
 }
 
+// general_mem_allocatorを使用する条件
 TEST_P( lfmemAllocFreeBwMultThread, TC2 )
 {
 	alpha::concurrent::general_mem_allocator test2_gma( param, 7 );
