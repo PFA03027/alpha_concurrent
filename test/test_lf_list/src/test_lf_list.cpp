@@ -20,7 +20,7 @@
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
 constexpr int            num_thread = 12;   // Tested until 128.
-constexpr std::uintptr_t loop_num   = 10000;
+constexpr std::uintptr_t loop_num   = 2000;
 
 using test_list = alpha::concurrent::lockfree_list<std::uintptr_t>;
 

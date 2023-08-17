@@ -55,7 +55,7 @@ static pthread_barrier_t barrier;
 
 constexpr int max_slot_size  = 1000;
 constexpr int max_alloc_size = 900;
-constexpr int num_loop       = 500;
+constexpr int num_loop       = 1000;
 
 using test_fifo_type = alpha::concurrent::fifo_list<void*, true, false>;
 
