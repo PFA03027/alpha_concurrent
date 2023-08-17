@@ -42,8 +42,16 @@ static_general_mem_allocator<14> get_g_gm_mem_instance_singleton(
 }   // namespace internal
 
 void* gmem_allocate(
-	size_t n,   //!< [in] memory size to allocate
-	size_t req_align )
+	size_t n   //!< [in] memory size to allocate
+)
+{
+	return internal::get_g_gm_mem_instance_singleton.allocate( n, default_slot_alignsize );
+}
+
+void* gmem_allocate(
+	size_t n,          //!< [in] memory size to allocate
+	size_t req_align   //!< [in] requested align size. req_align should be the power of 2
+)
 {
 	return internal::get_g_gm_mem_instance_singleton.allocate( n, req_align );
 }

@@ -49,7 +49,7 @@ struct room_boader {
 	 * @brief calculate allocated memory top address from base_addr that is room_boarder class with considering alignment
 	 *
 	 * @param base_addr top address of room_boarder class
-	 * @param req_align considering alignment
+	 * @param req_align considering alignment. req_align should be the power of 2
 	 * @return uintptr_t allocated memory top address
 	 */
 	static uintptr_t calc_allocated_addr( uintptr_t base_addr, size_t req_align );
@@ -57,10 +57,25 @@ struct room_boader {
 
 inline uintptr_t room_boader::calc_allocated_addr( uintptr_t base_addr, size_t req_align )
 {
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+	if ( !is_power_of_2( req_align ) ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
+		char buff[128];
+		snprintf( buff, 128, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
+		throw std::logic_error( buff );
+#else
+		internal::LogOutput( log_type::ERR, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
+#endif
+	}
+#endif
 	uintptr_t addr_ch_end         = static_cast<uintptr_t>( sizeof( room_boader ) ) + base_addr;
-	uintptr_t num_of_align_blocks = addr_ch_end / static_cast<uintptr_t>( req_align );
-	uintptr_t r_of_align_blocks   = addr_ch_end % static_cast<uintptr_t>( req_align );
-	uintptr_t addr_alloc_top      = static_cast<uintptr_t>( req_align ) * ( num_of_align_blocks + ( ( r_of_align_blocks == 0 ) ? 0 : 1 ) );
+	uintptr_t num_of_align_blocks = addr_ch_end / static_cast<uintptr_t>( req_align );   // TODO: ビットマスクを使った演算で多分軽量化できるが、まずは真面目に計算する。
+#ifdef ALCONCURRENT_CONF_ENABLE_MODULO_OPERATION_BY_BITMASK
+	uintptr_t r_of_align_blocks = addr_ch_end & ( static_cast<uintptr_t>( req_align ) - 1 );   // 剰余計算をビットマスク演算に変更。この時点で、req_alignが2のn乗でなければならない。
+#else
+	uintptr_t r_of_align_blocks = addr_ch_end % static_cast<uintptr_t>( req_align );
+#endif
+	uintptr_t addr_alloc_top = static_cast<uintptr_t>( req_align ) * ( num_of_align_blocks + ( ( r_of_align_blocks == 0 ) ? 0 : 1 ) );
 	return addr_alloc_top;
 }
 
@@ -152,8 +167,8 @@ private:
 
 constexpr uintptr_t alloc_chamber::calc_init_offset( void )
 {
-	size_t n = sizeof( alloc_chamber ) / default_align_size;
-	size_t r = sizeof( alloc_chamber ) % default_align_size;
+	size_t n = sizeof( alloc_chamber ) / default_align_size;   // TODO: ビットマスクを使った演算で多分軽量化できるが、まずは真面目に計算する。
+	size_t r = sizeof( alloc_chamber ) % default_align_size;   // ただ、ここは、default_slot_alignsizeは定数かつ2^n上である数値なので、コンパイラの最適化がかかっていると思われる。
 	return default_align_size * ( n + ( ( r == 0 ) ? 0 : 1 ) );
 }
 
@@ -331,7 +346,7 @@ void alloc_only_chamber::munmap_alloc_chamber( alloc_chamber* p_ac )
 	return;
 }
 
-void* alloc_only_chamber::allocate( size_t req_size, size_t req_align )
+void* alloc_only_chamber::chked_allocate( size_t req_size, size_t req_align )
 {
 	void* p_ans = try_allocate( req_size, req_align );
 

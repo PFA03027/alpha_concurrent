@@ -16,7 +16,9 @@
 #include <cstdlib>
 
 #include <atomic>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
 
 #include "alconcurrent/conf_logger.hpp"
 
@@ -29,6 +31,25 @@ namespace internal {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 // internal I/F
 constexpr size_t default_align_size = 32;
+
+/**
+ * @brief is power of 2 ?
+ *
+ * @param v
+ * @return true
+ * @return false
+ */
+template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+constexpr bool is_power_of_2( T v )
+{
+	// 2のn乗かどうかを判定する。
+	if ( v < 2 ) return false;
+
+	// step1: 最も下位に1が立っているビットのみ残した値を抽出する
+	auto v2 = -v & v;
+	// step2: 2のn乗の数値は、ビットが1つだけ立っている。よって、2のn乗の数値は最も下位のビットが1つだけ。よって、v2はvと同じになる。
+	return v == v2;
+}
 
 class alloc_chamber;
 
@@ -63,7 +84,19 @@ public:
 
 	~alloc_only_chamber();
 
-	void* allocate( size_t req_size, size_t req_align );
+	inline void* allocate( size_t req_size )
+	{
+		return chked_allocate( req_size, default_align_size );
+	}
+	void* allocate( size_t req_size, size_t req_align )
+	{
+		if ( !is_power_of_2( req_align ) ) {
+			char buff[128];
+			snprintf( buff, 128, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
+			throw std::logic_error( buff );
+		}
+		return chked_allocate( req_size, req_align );
+	}
 
 	void detect_unexpected_deallocate( void* );
 
@@ -71,6 +104,7 @@ public:
 	void                     dump_to_log( log_type lt, char c, int id );
 
 private:
+	void* chked_allocate( size_t req_size, size_t req_align );
 	void* try_allocate( size_t req_size, size_t req_align );
 	void  push_alloc_mem( void* p_alloced_mem, size_t allocated_size );
 	void  munmap_alloc_chamber( alloc_chamber* p_ac );
