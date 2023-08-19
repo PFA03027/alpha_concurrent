@@ -144,6 +144,9 @@ Current linking library of test decided by cmake.
 Therefore please configure cmake option "ALCONCURRENT_BUILD_SHARED_LIBS" via make option according your purpose like below;
         $ make ALCONCURRENT_BUILD_SHARED_LIBS=ON all  
 
+If you would like to do debug build, please type like below;
+        $ make BUILDTYPE=Debug test  
+
 ### Build test code and execute test
 After Build step, please execute below commands  
         $ make test  

@@ -13,6 +13,7 @@
 #define MMAP_ALLOCATOR_HPP_
 
 #include <cstdlib>
+#include <limits>
 
 namespace alpha {
 namespace concurrent {
@@ -58,7 +59,8 @@ alloc_mmap_status get_alloc_mmap_status( void );
 void print_of_mmap_allocator( void );
 
 // configuration value
-constexpr size_t conf_max_mmap_alloc_size = 1024 * 1024 * 1024;   // 1G
+// constexpr size_t conf_max_mmap_alloc_size = 1024UL * 1024UL * 1024UL;   // 1G
+constexpr size_t conf_max_mmap_alloc_size = std::numeric_limits<size_t>::max() / 2UL;
 
 }   // namespace internal
 }   // namespace concurrent

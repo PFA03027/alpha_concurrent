@@ -19,6 +19,9 @@ constexpr size_t test_conf_pre_mmap_size = 1024 * 1024;
 
 TEST( MMAP_Alocator, DO_max_size )
 {
+	if ( alpha::concurrent::internal::conf_max_mmap_alloc_size > ( 1024UL * 1024UL * 1024UL * 32UL ) ) {
+		return;   // 32Gを超えるようなら、多分テスト不可能なので、テストをスキップする。
+	}
 	// Arrange
 
 	// Act
@@ -35,6 +38,9 @@ TEST( MMAP_Alocator, DO_max_size )
 
 TEST( MMAP_Alocator, DO_max_size_plus_one )
 {
+	if ( alpha::concurrent::internal::conf_max_mmap_alloc_size > ( 1024UL * 1024UL * 1024UL * 32UL ) ) {
+		return;   // 32Gを超えるようなら、多分テスト不可能なので、テストをスキップする。
+	}
 	// Arrange
 
 	// Act
