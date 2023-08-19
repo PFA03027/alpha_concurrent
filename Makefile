@@ -18,6 +18,11 @@ BUILDTARGET?=common
 # 
 BUILDTYPE?=Release
 
+# Select build library type
+# ALCONCURRENT_BUILD_SHARED_LIBS=OFF -> static library
+# ALCONCURRENT_BUILD_SHARED_LIBS=ON -> shared library
+ALCONCURRENT_BUILD_SHARED_LIBS?=OFF
+
 # Sanitizer test option:
 # SANITIZER_TYPE= 1 ~ 20 or ""
 #
@@ -35,7 +40,7 @@ JOBS=$(shell expr ${CPUS} + ${CPUS} / 2)
 all: build
 	set -e; \
 	cd ${BUILD_DIR}; \
-	cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -DSANITIZER_TYPE=${SANITIZER_TYPE} -G "Unix Makefiles" ../; \
+	cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -DSANITIZER_TYPE=${SANITIZER_TYPE} -DALCONCURRENT_BUILD_SHARED_LIBS=${ALCONCURRENT_BUILD_SHARED_LIBS} -G "Unix Makefiles" ../; \
 	cmake --build . -j ${JOBS} -v --target ${BUILDIMPLTARGET}
 
 test: build-test

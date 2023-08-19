@@ -105,11 +105,6 @@ If the required size is over the max size of configuration paramter, it is alloc
 
 general_mem_allocator::prune() and gmem_prune() is introduce to release the allocated memory if that is release by general_mem_allocator::deallocate() or gmem_deallocate().
 
-# Important points
-If disable ALCONCURRENT_CONF_USE_THREAD_LOCAL, Whether the provided class is lock-free depends on whether the POSIX API for thread-local storage is lock-free.
-
-If the POSIX thread-local storage API is lock-free, the main operations such as push () / pop () will behave as lock-free.
-
 # Build
 There is 2way for build
 1. build by make  
@@ -128,77 +123,85 @@ If you would like to build this library as a shared library on your platform, pl
 ### To install your system
 Current libalconcurrent builder is not prepared installing logic.
 Therefore please do below by your build system or manual operation.
-1. copy the folder libalconcurrent/inc/alconcurrent into your expected header file directory
+1. copy the header files directory that is libalconcurrent/inc/alconcurrent into your expected header files directory
 2. copy the library file "libalconcurrent/libalconcurrent.a" into your expected library files directory
 
 If you build libalconcurrent as a shared library, please copy it.
 
 ## How to build by cmake
 ### Pre-condition:
-1. Checkout googletest.  
-Because libalconcurrent includes googletset as submodule, please execute below to checkout googletest;  
-        $ git submodule update --init --recursive  
-Currently, libalconcurrent uses googletest v1.11.0.
-
-2. Please prepare cmake on your system.  
+Please prepare cmake on your system.  
 In case of Windows system, please download cmake windows binary from https://cmake.org/download/.  
 After install, please copy xxx/CMake/yyy to zzz/migwin/.  
 Cmake is installed into C:\Program Files\CMake normally. And E.g, the eclipse environment is C:\Eclipse\pleiades\eclipse\mingw.  
 In this case, Copy all folders in C:\Program Files\CMake to C:\Eclipse\pleiades\eclipse\mingw.
 
-### Build step
-1. Prepare build directory for cmake build
-2. type command in the prepared directory  
-        $ mkdir build  
-        $ cd build  
-        $ cmake -G "your target generater" <path of alpha_concurrent>  
-        $ cmake --build .  
-You could refer make_win_eclipse.sh or make_linux.sh as the sample for above commands
+### Build by cmake for library only build
+type command in the prepared directory  
+        $ make all  
 
 Current linking library of test decided by cmake.
-Therefore please configure cmake global option "BUILD_SHARED_LIBS" according your purpose like below;
-        $ cmake -D BUILD_SHARED_LIBS=ON .....(other command line options)
-
-If you would like to do parallel build, please use -j N option or environment variable CMAKE_BUILD_PARALLEL_LEVEL for CMake.
-Especially, in case that you will use Eclipse with CMake project, please select the approach "environment variable CMAKE_BUILD_PARALLEL_LEVEL for CMake".
+Therefore please configure cmake option "ALCONCURRENT_BUILD_SHARED_LIBS" via make option according your purpose like below;
+        $ make ALCONCURRENT_BUILD_SHARED_LIBS=ON all  
 
 ### Build test code and execute test
 After Build step, please execute below commands  
-        $ cmake --build . --target build-test  
-        $ cmake --build . --target test  
+        $ make test  
 
 # Configuration MACRO
 Please refer common.cmake also
 
-### ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
-If comiple with ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC, lock free algorithms uses malloc/free instead of general_mem_allocator.
-
 ### ALCONCURRENT_CONF_USE_THREAD_LOCAL
 If compile with ALCONCURRENT_CONF_USE_THREAD_LOCAL, this library uses thread_local for dynamic thread local storage class instead of pthread thread local storage.  
 If you could rely on the destructor behavior of thread_local variable of C++ compiler, you could enable this option.  
-And then, you could get a little bit better performance.  
+And then, you could get better performance.  
 (G++ version 11.3.0 works well.)
+So, now this option is defined as default configuration.
+
+### ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
+If compile with ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER, memory slot offset is checked by simple algorithm.
+This makes better behavior for memory corruption.
+So, now this option is defined as default configuration.
+
+### ALCONCURRENT_CONF_PREFER_TO_SHARE_CHUNK
+If compile with ALCONCURRENT_CONF_PREFER_TO_SHARE_CHUNK, it will behave like sharing the memory slot as much as possible.  
+If this option is not set, prefer to use per-thread memory slots. Since each thread has an independent memory slot, it is less likely that memory allocation and release contention will occur. On the other hand, since each thread has an empty memory slot, the efficiency of memory usage decreases.
+
+### Utility option
+#### ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+If define this macro, it enables to measure the additional statistics that is the internal information to debug lock-free algorithm.
+
+### Debug purpose options
+#### ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+If you would like to pass through a memory allocation request to malloc() always, please define this macro.
+
+This macro loses the lock-free nature of the memory allocation process and is prone to memory fragmentation. Instead, the compiler sanitizer has the benefit of working effectively.
+
+#### ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+If you would like to record the backtrace of allcation and free for debugging, please define this macro.
+If you define this macro, the compilation also needs -g(debug symbol) and it is better to define  -rdynamic.
+
+#### ALCONCURRENT_CONF_ENABLE_CHECK_OVERRUN_WRITING
+If compile with ALCONCURRENT_CONF_ENABLE_CHECK_OVERRUN_WRITING, write over run is checked.
+
+### Internal use build option
+#### ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+If compile with ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR, it will detect logical error. This is only for internal debugging or porting activity.
+
+#### ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
+If compile with ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION, it throw std::logic_error when detect logical error. This is only for internal debugging or porting activity.
+
+#### ALCONCURRENT_CONF_ENABLE_MALLOC_INSTEAD_OF_MMAP
+When doing memory sanitizer test for internal lf_mem_alloc, this option is needed. In case of defined this option, lf_mem_alloc will call malloc/free instead of mmap/munmap. This is only for internal debugging or porting activity.
+
+### ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC
+If comiple with ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC, lock free algorithms uses malloc/free instead of general_mem_allocator.
 
 ### ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DEBUG, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP
 Configuration for log output type.
 Error log is alway enable to output.
 
-### ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-If define this macro, it enables to measure the additional statistics that is the internal information to debug lock-free algorithm.
-
-### ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
-If you would like to pass through a memory allocation request to malloc() always, please define this macro.
-
-This macro loses the lock-free nature of the memory allocation process and is prone to memory fragmentation. Instead, the compiler sanitizer has the benefit of working effectively.
-
-### ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-If you would like to record the backtrace of allcation and free for debugging, please define this macro.
-If you define this macro, the compilation also needs -g(debug symbol) and it is better to define  -rdynamic.
-
-### ALCONCURRENT_CONF_ENABLE_NON_REUSE_MEMORY_SLOT
-Even if an allocated memory via general_mem_allocator is free, it just marks as discared and not re-use it.
-This will makes memory leak. On the other hand, it is effective to analyze double free bug.
-If you use this option, it is recommened to enable ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE also.
+### 
 
 # Patent
 ## Hazard pointer algorithm

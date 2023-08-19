@@ -367,7 +367,7 @@ private:
  * If this I / F parameter setting is not performed, memory allocation using malloc / free will be performed. @n
  * このI/Fによるパラメータ設定が行われない場合、malloc/freeを使用したメモリアロケーションが行われる。
  *
- * @warning if compile with ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC, this API has no effect.
+ * @warning if compile with ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC, this API has no effect.
  */
 void set_param_to_free_nd_mem_alloc(
 	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array

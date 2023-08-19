@@ -277,7 +277,7 @@ static param_chunk_allocation param[] = {
 };
 #endif
 
-#ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC
 // not set paramter, because compile option request to use malloc/free
 #else
 #ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
@@ -294,7 +294,7 @@ static general_mem_allocator& get_gma( void )
 void* node_of_list::operator new( std::size_t n )   // usual new...(1)
 {
 	void* p_ans;
-#ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC
 	p_ans = std::malloc( n );
 	// p_ans = ::operator new( n );
 #else
@@ -311,7 +311,7 @@ void* node_of_list::operator new( std::size_t n )   // usual new...(1)
 }
 void node_of_list::operator delete( void* p_mem ) noexcept   // usual new...(2)
 {
-#ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC
 	std::free( p_mem );
 	// ::operator delete( p_mem );
 #else
@@ -327,7 +327,7 @@ void node_of_list::operator delete( void* p_mem ) noexcept   // usual new...(2)
 void* node_of_list::operator new[]( std::size_t n )   // usual new...(1)
 {
 	void* p_ans;
-#ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC
 	p_ans = std::malloc( n );
 	// p_ans = ::operator new[]( n );
 #else
@@ -344,7 +344,7 @@ void* node_of_list::operator new[]( std::size_t n )   // usual new...(1)
 }
 void node_of_list::operator delete[]( void* p_mem ) noexcept   // usual new...(2)
 {
-#ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC
 	std::free( p_mem );
 	// ::operator delete[]( p_mem );
 #else
@@ -368,7 +368,7 @@ void node_of_list::operator delete( void* p, void* p2 ) noexcept   // placement 
 
 general_mem_allocator_statistics node_of_list::get_statistics( void )
 {
-#ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC
 	return general_mem_allocator_statistics {};
 #else
 #ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
@@ -405,7 +405,7 @@ void set_param_to_free_nd_mem_alloc(
 	unsigned int                  num              //!< [in] array size
 )
 {
-#ifdef ALCONCURRENT_CONF_NOT_USE_LOCK_FREE_MEM_ALLOC
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC
 	// not set paramter, because compile option request to use malloc/free
 #else
 #ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
