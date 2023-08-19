@@ -98,14 +98,14 @@ struct free_node_stack {
 	using hzd_ptr_mgr_type = hazard_ptr<node_type, HZD_IDX_MAX>;
 	using scoped_hzd_type  = hazard_ptr_scoped_ref<node_type, HZD_IDX_MAX>;
 
-	free_node_stack( alloc_only_chamber* p_allocator_arg )
+	constexpr free_node_stack( alloc_only_chamber* p_allocator_arg )
 	  : hzd_ptrs_( p_allocator_arg )
 	  , p_free_node_stack_head_( nullptr )
 	  , mtx_consignment_stack_()
 	  , p_consignment_stack_head_( nullptr )
 	  , tls_p_hazard_slot_stack_head_( threadlocal_no_allocate_handler( this ) )
 	{
-		static_assert( std::is_standard_layout<free_node_stack>::value, "slot_array_mgr should be standard-layout type" );
+		static_assert( std::is_standard_layout<free_node_stack>::value, "free_node_stack should be standard-layout type" );
 	}
 
 	/**

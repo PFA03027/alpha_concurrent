@@ -183,7 +183,7 @@ struct concept_type_deallocater<
 
 template <
 	typename T,                                      //!< Type as original
-	bool MV_OWNERSHIP                      = true,   //!< move an ownership into a instance of class. If true, destructor will call delete operator.
+	bool MV_OWNERSHIP                      = true,   //!< move an ownership into an instance of class. If true, destructor will call delete operator.
 	typename CONCEPT_ALLOCATION_REQUIRED   = void,   //!< concept switch. if T requires to allocate, this will be defined.
 	typename CONCEPT_DEALLOCATION_REQUIRED = void    //!< concept switch. if T requires to deallocate, this will be defined.
 	>

@@ -216,12 +216,14 @@
             "program": "${workspaceFolder}/build/test/test_mem_alloc/test_mem_alloc",
             "args": [
                 "--gtest_catch_exceptions=0",
-                "--gtest_repeat=100",
+                // "--gtest_repeat=100",
+                // "--gtest_repeat=2000",
+                // "--gtest_shuffle",
                 // "--gtest_filter=many_tls/lfmemAllocFreeBwMultThread.TC1_prune/0:many_tls/lfmemAllocFreeBwMultThread.TC1_prune/3:various_threads/lfmemAllocLoadTest.load_test_lockfree_actual_behavior/1:lfmemAllocLoad.TC_Unstable_Threads",
                 // "--gtest_filter=many_tls/lfmemAllocFreeBwMultThread.TC1_prune/3",
                 // "--gtest_filter=various_threads/lfmemAllocLoadTest.load_test_lockfree_actual_behavior/1",
                 // "--gtest_filter=many_tls/lfmemAllocFreeBwMultThread.TC1/2",
-                "--gtest_filter=lfmemAlloc.TestGMemAllocator"
+                // "--gtest_filter=lfmemAlloc.TestGMemAllocator"
                 // "--gtest_filter=lfmemAlloc_prune.TestAllocFreeBwMultThread1"
                 // "--gtest_filter=lfmemAllocLoad.TC_Unstable_Threads"
             ],

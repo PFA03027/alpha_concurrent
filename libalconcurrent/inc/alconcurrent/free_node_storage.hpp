@@ -62,7 +62,7 @@ struct node_of_list {
 
 	bool next_CAS( node_of_list** pp_expect_ptr, node_of_list* p_desired_ptr, next_slot_idx cur_slot_idx )
 	{
-		return next_[(int)cur_slot_idx].compare_exchange_weak( *pp_expect_ptr, p_desired_ptr );
+		return next_[(int)cur_slot_idx].compare_exchange_weak( *pp_expect_ptr, p_desired_ptr, std::memory_order_acq_rel );
 	}
 
 	virtual void release_ownership( void );
