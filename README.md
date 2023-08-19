@@ -141,10 +141,10 @@ type command in the prepared directory
         $ make all  
 
 Current linking library of test decided by cmake.
-Therefore please configure cmake option "ALCONCURRENT_BUILD_SHARED_LIBS" via make option according your purpose like below;
+Therefore please configure cmake option "ALCONCURRENT_BUILD_SHARED_LIBS" via make option according your purpose like below;  
         $ make ALCONCURRENT_BUILD_SHARED_LIBS=ON all  
 
-If you would like to do debug build, please type like below;
+If you would like to do debug build, please type like below;  
         $ make BUILDTYPE=Debug test  
 
 ### Build test code and execute test
@@ -197,10 +197,10 @@ If compile with ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION, it throw s
 #### ALCONCURRENT_CONF_ENABLE_MALLOC_INSTEAD_OF_MMAP
 When doing memory sanitizer test for internal lf_mem_alloc, this option is needed. In case of defined this option, lf_mem_alloc will call malloc/free instead of mmap/munmap. This is only for internal debugging or porting activity.
 
-### ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC
+#### ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC
 If comiple with ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC, lock free algorithms uses malloc/free instead of general_mem_allocator.
 
-### ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DEBUG, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP
+#### ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_INFO, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DEBUG, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_TEST, ALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP
 Configuration for log output type.
 Error log is alway enable to output.
 
