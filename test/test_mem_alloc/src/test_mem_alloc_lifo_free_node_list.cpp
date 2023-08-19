@@ -11,7 +11,7 @@
 
 #include "gtest/gtest.h"
 
-#include "alconcurrent/lifo_free_node_stack.hpp"
+#include "../src/lifo_free_node_stack.hpp"
 
 #include "../src/lf_mem_alloc_slot.hpp"
 
