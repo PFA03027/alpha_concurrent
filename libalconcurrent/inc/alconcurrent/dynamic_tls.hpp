@@ -241,7 +241,6 @@ class dynamic_tls {
 public:
 	using value_type      = T;
 	using value_reference = T&;
-	using value_pointer   = T*;
 
 	constexpr dynamic_tls( void )
 	  : tls_key_( nullptr )
@@ -316,6 +315,8 @@ public:
 	}
 
 private:
+	using value_pointer = T*;
+
 	inline internal::dynamic_tls_key_t tls_key_chk_and_get( void )
 	{
 		internal::dynamic_tls_key_t ans = tls_key_.load( std::memory_order_acquire );
@@ -534,6 +535,56 @@ private:
 
 	internal::dynamic_tls_thread_cnt th_cnt_;   //!< thread count information
 };
+
+#if 0
+template <typename T, typename TL_HANDLER>
+class dynamic_tls_scoped_cache {
+public:
+	using dynamic_tls_type = dynamic_tls<T, TL_HANDLER>;
+
+	dynamic_tls_scoped_cache( dynamic_tls_type& ref_dtls )
+	  : ref_dtls_( ref_dtls )
+	  , ref_( ref_dtls_.get_tls_instance() )
+	{
+	}
+
+	typename dynamic_tls_type::value_reference get_tls_instance( void )
+	{
+		return ref_;
+	}
+
+private:
+	dynamic_tls_type&                          ref_dtls_;
+	typename dynamic_tls_type::value_reference ref_;
+};
+
+template <typename T, typename TL_HANDLER>
+class dynamic_tls_scoped_cache<T*, TL_HANDLER> {
+public:
+	using dynamic_tls_type = dynamic_tls<T*, TL_HANDLER>;
+
+	dynamic_tls_scoped_cache( dynamic_tls<T*, TL_HANDLER>& ref_dtls )
+	  : ref_dtls_( ref_dtls )
+	  , pointer_( ref_dtls_.get_tls_instance() )
+	{
+	}
+
+	typename dynamic_tls_type::value_type get_tls_instance( void )
+	{
+		return pointer_;
+	}
+
+	void set_value_to_tls_instance( typename dynamic_tls_type::value_type p_data )
+	{
+		ref_dtls_.set_value_to_tls_instance( p_data );
+		pointer_ = p_data;
+	}
+
+private:
+	dynamic_tls_type&                     ref_dtls_;
+	typename dynamic_tls_type::value_type pointer_;
+};
+#endif
 
 }   // namespace concurrent
 }   // namespace alpha
