@@ -167,6 +167,63 @@ void* func_test_fifo( void* p_data )
 	return nullptr;
 }
 
+void* func_test_fifo_ggmem( void* p_data )
+{
+	test_params*    p_test_param = reinterpret_cast<test_params*>( p_data );
+	test_fifo_type* p_test_obj   = p_test_param->p_test_obj;
+
+	fflush( NULL );
+	std::random_device seed_gen;
+	std::mt19937       engine( seed_gen() );
+
+	// 0以上9以下の値を等確率で発生させる
+	std::uniform_int_distribution<> num_sleep( 0, 9 );
+	std::uniform_int_distribution<> num_dist( 1, max_slot_size - 1 );
+	std::uniform_int_distribution<> size_dist( 1, max_alloc_size );
+
+	pthread_barrier_wait( &barrier );
+
+	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+	for ( int i = 0; i < p_test_param->num_loop; i++ ) {
+		int cur_alloc_num = num_dist( engine );
+		for ( int j = 0; j < cur_alloc_num; j++ ) {
+			void* p_tmp_alloc_to_push = alpha::concurrent::gmem_allocate( size_dist( engine ) );
+
+			p_test_obj->push( p_tmp_alloc_to_push );
+
+			// std::this_thread::sleep_for( std::chrono::milliseconds( num_sleep( engine ) ) );
+
+#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
+			auto [pop_flag, p_tmp_alloc] = p_test_obj->pop();
+#else
+			auto local_ret   = p_test_obj->pop();
+			auto pop_flag    = std::get<0>( local_ret );
+			auto p_tmp_alloc = std::get<1>( local_ret );
+#endif
+			if ( !pop_flag ) {
+				printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
+				printf( "fifo size count: %d\n", p_test_obj->get_size() );
+
+				auto local_ret = p_test_obj->pop();
+				pop_flag       = std::get<0>( local_ret );
+				p_tmp_alloc    = std::get<1>( local_ret );
+				if ( !pop_flag ) {
+					printf( "Bugggggggyyyy, then Bugggggggyyyy func_test_fifo()!!!\n" );
+					printf( "fifo size count: %d\n", p_test_obj->get_size() );
+
+					err_flag.store( true );
+					return nullptr;
+				}
+			}
+
+			alpha::concurrent::gmem_deallocate( p_tmp_alloc );
+		}
+	}
+	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 20, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
+
+	return nullptr;
+}
+
 void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::general_mem_allocator* p_tmg_arg )
 {
 	test_fifo_type fifo;
@@ -205,6 +262,56 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 			  << " func_test_fifo() Exec time: " << diff.count() << " msec" << std::endl;
 
 	auto statistics = p_tmg_arg->get_statistics();
+	printf( "Statistics is;\n%s\n", statistics.print().c_str() );
+#endif
+
+#ifdef PERFORMANCE_ANALYSIS_LOG1
+	printf( "retry/call %zu(%zu / %zu)\n",
+	        alpha::concurrent::internal::spin_count_push_to_free_node_stack.load() / alpha::concurrent::internal::call_count_push_to_free_node_stack.load(),
+	        alpha::concurrent::internal::spin_count_push_to_free_node_stack.load(),
+	        alpha::concurrent::internal::call_count_push_to_free_node_stack.load() );
+#endif
+
+	delete[] threads;
+}
+void load_test_lockfree_bw_mult_thread_ggmem( int num_of_thd )
+{
+	test_fifo_type fifo;
+
+	test_params tda;
+	tda.p_test_obj = &fifo;
+	tda.p_tmg      = nullptr;
+	tda.num_loop   = num_loop / num_of_thd;
+
+	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_t* threads = new pthread_t[num_of_thd];
+
+	for ( int i = 0; i < num_of_thd; i++ ) {
+		pthread_create( &threads[i], NULL, func_test_fifo_ggmem, &tda );
+	}
+	pthread_barrier_wait( &barrier );
+
+#ifdef DEBUG_LOG
+	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
+	std::cout << "!!!GO!!!" << std::endl;
+	fflush( NULL );
+#endif
+
+	for ( int i = 0; i < num_of_thd; i++ ) {
+		pthread_join( threads[i], nullptr );
+	}
+
+	EXPECT_EQ( 0, fifo.get_size() );
+	EXPECT_FALSE( err_flag.load() );
+
+#ifdef DEBUG_LOG
+	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
+
+	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
+	std::cout << "thread is " << num_of_thd
+			  << " func_test_fifo() Exec time: " << diff.count() << " msec" << std::endl;
+
+	auto statistics = alpha::concurrent::gmem_get_statistics();
 	printf( "Statistics is;\n%s\n", statistics.print().c_str() );
 #endif
 
@@ -313,6 +420,11 @@ TEST_P( lfmemAllocFreeBwMultThread, TC2 )
 	alpha::concurrent::general_mem_allocator test2_gma( param, 7 );
 
 	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread( num_thread_, &test2_gma ) );
+}
+
+TEST_P( lfmemAllocFreeBwMultThread, TC3 )
+{
+	EXPECT_NO_FATAL_FAILURE( load_test_lockfree_bw_mult_thread_ggmem( num_thread_ ) );
 }
 
 INSTANTIATE_TEST_SUITE_P( many_tls,
