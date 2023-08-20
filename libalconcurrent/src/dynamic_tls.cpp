@@ -137,16 +137,16 @@ struct dynamic_tls_key {
 		USED
 	};
 
-	unsigned int            idx_;                                   //!< index of key
-	std::atomic<alloc_stat> is_used_;                               //!< flag whether this key is used or not.
+	unsigned int            idx_;       //!< index of key
+	std::atomic<alloc_stat> is_used_;   //!< flag whether this key is used or not.
 #ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
-	std::atomic<int> acc_cnt_;                                      //!< count of accessor
+	std::atomic<int> acc_cnt_;   //!< count of accessor
 #endif
 	std::atomic<void*>                          tls_p_data_;        //!< atomic pointer of the paramter data for thread local storage
 	std::atomic<uintptr_t ( * )( void* )>       tls_allocator_;     //!< atomic pointer of allocator for thread local storage
 	std::atomic<void ( * )( uintptr_t, void* )> tls_deallocator_;   //!< atomic pointer of deallocator for thread local storage
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	bt_info bt_when_allocate_;                                      //!< back trace information when key is allocated
+	bt_info bt_when_allocate_;   //!< back trace information when key is allocated
 #endif
 
 	constexpr dynamic_tls_key( void )
@@ -166,141 +166,101 @@ class dynamic_tls_key_array;
 
 class dynamic_tls_content_array {
 public:
-	dynamic_tls_content_array( unsigned int base_idx_arg )
-	  : p_next_( nullptr )
-	  , base_idx_( base_idx_arg )
-	{
-	}
-
-	get_result get_tls_unchk_key( dynamic_tls_key_t key )
-	{
-		iterator cnt_it = search( key );
-		if ( cnt_it == end() ) {
-			return get_result { op_ret::OUT_OF_RANGE, 0U };   // 範囲外なので、取得処理失敗と判定し、OUT_OF_RANGEを返す。
-		}
-
-		tls_data_and_stat::stat cur_stat = cnt_it->tls_stat_.load( std::memory_order_acquire );
-#if 1
-		if ( cur_stat == tls_data_and_stat::stat::USED ) {
-			// already initialized
-		} else {
-			if ( cur_stat == tls_data_and_stat::stat::UNINITIALIZED ) {
-				// if before initialized
-				auto p_func = key->tls_allocator_.load( std::memory_order_acquire );
-				if ( p_func != nullptr ) {
-					cnt_it->tls_data_ = ( *p_func )( key->tls_p_data_ );
-				}
-				cnt_it->tls_stat_.store( tls_data_and_stat::stat::USED, std::memory_order_release );
-			} else {
-				// cur_stat == tls_data_and_stat::stat::DESTRUCTING or unknown value
-				// Should not happen this condition
-				internal::LogOutput( log_type::ERR, "into the unexpected condition for dynamic_tls_content_array::get_tls()" );
-				return get_result { op_ret::UNEXPECT_ERR, 0U };   // fail to get
-			}
-		}
-		return get_result { op_ret::SUCCESS, cnt_it->tls_data_ };
-#else
-		switch ( cur_stat ) {
-			case tls_data_and_stat::stat::UNINITIALIZED: {
-				// if before initialized
-				auto p_func = key->tls_allocator_.load( std::memory_order_acquire );
-				if ( p_func != nullptr ) {
-					cnt_it->tls_data_ = ( *p_func )( key->tls_p_data_ );
-				}
-				cnt_it->tls_stat_.store( tls_data_and_stat::stat::USED, std::memory_order_release );
-			} break;
-			case tls_data_and_stat::stat::USED: {
-				// already initialized
-			} break;
-
-			default:
-			case tls_data_and_stat::stat::DESTRUCTING: {
-				// Should not happen this condition
-				internal::LogOutput( log_type::ERR, "into the unexpected condition for dynamic_tls_content_array::get_tls()" );
-				return get_result { op_ret::UNEXPECT_ERR, 0U };   // fail to get
-			} break;
-		}
-		return get_result { op_ret::SUCCESS, cnt_it->tls_data_ };
-#endif
-	}
-
-	op_ret set_tls_unchk_key( dynamic_tls_key_t key, uintptr_t p_data_arg )
-	{
-		iterator cnt_it = search( key );
-		if ( cnt_it == end() ) {
-			return op_ret::OUT_OF_RANGE;   // 範囲外なので、保存処理失敗と判定し、OUT_OF_RANGEを返す。
-		}
-
-		tls_data_and_stat::stat cur_stat = cnt_it->tls_stat_.load( std::memory_order_acquire );
-#if 1
-		if ( ( cur_stat == tls_data_and_stat::stat::UNINITIALIZED ) || ( cur_stat == tls_data_and_stat::stat::USED ) ) {
-			cnt_it->tls_stat_.store( tls_data_and_stat::stat::USED, std::memory_order_release );
-			cnt_it->tls_data_ = p_data_arg;
-			return op_ret::SUCCESS;
-		} else {
-			// Should not happen this condition
-			internal::LogOutput( log_type::ERR, "into the unexpected condition for dynamic_tls_content_array::set_tls()" );
-			return op_ret::UNEXPECT_ERR;   // fail to get
-		}
-#else
-		switch ( cur_stat ) {
-			case tls_data_and_stat::stat::UNINITIALIZED: {
-				// if before initialized, ...TODO: what should we do ?
-			} break;
-			case tls_data_and_stat::stat::USED: {
-				// already initialized
-			} break;
-
-			default:
-			case tls_data_and_stat::stat::DESTRUCTING: {
-				// Should not happen this condition
-				internal::LogOutput( log_type::ERR, "into the unexpected condition for dynamic_tls_content_array::set_tls()" );
-				return op_ret::UNEXPECT_ERR;   // fail to get
-			} break;
-		}
-		cnt_it->tls_data_ = p_data_arg;
-		cnt_it->tls_stat_.store( tls_data_and_stat::stat::USED, std::memory_order_release );
-
-		return op_ret::SUCCESS;
-#endif
-	}
-
-	op_ret destruct_tls_by_key_release( dynamic_tls_key_t key )
-	{
-		iterator cnt_it = search( key );
-		if ( cnt_it == end() ) {
-			return op_ret::OUT_OF_RANGE;   // 範囲外なので、デストラクト処理失敗と判定し、OUT_OF_RANGEを返す。
-		}
-
-		return cnt_it->destruct_tls_by_key_release( key );
-	}
-
-	void* operator new( std::size_t n );                   // usual new...(1)
-	void  operator delete( void* p_mem ) noexcept;         // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
-
-	void* operator new[]( std::size_t n );                 // usual new...(1)
-	void  operator delete[]( void* p_mem ) noexcept;       // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
-
-	void* operator new( std::size_t n, void* p );          // placement new
-	void  operator delete( void* p, void* p2 ) noexcept;   // placement delete...(3)
-
-	dynamic_tls_content_array* p_next_;                    //!< thread local storage方向で、次のarrayへのポインタ
-	const unsigned int         base_idx_;
-
-private:
 	struct tls_data_and_stat {
 		enum class stat {
 			UNINITIALIZED = 0,
 			USED,
 			DESTRUCTING
 		};
-		std::atomic<stat> tls_stat_;
-		uintptr_t         tls_data_;
 
 		constexpr tls_data_and_stat( void )
 		  : tls_stat_( stat::UNINITIALIZED )
 		  , tls_data_( 0 )
 		{
+		}
+
+		get_result get_tls( dynamic_tls_key_t key )
+		{
+			tls_data_and_stat::stat cur_stat = tls_stat_.load( std::memory_order_acquire );
+#if 1
+			if ( cur_stat != tls_data_and_stat::stat::USED ) {
+				// not initialized yet
+				if ( cur_stat == tls_data_and_stat::stat::UNINITIALIZED ) {
+					// if before initialized
+					auto p_func = key->tls_allocator_.load( std::memory_order_acquire );
+					if ( p_func != nullptr ) {
+						tls_data_ = ( *p_func )( key->tls_p_data_ );
+					}
+					tls_stat_.store( tls_data_and_stat::stat::USED, std::memory_order_release );
+				} else {
+					// cur_stat == tls_data_and_stat::stat::DESTRUCTING or unknown value
+					// Should not happen this condition
+					internal::LogOutput( log_type::ERR, "into the unexpected condition for dynamic_tls_content_array::get_tls()" );
+					return get_result { op_ret::UNEXPECT_ERR, 0U };   // fail to get
+				}
+			} else {
+				// already initialized
+			}
+			return get_result { op_ret::SUCCESS, tls_data_ };
+#else
+			switch ( cur_stat ) {
+				case tls_data_and_stat::stat::UNINITIALIZED: {
+					// if before initialized
+					auto p_func = key->tls_allocator_.load( std::memory_order_acquire );
+					if ( p_func != nullptr ) {
+						tls_data_ = ( *p_func )( key->tls_p_data_ );
+					}
+					tls_stat_.store( tls_data_and_stat::stat::USED, std::memory_order_release );
+				} break;
+				case tls_data_and_stat::stat::USED: {
+					// already initialized
+				} break;
+
+				default:
+				case tls_data_and_stat::stat::DESTRUCTING: {
+					// Should not happen this condition
+					internal::LogOutput( log_type::ERR, "into the unexpected condition for dynamic_tls_content_array::get_tls()" );
+					return get_result { op_ret::UNEXPECT_ERR, 0U };   // fail to get
+				} break;
+			}
+			return get_result { op_ret::SUCCESS, tls_data_ };
+#endif
+		}
+
+		op_ret set_tls( dynamic_tls_key_t key, uintptr_t p_data_arg )
+		{
+			tls_data_and_stat::stat cur_stat = tls_stat_.load( std::memory_order_acquire );
+#if 1
+			if ( ( cur_stat == tls_data_and_stat::stat::UNINITIALIZED ) || ( cur_stat == tls_data_and_stat::stat::USED ) ) {
+				tls_stat_.store( tls_data_and_stat::stat::USED, std::memory_order_release );
+				tls_data_ = p_data_arg;
+				return op_ret::SUCCESS;
+			} else {
+				// Should not happen this condition
+				internal::LogOutput( log_type::ERR, "into the unexpected condition for dynamic_tls_content_array::set_tls()" );
+				return op_ret::UNEXPECT_ERR;   // fail to get
+			}
+#else
+			switch ( cur_stat ) {
+				case tls_data_and_stat::stat::UNINITIALIZED: {
+					// if before initialized, ...TODO: what should we do ?
+				} break;
+				case tls_data_and_stat::stat::USED: {
+					// already initialized
+				} break;
+
+				default:
+				case tls_data_and_stat::stat::DESTRUCTING: {
+					// Should not happen this condition
+					internal::LogOutput( log_type::ERR, "into the unexpected condition for dynamic_tls_content_array::set_tls()" );
+					return op_ret::UNEXPECT_ERR;   // fail to get
+				} break;
+			}
+			tls_data_ = p_data_arg;
+			tls_stat_.store( tls_data_and_stat::stat::USED, std::memory_order_release );
+
+			return op_ret::SUCCESS;
+#endif
 		}
 
 		op_ret destruct_tls_by_thread_exit( dynamic_tls_key_t key )
@@ -362,8 +322,72 @@ private:
 			tls_stat_.store( tls_data_and_stat::stat::UNINITIALIZED, std::memory_order_release );
 			return op_ret::SUCCESS;
 		}
+
+	private:
+		std::atomic<stat> tls_stat_;
+		uintptr_t         tls_data_;
 	};
 
+	struct search_result {
+		op_ret             stat_;     //!< 取得処理に成功した場合にop_ret::SUCCESSとなる。それ以外の場合は、何らかのエラーによる失敗を示す。
+		tls_data_and_stat* p_data_;   //!< 取得処理に成功した場合に、取得した値が保持される。取得に失敗した場合は、不定値となる。
+	};
+
+	dynamic_tls_content_array( unsigned int base_idx_arg )
+	  : p_next_( nullptr )
+	  , base_idx_( base_idx_arg )
+	{
+	}
+
+	search_result search_tls_unchk_key( dynamic_tls_key_t key )
+	{
+		iterator cnt_it = search( key );
+		return search_result { cnt_it != end() ? op_ret::SUCCESS : op_ret::OUT_OF_RANGE, cnt_it };   // 範囲外の場合は、OUT_OF_RANGEを返す。
+	}
+#if 0
+	get_result get_tls_unchk_key( dynamic_tls_key_t key )
+	{
+		search_result s_ret = search_tls_unchk_key( key );
+		if ( s_ret.stat_ == op_ret::SUCCESS ) {
+			return s_ret.p_data_->get_tls( key );
+		} else {
+			return get_result { s_ret.stat_, 0UL };
+		}
+	}
+
+	op_ret set_tls_unchk_key( dynamic_tls_key_t key, uintptr_t p_data_arg )
+	{
+		search_result s_ret = search_tls_unchk_key( key );
+		if ( s_ret.stat_ == op_ret::SUCCESS ) {
+			return s_ret.p_data_->set_tls( key, p_data_arg );
+		} else {
+			return s_ret.stat_;
+		}
+	}
+#endif
+	op_ret destruct_tls_by_key_release( dynamic_tls_key_t key )
+	{
+		iterator cnt_it = search( key );
+		if ( cnt_it == end() ) {
+			return op_ret::OUT_OF_RANGE;   // 範囲外なので、デストラクト処理失敗と判定し、OUT_OF_RANGEを返す。
+		}
+
+		return cnt_it->destruct_tls_by_key_release( key );
+	}
+
+	void* operator new( std::size_t n );             // usual new...(1)
+	void  operator delete( void* p_mem ) noexcept;   // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
+
+	void* operator new[]( std::size_t n );             // usual new...(1)
+	void  operator delete[]( void* p_mem ) noexcept;   // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
+
+	void* operator new( std::size_t n, void* p );          // placement new
+	void  operator delete( void* p, void* p2 ) noexcept;   // placement delete...(3)
+
+	dynamic_tls_content_array* p_next_;   //!< thread local storage方向で、次のarrayへのポインタ
+	const unsigned int         base_idx_;
+
+private:
 	using iterator = tls_data_and_stat*;
 
 	inline iterator begin( void )
@@ -409,13 +433,15 @@ public:
 	{
 	}
 
-	get_result get_tls_unchk_key( dynamic_tls_key_t key )
+	dynamic_tls_content_array::search_result search_tls_unchk_key( dynamic_tls_key_t key )
 	{
-		if ( ownership_state_.load( std::memory_order_acquire ) != cnt_arry_state::USED ) return get_result();
+		if ( ownership_state_.load( std::memory_order_acquire ) != cnt_arry_state::USED ) {
+			return dynamic_tls_content_array::search_result { op_ret::INVALID, nullptr };
+		}
 
 		dynamic_tls_content_array* p_cur_tls_ca = p_head_content_.load( std::memory_order_acquire );
 		while ( p_cur_tls_ca != nullptr ) {
-			auto ret = p_cur_tls_ca->get_tls_unchk_key( key );
+			auto ret = p_cur_tls_ca->search_tls_unchk_key( key );
 #if 1
 			if ( ret.stat_ != op_ret::OUT_OF_RANGE ) {
 				// case op_ret::INVALID:
@@ -450,45 +476,27 @@ public:
 		// keyに対応するdynamic_tls_content_arrayが見つからなかったので、dynamic_tls_content_arrayが不足している。よって、追加
 		dynamic_tls_content_array* p_new = push_new_tls_array_for( key );
 
-		return p_new->get_tls_unchk_key( key );
+		return p_new->search_tls_unchk_key( key );
+	}
+
+	get_result get_tls_unchk_key( dynamic_tls_key_t key )
+	{
+		auto s_ret = search_tls_unchk_key( key );
+		if ( s_ret.stat_ == op_ret::SUCCESS ) {
+			return s_ret.p_data_->get_tls( key );
+		} else {
+			return get_result { s_ret.stat_, 0UL };
+		}
 	}
 
 	op_ret set_tls_unchk_key( dynamic_tls_key_t key, uintptr_t p_data_arg )
 	{
-		if ( ownership_state_.load( std::memory_order_acquire ) != cnt_arry_state::USED ) return op_ret::INVALID;
-
-		dynamic_tls_content_array* p_cur_tls_ca = p_head_content_.load( std::memory_order_acquire );
-		while ( p_cur_tls_ca != nullptr ) {
-			auto ret = p_cur_tls_ca->set_tls_unchk_key( key, p_data_arg );
-#if 1
-			if ( ret != op_ret::OUT_OF_RANGE ) {
-				return ret;
-			}
-#else
-			switch ( ret ) {
-				default:
-				case op_ret::INVALID:
-				case op_ret::INVALID_KEY:
-				case op_ret::UNEXPECT_ERR: {
-					// 引数のkeyに問題があるため、取得処理失敗で終了する。
-					return ret;
-				} break;
-
-				case op_ret::SUCCESS: {
-					return ret;
-				} break;
-				case op_ret::OUT_OF_RANGE: {
-					// continue to next dynamic_tls_content_array
-				} break;
-			}
-#endif
-			p_cur_tls_ca = p_cur_tls_ca->p_next_;
+		auto s_ret = search_tls_unchk_key( key );
+		if ( s_ret.stat_ == op_ret::SUCCESS ) {
+			return s_ret.p_data_->set_tls( key, p_data_arg );
+		} else {
+			return s_ret.stat_;
 		}
-
-		// keyに対応するdynamic_tls_content_arrayが見つからなかったので、dynamic_tls_content_arrayが不足している。よって、追加
-		dynamic_tls_content_array* p_new = push_new_tls_array_for( key );
-
-		return p_new->set_tls_unchk_key( key, p_data_arg );
 	}
 
 	bool try_get_ownership( void )
@@ -534,16 +542,16 @@ public:
 
 	void call_destructor_and_release_ownership( void );
 
-	void* operator new( std::size_t n );                   // usual new...(1)
-	void  operator delete( void* p_mem ) noexcept;         // usual delete...(2)	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放しない
+	void* operator new( std::size_t n );             // usual new...(1)
+	void  operator delete( void* p_mem ) noexcept;   // usual delete...(2)	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放しない
 
-	void* operator new[]( std::size_t n );                 // usual new...(1)
-	void  operator delete[]( void* p_mem ) noexcept;       // usual delete...(2)	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放しない
+	void* operator new[]( std::size_t n );             // usual new...(1)
+	void  operator delete[]( void* p_mem ) noexcept;   // usual delete...(2)	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放しない
 
 	void* operator new( std::size_t n, void* p );          // placement new
 	void  operator delete( void* p, void* p2 ) noexcept;   // placement delete...(3)
 
-	std::atomic<dynamic_tls_content_head*> p_next_;        //!< thread方向で、次のarrayへのポインタ
+	std::atomic<dynamic_tls_content_head*> p_next_;   //!< thread方向で、次のarrayへのポインタ
 
 private:
 	dynamic_tls_content_array* push_new_tls_array_for( dynamic_tls_key_t key )
@@ -613,11 +621,11 @@ public:
 
 	bool release_key( dynamic_tls_key* p_key_arg );
 
-	void* operator new( std::size_t n );                   // usual new...(1)
-	void  operator delete( void* p_mem ) noexcept;         // usual delete...(2)	dynamic_tls_key_arrayは、破棄しないクラスなので、メモリ開放しない
+	void* operator new( std::size_t n );             // usual new...(1)
+	void  operator delete( void* p_mem ) noexcept;   // usual delete...(2)	dynamic_tls_key_arrayは、破棄しないクラスなので、メモリ開放しない
 
-	void* operator new[]( std::size_t n );                 // usual new...(1)
-	void  operator delete[]( void* p_mem ) noexcept;       // usual delete...(2)	dynamic_tls_key_arrayは、破棄しないクラスなので、メモリ開放しない
+	void* operator new[]( std::size_t n );             // usual new...(1)
+	void  operator delete[]( void* p_mem ) noexcept;   // usual delete...(2)	dynamic_tls_key_arrayは、破棄しないクラスなので、メモリ開放しない
 
 	void* operator new( std::size_t n, void* p );          // placement new
 	void  operator delete( void* p, void* p2 ) noexcept;   // placement delete...(3)
@@ -1171,6 +1179,41 @@ void dynamic_tls_key_array::operator delete( void* p, void* p2 ) noexcept   // p
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+dynamic_tls_key_scoped_accessor::dynamic_tls_key_scoped_accessor( dynamic_tls_key_t key, op_ret stat, void* p )
+  : stat_( stat )
+  , key_( key )
+  , p_( p )
+{
+#ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
+	if ( stat_ == op_ret::SUCESS ) {
+		key->acc_cnt_.fetch_add( 1, std::memory_order_acq_rel );
+	}
+#endif
+}
+
+#ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
+dynamic_tls_key_scoped_accessor::~dynamic_tls_key_scoped_accessor()
+{
+	if ( stat_ == op_ret::SUCESS ) {
+		key->acc_cnt_.fetch_sub( 1, std::memory_order_acq_rel );
+	}
+}
+#endif
+
+op_ret dynamic_tls_key_scoped_accessor::set_value( uintptr_t data )
+{
+	dynamic_tls_content_array::tls_data_and_stat* p_tls = reinterpret_cast<dynamic_tls_content_array::tls_data_and_stat*>( p_ );
+	return p_tls->set_tls( key_, data );
+}
+
+get_result dynamic_tls_key_scoped_accessor::get_value( void )
+{
+	dynamic_tls_content_array::tls_data_and_stat* p_tls = reinterpret_cast<dynamic_tls_content_array::tls_data_and_stat*>( p_ );
+	return p_tls->get_tls( key_ );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 dynamic_tls_key_t dynamic_tls_key_create( void* p_param, uintptr_t ( *allocator )( void* p_param ), void ( *deallocator )( uintptr_t tls_data, void* p_param ) )
 {
 	dynamic_tls_key_t p_ans = dynamic_tls_mgr::get_instance().allocate_key( p_param, allocator, deallocator );
@@ -1237,6 +1280,26 @@ get_result dynamic_tls_getspecific( dynamic_tls_key_t key )
 
 	dynamic_tls_content_head* p_cur_dtls = dynamic_tls_mgr::get_instance().get_current_thread_dynamic_tls_content_head();
 	return p_cur_dtls->get_tls_unchk_key( key );
+}
+
+dynamic_tls_key_scoped_accessor dynamic_tls_getspecific_accessor( dynamic_tls_key_t key )
+{
+	if ( key == nullptr ) {
+		internal::LogOutput( log_type::ERR, "dynamic_tls_getspecific was called with nullptr" );
+		return dynamic_tls_key_scoped_accessor( key, op_ret::INVALID_KEY, 0UL );
+	}
+	if ( key->is_used_.load( std::memory_order_acquire ) != dynamic_tls_key::alloc_stat::USED ) {
+		internal::LogOutput( log_type::ERR, "dynamic_tls_key(%p) is not used, why do you call dynamic_tls_getspecific() with %p", key, key );
+		return dynamic_tls_key_scoped_accessor( key, op_ret::INVALID_KEY, 0UL );
+	}
+
+#ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
+	scoped_inout_counter_atomic_int cl( key->acc_cnt_ );
+#endif
+
+	dynamic_tls_content_head* p_cur_dtls = dynamic_tls_mgr::get_instance().get_current_thread_dynamic_tls_content_head();
+	auto                      s_ret      = p_cur_dtls->search_tls_unchk_key( key );
+	return dynamic_tls_key_scoped_accessor( key, s_ret.stat_, reinterpret_cast<void*>( s_ret.p_data_ ) );
 }
 
 dynamic_tls_status_info dynamic_tls_get_status( void )

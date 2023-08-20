@@ -73,10 +73,11 @@ TEST( FreeNodeStack, CanCall_PushPop_tofrom_tls_stack )
 	int                                             test_int;
 	test_free_node                                  sut_node( &test_int, nullptr );
 	test_free_node_stack                            sut( &aoc );
-	sut.push_to_tls_stack( &sut_node );
+	test_free_node_stack::scoped_np_accessor_type   sut_acs = sut.tls_p_hazard_slot_stack_head_.get_tls_accessor();
+	sut.push_to_tls_stack( &sut_node, sut_acs );
 
 	// Act
-	test_free_node* p_ret = sut.pop_from_tls_stack();
+	test_free_node* p_ret = sut.pop_from_tls_stack( sut_acs );
 
 	// Assert
 	EXPECT_EQ( p_ret, &sut_node );

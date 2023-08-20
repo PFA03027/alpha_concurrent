@@ -59,8 +59,8 @@ enum class op_ret {
 	UNEXPECT_ERR    //!< p_data_ data is invalid by unexpected error
 };
 struct get_result {
-	op_ret    stat_;     //!< 取得処理に成功した場合にtrue
-	uintptr_t p_data_;   //!< 取得処理に成功した場合に、取得した値が保持される
+	op_ret    stat_;     //!< 取得処理に成功した場合にop_ret::SUCCESSとなる。それ以外の場合は、何らかのエラーによる失敗を示す。
+	uintptr_t p_data_;   //!< 取得処理に成功した場合に、取得した値が保持される。取得に失敗した場合は、不定値となる。
 
 	constexpr get_result( void )
 	  : stat_( op_ret::INVALID )
@@ -72,6 +72,25 @@ struct get_result {
 	  , p_data_( p_data_arg )
 	{
 	}
+};
+
+class dynamic_tls_key_scoped_accessor {
+public:
+	dynamic_tls_key_scoped_accessor( dynamic_tls_key_t key, op_ret stat, void* p );
+#ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
+	~dynamic_tls_key_scoped_accessor();
+#endif
+
+	op_ret     set_value( uintptr_t data );
+	get_result get_value( void );
+
+	const op_ret stat_;   //!< 取得処理に成功した場合にop_ret::SUCCESSとなる。それ以外の場合は、何らかのエラーによる失敗を示す。
+
+private:
+	dynamic_tls_key_t key_;   //!< アクセス時の補助データとして使用する。
+	void* const       p_;     //!< 内部のスレッドローカルデータ構造体へのポインタ
+
+	friend dynamic_tls_key_scoped_accessor dynamic_tls_getspecific_accessor( dynamic_tls_key_t key );
 };
 
 /*!
@@ -101,6 +120,12 @@ op_ret dynamic_tls_setspecific( dynamic_tls_key_t key, uintptr_t tls_data );
  *
  */
 get_result dynamic_tls_getspecific( dynamic_tls_key_t key );
+
+/*!
+ * @brief	get an accessor to a thread local storage
+ *
+ */
+dynamic_tls_key_scoped_accessor dynamic_tls_getspecific_accessor( dynamic_tls_key_t key );
 
 /**
  * @brief get dynamic thread local storage status
@@ -242,6 +267,31 @@ public:
 	using value_type      = T;
 	using value_reference = T&;
 
+	class scoped_accessor {
+	public:
+		T& ref( void )
+		{
+			return *p_;
+		}
+
+	private:
+		scoped_accessor( internal::dynamic_tls_key_scoped_accessor&& ac_arg )
+		  : accessor_( ac_arg )
+		  , p_( nullptr )
+		{
+			internal::get_result ret = accessor_.get_value();
+			if ( ret.stat_ != internal::op_ret::SUCCESS ) {
+				throw std::bad_alloc();
+			}
+			p_ = reinterpret_cast<T*>( ret.p_data_ );
+		}
+
+		internal::dynamic_tls_key_scoped_accessor accessor_;
+		T*                                        p_;
+
+		friend dynamic_tls;
+	};
+
 	constexpr dynamic_tls( void )
 	  : tls_key_( nullptr )
 	  , tl_handler_()
@@ -299,6 +349,11 @@ public:
 
 		// printf( "XXXXXXXXXXX tmp_ret.p_data_ = %lx\n", tmp_ret.p_data_ );
 		return *( reinterpret_cast<value_pointer>( tmp_ret.p_data_ ) );
+	}
+
+	scoped_accessor get_tls_accessor( void )
+	{
+		return internal::dynamic_tls_getspecific_accessor( tls_key_chk_and_get() );
 	}
 
 	/**
@@ -385,6 +440,39 @@ class dynamic_tls<T*, TL_HANDLER> {
 public:
 	using value_type = T*;
 
+	class scoped_accessor {
+	public:
+		T* get( void )
+		{
+			internal::get_result ret = accessor_.get_value();
+			if ( ret.stat_ != internal::op_ret::SUCCESS ) {
+				throw std::bad_alloc();
+			}
+			return reinterpret_cast<T*>( ret.p_data_ );
+		}
+
+		void set( T* storing_data )
+		{
+			internal::op_ret ret = accessor_.set_value( reinterpret_cast<uintptr_t>( storing_data ) );
+			if ( ret != internal::op_ret::SUCCESS ) {
+				throw std::bad_alloc();
+			}
+		}
+
+	private:
+		scoped_accessor( internal::dynamic_tls_key_scoped_accessor&& ac_arg )
+		  : accessor_( ac_arg )
+		{
+			if ( accessor_.stat_ != internal::op_ret::SUCCESS ) {
+				throw std::bad_alloc();
+			}
+		}
+
+		internal::dynamic_tls_key_scoped_accessor accessor_;
+
+		friend dynamic_tls;
+	};
+
 	constexpr dynamic_tls( void )
 	  : tls_key_( nullptr )
 	  , tl_handler_()
@@ -465,6 +553,11 @@ public:
 		return;
 	}
 
+	scoped_accessor get_tls_accessor( void )
+	{
+		return internal::dynamic_tls_getspecific_accessor( tls_key_chk_and_get() );
+	}
+
 	/**
 	 * @brief get thread count information
 	 *
@@ -535,56 +628,6 @@ private:
 
 	internal::dynamic_tls_thread_cnt th_cnt_;   //!< thread count information
 };
-
-#if 0
-template <typename T, typename TL_HANDLER>
-class dynamic_tls_scoped_cache {
-public:
-	using dynamic_tls_type = dynamic_tls<T, TL_HANDLER>;
-
-	dynamic_tls_scoped_cache( dynamic_tls_type& ref_dtls )
-	  : ref_dtls_( ref_dtls )
-	  , ref_( ref_dtls_.get_tls_instance() )
-	{
-	}
-
-	typename dynamic_tls_type::value_reference get_tls_instance( void )
-	{
-		return ref_;
-	}
-
-private:
-	dynamic_tls_type&                          ref_dtls_;
-	typename dynamic_tls_type::value_reference ref_;
-};
-
-template <typename T, typename TL_HANDLER>
-class dynamic_tls_scoped_cache<T*, TL_HANDLER> {
-public:
-	using dynamic_tls_type = dynamic_tls<T*, TL_HANDLER>;
-
-	dynamic_tls_scoped_cache( dynamic_tls<T*, TL_HANDLER>& ref_dtls )
-	  : ref_dtls_( ref_dtls )
-	  , pointer_( ref_dtls_.get_tls_instance() )
-	{
-	}
-
-	typename dynamic_tls_type::value_type get_tls_instance( void )
-	{
-		return pointer_;
-	}
-
-	void set_value_to_tls_instance( typename dynamic_tls_type::value_type p_data )
-	{
-		ref_dtls_.set_value_to_tls_instance( p_data );
-		pointer_ = p_data;
-	}
-
-private:
-	dynamic_tls_type&                     ref_dtls_;
-	typename dynamic_tls_type::value_type pointer_;
-};
-#endif
 
 }   // namespace concurrent
 }   // namespace alpha
