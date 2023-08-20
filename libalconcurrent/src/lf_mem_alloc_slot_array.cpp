@@ -24,16 +24,46 @@ std::atomic<size_t> spin_count_push_to_free_node_stack( 0 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct slot_array_mgr_alloc_mem_addr_and_size {
+	void*  p_alloc_;
+	size_t alloc_size_;
+};
+
+static constexpr uintptr_t calc_diff( void )
+{
+	if ( sizeof( size_t ) <= sizeof( uintptr_t ) ) {
+		return static_cast<uintptr_t>( sizeof( uintptr_t ) );
+	} else {
+		size_t mx      = sizeof( size_t ) / sizeof( uintptr_t );
+		size_t rx      = sizeof( size_t ) % sizeof( uintptr_t );
+		size_t ans_cnd = mx * sizeof( uintptr_t ) + ( ( rx == 0 ) ? 0 : sizeof( uintptr_t ) );
+		return static_cast<uintptr_t>( ans_cnd );
+	}
+}
+
+static inline slot_array_mgr_alloc_mem_addr_and_size calc_addr_and_size( void* p )
+{
+	uintptr_t addr_rm_mem = reinterpret_cast<uintptr_t>( p ) - calc_diff();
+	size_t    alloc_size  = *( reinterpret_cast<size_t*>( addr_rm_mem ) );
+	return slot_array_mgr_alloc_mem_addr_and_size { reinterpret_cast<void*>( addr_rm_mem ), alloc_size };
+}
+
+static inline void dealloc_allocated_area_of_slot_array_mgr( void* p )
+{
+	if ( p == nullptr ) return;
+
+	auto alloc_area_info = calc_addr_and_size( p );
+
+	int dealloc_ret = deallocate_by_munmap( alloc_area_info.p_alloc_, alloc_area_info.alloc_size_ );
+	if ( dealloc_ret != 0 ) {
+		LogOutput( log_type::ERR, "fail deallocate_by_munmap(%p, %zu)", alloc_area_info.p_alloc_, alloc_area_info.alloc_size_ );
+	}
+}
+
 // usual delete...(2)
 void slot_array_mgr::operator delete( void* p_mem ) noexcept
 {
-	if ( p_mem == nullptr ) return;
-
-	size_t alloc_size  = *( reinterpret_cast<size_t*>( p_mem ) );   // ちょっとトリッキーな方法でmmapで確保したサイズ情報を引き出す。const size_tで宣言されているので、書き換えは発生しないことを利用する。
-	int    dealloc_ret = deallocate_by_munmap( p_mem, alloc_size );
-	if ( dealloc_ret != 0 ) {
-		LogOutput( log_type::ERR, "fail deallocate_by_munmap(%p, %zu)", p_mem, alloc_size );
-	}
+	dealloc_allocated_area_of_slot_array_mgr( p_mem );
 }
 
 // placement new    可変長部分の領域も確保するnew operator
@@ -48,25 +78,20 @@ void* slot_array_mgr::operator new( std::size_t n_of_slot_array_mgr, size_t num_
 		throw std::bad_alloc();
 	}
 
-	*( reinterpret_cast<size_t*>( alloc_ret.p_allocated_addr_ ) ) = alloc_ret.allocated_size_;   // ちょっとトリッキーな方法でmmapで確保したサイズ情報をコンストラクタに渡す
-	return alloc_ret.p_allocated_addr_;
+	*( reinterpret_cast<size_t*>( alloc_ret.p_allocated_addr_ ) ) = alloc_ret.allocated_size_;
+
+	uintptr_t ans_addr = reinterpret_cast<uintptr_t>( alloc_ret.p_allocated_addr_ ) + calc_diff();
+	return reinterpret_cast<void*>( ans_addr );
 }
 
 void slot_array_mgr::operator delete( void* p, size_t num_of_slots_, size_t expected_alloc_n_per_slot ) noexcept
 {
 	// 配置newに対応するdelete。
-	if ( p == nullptr ) return;
-
-	size_t alloc_size  = *( reinterpret_cast<size_t*>( p ) );   // ちょっとトリッキーな方法でmmapで確保したサイズ情報を引き出す。const size_tで宣言されているので、書き換えは発生しないことを利用する。
-	int    dealloc_ret = deallocate_by_munmap( p, alloc_size );
-	if ( dealloc_ret != 0 ) {
-		LogOutput( log_type::ERR, "fail deallocate_by_munmap(%p, %zu)", p, alloc_size );
-	}
+	dealloc_allocated_area_of_slot_array_mgr( p );
 }
 
 slot_array_mgr::slot_array_mgr( chunk_header_multi_slot* p_owner, size_t num_of_slots, size_t n )
-  : alloc_size_( *( reinterpret_cast<size_t*>( this ) ) )   // ちょっとトリッキーなー方法で確保されたサイズ情報をopertor new()から受け取る。
-  , num_of_slots_( num_of_slots )
+  : num_of_slots_( num_of_slots )
   , expected_n_per_slot_( n )
   , slot_container_size_of_this_( calc_one_slot_container_bytes( n ) )
   , p_owner_chunk_header_( p_owner )
@@ -107,13 +132,15 @@ bool_size_t slot_array_mgr::get_slot_idx_from_slot_header_of_array( slot_header_
 
 void slot_array_mgr::dump( int indent )
 {
+	auto alloc_area_info = calc_addr_and_size( this );
+
 	std::string indent_str;
 	for ( int i = 0; i < indent; i++ ) {
 		indent_str += "\t";
 	}
 	internal::LogOutput( log_type::DUMP, "%sslot_array_mgr(%p)={alloc_size_=%zu,num_of_slots_=%zu,expected_n_per_slot_=%zu,slot_container_size_of_this_=%zu,p_owner_chunk_header_=%p,p_slot_container_top=%p",
 	                     indent_str.c_str(),
-	                     this, alloc_size_, num_of_slots_, expected_n_per_slot_, slot_container_size_of_this_, p_owner_chunk_header_.load(), p_slot_container_top );
+	                     this, alloc_area_info.alloc_size_, num_of_slots_, expected_n_per_slot_, slot_container_size_of_this_, p_owner_chunk_header_.load(), p_slot_container_top );
 	auto total_statistics = allocator_.get_statistics();
 	internal::LogOutput( log_type::DUMP, "%s%s", indent_str.c_str(), total_statistics.print().c_str() );
 	internal::LogOutput( log_type::DUMP, "%s}", indent_str.c_str() );

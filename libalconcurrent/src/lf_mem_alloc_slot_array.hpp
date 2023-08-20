@@ -32,7 +32,6 @@ namespace internal {
 class chunk_header_multi_slot;
 
 struct slot_array_mgr {
-	const size_t                          alloc_size_;                    //!< 自身のslot_array_mgrのために確保した領域のバイト数
 	const size_t                          num_of_slots_;                  //!< 自身のslot_array_mgrで管理しているslot数
 	const size_t                          expected_n_per_slot_;           //!< 自身のslot_array_mgrで管理しているslotが期待しているallocateサイズ
 	const size_t                          slot_container_size_of_this_;   //!< 自身のslot_array_mgrで管理しているslot_container1つ分のバイト数
