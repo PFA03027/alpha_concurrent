@@ -73,7 +73,7 @@ inline uintptr_t room_boader::calc_allocated_addr( uintptr_t base_addr, size_t r
 #ifdef ALCONCURRENT_CONF_ENABLE_MODULO_OPERATION_BY_BITMASK
 	uintptr_t r_of_align_blocks = addr_ch_end & ( static_cast<uintptr_t>( req_align ) - 1 );   // 剰余計算をビットマスク演算に変更。この時点で、req_alignが2のn乗でなければならない。
 #else
-	uintptr_t r_of_align_blocks = addr_ch_end % static_cast<uintptr_t>( req_align );
+	uintptr_t               r_of_align_blocks = addr_ch_end % static_cast<uintptr_t>( req_align );
 #endif
 	uintptr_t addr_alloc_top = static_cast<uintptr_t>( req_align ) * ( num_of_align_blocks + ( ( r_of_align_blocks == 0 ) ? 0 : 1 ) );
 	return addr_alloc_top;
@@ -162,10 +162,20 @@ struct alloc_chamber {
 private:
 	uintptr_t calc_addr_chopped_room_end_by( uintptr_t expected_offset_, size_t req_size, size_t req_align );
 
+#if ( __cpp_constexpr >= 201304 )
 	static constexpr uintptr_t calc_init_offset( void );
+#else
+	static inline uintptr_t calc_init_offset( void );
+#endif
 };
 
-constexpr uintptr_t alloc_chamber::calc_init_offset( void )
+#if ( __cpp_constexpr >= 201304 )
+constexpr
+#else
+inline
+#endif
+	uintptr_t
+	alloc_chamber::calc_init_offset( void )
 {
 	size_t n = sizeof( alloc_chamber ) / default_align_size;   // TODO: ビットマスクを使った演算で多分軽量化できるが、まずは真面目に計算する。
 	size_t r = sizeof( alloc_chamber ) % default_align_size;   // ただ、ここは、default_slot_alignsizeは定数かつ2^n上である数値なので、コンパイラの最適化がかかっていると思われる。

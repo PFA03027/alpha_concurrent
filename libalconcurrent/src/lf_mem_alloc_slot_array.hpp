@@ -260,11 +260,26 @@ private:
 		return p_cur;
 	}
 
-	static constexpr size_t calc_one_slot_container_bytes( size_t n )
+	static
+#if ( __cpp_constexpr >= 201304 )
+		constexpr
+#else
+		inline
+#endif
+		size_t
+		calc_one_slot_container_bytes( size_t n )
 	{
 		return slot_container::calc_slot_container_size( n, default_slot_alignsize );
 	}
-	static constexpr size_t calc_total_slot_container_array_bytes( size_t num_of_slots, size_t n )
+
+	static
+#if ( __cpp_constexpr >= 201304 )
+		constexpr
+#else
+		inline
+#endif
+		size_t
+		calc_total_slot_container_array_bytes( size_t num_of_slots, size_t n )
 	{
 		return calc_one_slot_container_bytes( n ) * num_of_slots;
 	}

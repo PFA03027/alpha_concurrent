@@ -160,10 +160,18 @@ struct dynamic_tls_thread_cnt {
 	  , max_thread_count_( 0 )
 	{
 	}
-	constexpr dynamic_tls_thread_cnt( const dynamic_tls_thread_cnt& )            = default;
-	constexpr dynamic_tls_thread_cnt( dynamic_tls_thread_cnt&& )                 = default;
+	constexpr dynamic_tls_thread_cnt( const dynamic_tls_thread_cnt& ) = default;
+	constexpr dynamic_tls_thread_cnt( dynamic_tls_thread_cnt&& )      = default;
+#if ( __cpp_constexpr >= 201304 )
 	constexpr dynamic_tls_thread_cnt& operator=( const dynamic_tls_thread_cnt& ) = default;
-	constexpr dynamic_tls_thread_cnt& operator=( dynamic_tls_thread_cnt&& )      = default;
+#else
+	dynamic_tls_thread_cnt& operator=( const dynamic_tls_thread_cnt& ) = default;
+#endif
+#if ( __cpp_constexpr >= 201304 )
+	constexpr dynamic_tls_thread_cnt& operator=( dynamic_tls_thread_cnt&& ) = default;
+#else
+	dynamic_tls_thread_cnt& operator=( dynamic_tls_thread_cnt&& )      = default;
+#endif
 
 	void count_up( void )
 	{

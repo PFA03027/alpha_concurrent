@@ -754,7 +754,6 @@ private:
 		constexpr tl_content_head( void )
 		  : p_tl_cnt_head_( nullptr )
 		{
-			return;
 		}
 
 		~tl_content_head()

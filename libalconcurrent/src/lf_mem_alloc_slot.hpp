@@ -41,10 +41,15 @@ inline constexpr uintptr_t make_maker_value( uintptr_t offset_v )
 inline constexpr bool check_marker_func( uintptr_t offset_v, uintptr_t marker_v )
 {
 	// 今は簡単な仕組みで実装する
+#if ( __cpp_constexpr >= 201304 )
 	std::uintptr_t tmp = offset_v;
 	tmp += marker_v + 1;   // intentionally saturating arithmetic operation
 
-	return ( tmp == 0 );
+	bool ans = ( tmp == 0 );
+	return ans;
+#else
+	return ( ( offset_v + ( marker_v + 1 ) ) == 0 );
+#endif
 }
 #endif
 
@@ -188,7 +193,10 @@ struct slot_header_of_array {
 	slot_mheader       mh_;   //!< main header
 	array_slot_sheader sh_;   //!< sub header
 
-	constexpr slot_header_of_array( uintptr_t offset_to_mgr_arg )
+#if ( __cpp_constexpr >= 201304 )
+	constexpr
+#endif
+		slot_header_of_array( uintptr_t offset_to_mgr_arg )
 	  : mh_( offset_to_mgr_arg )
 	  , sh_()
 	{
@@ -279,7 +287,11 @@ struct slot_header_of_alloc {
 
 	void dump( int indent = 0 );
 
+#if ( __cpp_constexpr >= 201304 )
 	static constexpr size_t calc_slot_header_and_container_size( size_t n, size_t req_alignsize );
+#else
+	static inline size_t calc_slot_header_and_container_size( size_t n, size_t req_alignsize );
+#endif
 };
 
 static_assert( std::is_standard_layout<slot_header_of_alloc>::value, "slot_header_of_alloc should be standard-layout type" );
@@ -348,14 +360,24 @@ struct slot_container {
 #endif
 
 	static bool_unified_slot_header_p get_slot_header_from_assignment_p( void* p_mem );
-	static constexpr size_t           calc_slot_container_size( size_t n, size_t req_alignsize );
-	static void*                      construct_slot_container_in_container_buffer( slot_mheader* p_bind_mh_of_slot, slot_container* p_container_top, size_t container_size, size_t n, size_t req_align );
+#if ( __cpp_constexpr >= 201304 )
+	static constexpr size_t calc_slot_container_size( size_t n, size_t req_alignsize );
+#else
+	static inline size_t calc_slot_container_size( size_t n, size_t req_alignsize );
+#endif
+	static void* construct_slot_container_in_container_buffer( slot_mheader* p_bind_mh_of_slot, slot_container* p_container_top, size_t container_size, size_t n, size_t req_align );
 };
 
 static_assert( std::is_standard_layout<slot_container>::value, "slot_container should be standard-layout type" );
 static_assert( ( sizeof( slot_container ) % default_slot_alignsize ) == 0, "slot_container must be a constant multiple of default_slot_alignsize" );
 
-inline constexpr size_t slot_container::calc_slot_container_size( size_t n, size_t req_alignsize )
+#if ( __cpp_constexpr >= 201304 )
+constexpr
+#else
+inline
+#endif
+	size_t
+	slot_container::calc_slot_container_size( size_t n, size_t req_alignsize )
 {
 	// slot container header + tail_padding + n bytes
 	size_t tfit_req_alignsize = ( req_alignsize > default_slot_alignsize ) ? req_alignsize : default_slot_alignsize;
@@ -366,7 +388,13 @@ inline constexpr size_t slot_container::calc_slot_container_size( size_t n, size
 	return ans;
 }
 
-inline constexpr size_t slot_header_of_alloc::calc_slot_header_and_container_size( size_t n, size_t req_alignsize )
+#if ( __cpp_constexpr >= 201304 )
+constexpr
+#else
+inline
+#endif
+	size_t
+	slot_header_of_alloc::calc_slot_header_and_container_size( size_t n, size_t req_alignsize )
 {
 	return sizeof( slot_header_of_alloc ) + slot_container::calc_slot_container_size( n, req_alignsize );
 }

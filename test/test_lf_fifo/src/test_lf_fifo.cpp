@@ -138,7 +138,7 @@ TEST_F( lffifoTest, TC1_SimplePushPop )
 #else
 	auto local_ret1     = p_test_obj->pop();
 	auto p_pop_node     = std::get<0>( local_ret1 );
-	auto val            = std::get<1>( local_ret );
+	auto val            = std::get<1>( local_ret1 );
 #endif
 
 	ASSERT_NE( nullptr, p_pop_node );

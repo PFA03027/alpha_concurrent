@@ -29,7 +29,14 @@ struct slot_array_mgr_alloc_mem_addr_and_size {
 	size_t alloc_size_;
 };
 
-static constexpr uintptr_t calc_diff( void )
+static
+#if ( __cpp_constexpr >= 201304 )
+	constexpr
+#else
+	inline
+#endif
+	uintptr_t
+	calc_diff( void )
 {
 	if ( sizeof( size_t ) <= sizeof( uintptr_t ) ) {
 		return static_cast<uintptr_t>( sizeof( uintptr_t ) );
