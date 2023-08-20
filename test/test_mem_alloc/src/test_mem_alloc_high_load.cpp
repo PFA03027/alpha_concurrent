@@ -336,7 +336,11 @@ void load_test_lockfree_min2( int num_of_thd )
 
 	std::vector<std::unique_ptr<alpha::concurrent::general_mem_allocator>> free_gma_array( num_of_thd );
 	for ( int i = 0; i < num_of_thd; i++ ) {
+#if ( __cpp_lib_make_unique >= 201304 )
 		free_gma_array[i] = std::make_unique<alpha::concurrent::general_mem_allocator>( param2, 1 );
+#else
+		free_gma_array[i] = std::unique_ptr<alpha::concurrent::general_mem_allocator>( new alpha::concurrent::general_mem_allocator( param2, 1 ) );
+#endif
 	}
 
 	for ( int i = 0; i < num_of_thd; i++ ) {

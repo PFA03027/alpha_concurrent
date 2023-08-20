@@ -59,8 +59,8 @@ enum class op_ret {
 	UNEXPECT_ERR    //!< p_data_ data is invalid by unexpected error
 };
 struct get_result {
-	op_ret    stat_;     //!< 取得処理に成功した場合にtrue
-	uintptr_t p_data_;   //!< 取得処理に成功した場合に、取得した値が保持される
+	op_ret    stat_;     //!< 取得処理に成功した場合にop_ret::SUCCESSとなる。それ以外の場合は、何らかのエラーによる失敗を示す。
+	uintptr_t p_data_;   //!< 取得処理に成功した場合に、取得した値が保持される。取得に失敗した場合は、不定値となる。
 
 	constexpr get_result( void )
 	  : stat_( op_ret::INVALID )
@@ -72,6 +72,25 @@ struct get_result {
 	  , p_data_( p_data_arg )
 	{
 	}
+};
+
+class dynamic_tls_key_scoped_accessor {
+public:
+	dynamic_tls_key_scoped_accessor( dynamic_tls_key_t key, op_ret stat, void* p );
+#ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
+	~dynamic_tls_key_scoped_accessor();
+#endif
+
+	op_ret     set_value( uintptr_t data );
+	get_result get_value( void );
+
+	const op_ret stat_;   //!< 取得処理に成功した場合にop_ret::SUCCESSとなる。それ以外の場合は、何らかのエラーによる失敗を示す。
+
+private:
+	dynamic_tls_key_t key_;   //!< アクセス時の補助データとして使用する。
+	void* const       p_;     //!< 内部のスレッドローカルデータ構造体へのポインタ
+
+	friend dynamic_tls_key_scoped_accessor dynamic_tls_getspecific_accessor( dynamic_tls_key_t key );
 };
 
 /*!
@@ -101,6 +120,12 @@ op_ret dynamic_tls_setspecific( dynamic_tls_key_t key, uintptr_t tls_data );
  *
  */
 get_result dynamic_tls_getspecific( dynamic_tls_key_t key );
+
+/*!
+ * @brief	get an accessor to a thread local storage
+ *
+ */
+dynamic_tls_key_scoped_accessor dynamic_tls_getspecific_accessor( dynamic_tls_key_t key );
 
 /**
  * @brief get dynamic thread local storage status
@@ -135,10 +160,15 @@ struct dynamic_tls_thread_cnt {
 	  , max_thread_count_( 0 )
 	{
 	}
-	constexpr dynamic_tls_thread_cnt( const dynamic_tls_thread_cnt& )            = default;
-	constexpr dynamic_tls_thread_cnt( dynamic_tls_thread_cnt&& )                 = default;
+	constexpr dynamic_tls_thread_cnt( const dynamic_tls_thread_cnt& ) = default;
+	constexpr dynamic_tls_thread_cnt( dynamic_tls_thread_cnt&& )      = default;
+#if ( __cpp_constexpr >= 201304 )
 	constexpr dynamic_tls_thread_cnt& operator=( const dynamic_tls_thread_cnt& ) = default;
 	constexpr dynamic_tls_thread_cnt& operator=( dynamic_tls_thread_cnt&& )      = default;
+#else
+	dynamic_tls_thread_cnt& operator=( const dynamic_tls_thread_cnt& ) = default;
+	dynamic_tls_thread_cnt& operator=( dynamic_tls_thread_cnt&& )      = default;
+#endif
 
 	void count_up( void )
 	{
@@ -241,7 +271,31 @@ class dynamic_tls {
 public:
 	using value_type      = T;
 	using value_reference = T&;
-	using value_pointer   = T*;
+
+	class scoped_accessor {
+	public:
+		T& ref( void )
+		{
+			return *p_;
+		}
+
+	private:
+		scoped_accessor( internal::dynamic_tls_key_scoped_accessor&& ac_arg )
+		  : accessor_( ac_arg )
+		  , p_( nullptr )
+		{
+			internal::get_result ret = accessor_.get_value();
+			if ( ret.stat_ != internal::op_ret::SUCCESS ) {
+				throw std::bad_alloc();
+			}
+			p_ = reinterpret_cast<T*>( ret.p_data_ );
+		}
+
+		internal::dynamic_tls_key_scoped_accessor accessor_;
+		T*                                        p_;
+
+		friend dynamic_tls;
+	};
 
 	constexpr dynamic_tls( void )
 	  : tls_key_( nullptr )
@@ -280,12 +334,9 @@ public:
 	}
 
 	/**
-	 * @brief gets a reference of thread local data with the constructor paramters for first call of a thread
+	 * @brief gets a reference of thread local data
 	 *
-	 * If a call of this I/F by a thread is first, this I/F will allocate a thread local memory for T and
-	 * construct it by it's constructor with Args and args.
-	 *
-	 * @tparam Args	constructor paramter types of T
+	 * If a call of this I/F by a thread is first, this I/F will allocate a thread local memory by TL_HANDLER
 	 *
 	 * @return a reference of thread local data
 	 *
@@ -303,6 +354,18 @@ public:
 	}
 
 	/**
+	 * @brief gets an accessor of thread local data
+	 *
+	 * @return an accessor of thread local data
+	 *
+	 * @exception if fail to allocate thread local data, throw std::bad_alloc
+	 */
+	scoped_accessor get_tls_accessor( void )
+	{
+		return internal::dynamic_tls_getspecific_accessor( tls_key_chk_and_get() );
+	}
+
+	/**
 	 * @brief get thread count information
 	 *
 	 * @return 1st: current thread count
@@ -316,6 +379,8 @@ public:
 	}
 
 private:
+	using value_pointer = T*;
+
 	inline internal::dynamic_tls_key_t tls_key_chk_and_get( void )
 	{
 		internal::dynamic_tls_key_t ans = tls_key_.load( std::memory_order_acquire );
@@ -384,6 +449,39 @@ class dynamic_tls<T*, TL_HANDLER> {
 public:
 	using value_type = T*;
 
+	class scoped_accessor {
+	public:
+		T* get( void )
+		{
+			internal::get_result ret = accessor_.get_value();
+			if ( ret.stat_ != internal::op_ret::SUCCESS ) {
+				throw std::bad_alloc();
+			}
+			return reinterpret_cast<T*>( ret.p_data_ );
+		}
+
+		void set( T* storing_data )
+		{
+			internal::op_ret ret = accessor_.set_value( reinterpret_cast<uintptr_t>( storing_data ) );
+			if ( ret != internal::op_ret::SUCCESS ) {
+				throw std::bad_alloc();
+			}
+		}
+
+	private:
+		scoped_accessor( internal::dynamic_tls_key_scoped_accessor&& ac_arg )
+		  : accessor_( ac_arg )
+		{
+			if ( accessor_.stat_ != internal::op_ret::SUCCESS ) {
+				throw std::bad_alloc();
+			}
+		}
+
+		internal::dynamic_tls_key_scoped_accessor accessor_;
+
+		friend dynamic_tls;
+	};
+
 	constexpr dynamic_tls( void )
 	  : tls_key_( nullptr )
 	  , tl_handler_()
@@ -421,14 +519,11 @@ public:
 	}
 
 	/**
-	 * @brief gets a reference of thread local data with the constructor paramters for first call of a thread
+	 * @brief gets a value of thread local data
 	 *
-	 * If a call of this I/F by a thread is first, this I/F will allocate a thread local memory for T and
-	 * construct it by it's constructor with Args and args.
+	 * If a call of this I/F by a thread is first, this I/F will allocate a thread local data by TL_HANDLER
 	 *
-	 * @tparam Args	constructor paramter types of T
-	 *
-	 * @return a reference of thread local data
+	 * @return value of thread local data
 	 *
 	 * @exception if fail to allocate thread local data, throw std::bad_alloc
 	 */
@@ -444,14 +539,9 @@ public:
 	}
 
 	/**
-	 * @brief gets a reference of thread local data with the constructor paramters for first call of a thread
+	 * @brief Set the value to thread local data
 	 *
-	 * If a call of this I/F by a thread is first, this I/F will allocate a thread local memory for T and
-	 * construct it by it's constructor with Args and args.
-	 *
-	 * @tparam Args	constructor paramter types of T
-	 *
-	 * @return a reference of thread local data
+	 * @param p_data the value to be set
 	 *
 	 * @exception if fail to allocate thread local data, throw std::bad_alloc
 	 */
@@ -462,6 +552,18 @@ public:
 			throw std::bad_alloc();
 		}
 		return;
+	}
+
+	/**
+	 * @brief gets an accessor of thread local data
+	 *
+	 * @return an accessor of thread local data
+	 *
+	 * @exception if fail to allocate thread local data, throw std::bad_alloc
+	 */
+	scoped_accessor get_tls_accessor( void )
+	{
+		return internal::dynamic_tls_getspecific_accessor( tls_key_chk_and_get() );
 	}
 
 	/**

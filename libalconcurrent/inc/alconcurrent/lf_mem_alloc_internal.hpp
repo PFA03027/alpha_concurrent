@@ -67,10 +67,15 @@ struct chunk_list_statistics {
 	  , dealloc_collision_cnt_( 0 )
 	{
 	}
-	constexpr chunk_list_statistics( const chunk_list_statistics& )            = default;
-	constexpr chunk_list_statistics( chunk_list_statistics&& )                 = default;
+	constexpr chunk_list_statistics( const chunk_list_statistics& ) = default;
+	constexpr chunk_list_statistics( chunk_list_statistics&& )      = default;
+#if ( __cpp_constexpr >= 201304 )
 	constexpr chunk_list_statistics& operator=( const chunk_list_statistics& ) = default;
 	constexpr chunk_list_statistics& operator=( chunk_list_statistics&& )      = default;
+#else
+	chunk_list_statistics& operator=( const chunk_list_statistics& ) = default;
+	chunk_list_statistics& operator=( chunk_list_statistics&& )      = default;
+#endif
 
 	chunk_statistics get_statistics( void ) const;
 
@@ -351,7 +356,6 @@ public:
 	  , tls_hint_( tl_chunk_param_destructor( this ) )
 	  , statistics_()
 	{
-		return;
 	}
 
 	/*!

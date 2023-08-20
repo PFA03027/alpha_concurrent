@@ -138,11 +138,15 @@ chunk_header_multi_slot::~chunk_header_multi_slot()
 
 constexpr std::size_t get_slot_header_size( void )
 {
+#if ( __cpp_constexpr >= 201304 )
 	std::size_t tmp = sizeof( slot_header ) / default_slot_alignsize;
 
 	std::size_t ans = ( tmp + 1 ) * default_slot_alignsize;
 
 	return ans;
+#else
+	return ( ( sizeof( slot_header ) / default_slot_alignsize ) + 1 ) * default_slot_alignsize;
+#endif
 }
 
 void chunk_header_multi_slot::set_slot_allocation_conf(
@@ -451,9 +455,7 @@ chunk_statistics chunk_header_multi_slot::get_statistics( void ) const
 	// access可能状態なので、accesserのカウントアップを行い、access 開始を表明
 	scoped_inout_counter_atomic_int cnt_inout( num_of_accesser_ );
 
-	chunk_statistics ans { 0 };
-
-	ans = p_statistics_->get_statistics();
+	chunk_statistics ans = p_statistics_->get_statistics();
 
 	ans.alloc_conf_ = slot_conf_;
 
@@ -631,7 +633,7 @@ void* chunk_list::allocate_mem_slot( size_t req_size, size_t req_align )
 		// オーバーフローしてしまったら、2倍化を取りやめる。
 		new_slot_num = cur_slot_num;
 	}
-	param_chunk_allocation cur_alloc_conf { chunk_param_.size_of_one_piece_, new_slot_num };
+	param_chunk_allocation cur_alloc_conf( chunk_param_.size_of_one_piece_, new_slot_num );
 
 	// 空きchunk_header_multi_slotに対して、再利用を試みる。
 	// リンクリストをたどって、次に検索するchunkを取り出す。

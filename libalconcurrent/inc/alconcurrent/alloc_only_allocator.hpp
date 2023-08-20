@@ -39,16 +39,22 @@ constexpr size_t default_align_size = 32;
  * @return true
  * @return false
  */
-template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+template <typename T>
 constexpr bool is_power_of_2( T v )
 {
+	static_assert( std::is_integral<T>::value, "T should be integral type" );
+#if ( __cpp_constexpr >= 201304 )
 	// 2のn乗かどうかを判定する。
 	if ( v < 2 ) return false;
 
 	// step1: 最も下位に1が立っているビットのみ残した値を抽出する
-	auto v2 = -v & v;
+	T v2 = -v & v;
 	// step2: 2のn乗の数値は、ビットが1つだけ立っている。よって、2のn乗の数値は最も下位のビットが1つだけ。よって、v2はvと同じになる。
-	return v == v2;
+	bool ans = ( v == v2 );
+	return ans;
+#else
+	return ( ( v == ( -v & v ) ) && ( v >= 2 ) );
+#endif
 }
 
 class alloc_chamber;

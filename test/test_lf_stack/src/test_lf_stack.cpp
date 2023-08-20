@@ -338,7 +338,7 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( test_lifo_type* p_test_obj[] )
 
 TEST_F( lfStackTest, TC3 )
 {
-	test_lifo_type  sut[2] = { num_thread, num_thread };
+	test_lifo_type  sut[2];
 	test_lifo_type* p_test_obj[2];
 	p_test_obj[0] = &( sut[0] );
 	p_test_obj[1] = &( sut[1] );

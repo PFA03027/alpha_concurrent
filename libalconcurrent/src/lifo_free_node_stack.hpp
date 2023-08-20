@@ -93,10 +93,12 @@ struct free_node_stack {
 		free_node_stack* const p_parent_;
 	};
 
-	using node_type        = NODE_T;
-	using node_pointer     = NODE_T*;
-	using hzd_ptr_mgr_type = hazard_ptr<node_type, HZD_IDX_MAX>;
-	using scoped_hzd_type  = hazard_ptr_scoped_ref<node_type, HZD_IDX_MAX>;
+	using node_type               = NODE_T;
+	using node_pointer            = NODE_T*;
+	using hzd_ptr_mgr_type        = hazard_ptr<node_type, HZD_IDX_MAX>;
+	using scoped_hzd_type         = hazard_ptr_scoped_ref<node_type, HZD_IDX_MAX>;
+	using dynamic_tls_np_type     = dynamic_tls<node_pointer, threadlocal_no_allocate_handler>;
+	using scoped_np_accessor_type = typename dynamic_tls_np_type::scoped_accessor;
 
 	constexpr free_node_stack( alloc_only_chamber* p_allocator_arg )
 	  : hzd_ptrs_( p_allocator_arg )
@@ -196,21 +198,21 @@ struct free_node_stack {
 		return nullptr;
 	}
 
-	void push_to_tls_stack( node_pointer p_n )
+	void push_to_tls_stack( node_pointer p_n, scoped_np_accessor_type& acsor )
 	{
-		node_pointer p_cur_head = tls_p_hazard_slot_stack_head_.get_tls_instance();
+		node_pointer p_cur_head = acsor.get();
 		p_n->set_next( p_cur_head );
-		tls_p_hazard_slot_stack_head_.set_value_to_tls_instance( p_n );
+		acsor.set( p_n );
 	}
 
-	node_pointer pop_from_tls_stack( void )
+	node_pointer pop_from_tls_stack( scoped_np_accessor_type& acsor )
 	{
-		node_pointer p_ans = tls_p_hazard_slot_stack_head_.get_tls_instance();
+		node_pointer p_ans = acsor.get();
 		if ( p_ans == nullptr ) return nullptr;
 
 		node_pointer p_new_head = p_ans->get_next();
 		p_ans->set_next( nullptr );
-		tls_p_hazard_slot_stack_head_.set_value_to_tls_instance( p_new_head );
+		acsor.set( p_new_head );
 		return p_ans;
 	}
 
@@ -236,7 +238,8 @@ struct free_node_stack {
 		if ( ul.try_lock() ) {
 			// ロックが確保できたので、push先優先順位1位の共有ノードスタックにプッシュ
 			nonlockchk_push_to_consignment_stack( p_n );
-			node_pointer p_rcy = pop_from_tls_stack();
+			scoped_np_accessor_type acsor = tls_p_hazard_slot_stack_head_.get_tls_accessor();
+			node_pointer            p_rcy = pop_from_tls_stack( acsor );
 			if ( p_rcy != nullptr ) {
 				nonlockchk_push_to_consignment_stack( p_rcy );
 			}
@@ -245,13 +248,14 @@ struct free_node_stack {
 				// 共有ノードスタックのロックが確保できなかった
 				// p_nをスレッドローカルに戻す前に、フリーノードスタックにリサイクルを行う。
 				// スレッドローカルからリサイクルウ候補を1つ取り出す。
-				node_pointer p_rcy = pop_from_tls_stack();
+				scoped_np_accessor_type acsor = tls_p_hazard_slot_stack_head_.get_tls_accessor();
+				node_pointer            p_rcy = pop_from_tls_stack( acsor );
 				// 次にpush先優先順位2位スレッドローカルに戻す
-				push_to_tls_stack( p_n );
+				push_to_tls_stack( p_n, acsor );
 				if ( p_rcy != nullptr ) {
 					if ( hzd_ptrs_.check_ptr_in_hazard_list( p_rcy ) ) {
 						// まだハザードポインタに残っているので、元に戻す
-						push_to_tls_stack( p_rcy );
+						push_to_tls_stack( p_rcy, acsor );
 					} else {
 						// ハザードポインタに乗っていないので、即座にpush先優先順位3位のフリーノードスタックにプッシュ。
 						push_to_free_node_stack_wo_hzd_chk( p_rcy );
@@ -267,7 +271,8 @@ struct free_node_stack {
 	node_pointer pop( void )
 	{
 		// push先優先順位3位のスレッドローカルリストからノードを取り出し、フリーノードとして返せるかどうかをチェックする。
-		node_pointer p_tls_tmp = pop_from_tls_stack();   // スレッドローカルリストからノードを取り出す
+		scoped_np_accessor_type acsor     = tls_p_hazard_slot_stack_head_.get_tls_accessor();
+		node_pointer            p_tls_tmp = pop_from_tls_stack( acsor );   // スレッドローカルリストからノードを取り出す
 		if ( p_tls_tmp != nullptr ) {
 			// ノードが取り出せたので、フリーノードとして返す。
 			return p_tls_tmp;
@@ -305,11 +310,11 @@ struct free_node_stack {
 		return nullptr;   // 結局取り出しには失敗した。
 	}
 
-	hzd_ptr_mgr_type                                           hzd_ptrs_;                       //!< ハザードポインタ管理構造体
-	std::atomic<node_pointer>                                  p_free_node_stack_head_;         //!< 未使用状態のslot_header_of_arrayスタックの、先頭slot_header_of_arrayへのポインタ
-	std::mutex                                                 mtx_consignment_stack_;          //!< スレッド終了時のハザード中のスロットを受け取るスタックの排他制御用mutex
-	node_pointer                                               p_consignment_stack_head_;       //!< スレッド終了時のハザード中のスロットを受け取るスタックの、先頭slot_header_of_arrayへのポインタ。mutexロックの内側でアクセスするので、atomic変数にはしない。
-	dynamic_tls<node_pointer, threadlocal_no_allocate_handler> tls_p_hazard_slot_stack_head_;   //!< ハザード中のスロットを受け取るスレッド毎のスタックの、先頭slot_header_of_arrayへのポインタ
+	hzd_ptr_mgr_type          hzd_ptrs_;                       //!< ハザードポインタ管理構造体
+	std::atomic<node_pointer> p_free_node_stack_head_;         //!< 未使用状態のslot_header_of_arrayスタックの、先頭slot_header_of_arrayへのポインタ
+	std::mutex                mtx_consignment_stack_;          //!< スレッド終了時のハザード中のスロットを受け取るスタックの排他制御用mutex
+	node_pointer              p_consignment_stack_head_;       //!< スレッド終了時のハザード中のスロットを受け取るスタックの、先頭slot_header_of_arrayへのポインタ。mutexロックの内側でアクセスするので、atomic変数にはしない。
+	dynamic_tls_np_type       tls_p_hazard_slot_stack_head_;   //!< ハザード中のスロットを受け取るスレッド毎のスタックの、先頭slot_header_of_arrayへのポインタ
 };
 
 template <typename NODE_T>

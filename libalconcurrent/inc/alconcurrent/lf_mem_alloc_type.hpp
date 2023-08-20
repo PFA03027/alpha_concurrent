@@ -24,8 +24,24 @@ constexpr size_t default_slot_alignsize = sizeof( std::uintptr_t );
  * @brief	configuration paramters when allocate chunk
  */
 struct param_chunk_allocation {
-	size_t size_of_one_piece_ = 0;   //!< size of one piece in a chunk
-	size_t num_of_pieces_     = 0;   //!< number of pieces in a chunk
+	size_t size_of_one_piece_;   //!< size of one piece in a chunk
+	size_t num_of_pieces_;       //!< number of pieces in a chunk
+
+	constexpr param_chunk_allocation( void )
+	  : size_of_one_piece_( 0 )
+	  , num_of_pieces_( 0 )
+	{
+	}
+	constexpr param_chunk_allocation( int )
+	  : size_of_one_piece_( 0 )
+	  , num_of_pieces_( 0 )
+	{
+	}
+	constexpr param_chunk_allocation( size_t size_of_one_piece_arg, size_t num_of_pieces_arg )
+	  : size_of_one_piece_( size_of_one_piece_arg )
+	  , num_of_pieces_( num_of_pieces_arg )
+	{
+	}
 };
 
 /*!

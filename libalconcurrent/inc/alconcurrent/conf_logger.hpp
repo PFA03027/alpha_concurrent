@@ -48,11 +48,16 @@ struct bt_info {
 	{
 	}
 
-	~bt_info()                                     = default;
-	constexpr bt_info( const bt_info& )            = default;
-	constexpr bt_info( bt_info&& )                 = default;
+	~bt_info()                          = default;
+	constexpr bt_info( const bt_info& ) = default;
+	constexpr bt_info( bt_info&& )      = default;
+#if ( __cpp_constexpr >= 201304 )
 	constexpr bt_info& operator=( const bt_info& ) = default;
 	constexpr bt_info& operator=( bt_info&& )      = default;
+#else
+	bt_info& operator=( const bt_info& ) = default;
+	bt_info& operator=( bt_info&& )      = default;
+#endif
 
 	void dump_to_log( log_type lt, char c, int id );
 };

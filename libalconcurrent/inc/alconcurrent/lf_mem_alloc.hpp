@@ -78,7 +78,6 @@ public:
 	  , param_ch_array_( nullptr )
 	  , exclusive_ctl_of_prune_( false )
 	{
-		return;
 	}
 
 	/*!
@@ -94,10 +93,11 @@ public:
 	{
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else
+#if ( __cpp_fold_expressions >= 201411 )
 		static_assert( ( ... && ( std::is_same<typename std::remove_const<Args>::type, param_chunk_allocation>::value ) ), "constructor parameter is not same to param_chunk_allocation" );
+#endif
 		static_assert( NUM_ENTRY >= sizeof...( args ), "number of constructer paramter is over than NUM_ENTRY" );
 #endif
-		return;
 	}
 
 	/*!
@@ -230,7 +230,10 @@ public:
 	/*!
 	 * @brief	constructor
 	 */
-	constexpr general_mem_allocator( void ) = default;
+#if ( __cpp_constexpr >= 201304 )
+	constexpr
+#endif
+		general_mem_allocator( void ) = default;
 
 	/*!
 	 * @brief	constructor
