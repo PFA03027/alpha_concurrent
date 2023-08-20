@@ -164,12 +164,9 @@ struct dynamic_tls_thread_cnt {
 	constexpr dynamic_tls_thread_cnt( dynamic_tls_thread_cnt&& )      = default;
 #if ( __cpp_constexpr >= 201304 )
 	constexpr dynamic_tls_thread_cnt& operator=( const dynamic_tls_thread_cnt& ) = default;
+	constexpr dynamic_tls_thread_cnt& operator=( dynamic_tls_thread_cnt&& )      = default;
 #else
 	dynamic_tls_thread_cnt& operator=( const dynamic_tls_thread_cnt& ) = default;
-#endif
-#if ( __cpp_constexpr >= 201304 )
-	constexpr dynamic_tls_thread_cnt& operator=( dynamic_tls_thread_cnt&& ) = default;
-#else
 	dynamic_tls_thread_cnt& operator=( dynamic_tls_thread_cnt&& )      = default;
 #endif
 
@@ -337,12 +334,9 @@ public:
 	}
 
 	/**
-	 * @brief gets a reference of thread local data with the constructor paramters for first call of a thread
+	 * @brief gets a reference of thread local data
 	 *
-	 * If a call of this I/F by a thread is first, this I/F will allocate a thread local memory for T and
-	 * construct it by it's constructor with Args and args.
-	 *
-	 * @tparam Args	constructor paramter types of T
+	 * If a call of this I/F by a thread is first, this I/F will allocate a thread local memory by TL_HANDLER
 	 *
 	 * @return a reference of thread local data
 	 *
@@ -359,6 +353,13 @@ public:
 		return *( reinterpret_cast<value_pointer>( tmp_ret.p_data_ ) );
 	}
 
+	/**
+	 * @brief gets an accessor of thread local data
+	 *
+	 * @return an accessor of thread local data
+	 *
+	 * @exception if fail to allocate thread local data, throw std::bad_alloc
+	 */
 	scoped_accessor get_tls_accessor( void )
 	{
 		return internal::dynamic_tls_getspecific_accessor( tls_key_chk_and_get() );
@@ -518,14 +519,11 @@ public:
 	}
 
 	/**
-	 * @brief gets a reference of thread local data with the constructor paramters for first call of a thread
+	 * @brief gets a value of thread local data
 	 *
-	 * If a call of this I/F by a thread is first, this I/F will allocate a thread local memory for T and
-	 * construct it by it's constructor with Args and args.
+	 * If a call of this I/F by a thread is first, this I/F will allocate a thread local data by TL_HANDLER
 	 *
-	 * @tparam Args	constructor paramter types of T
-	 *
-	 * @return a reference of thread local data
+	 * @return value of thread local data
 	 *
 	 * @exception if fail to allocate thread local data, throw std::bad_alloc
 	 */
@@ -541,14 +539,9 @@ public:
 	}
 
 	/**
-	 * @brief gets a reference of thread local data with the constructor paramters for first call of a thread
+	 * @brief Set the value to thread local data
 	 *
-	 * If a call of this I/F by a thread is first, this I/F will allocate a thread local memory for T and
-	 * construct it by it's constructor with Args and args.
-	 *
-	 * @tparam Args	constructor paramter types of T
-	 *
-	 * @return a reference of thread local data
+	 * @param p_data the value to be set
 	 *
 	 * @exception if fail to allocate thread local data, throw std::bad_alloc
 	 */
@@ -561,6 +554,13 @@ public:
 		return;
 	}
 
+	/**
+	 * @brief gets an accessor of thread local data
+	 *
+	 * @return an accessor of thread local data
+	 *
+	 * @exception if fail to allocate thread local data, throw std::bad_alloc
+	 */
 	scoped_accessor get_tls_accessor( void )
 	{
 		return internal::dynamic_tls_getspecific_accessor( tls_key_chk_and_get() );
