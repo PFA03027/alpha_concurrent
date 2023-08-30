@@ -76,10 +76,10 @@ struct bt_info {
  */
 class logger_if_abst {
 public:
+	constexpr logger_if_abst( void ) = default;
+
 	/*!
 	 * @brief	Output a log to logger
-	 *
-	 *
 	 */
 	virtual void output_log(
 		const log_type,              //!< [in]	log type for logger

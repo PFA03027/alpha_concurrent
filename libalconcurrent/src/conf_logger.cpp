@@ -19,6 +19,9 @@ namespace concurrent {
 namespace internal {
 
 class default_logger : public logger_if_abst {
+public:
+	constexpr default_logger( void ) = default;
+
 	void output_log(
 		const log_type,              //!< [in]	log type for logger
 		const size_t max_buf_size,   //!< [in]	max string buffer size of 3rd parameter
