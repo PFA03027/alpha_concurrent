@@ -43,6 +43,9 @@ all: build
 	cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -DSANITIZER_TYPE=${SANITIZER_TYPE} -DALCONCURRENT_BUILD_SHARED_LIBS=${ALCONCURRENT_BUILD_SHARED_LIBS} -G "Unix Makefiles" ../; \
 	cmake --build . -j ${JOBS} -v --target ${BUILDIMPLTARGET}
 
+build:
+	mkdir -p ${BUILD_DIR}
+
 test: build-test
 	set -e; \
 	cd ${BUILD_DIR}; \
@@ -51,8 +54,12 @@ test: build-test
 build-test:
 	make BUILDIMPLTARGET=build-test all
 
-build:
-	mkdir -p ${BUILD_DIR}
+sample: build-sample
+	set -e; \
+	echo finish make sample
+
+build-sample:
+	make BUILDIMPLTARGET=build-sample all
 
 clean:
 	-rm -fr ${BUILD_DIR}
