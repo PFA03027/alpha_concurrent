@@ -309,6 +309,24 @@ void* node_of_list::operator new( std::size_t n )   // usual new...(1)
 
 	return p_ans;
 }
+void* node_of_list::operator new( std::size_t n, std::align_val_t alignment )   // usual new with alignment...(1) C++11/C++14 just ignore. C++17 and after uses this.
+{
+	void* p_ans;
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC
+	p_ans = std::malloc( n );
+	// p_ans = ::operator new( n );
+#else
+#ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
+	p_ans = get_gma().allocate( n, static_cast<size_t>( alignment ) );
+#else
+	p_ans = gmem_allocate( n, static_cast<size_t>( alignment ) );
+#endif
+#endif
+
+	if ( p_ans == nullptr ) throw std::bad_alloc();
+
+	return p_ans;
+}
 void node_of_list::operator delete( void* p_mem ) noexcept   // usual new...(2)
 {
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC

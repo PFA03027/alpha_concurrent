@@ -24,7 +24,7 @@
 #include "alconcurrent/lf_fifo.hpp"
 
 template <typename FIFOType>
-std::size_t worker_task_stack(
+std::tuple<std::size_t, typename FIFOType::value_type> worker_task_stack(
 	std::latch&       start_sync_latch,
 	std::atomic_bool& loop_flag,
 	FIFOType&         sut )
@@ -51,7 +51,7 @@ std::size_t worker_task_stack(
 		abort();
 	}
 
-	return count;
+	return { count, pop_value };
 }
 
 template <typename FIFOType>
@@ -61,12 +61,13 @@ int nwoker_perf_test_stack( unsigned int nworker, FIFOType& sut )
 
 	std::latch       start_sync_latch( nworker + 1 );
 	std::atomic_bool loop_flag( true );
+	using result_type = decltype( worker_task_stack<FIFOType>( start_sync_latch, loop_flag, sut ) );
 
-	std::vector<std::future<std::size_t>> rets;
+	std::vector<std::future<result_type>> rets;
 	rets.reserve( nworker );
 	std::vector<std::thread> task_threads( nworker );
 	for ( auto& t : task_threads ) {
-		std::packaged_task<std::size_t()> task(
+		std::packaged_task<result_type()> task(
 			[&start_sync_latch, &loop_flag, &sut]() {
 				return worker_task_stack<FIFOType>( start_sync_latch, loop_flag, sut );
 			} );   // 非同期実行する関数を登録する
@@ -83,12 +84,15 @@ int nwoker_perf_test_stack( unsigned int nworker, FIFOType& sut )
 			t.join();
 		}
 	}
-	std::size_t result = 0;
+	std::size_t count_sum = 0;
+	std::size_t total_sum = 0;
 	for ( auto& r : rets ) {
-		result += r.get();
+		auto [count_ret, sum_ret] = r.get();
+		count_sum += count_ret;
+		total_sum += sum_ret;
 	}
 
-	std::cout << "result is " << result << std::endl;
+	std::cout << "result is count_sum: " << count_sum << "\t\ttotal sum: " << total_sum << "\t\t" << ( ( count_sum == total_sum ) ? "Good" : "FAILED" ) << std::endl;
 
 	return EXIT_SUCCESS;
 }

@@ -68,8 +68,9 @@ struct node_of_list {
 	virtual void release_ownership( void );
 	virtual void teardown_by_recycle( void );
 
-	void* operator new( std::size_t n );             // usual new...(1)
-	void  operator delete( void* p_mem ) noexcept;   // usual delete...(2)
+	void* operator new( std::size_t n );                               // usual new...(1)
+	void* operator new( std::size_t n, std::align_val_t alignment );   // usual new with alignment...(1) C++11/C++14 just ignore. C++17 and after uses this.
+	void  operator delete( void* p_mem ) noexcept;                     // usual delete...(2)
 
 	void* operator new[]( std::size_t n );             // usual new...(1)
 	void  operator delete[]( void* p_mem ) noexcept;   // usual delete...(2)

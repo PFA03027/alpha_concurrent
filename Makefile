@@ -55,8 +55,9 @@ build-test:
 	make BUILDIMPLTARGET=build-test all
 
 sample: build-sample
-	set -e; \
 	echo finish make sample
+	build/sample/perf_stack/perf_stack
+	build/sample/perf_fifo/perf_fifo
 
 build-sample:
 	make BUILDIMPLTARGET=build-sample all

@@ -30,7 +30,11 @@ namespace internal {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 // internal I/F
-constexpr size_t default_align_size = 32;
+#ifdef __cpp_lib_hardware_interference_size
+constexpr size_t default_align_size = std::hardware_destructive_interference_size;   // it is better to be equal to std::hardware_destructive_interference_size
+#else
+constexpr size_t default_align_size = 64;   // it is better to be equal to std::hardware_destructive_interference_size
+#endif
 
 /**
  * @brief is power of 2 ?
