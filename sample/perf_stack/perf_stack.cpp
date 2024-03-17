@@ -191,7 +191,8 @@ public:
 	using value_type = T;
 
 	fixsize_lf_stack( void )
-	  : ap_head_valid_stack_( nullptr )
+	  : spin_cnt_( 0 )
+	  , ap_head_valid_stack_( nullptr )
 	  , ap_head_free_stack_( nullptr )
 	{
 		for ( size_t idx = 1; idx < ReserveSize; idx++ ) {
@@ -204,20 +205,22 @@ public:
 
 	void push( value_type x )
 	{
-		node_type* p = stack_pop( ap_head_free_stack_ );
+		node_type* p = stack_pop( ap_head_free_stack_, spin_cnt_ );
 		p->val_.store( x, store_order );
-		stack_push( ap_head_valid_stack_, p );
+		stack_push( ap_head_valid_stack_, p, spin_cnt_ );
 	}
 	std::tuple<bool, value_type> pop( void )
 	{
-		node_type* p = stack_pop( ap_head_valid_stack_ );
+		node_type* p = stack_pop( ap_head_valid_stack_, spin_cnt_ );
 		if ( p == nullptr ) {
 			return std::tuple<bool, value_type>( false, value_type {} );
 		}
 		value_type ans = p->val_.load( load_order );
-		stack_push( ap_head_free_stack_, p );
+		stack_push( ap_head_free_stack_, p, spin_cnt_ );
 		return std::tuple<bool, value_type>( true, ans );
 	}
+
+	std::atomic<std::size_t> spin_cnt_;
 
 private:
 	struct node_type {
@@ -302,9 +305,17 @@ private:
 		}
 	};
 
-	static void stack_push( std::atomic<node_type*>& stack_head, node_type* p )
+	static void stack_push( std::atomic<node_type*>& stack_head, node_type* p, std::atomic<std::size_t>& spin_cnt )
 	{
-		// while ( p->ac_cnt_.load( load_order ) != 0 ) {}   // spin lock...
+#if 0
+		std::size_t cnt = 0;
+		while ( p->ac_cnt_.load( load_order ) != 0 ) {
+			cnt++;
+		}   // spin lock...
+		spin_cnt.fetch_add( cnt );
+#else
+		while ( p->ac_cnt_.load( load_order ) != 0 ) {}   // spin lock...
+#endif
 		node_type* p_cur_head = stack_head.load( load_order );
 		do {
 			p->ap_next_.store( p_cur_head, store_order );
@@ -312,7 +323,7 @@ private:
 		return;
 	}
 
-	static node_type* stack_pop( std::atomic<node_type*>& stack_head )
+	static node_type* stack_pop( std::atomic<node_type*>& stack_head, std::atomic<std::size_t>& spin_cnt )
 	{
 		node_type* p_cur_head               = nullptr;
 		node_type* p_updated_head_candidate = nullptr;
@@ -331,7 +342,6 @@ private:
 				p_updated_head_candidate = p_cur_head->ap_next_.load( load_order );
 			} while ( !stack_head.compare_exchange_weak( p_cur_head, p_updated_head_candidate, rmw_order ) );
 		}
-		while ( p_cur_head->ac_cnt_.load( load_order ) != 0 ) {}   // spin lock...
 		return p_cur_head;
 	}
 
@@ -360,9 +370,17 @@ int main( void )
 
 	std::cout << "--- fixsize_lf_stack ---" << std::endl;
 	nwoker_perf_test_stack<fixsize_lf_stack<TestType>>( nworker * 2, sut4 );
+	std::cout << sut4.spin_cnt_.load() << std::endl;
+	sut4.spin_cnt_.store( 0 );
 	nwoker_perf_test_stack<fixsize_lf_stack<TestType>>( nworker, sut4 );
+	std::cout << sut4.spin_cnt_.load() << std::endl;
+	sut4.spin_cnt_.store( 0 );
 	nwoker_perf_test_stack<fixsize_lf_stack<TestType>>( nworker / 2, sut4 );
+	std::cout << sut4.spin_cnt_.load() << std::endl;
+	sut4.spin_cnt_.store( 0 );
 	nwoker_perf_test_stack<fixsize_lf_stack<TestType>>( 1, sut4 );
+	std::cout << sut4.spin_cnt_.load() << std::endl;
+	sut4.spin_cnt_.store( 0 );
 	std::cout << "--- alpha::concurrent::stack_list<> ---" << std::endl;
 	nwoker_perf_test_stack<alpha::concurrent::stack_list<TestType>>( nworker * 2, sut1 );
 	nwoker_perf_test_stack<alpha::concurrent::stack_list<TestType>>( nworker, sut1 );
