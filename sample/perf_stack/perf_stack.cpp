@@ -99,21 +99,20 @@ int nwoker_perf_test_stack( unsigned int nworker, FIFOType& sut )
 
 // ===========================================================
 constexpr std::size_t ReserveSize = 10000;
-using TestType                    = std::size_t;
-// using TestType = int;
 
-class vec_stack {
+template <typename T>
+class vec_mutex_stack {
 public:
-	using value_type = TestType;
+	using value_type = T;
 
-	vec_stack( void )
+	vec_mutex_stack( void )
 	  : mtx_()
 	  , vec_( ReserveSize )
 	  , head_idx_( 0 )
 	{
 	}
 
-	void push( TestType x )
+	void push( value_type x )
 	{
 		std::lock_guard<std::mutex> lk( mtx_ );
 		if ( head_idx_ >= ReserveSize ) {
@@ -123,58 +122,227 @@ public:
 		vec_[head_idx_] = x;
 		head_idx_++;
 	}
-	std::tuple<bool, TestType> pop( void )
+	std::tuple<bool, value_type> pop( void )
 	{
 		std::lock_guard<std::mutex> lk( mtx_ );
 		if ( head_idx_ <= 0 ) {
-			return std::tuple<bool, TestType> { false, 0 };
+			return std::tuple<bool, value_type> { false, 0 };
 		}
 		head_idx_--;
 
-		TestType ans = vec_[head_idx_];
-		return std::tuple<bool, TestType> { true, ans };
+		value_type ans = vec_[head_idx_];
+		return std::tuple<bool, value_type> { true, ans };
 	}
 
 private:
-	std::mutex            mtx_;
-	std::vector<TestType> vec_;
-	std::size_t           head_idx_;
+	std::mutex              mtx_;
+	std::vector<value_type> vec_;
+	std::size_t             head_idx_;
 };
 
-class list_stack {
+template <typename T>
+class list_mutex_stack {
 public:
-	using value_type = TestType;
+	using value_type = T;
 
-	list_stack( void )
+	list_mutex_stack( void )
 	{
 	}
 
-	void push( TestType x )
+	void push( value_type x )
 	{
 		std::lock_guard<std::mutex> lk( mtx_ );
 		l_.emplace_back( x );
 	}
-	std::tuple<bool, TestType> pop( void )
+	std::tuple<bool, value_type> pop( void )
 	{
 		std::lock_guard<std::mutex> lk( mtx_ );
 		if ( l_.size() <= 0 ) {
-			return std::tuple<bool, TestType> { false, 0 };
+			return std::tuple<bool, value_type> { false, 0 };
 		}
 
-		TestType ans = l_.back();
+		value_type ans = l_.back();
 		l_.pop_back();
-		return std::tuple<bool, TestType> { true, ans };
+		return std::tuple<bool, value_type> { true, ans };
 	}
 
 private:
-	std::mutex          mtx_;
-	std::list<TestType> l_;
+	std::mutex            mtx_;
+	std::list<value_type> l_;
 };
 
+// ===========================================================
+#ifdef __cpp_lib_hardware_interference_size
+constexpr size_t default_align_size = std::hardware_destructive_interference_size;   // it is better to be equal to std::hardware_destructive_interference_size
+#else
+constexpr size_t default_align_size = 64;   // it is better to be equal to std::hardware_destructive_interference_size
+#endif
+
+template <typename T>
 class fixsize_lf_stack {
+	// static constexpr std::memory_order store_order = std::memory_order_seq_cst;
+	// static constexpr std::memory_order load_order  = std::memory_order_seq_cst;
+	// static constexpr std::memory_order rmw_order   = std::memory_order_seq_cst;
+	static constexpr std::memory_order store_order = std::memory_order_release;
+	static constexpr std::memory_order load_order  = std::memory_order_acquire;
+	static constexpr std::memory_order rmw_order   = std::memory_order_acq_rel;
+
 public:
+	using value_type = T;
+
+	fixsize_lf_stack( void )
+	  : ap_head_valid_stack_( nullptr )
+	  , ap_head_free_stack_( nullptr )
+	{
+		for ( size_t idx = 1; idx < ReserveSize; idx++ ) {
+			array_nodes_[idx - 1].ap_next_.store( &( array_nodes_[idx] ), store_order );
+		}
+		array_nodes_[ReserveSize - 1].ap_next_.store( nullptr, store_order );
+
+		ap_head_free_stack_.store( &( array_nodes_[0] ), store_order );
+	}
+
+	void push( value_type x )
+	{
+		node_type* p = stack_pop( ap_head_free_stack_ );
+		p->val_.store( x, store_order );
+		stack_push( ap_head_valid_stack_, p );
+	}
+	std::tuple<bool, value_type> pop( void )
+	{
+		node_type* p = stack_pop( ap_head_valid_stack_ );
+		if ( p == nullptr ) {
+			return std::tuple<bool, value_type>( false, value_type {} );
+		}
+		value_type ans = p->val_.load( load_order );
+		stack_push( ap_head_free_stack_, p );
+		return std::tuple<bool, value_type>( true, ans );
+	}
+
 private:
+	struct node_type {
+		alignas( default_align_size ) std::atomic<value_type> val_;   // implicitly requires default constructible.
+		alignas( default_align_size ) std::atomic<node_type*> ap_next_;
+		alignas( default_align_size ) std::atomic<std::size_t> ac_cnt_;   // accesser counter to protect
+
+		class ac_ctrl_raii {
+		public:
+			ac_ctrl_raii( void )
+			  : p_refing_( nullptr )
+			{
+			}
+			ac_ctrl_raii( node_type* p_nt )
+			  : p_refing_( p_nt )
+			{
+				if ( p_refing_ == nullptr ) return;
+				p_refing_->ac_cnt_.fetch_add( 1, rmw_order );
+			}
+			~ac_ctrl_raii()
+			{
+				if ( p_refing_ == nullptr ) return;
+				p_refing_->ac_cnt_.fetch_sub( 1, rmw_order );
+			}
+			ac_ctrl_raii( const ac_ctrl_raii& src )
+			  : p_refing_( src.p_refing_ )
+			{
+				if ( p_refing_ == nullptr ) return;
+				p_refing_->ac_cnt_.fetch_add( 1, rmw_order );
+			}
+			ac_ctrl_raii( ac_ctrl_raii&& src )
+			  : p_refing_( src.p_refing_ )
+			{
+				src.p_refing_ = nullptr;
+			}
+			ac_ctrl_raii& operator=( const ac_ctrl_raii& src )
+			{
+				if ( this == &src ) return *this;
+				if ( p_refing_ == src.p_refing_ ) return *this;
+
+				if ( p_refing_ != nullptr ) {
+					p_refing_->ac_cnt_.fetch_sub( 1, rmw_order );
+				}
+				if ( src.p_refing_ != nullptr ) {
+					src.p_refing_->ac_cnt_.fetch_add( 1, rmw_order );
+				}
+				p_refing_ = src.p_refing_;
+				return *this;
+			}
+			ac_ctrl_raii& operator=( ac_ctrl_raii&& src )
+			{
+				if ( this == &src ) return *this;
+				if ( p_refing_ == src.p_refing_ ) {
+					if ( src.p_refing_ != nullptr ) {
+						src.p_refing_->ac_cnt_.fetch_sub( 1, rmw_order );
+						src.p_refing_ = nullptr;
+					}
+				} else {
+					if ( p_refing_ != nullptr ) {
+						p_refing_->ac_cnt_.fetch_sub( 1, rmw_order );
+					}
+					p_refing_     = src.p_refing_;
+					src.p_refing_ = nullptr;
+				}
+				return *this;
+			}
+
+		private:
+			node_type* p_refing_;
+		};
+
+		node_type( void )
+		  : val_ {}
+		  , ap_next_( nullptr )
+		  , ac_cnt_( 0 )
+		{
+		}
+
+		ac_ctrl_raii protect( void )
+		{
+			return ac_ctrl_raii( this );
+		}
+	};
+
+	static void stack_push( std::atomic<node_type*>& stack_head, node_type* p )
+	{
+		// while ( p->ac_cnt_.load( load_order ) != 0 ) {}   // spin lock...
+		node_type* p_cur_head = stack_head.load( load_order );
+		do {
+			p->ap_next_.store( p_cur_head, store_order );
+		} while ( !stack_head.compare_exchange_weak( p_cur_head, p, rmw_order ) );
+		return;
+	}
+
+	static node_type* stack_pop( std::atomic<node_type*>& stack_head )
+	{
+		node_type* p_cur_head               = nullptr;
+		node_type* p_updated_head_candidate = nullptr;
+		p_cur_head                          = stack_head.load( load_order );
+		{
+			typename node_type::ac_ctrl_raii ac;
+			do {
+				while ( true ) {
+					if ( p_cur_head == nullptr ) return nullptr;
+					ac                        = p_cur_head->protect();
+					node_type* p_desired_head = p_cur_head;
+					if ( stack_head.compare_exchange_weak( p_cur_head, p_desired_head, rmw_order ) ) {
+						break;   // weakで、ABA問題に対処している。。。つもりだが、x64ではダメかも。
+					}
+				}
+				p_updated_head_candidate = p_cur_head->ap_next_.load( load_order );
+			} while ( !stack_head.compare_exchange_weak( p_cur_head, p_updated_head_candidate, rmw_order ) );
+		}
+		while ( p_cur_head->ac_cnt_.load( load_order ) != 0 ) {}   // spin lock...
+		return p_cur_head;
+	}
+
+	node_type array_nodes_[ReserveSize];
+	alignas( default_align_size ) std::atomic<node_type*> ap_head_valid_stack_;
+	alignas( default_align_size ) std::atomic<node_type*> ap_head_free_stack_;
 };
+
+// ===========================================================
+using TestType = std::size_t;
+// using TestType = int;
 
 int main( void )
 {
@@ -186,24 +354,30 @@ int main( void )
 		nworker = 10;
 	}
 	alpha::concurrent::stack_list<TestType> sut1( ReserveSize );
-	vec_stack                               sut2;
-	list_stack                              sut3;
+	vec_mutex_stack<TestType>               sut2;
+	list_mutex_stack<TestType>              sut3;
+	fixsize_lf_stack<TestType>              sut4;
 
+	std::cout << "--- fixsize_lf_stack ---" << std::endl;
+	nwoker_perf_test_stack<fixsize_lf_stack<TestType>>( nworker * 2, sut4 );
+	nwoker_perf_test_stack<fixsize_lf_stack<TestType>>( nworker, sut4 );
+	nwoker_perf_test_stack<fixsize_lf_stack<TestType>>( nworker / 2, sut4 );
+	nwoker_perf_test_stack<fixsize_lf_stack<TestType>>( 1, sut4 );
 	std::cout << "--- alpha::concurrent::stack_list<> ---" << std::endl;
 	nwoker_perf_test_stack<alpha::concurrent::stack_list<TestType>>( nworker * 2, sut1 );
 	nwoker_perf_test_stack<alpha::concurrent::stack_list<TestType>>( nworker, sut1 );
 	nwoker_perf_test_stack<alpha::concurrent::stack_list<TestType>>( nworker / 2, sut1 );
 	nwoker_perf_test_stack<alpha::concurrent::stack_list<TestType>>( 1, sut1 );
-	std::cout << "--- vec_stack ---" << std::endl;
-	nwoker_perf_test_stack<vec_stack>( nworker * 2, sut2 );
-	nwoker_perf_test_stack<vec_stack>( nworker, sut2 );
-	nwoker_perf_test_stack<vec_stack>( nworker / 2, sut2 );
-	nwoker_perf_test_stack<vec_stack>( 1, sut2 );
-	std::cout << "--- list_stack ---" << std::endl;
-	nwoker_perf_test_stack<list_stack>( nworker * 2, sut3 );
-	nwoker_perf_test_stack<list_stack>( nworker, sut3 );
-	nwoker_perf_test_stack<list_stack>( nworker / 2, sut3 );
-	nwoker_perf_test_stack<list_stack>( 1, sut3 );
+	std::cout << "--- vec_mutex_stack ---" << std::endl;
+	nwoker_perf_test_stack<vec_mutex_stack<TestType>>( nworker * 2, sut2 );
+	nwoker_perf_test_stack<vec_mutex_stack<TestType>>( nworker, sut2 );
+	nwoker_perf_test_stack<vec_mutex_stack<TestType>>( nworker / 2, sut2 );
+	nwoker_perf_test_stack<vec_mutex_stack<TestType>>( 1, sut2 );
+	std::cout << "--- list_mutex_stack ---" << std::endl;
+	nwoker_perf_test_stack<list_mutex_stack<TestType>>( nworker * 2, sut3 );
+	nwoker_perf_test_stack<list_mutex_stack<TestType>>( nworker, sut3 );
+	nwoker_perf_test_stack<list_mutex_stack<TestType>>( nworker / 2, sut3 );
+	nwoker_perf_test_stack<list_mutex_stack<TestType>>( 1, sut3 );
 
 	return EXIT_SUCCESS;
 }
