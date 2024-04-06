@@ -8,11 +8,13 @@
  * @copyright Copyright (c) 2023 by Teruaki Ata <PFA03027@nifty.com>
  *
  */
-#include <atomic>
+
+#include <cerrno>
 #include <cstdint>
 #include <cstdio>
 
-#include <errno.h>
+#include <atomic>
+
 #include <sys/mman.h>
 #include <unistd.h>
 

@@ -9,6 +9,7 @@
  *
  */
 
+#include <cerrno>
 #include <cstdint>
 #include <cstdlib>
 
@@ -73,7 +74,7 @@ inline uintptr_t room_boader::calc_allocated_addr( uintptr_t base_addr, size_t r
 #ifdef ALCONCURRENT_CONF_ENABLE_MODULO_OPERATION_BY_BITMASK
 	uintptr_t r_of_align_blocks = addr_ch_end & ( static_cast<uintptr_t>( req_align ) - 1 );   // 剰余計算をビットマスク演算に変更。この時点で、req_alignが2のn乗でなければならない。
 #else
-	uintptr_t               r_of_align_blocks = addr_ch_end % static_cast<uintptr_t>( req_align );
+	uintptr_t r_of_align_blocks = addr_ch_end % static_cast<uintptr_t>( req_align );
 #endif
 	uintptr_t addr_alloc_top = static_cast<uintptr_t>( req_align ) * ( num_of_align_blocks + ( ( r_of_align_blocks == 0 ) ? 0 : 1 ) );
 	return addr_alloc_top;

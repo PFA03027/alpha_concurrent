@@ -15,6 +15,7 @@
 #if 0
 #include "alconcurrent/conf_logger.hpp"
 #include "mmap_allocator.hpp"
+#include <cerrno>
 #include <cstdlib>
 
 namespace alpha {

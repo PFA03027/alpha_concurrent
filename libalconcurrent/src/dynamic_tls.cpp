@@ -12,9 +12,10 @@
 #include <pthread.h>
 #include <string.h>
 
-#include <atomic>
 #include <cerrno>
 #include <cstdlib>
+
+#include <atomic>
 #include <mutex>
 #include <thread>
 
