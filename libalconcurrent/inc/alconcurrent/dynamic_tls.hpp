@@ -23,7 +23,6 @@
 
 #include <atomic>
 #include <cassert>
-#include <cerrno>
 #include <cstdlib>
 #include <memory>
 #include <mutex>

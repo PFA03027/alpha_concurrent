@@ -12,9 +12,10 @@
 #include <pthread.h>
 #include <string.h>
 
-#include <atomic>
 #include <cerrno>
 #include <cstdlib>
+
+#include <atomic>
 #include <mutex>
 #include <thread>
 
@@ -882,7 +883,7 @@ private:
 #ifdef ALCONCURRENT_CONF_USE_THREAD_LOCAL
 	static thread_local tl_content_head tl_cnt_head_;
 #else
-	tl_content_head        tl_cnt_head_;
+	tl_content_head tl_cnt_head_;
 #endif
 
 	static std::atomic<bool> is_live_;
