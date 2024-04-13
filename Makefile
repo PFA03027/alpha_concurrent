@@ -63,7 +63,7 @@ build-sample:
 	make BUILDIMPLTARGET=build-sample all
 
 clean:
-	-rm -fr ${BUILD_DIR}
+	-rm -fr ${BUILD_DIR} build.*
 
 coverage: clean
 	set -e; \
@@ -90,6 +90,13 @@ sanitizer:
 
 sanitizer.%.sanitizer: clean
 	make BUILDTARGET=common BUILDTYPE=Debug SANITIZER_TYPE=$* test
+
+SANP=$(shell expr ${CPUS} / 4)
+sanitizer.p:
+	set -e; \
+	seq 1 21| \
+	sed -E 's/([0-9]+)/make BUILD_DIR=build.\1 BUILDTARGET=common BUILDTYPE=Debug SANITIZER_TYPE=\1 test/' | \
+	xargs -P${SANP} -i -d'\n' -n1 bash -c {}
 
 
 .PHONY: test build sanitizer
