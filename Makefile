@@ -55,8 +55,7 @@ build:
 	mkdir -p ${BUILD_DIR}
 
 clean:
-	-rm -fr ${BUILD_DIR}
-	-rm -fr build.*
+	-rm -fr ${BUILD_DIR} build.*
 
 coverage: clean
 	set -e; \
