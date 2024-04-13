@@ -9,3 +9,4 @@ target_link_libraries(${EXEC_TARGET} alconcurrent gtest gtest_main pthread)
 add_dependencies(build-test ${EXEC_TARGET})
 
 add_test(NAME ${EXEC_TARGET} COMMAND $<TARGET_FILE:${EXEC_TARGET}>)
+#gtest_discover_tests(${EXEC_TARGET})

@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
+find_package(GTest)
 find_package(Git QUIET)
 
 # Gitがインストールされており、トップディレクトリに.gitディレクトリがある
