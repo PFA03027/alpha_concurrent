@@ -582,7 +582,7 @@ TEST( lfmemAlloc_P, PlatformCheck )
 	return;
 }
 
-TEST( expriment_impl, general_mem_allocator_impl_test )
+TEST( experiment_impl, general_mem_allocator_impl_test )
 {
 	alpha::concurrent::static_general_mem_allocator<2> a(
 		alpha::concurrent::param_chunk_allocation { 24, 32 },      // 1
@@ -591,4 +591,10 @@ TEST( expriment_impl, general_mem_allocator_impl_test )
 
 	auto ret_st = a.get_statistics();
 	printf( "%s\n", ret_st.print().c_str() );
+}
+
+TEST( experiment_impl, general_mem_allocator )
+{
+	void* test_ptr1 = alpha::concurrent::gmem_allocate( 100 );
+	alpha::concurrent::gmem_deallocate( test_ptr1 );
 }
