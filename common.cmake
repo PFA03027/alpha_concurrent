@@ -1,7 +1,8 @@
 
 # Common compile options
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+set(WARNING_OPT "-Wall -Wconversion -Werror")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WARNING_OPT}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${WARNING_OPT}")
 
 # set(CMAKE_CXX_STANDARD 11)	# for test purpose
 # set(CMAKE_CXX_STANDARD 14)	# for test purpose

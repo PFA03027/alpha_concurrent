@@ -175,7 +175,8 @@ TEST_F( lfmemAllocInside, TestChunkHeaderMultiSlot )
 
 	EXPECT_FALSE( p_chms->recycle_mem_slot( test_ptr3 ) );
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
-	EXPECT_FALSE( p_chms->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 ) ) );
+	uintptr_t ui_test_ptr1 = reinterpret_cast<uintptr_t>( test_ptr1 ) + 1;
+	EXPECT_FALSE( p_chms->recycle_mem_slot( reinterpret_cast<void*>( ui_test_ptr1 ) ) );
 	{
 		int err_cnt, warn_cnt;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
@@ -256,9 +257,12 @@ TEST_F( lfmemAllocInside, TestChunkList_IllegalAddressFree )
 
 #ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
 	{
-		EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr3 + 1 ) ) );
-		EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr1 + 1 ) ) );
-		EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( test_ptr2 + 1 ) ) );
+		uintptr_t ui_test_ptr1 = reinterpret_cast<uintptr_t>( test_ptr1 ) + 1;
+		uintptr_t ui_test_ptr2 = reinterpret_cast<uintptr_t>( test_ptr2 ) + 1;
+		uintptr_t ui_test_ptr3 = reinterpret_cast<uintptr_t>( test_ptr3 ) + 1;
+		EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( ui_test_ptr3 ) ) );
+		EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( ui_test_ptr1 ) ) );
+		EXPECT_FALSE( p_ch_lst->recycle_mem_slot( reinterpret_cast<void*>( ui_test_ptr2 ) ) );
 		int err_cnt, warn_cnt;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &err_cnt, &warn_cnt );
 		EXPECT_GT( err_cnt, 0 );
@@ -578,7 +582,7 @@ TEST( lfmemAlloc_P, PlatformCheck )
 	return;
 }
 
-TEST( expriment_impl, general_mem_allocator_impl_test )
+TEST( experiment_impl, general_mem_allocator_impl_test )
 {
 	alpha::concurrent::static_general_mem_allocator<2> a(
 		alpha::concurrent::param_chunk_allocation { 24, 32 },      // 1
@@ -587,4 +591,10 @@ TEST( expriment_impl, general_mem_allocator_impl_test )
 
 	auto ret_st = a.get_statistics();
 	printf( "%s\n", ret_st.print().c_str() );
+}
+
+TEST( experiment_impl, general_mem_allocator )
+{
+	void* test_ptr1 = alpha::concurrent::gmem_allocate( 100 );
+	alpha::concurrent::gmem_deallocate( test_ptr1 );
 }

@@ -144,7 +144,7 @@ void test_case1( void )
 	pthread_barrier_wait( &barrier );
 	// std::cout << "!!!GO!!!" << std::endl;
 
-	int sum = 0;
+	uintptr_t sum = 0;
 	for ( int i = 0; i <= num_thread; i++ ) {
 		uintptr_t e;
 		pthread_join( threads[i], reinterpret_cast<void**>( &e ) );

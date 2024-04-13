@@ -502,8 +502,8 @@ unsigned int chunk_list::tl_chunk_param::get_new_tl_id( void )
 }
 
 chunk_list::tl_chunk_param::tl_chunk_param(
-	chunk_list*  p_owner_chunk_list_arg,   //!< [in] pointer to onwer chunk_list
-	unsigned int init_num_of_pieces_arg    //!< [in] initiall number of slots for allocation
+	chunk_list* p_owner_chunk_list_arg,   //!< [in] pointer to onwer chunk_list
+	size_t      init_num_of_pieces_arg    //!< [in] initiall number of slots for allocation
 	)
   : p_owner_chunk_list_( p_owner_chunk_list_arg )
   , tl_id_( get_new_tl_id() )
@@ -529,11 +529,11 @@ void chunk_list::mark_as_reserved_deletion(
 	return;
 }
 
-unsigned int chunk_list::get_cur_max_slot_size(
+size_t chunk_list::get_cur_max_slot_size(
 	unsigned int target_tl_id_arg   //!< [in] オーナー権を開放する対象のtl_id_
 )
 {
-	unsigned int ans_cur_max_size = 0;
+	size_t ans_cur_max_size = 0;
 	for ( auto&& e : p_top_chunk_ ) {
 		if ( e.owner_tl_id_.load( std::memory_order_acquire ) != target_tl_id_arg ) continue;
 
@@ -624,8 +624,8 @@ void* chunk_list::allocate_mem_slot( size_t req_size, size_t req_align )
 	// 以降は、新しいメモリ領域をmallocで確保することになる。
 	// 確保するスロットサイズを決める。既存のスロット数では足りなかったので、スロット数を2倍化する。
 	// unsigned int cur_slot_num = hint_params.num_of_pieces_;
-	unsigned int cur_slot_num = get_cur_max_slot_size( hint_params.tl_id_ );
-	unsigned int new_slot_num = cur_slot_num * 2;
+	size_t cur_slot_num = get_cur_max_slot_size( hint_params.tl_id_ );
+	size_t new_slot_num = cur_slot_num * 2;
 	if ( cur_slot_num == 0 ) {
 		new_slot_num = chunk_param_.num_of_pieces_;
 	}

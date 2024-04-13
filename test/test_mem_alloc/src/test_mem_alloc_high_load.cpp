@@ -160,7 +160,7 @@ void* one_load_empty_actual_behavior( void* p_data )
 	for ( int i = 0; i < num_loop * ( max_slot_size / 20 ); i++ ) {
 		int cur_alloc_num = num_dist( engine );
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
-			y = size_dist( engine );
+			y = static_cast<char>( size_dist( engine ) );
 			write_task( &y );
 		}
 
@@ -170,7 +170,7 @@ void* one_load_empty_actual_behavior( void* p_data )
 
 		int cur_calc_load_num = calc_load( engine );
 		for ( int j = 0; j < cur_calc_load_num; j++ ) {
-			y = j % cur_alloc_num;
+			y = static_cast<char>( j % cur_alloc_num );
 			write_task( &y );
 		}
 
