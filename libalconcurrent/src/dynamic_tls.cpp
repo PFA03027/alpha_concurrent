@@ -138,7 +138,7 @@ struct dynamic_tls_key {
 		USED
 	};
 
-	unsigned int            idx_;       //!< index of key
+	size_t                  idx_;       //!< index of key
 	std::atomic<alloc_stat> is_used_;   //!< flag whether this key is used or not.
 #ifdef ALCONCURRENT_CONF_ENABLE_INDIVIDUAL_KEY_EXCLUSIVE_ACCESS
 	std::atomic<int> acc_cnt_;   //!< count of accessor
@@ -334,7 +334,7 @@ public:
 		tls_data_and_stat* p_data_;   //!< 取得処理に成功した場合に、取得した値が保持される。取得に失敗した場合は、不定値となる。
 	};
 
-	dynamic_tls_content_array( unsigned int base_idx_arg )
+	dynamic_tls_content_array( size_t base_idx_arg )
 	  : p_next_( nullptr )
 	  , base_idx_( base_idx_arg )
 	{
@@ -386,7 +386,7 @@ public:
 	void  operator delete( void* p, void* p2 ) noexcept;   // placement delete...(3)
 
 	dynamic_tls_content_array* p_next_;   //!< thread local storage方向で、次のarrayへのポインタ
-	const unsigned int         base_idx_;
+	const size_t               base_idx_;
 
 private:
 	using iterator = tls_data_and_stat*;
@@ -557,7 +557,7 @@ public:
 private:
 	dynamic_tls_content_array* push_new_tls_array_for( dynamic_tls_key_t key )
 	{
-		unsigned int               base_idx = ( key->idx_ / ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE ) * ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE;
+		size_t                     base_idx = ( key->idx_ / ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE ) * ALCONCURRENT_CONF_DYNAMIC_TLS_ARRAY_SIZE;
 		dynamic_tls_content_array* p_new    = new dynamic_tls_content_array( base_idx );
 		p_new->p_next_                      = p_head_content_.load( std::memory_order_acquire );
 		p_head_content_.store( p_new, std::memory_order_release );
@@ -684,7 +684,7 @@ public:
 		return false;
 	}
 
-	dynamic_tls_key_array* get_dynamic_tls_key_array( unsigned int base_idx_arg )
+	dynamic_tls_key_array* get_dynamic_tls_key_array( size_t base_idx_arg )
 	{
 		dynamic_tls_key_array* p_cur_dtls_ka = p_top_dtls_key_array_.load( std::memory_order_acquire );
 		while ( p_cur_dtls_ka != nullptr ) {

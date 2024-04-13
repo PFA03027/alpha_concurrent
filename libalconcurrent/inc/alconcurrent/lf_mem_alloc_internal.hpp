@@ -81,8 +81,8 @@ struct chunk_list_statistics {
 
 	std::atomic<unsigned int> chunk_num_;               //!< number of chunks
 	std::atomic<unsigned int> valid_chunk_num_;         //!< number of valid chunks
-	std::atomic<unsigned int> total_slot_cnt_;          //!< total slot count
-	std::atomic<unsigned int> free_slot_cnt_;           //!< free slot count
+	std::atomic<size_t>       total_slot_cnt_;          //!< total slot count
+	std::atomic<size_t>       free_slot_cnt_;           //!< free slot count
 	std::atomic<unsigned int> consum_cnt_;              //!< current count of allocated slots
 	std::atomic<unsigned int> max_consum_cnt_;          //!< max count of allocated slots
 	std::atomic<unsigned int> alloc_req_cnt_;           //!< allocation request count
@@ -401,12 +401,12 @@ private:
 	struct tl_chunk_param {
 		chunk_list* const        p_owner_chunk_list_;   //!< 所有者となるchunk_listへのポインタ
 		const unsigned int       tl_id_;                //!< スレッド毎に構造体を区別するためおID
-		unsigned int             num_of_pieces_;        //!< 現在のメモリ領域割り当てに使用したスロット数
+		size_t                   num_of_pieces_;        //!< 現在のメモリ領域割り当てに使用したスロット数
 		chunk_header_multi_slot* tls_p_hint_chunk;      //!< 所有者のスレッドが最初に参照するべきchunk_header_multi_slotへのポインタ。
 
 		tl_chunk_param(
-			chunk_list*  p_owner_chunk_list_arg,   //!< [in] pointer to onwer chunk_list
-			unsigned int init_num_of_pieces_arg    //!< [in] initiall number of slots for allocation
+			chunk_list* p_owner_chunk_list_arg,   //!< [in] pointer to onwer chunk_list
+			size_t      init_num_of_pieces_arg    //!< [in] initiall number of slots for allocation
 		);
 
 	private:
@@ -524,7 +524,7 @@ private:
 		const chunk_header_multi_slot* p_non_release_chunk_arg   //!< [in] オーナー権解放の対象外とするchunk_header_multi_slotへのポインタ。指定しない場合は、nullptrを指定すること。
 	);
 
-	unsigned int get_cur_max_slot_size(
+	size_t get_cur_max_slot_size(
 		unsigned int target_tl_id_arg   //!< [in] オーナー権を開放する対象のtl_id_
 	);
 
