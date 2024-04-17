@@ -86,7 +86,11 @@ public:
 	template <typename... Args>
 	constexpr static_general_mem_allocator( Args... args )
 	  : allocating_only_allocator_( true, 32 * 1024 )
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+	  , pr_ch_size_( 0 )
+#else
 	  , pr_ch_size_( sizeof...( args ) )
+#endif
 	  , param_ch_array_impl { { std::forward<Args>( args ), &allocating_only_allocator_ }... }
 	  , param_ch_array_( param_ch_array_impl )
 	  , exclusive_ctl_of_prune_( false )
