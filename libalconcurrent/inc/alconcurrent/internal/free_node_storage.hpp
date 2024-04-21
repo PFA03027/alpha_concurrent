@@ -15,8 +15,8 @@
 #include <memory>
 #include <mutex>
 
-#include "hazard_ptr.hpp"
-#include "lf_mem_alloc.hpp"
+#include "../hazard_ptr.hpp"
+#include "../lf_mem_alloc.hpp"
 
 namespace alpha {
 namespace concurrent {

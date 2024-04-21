@@ -22,8 +22,8 @@
 #include <mutex>
 #include <thread>
 
-#include "alloc_only_allocator.hpp"
 #include "dynamic_tls.hpp"
+#include "internal/alloc_only_allocator.hpp"
 
 namespace alpha {
 namespace concurrent {

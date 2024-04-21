@@ -18,8 +18,8 @@
 #include <vector>
 
 #include "alconcurrent/conf_logger.hpp"
+#include "alconcurrent/internal/lf_mem_alloc_internal.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
-#include "alconcurrent/lf_mem_alloc_internal.hpp"
 
 #include "mmap_allocator.hpp"
 #include "utility.hpp"

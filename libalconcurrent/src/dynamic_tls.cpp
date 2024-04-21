@@ -22,7 +22,7 @@
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/dynamic_tls.hpp"
 
-#include "alconcurrent/alloc_only_allocator.hpp"
+#include "alconcurrent/internal/alloc_only_allocator.hpp"
 #include "utility.hpp"
 
 namespace alpha {

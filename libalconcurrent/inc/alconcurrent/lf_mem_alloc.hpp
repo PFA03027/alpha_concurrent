@@ -20,8 +20,8 @@
 
 #include "conf_logger.hpp"
 
-#include "alloc_only_allocator.hpp"
-#include "lf_mem_alloc_internal.hpp"
+#include "internal/alloc_only_allocator.hpp"
+#include "internal/lf_mem_alloc_internal.hpp"
 #include "lf_mem_alloc_type.hpp"
 
 namespace alpha {

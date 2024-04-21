@@ -8,7 +8,7 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#include "alconcurrent/free_node_storage.hpp"
+#include "alconcurrent/internal/free_node_storage.hpp"
 
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"

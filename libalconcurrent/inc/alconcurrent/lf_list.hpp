@@ -16,9 +16,9 @@
 #include <memory>
 #include <tuple>
 
-#include "free_node_storage.hpp"
 #include "hazard_ptr.hpp"
-#include "one_way_list_node.hpp"
+#include "internal/free_node_storage.hpp"
+#include "internal/one_way_list_node.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -720,9 +720,9 @@ public:
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 				auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
 #else
-                auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
-                auto p_prev    = std::get<0>( local_ret );
-                auto p_curr    = std::get<1>( local_ret );
+				auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+				auto p_prev    = std::get<0>( local_ret );
+				auto p_curr    = std::get<1>( local_ret );
 #endif
 				if ( !base_list_.is_end_node( p_curr ) ) continue;
 				if ( base_list_.is_head_node( p_prev ) ) {

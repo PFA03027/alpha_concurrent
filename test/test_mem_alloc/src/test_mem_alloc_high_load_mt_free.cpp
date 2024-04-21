@@ -21,7 +21,7 @@
 #include "alconcurrent/lf_fifo.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
 
-#include "alconcurrent/alloc_only_allocator.hpp"
+#include "alconcurrent/internal/alloc_only_allocator.hpp"
 
 #include "mmap_allocator.hpp"
 
