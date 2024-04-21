@@ -361,13 +361,7 @@ private:
 /*!
  * @brief	Set parameters in the lock-free memory allocator to enable the function.
  *
- * ロックフリーメモリアロケータに、パラメータを設定し機能を有効化する。
- *
- * @note
- * If this I / F parameter setting is not performed, memory allocation using malloc / free will be performed. @n
- * このI/Fによるパラメータ設定が行われない場合、malloc/freeを使用したメモリアロケーションが行われる。
- *
- * @warning if compile with ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC, this API has no effect.
+ * @warning This is obsolated. So there is no effect
  */
 void set_param_to_free_nd_mem_alloc(
 	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
