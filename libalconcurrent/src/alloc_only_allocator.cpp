@@ -28,21 +28,62 @@ namespace concurrent {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 namespace internal {
 
-struct room_boader {
-	const size_t    chopped_size_;                       //!< chopped roomのサイズ。次のroom_boaderへのオフセットも意味する。そのため、次のroom_boaderのアライメント、およびtail_padding領域を含む
-	const uintptr_t offset_into_the_allocated_memory_;   //!< 呼び出し元に渡したメモリアドレスへのオフセット
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	bt_info alloc_bt_info_;   //!< backtrace information when is allocated
-#endif
+struct alloc_chamber;
 
-	room_boader( size_t chopped_size_arg, size_t req_size, size_t req_align );
+struct alloc_in_room {
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+	bt_info alloc_bt_info_;     //!< backtrace information when is allocated
+	bt_info dealloc_bt_info_;   //!< backtrace information when is deallocated
+#endif
+	std::atomic<bool>    is_freeed_;            //!< freeされた場合、真を示す。
+	const alloc_chamber* p_to_alloc_chamber_;   //!< このchopped roomが属するalloc_chamberへのポインタ
+	unsigned char        mem[0];                //!< allocateしたメモリ領域
+
+	explicit alloc_in_room( const alloc_chamber* p_ac )
+	  :
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+	  alloc_bt_info_()
+	  , dealloc_bt_info_()
+	  ,
+#endif
+	  is_freeed_( false )
+	  , p_to_alloc_chamber_( p_ac )
+	{
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+		RECORD_BACKTRACE_GET_BACKTRACE( alloc_bt_info_ );
+#endif
+	}
+
+	void dump_to_log( log_type lt, char c, int id )
+	{
+		internal::LogOutput(
+			lt,
+			"[%d-%c]\taddr = %p, is_freeed_ = %s, p_to_alloc_chamber_ = %p",
+			id, c,
+			this,
+			is_freeed_.load( std::memory_order_acquire ) ? "true" : "false",
+			p_to_alloc_chamber_ );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+		internal::LogOutput( lt, "[%d-%c]\taddr = %p, alloc_bt_info_", id, c, this );
+		alloc_bt_info_.dump_to_log( lt, c, id );
+		internal::LogOutput( lt, "[%d-%c]\taddr = %p, dealloc_bt_info_", id, c, this );
+		dealloc_bt_info_.dump_to_log( lt, c, id );
+#endif
+	}
+};
+
+struct room_boader {
+	const size_t         chopped_size_;      //!< chopped roomのサイズ。次のroom_boaderへのオフセットも意味する。そのため、次のroom_boaderのアライメント、およびtail_padding領域を含む
+	alloc_in_room* const p_alloc_in_room_;   //!< alloc_in_roomの先頭メモリアドレス
+
+	room_boader( const alloc_chamber* p_parent, size_t chopped_size_arg, size_t req_size, size_t req_align );
 
 	/**
 	 * @brief Get the allocated memory addr that is assigned to caller
 	 *
 	 * @return void* the allocated memory addr
 	 */
-	void* get_allocated_mem_addr( void );
+	void* get_allocated_mem_pointer( void );
 
 	void dump_to_log( log_type lt, char c, int id );
 
@@ -50,13 +91,52 @@ struct room_boader {
 	 * @brief calculate allocated memory top address from base_addr that is room_boarder class with considering alignment
 	 *
 	 * @param base_addr top address of room_boarder class
+	 * @param req_size required memory size to allocate
 	 * @param req_align considering alignment. req_align should be the power of 2
 	 * @return uintptr_t allocated memory top address
 	 */
-	static uintptr_t calc_allocated_addr( uintptr_t base_addr, size_t req_align );
+	static uintptr_t calc_addr_of_end_of_tail_padding_based_on_room_boader( uintptr_t base_addr, size_t req_size, size_t req_align );
+
+	static bool try_marks_as_deallocated( void* p_mem );
+
+private:
+	/**
+	 * @brief calculate allocated memory top address from base_addr that is room_boarder class with considering alignment
+	 *
+	 * @param base_addr top address of room_boarder class
+	 * @param req_align considering alignment. req_align should be the power of 2
+	 * @return uintptr_t allocated memory top address
+	 */
+	static uintptr_t calc_addr_of_allocated_memory_based_on_room_boader( uintptr_t base_addr, size_t req_align );
+
+	/**
+	 * @brief calculate alloc_in_room top address from base_addr that is room_boarder class with considering alignment
+	 *
+	 * @param base_addr top address of room_boarder class
+	 * @param req_align considering alignment. req_align should be the power of 2
+	 * @return uintptr_t allocated memory top address
+	 */
+	static alloc_in_room* calc_pointer_of_alloc_in_room_based_on_room_boarder( uintptr_t base_addr, size_t req_align );
+
+	/**
+	 * @brief calculate alloc_in_room top address from base_addr that is room_boarder class with considering alignment
+	 *
+	 * @param base_addr top address of room_boarder class
+	 * @param req_align considering alignment. req_align should be the power of 2
+	 * @return uintptr_t allocated memory top address
+	 */
+	static unsigned char* calc_pointer_of_tail_padding_based_on_room_boarder( uintptr_t base_addr, size_t req_size, size_t req_align );
+
+	/**
+	 * @brief calculate alloc_in_room top address from the allocated memory address
+	 *
+	 * @param p_mem pointer to the allocated memory that get_allocated_mem_pointer() is returned normaly.
+	 * @return uintptr_t allocated memory top address
+	 */
+	static alloc_in_room* calc_addr_of_alloc_in_room_from_allocated_memory( void* p_mem );
 };
 
-inline uintptr_t room_boader::calc_allocated_addr( uintptr_t base_addr, size_t req_align )
+inline uintptr_t room_boader::calc_addr_of_allocated_memory_based_on_room_boader( uintptr_t base_addr, size_t req_align )
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
 	if ( !is_power_of_2( req_align ) ) {
@@ -69,7 +149,7 @@ inline uintptr_t room_boader::calc_allocated_addr( uintptr_t base_addr, size_t r
 #endif
 	}
 #endif
-	uintptr_t addr_ch_end         = static_cast<uintptr_t>( sizeof( room_boader ) ) + base_addr;
+	uintptr_t addr_ch_end         = base_addr + static_cast<uintptr_t>( sizeof( room_boader ) ) + static_cast<uintptr_t>( sizeof( alloc_in_room ) );
 	uintptr_t num_of_align_blocks = addr_ch_end / static_cast<uintptr_t>( req_align );   // TODO: ビットマスクを使った演算で多分軽量化できるが、まずは真面目に計算する。
 #ifdef ALCONCURRENT_CONF_ENABLE_MODULO_OPERATION_BY_BITMASK
 	uintptr_t r_of_align_blocks = addr_ch_end & ( static_cast<uintptr_t>( req_align ) - 1 );   // 剰余計算をビットマスク演算に変更。この時点で、req_alignが2のn乗でなければならない。
@@ -80,42 +160,87 @@ inline uintptr_t room_boader::calc_allocated_addr( uintptr_t base_addr, size_t r
 	return addr_alloc_top;
 }
 
-room_boader::room_boader( size_t chopped_size_arg, size_t req_size, size_t req_align )
-  : chopped_size_( chopped_size_arg )
-  , offset_into_the_allocated_memory_( calc_allocated_addr( reinterpret_cast<uintptr_t>( this ), req_align ) - reinterpret_cast<uintptr_t>( this ) )
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-  , alloc_bt_info_()
-#endif
+inline alloc_in_room* room_boader::calc_addr_of_alloc_in_room_from_allocated_memory( void* p_mem )
 {
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	RECORD_BACKTRACE_GET_BACKTRACE( alloc_bt_info_ );
+	uintptr_t      addr_allocated_mem = reinterpret_cast<uintptr_t>( p_mem );
+	uintptr_t      addr_ans           = addr_allocated_mem - sizeof( alloc_in_room );
+	alloc_in_room* p_ans              = reinterpret_cast<alloc_in_room*>( addr_ans );
+
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+	if ( addr_allocated_mem != reinterpret_cast<uintptr_t>( p_ans->mem ) ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
+		char buff[128];
+		snprintf( buff, 128, "calculated address is different to actual address 0x%zu, 0x%zu", addr_allocated_mem, reinterpret_cast<uintptr_t>( p_ans->mem ) );
+		throw std::logic_error( buff );
+#else
+		internal::LogOutput( log_type::ERR, "calculated address is different to actual address 0x%zu, 0x%zu", addr_allocated_mem, reinterpret_cast<uintptr_t>( alloc_in_room.mem ) );
+#endif
+	}
 #endif
 
-	uintptr_t      addr_tail_padding  = reinterpret_cast<uintptr_t>( this ) + offset_into_the_allocated_memory_ + req_size;
-	unsigned char* p_top_tail_padding = reinterpret_cast<unsigned char*>( addr_tail_padding );
-	*p_top_tail_padding               = 0xFF;   // TODO: アクセスオーバーライト検出のマーク値は仮実装
+	return p_ans;
 }
 
-inline void* room_boader::get_allocated_mem_addr( void )
+inline alloc_in_room* room_boader::calc_pointer_of_alloc_in_room_based_on_room_boarder( uintptr_t base_addr, size_t req_align )
 {
-	uintptr_t allocated_mem_addr = reinterpret_cast<uintptr_t>( this ) + offset_into_the_allocated_memory_;
-	return reinterpret_cast<void*>( allocated_mem_addr );
+	uintptr_t addr_allocated_mem = calc_addr_of_allocated_memory_based_on_room_boader( base_addr, req_align );
+	return calc_addr_of_alloc_in_room_from_allocated_memory( reinterpret_cast<void*>( addr_allocated_mem ) );
+}
+
+inline unsigned char* room_boader::calc_pointer_of_tail_padding_based_on_room_boarder( uintptr_t base_addr, size_t req_size, size_t req_align )
+{
+	uintptr_t addr_allocated_mem = calc_addr_of_allocated_memory_based_on_room_boader( base_addr, req_align );
+	uintptr_t addr_tail_padding  = addr_allocated_mem + req_size;
+	return reinterpret_cast<unsigned char*>( addr_tail_padding );
+}
+
+inline uintptr_t room_boader::calc_addr_of_end_of_tail_padding_based_on_room_boader( uintptr_t base_addr, size_t req_size, size_t req_align )
+{
+	uintptr_t addr_alloc_top        = calc_addr_of_allocated_memory_based_on_room_boader( base_addr, req_align );
+	uintptr_t addr_alloc_end        = addr_alloc_top + req_size;
+	uintptr_t num_of_align_end      = ( addr_alloc_end + default_align_size ) / default_align_size;
+	uintptr_t addr_chopped_room_end = num_of_align_end * default_align_size;
+	return addr_chopped_room_end;
+}
+
+room_boader::room_boader( const alloc_chamber* p_parent, size_t chopped_size_arg, size_t req_size, size_t req_align )
+  : chopped_size_( chopped_size_arg )
+  , p_alloc_in_room_( new( calc_pointer_of_alloc_in_room_based_on_room_boarder( reinterpret_cast<uintptr_t>( this ), req_align ) ) alloc_in_room( p_parent ) )
+{
+	unsigned char* p_top_tail_padding = calc_pointer_of_tail_padding_based_on_room_boarder( reinterpret_cast<uintptr_t>( this ), req_size, req_align );
+	*p_top_tail_padding               = 0xFF;   // TODO: オーバーラン書き込み検出のマーク値は仮実装
+
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+	uintptr_t addr_end_of_room_boader   = reinterpret_cast<uintptr_t>( this ) + sizeof( room_boader );
+	uintptr_t addr_top_of_alloc_in_room = reinterpret_cast<uintptr_t>( p_alloc_in_room_ );
+	if ( addr_end_of_room_boader > addr_top_of_alloc_in_room ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
+		char buff[128];
+		snprintf( buff, 128, "room_boader and alloc_in_room is overlapped, addr_end_of_room_boader = 0x%zu, addr_top_of_alloc_in_room = 0x%zu", addr_end_of_room_boader, addr_top_of_alloc_in_room );
+		throw std::logic_error( buff );
+#else
+		internal::LogOutput( log_type::ERR, "room_boader and alloc_in_room is overlapped, addr_end_of_room_boader = 0x%zu, addr_top_of_alloc_in_room = 0x%zu", addr_end_of_room_boader, addr_top_of_alloc_in_room );
+#endif
+	}
+#endif
+}
+
+inline void* room_boader::get_allocated_mem_pointer( void )
+{
+	return reinterpret_cast<void*>( p_alloc_in_room_->mem );
 }
 
 void room_boader::dump_to_log( log_type lt, char c, int id )
 {
 	internal::LogOutput(
 		lt,
-		"[%d-%c]\taddr = %p, chopped_size_ = 0x%zx, offset_into_the_allocated_memory_ = 0x%zx(%p)",
+		"[%d-%c]\taddr = %p, chopped_size_ = 0x%zx, p_alloc_in_room_ = %p",
 		id, c,
 		this,
 		chopped_size_,
-		offset_into_the_allocated_memory_,
-		reinterpret_cast<void*>( reinterpret_cast<uintptr_t>( this ) + offset_into_the_allocated_memory_ ) );
+		reinterpret_cast<void*>( p_alloc_in_room_ ) );
 
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	alloc_bt_info_.dump_to_log( lt, c, id );
-#endif
+	p_alloc_in_room_->dump_to_log( lt, c, id );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,6 +269,7 @@ std::string alloc_chamber_statistics::print( void ) const
 }
 
 struct alloc_chamber {
+	const uintptr_t             magic_number_;   //!< alloc_chamber構造体であることを示すマジックナンバー
 	const size_t                chamber_size_;   //!< alloc_chamberのサイズ
 	std::atomic<alloc_chamber*> next_;           //!< alloc_chamberのスタックリスト上の次のalloc_chamber
 	std::atomic<uintptr_t>      offset_;         //!< 次のallocateの先頭へのオフセット
@@ -156,9 +282,21 @@ struct alloc_chamber {
 
 	void* allocate( size_t req_size, size_t req_align );
 
+	room_boader* search_associated_room_boader( void* p_mem ) const;
+
 	alloc_chamber_statistics get_statistics( void ) const;
 
 	void dump_to_log( log_type lt, char c, int id );
+
+	static inline bool is_alloc_chamber( const alloc_chamber* p_test )
+	{
+		return ( p_test->magic_number_ == kMagicNumber );
+	}
+
+	static inline bool try_deallocate( void* p_mem )
+	{
+		return room_boader::try_marks_as_deallocated( p_mem );
+	}
 
 private:
 	uintptr_t calc_addr_chopped_room_end_by( uintptr_t expected_offset_, size_t req_size, size_t req_align );
@@ -168,6 +306,7 @@ private:
 #else
 	static inline uintptr_t calc_init_offset( void );
 #endif
+	static constexpr uintptr_t kMagicNumber = 0x416c6c6343686d62;   //!< 'AllcChmb'
 };
 
 #if ( __cpp_constexpr >= 201304 )
@@ -184,7 +323,8 @@ inline
 }
 
 alloc_chamber::alloc_chamber( size_t chamber_size_arg )
-  : chamber_size_( chamber_size_arg )
+  : magic_number_( kMagicNumber )
+  , chamber_size_( chamber_size_arg )
   , next_( nullptr )
   , offset_( calc_init_offset() )
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
@@ -198,12 +338,8 @@ alloc_chamber::alloc_chamber( size_t chamber_size_arg )
 
 inline uintptr_t alloc_chamber::calc_addr_chopped_room_end_by( uintptr_t expected_offset_, size_t req_size, size_t req_align )
 {
-	uintptr_t base_addr             = expected_offset_ + reinterpret_cast<uintptr_t>( this );
-	uintptr_t addr_alloc_top        = room_boader::calc_allocated_addr( base_addr, req_align );
-	uintptr_t addr_alloc_end        = addr_alloc_top + req_size;
-	uintptr_t num_of_align_end      = ( addr_alloc_end + default_align_size ) / default_align_size;
-	uintptr_t addr_chopped_room_end = num_of_align_end * default_align_size;
-	return addr_chopped_room_end;
+	uintptr_t base_addr = expected_offset_ + reinterpret_cast<uintptr_t>( this );
+	return room_boader::calc_addr_of_end_of_tail_padding_based_on_room_boader( base_addr, req_size, req_align );
 }
 
 void* alloc_chamber::allocate( size_t req_size, size_t req_align )
@@ -232,9 +368,28 @@ void* alloc_chamber::allocate( size_t req_size, size_t req_align )
 	uintptr_t    addr_top_my_chopped_room = reinterpret_cast<uintptr_t>( this ) + cur_offset;
 	size_t       final_chopped_room_size  = static_cast<size_t>( addr_chopped_room_end - addr_top_my_chopped_room );
 	void*        p_top_my_chopped_room    = reinterpret_cast<void*>( addr_top_my_chopped_room );
-	room_boader* p_rb                     = new ( p_top_my_chopped_room ) room_boader( final_chopped_room_size, req_size, req_align );
-	void*        p_ans                    = p_rb->get_allocated_mem_addr();
+	room_boader* p_rb                     = new ( p_top_my_chopped_room ) room_boader( this, final_chopped_room_size, req_size, req_align );
+	void*        p_ans                    = p_rb->get_allocated_mem_pointer();
 	return p_ans;
+}
+
+room_boader* alloc_chamber::search_associated_room_boader( void* p_mem ) const
+{
+	const uintptr_t addr_top_free_room = offset_.load( std::memory_order_acquire ) + reinterpret_cast<uintptr_t>( this );
+	const uintptr_t addr_p_mem         = reinterpret_cast<uintptr_t>( p_mem );
+	uintptr_t       addr_cur_rb        = reinterpret_cast<uintptr_t>( this ) + calc_init_offset();
+
+	while ( addr_cur_rb < addr_top_free_room ) {
+		room_boader* p_cur_rb    = reinterpret_cast<room_boader*>( addr_cur_rb );
+		uintptr_t    addr_nxt_rb = addr_cur_rb + p_cur_rb->chopped_size_;
+		if ( ( addr_cur_rb < addr_p_mem ) && ( addr_p_mem < addr_nxt_rb ) ) {
+			return p_cur_rb;   // p_memが所属するchopped roomを特定できた。
+		}
+		addr_cur_rb = addr_nxt_rb;
+	}
+
+	// p_memが所属するchopped roomを特定できなかった。
+	return nullptr;
 }
 
 void alloc_chamber::dump_to_log( log_type lt, char c, int id )
@@ -271,6 +426,39 @@ alloc_chamber_statistics alloc_chamber::get_statistics( void ) const
 	ans.free_size_   = ans.alloc_size_ - ans.consum_size_;
 
 	return ans;
+}
+
+bool room_boader::try_marks_as_deallocated( void* p_mem )
+{
+	alloc_in_room* p_air = room_boader::calc_addr_of_alloc_in_room_from_allocated_memory( p_mem );
+	if ( !alloc_chamber::is_alloc_chamber( p_air->p_to_alloc_chamber_ ) ) {
+		internal::LogOutput( log_type::ERR, "required address(%p) is not the allocated memory by alloc_chamber", p_mem );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+		bt_info cur_bt_info;   //!< backtrace information when is allocated
+		RECORD_BACKTRACE_GET_BACKTRACE( cur_bt_info );
+#endif
+		return false;
+	}
+
+	bool expected_is_free = false;
+	if ( !p_air->is_freeed_.compare_exchange_strong( expected_is_free, true, std::memory_order_release ) ) {
+		internal::LogOutput( log_type::ERR, "required address(%p) is freed already. This is double free issue.", p_mem );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+		bt_info cur_bt_info;   //!< backtrace information when is allocated
+		RECORD_BACKTRACE_GET_BACKTRACE( cur_bt_info );
+
+		p_air->alloc_bt_info_.dump_to_log( log_type::ERR, 'a', 1 );
+		p_air->alloc_bt_info_.dump_to_log( log_type::ERR, 'd', 1 );
+		cur_bt_info.dump_to_log( log_type::ERR, 'c', 1 );
+#endif
+		return false;
+	}
+
+	// ここに来た段階で、is_freed_は、trueになっている。
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+	RECORD_BACKTRACE_GET_BACKTRACE( p_air->dealloc_bt_info_ );
+#endif
+	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -383,8 +571,9 @@ void* alloc_only_chamber::chked_allocate( size_t req_size, size_t req_align )
 	return p_ans;
 }
 
-void alloc_only_chamber::deallocate( void* )
+void alloc_only_chamber::deallocate( void* p_mem )
 {
+	alloc_chamber::try_deallocate( p_mem );
 }
 
 alloc_chamber_statistics alloc_only_chamber::get_statistics( void ) const

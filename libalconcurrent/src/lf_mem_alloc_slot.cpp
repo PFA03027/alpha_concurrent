@@ -10,6 +10,7 @@
  */
 
 #include "lf_mem_alloc_slot.hpp"
+#include "alconcurrent/internal/alloc_only_allocator.hpp"
 
 namespace alpha {
 namespace concurrent {

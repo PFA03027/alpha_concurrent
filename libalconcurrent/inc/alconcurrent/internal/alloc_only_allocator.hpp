@@ -45,7 +45,8 @@ constexpr bool is_power_of_2( T v )
 	static_assert( std::is_integral<T>::value, "T should be integral type" );
 #if ( __cpp_constexpr >= 201304 )
 	// 2のn乗かどうかを判定する。
-	if ( v < 2 ) return false;
+	if ( v < 1 ) return false;
+	if ( v == 1 ) return true;   // 2のゼロ乗と考えてtrueを返す。
 
 	// step1: 最も下位に1が立っているビットのみ残した値を抽出する
 	T v2 = -v & v;
@@ -53,7 +54,7 @@ constexpr bool is_power_of_2( T v )
 	bool ans = ( v == v2 );
 	return ans;
 #else
-	return ( ( v == ( -v & v ) ) && ( v >= 2 ) );
+	return ( ( v == ( -v & v ) ) && ( v >= 2 ) ) || ( v == 1 );
 #endif
 }
 
@@ -105,7 +106,7 @@ public:
 	 *
 	 * This API just marks as deallocated. then it will be possible to detect double free that is unexpected.
 	 */
-	void deallocate( void* );
+	static void deallocate( void* p_mem );
 
 	alloc_chamber_statistics get_statistics( void ) const;
 	void                     dump_to_log( log_type lt, char c, int id );
