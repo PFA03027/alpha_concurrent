@@ -361,9 +361,13 @@ private:
 /*!
  * @brief	Set parameters in the lock-free memory allocator to enable the function.
  *
- * @warning This is obsolated. So there is no effect
+ * @warning This is obsolated. So there is no effect.
  */
-void set_param_to_free_nd_mem_alloc(
+#if __has_cpp_attribute( deprecated )
+[[deprecated( "This is obsolated. So there is no effect." )]]
+#endif
+void
+set_param_to_free_nd_mem_alloc(
 	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
 	unsigned int                  num              //!< [in] array size
 );

@@ -26,18 +26,10 @@ using test_list = alpha::concurrent::lockfree_list<std::uintptr_t>;
 
 pthread_barrier_t barrier;
 
-// example
-static alpha::concurrent::param_chunk_allocation param[] = {
-	{ 32, 10000 },
-	{ 64, 10000 },
-	{ 128, 10000 },
-};
-
 class lflistTest : public ::testing::Test {
 protected:
 	virtual void SetUp()
 	{
-		set_param_to_free_nd_mem_alloc( param, 3 );
 		alpha::concurrent::gmem_prune();
 	}
 
@@ -200,9 +192,9 @@ void* func_test_list_insert_remove( void* data )
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [ins_chk_ret, ins_allc_ret] = p_test_obj->insert( target_value, search_insert_pos );
 #else
-            auto local_ret    = p_test_obj->insert( target_value, search_insert_pos );
-            auto ins_chk_ret  = std::get<0>( local_ret );
-            auto ins_allc_ret = std::get<1>( local_ret );
+			auto local_ret    = p_test_obj->insert( target_value, search_insert_pos );
+			auto ins_chk_ret  = std::get<0>( local_ret );
+			auto ins_allc_ret = std::get<1>( local_ret );
 #endif
 			if ( ins_chk_ret ) break;
 			if ( ins_allc_ret ) {

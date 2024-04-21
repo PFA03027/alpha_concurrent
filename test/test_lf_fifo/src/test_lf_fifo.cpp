@@ -30,18 +30,10 @@ using test_fifo_type2 = alpha::concurrent::fifo_list<std::uintptr_t, false>;
 
 pthread_barrier_t barrier;
 
-// example
-static alpha::concurrent::param_chunk_allocation param[] = {
-	{ 32, 100000 },
-	{ 64, 100000 },
-	{ 128, 100000 },
-};
-
 class lffifoTest : public ::testing::Test {
 protected:
 	void SetUp() override
 	{
-		set_param_to_free_nd_mem_alloc( param, 3 );
 		alpha::concurrent::gmem_prune();
 	}
 
@@ -136,9 +128,9 @@ TEST_F( lffifoTest, TC1_SimplePushPop )
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 	auto [p_pop_node, val] = p_test_obj->pop();
 #else
-	auto local_ret1     = p_test_obj->pop();
-	auto p_pop_node     = std::get<0>( local_ret1 );
-	auto val            = std::get<1>( local_ret1 );
+	auto local_ret1 = p_test_obj->pop();
+	auto p_pop_node = std::get<0>( local_ret1 );
+	auto val        = std::get<1>( local_ret1 );
 #endif
 
 	ASSERT_NE( nullptr, p_pop_node );
@@ -345,9 +337,9 @@ void* func_test_fifo( void* data )
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 		auto [pop_flag, vv] = p_test_obj->pop();
 #else
-		auto local_ret    = p_test_obj->pop();
-		auto pop_flag     = std::get<0>( local_ret );
-		auto vv           = std::get<1>( local_ret );
+		auto local_ret = p_test_obj->pop();
+		auto pop_flag  = std::get<0>( local_ret );
+		auto vv        = std::get<1>( local_ret );
 #endif
 		if ( !pop_flag ) {
 			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string( v ).c_str() );
@@ -373,9 +365,9 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( TEST_FIFO_TYPE* p_test_obj[] )
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [pop_flag, vv] = p_test_obj[0]->pop();
 #else
-            auto local_ret = p_test_obj[0]->pop();
-            auto pop_flag  = std::get<0>( local_ret );
-            auto vv        = std::get<1>( local_ret );
+			auto local_ret = p_test_obj[0]->pop();
+			auto pop_flag  = std::get<0>( local_ret );
+			auto vv        = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v1 ).c_str() );
@@ -388,9 +380,9 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( TEST_FIFO_TYPE* p_test_obj[] )
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [pop_flag, vv] = p_test_obj[1]->pop();
 #else
-            auto local_ret = p_test_obj[1]->pop();
-            auto pop_flag  = std::get<0>( local_ret );
-            auto vv        = std::get<1>( local_ret );
+			auto local_ret = p_test_obj[1]->pop();
+			auto pop_flag  = std::get<0>( local_ret );
+			auto vv        = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v2 ).c_str() );
@@ -503,9 +495,9 @@ void* func_test4_fifo( void* data )
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 		auto [pop_flag, vv] = p_test_obj->pop();
 #else
-        auto local_ret = p_test_obj->pop();
-        auto pop_flag  = std::get<0>( local_ret );
-        auto vv        = std::get<1>( local_ret );
+		auto local_ret = p_test_obj->pop();
+		auto pop_flag  = std::get<0>( local_ret );
+		auto vv        = std::get<1>( local_ret );
 #endif
 		if ( !pop_flag ) {
 			printf( "Bugggggggyyyy  func_test4_fifo()!!!  %s\n", std::to_string( v ).c_str() );
@@ -554,9 +546,9 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( TEST_FIFO_TYPE* p_test_obj[] 
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [pop_flag, vv] = p_test_obj[0]->pop();
 #else
-            auto local_ret = p_test_obj[0]->pop();
-            auto pop_flag  = std::get<0>( local_ret );
-            auto vv        = std::get<1>( local_ret );
+			auto local_ret = p_test_obj[0]->pop();
+			auto pop_flag  = std::get<0>( local_ret );
+			auto vv        = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test4_fifo2()  %s\n", std::to_string( v1 ).c_str() );
@@ -569,9 +561,9 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( TEST_FIFO_TYPE* p_test_obj[] 
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 			auto [pop_flag, vv] = p_test_obj[1]->pop();
 #else
-            auto local_ret = p_test_obj[1]->pop();
-            auto pop_flag  = std::get<0>( local_ret );
-            auto vv        = std::get<1>( local_ret );
+			auto local_ret = p_test_obj[1]->pop();
+			auto pop_flag  = std::get<0>( local_ret );
+			auto vv        = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test4_fifo2()  %s\n", std::to_string( v2 ).c_str() );

@@ -26,18 +26,10 @@ using test_list = alpha::concurrent::one_side_deque<std::uintptr_t>;
 
 pthread_barrier_t barrier;
 
-// example
-static alpha::concurrent::param_chunk_allocation param[] = {
-	{ 32, 100 },
-	{ 64, 100 },
-	{ 128, 100 },
-};
-
 class lfOneSideDeqTest : public ::testing::Test {
 protected:
 	virtual void SetUp()
 	{
-		set_param_to_free_nd_mem_alloc( param, 3 );
 		alpha::concurrent::gmem_prune();
 	}
 
