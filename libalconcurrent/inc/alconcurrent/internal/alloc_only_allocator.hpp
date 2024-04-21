@@ -90,11 +90,7 @@ public:
 
 	~alloc_only_chamber();
 
-	inline void* allocate( size_t req_size )
-	{
-		return chked_allocate( req_size, default_align_size );
-	}
-	void* allocate( size_t req_size, size_t req_align )
+	inline void* allocate( size_t req_size, size_t req_align = default_align_size )
 	{
 		if ( !is_power_of_2( req_align ) ) {
 			char buff[128];
@@ -104,7 +100,12 @@ public:
 		return chked_allocate( req_size, req_align );
 	}
 
-	void detect_unexpected_deallocate( void* );
+	/**
+	 * @brief Marks the area as deallocated
+	 *
+	 * This API just marks as deallocated. then it will be possible to detect double free that is unexpected.
+	 */
+	void deallocate( void* );
 
 	alloc_chamber_statistics get_statistics( void ) const;
 	void                     dump_to_log( log_type lt, char c, int id );

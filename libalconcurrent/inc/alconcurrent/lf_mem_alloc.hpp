@@ -113,7 +113,6 @@ public:
 			for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
 				param_ch_array_[i].~chunk_list();
 			}
-			// allocating_only_allocator_.detect_unexpected_deallocate( reinterpret_cast<void*>( param_ch_array_ ) );
 		}
 	}
 

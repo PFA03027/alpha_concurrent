@@ -107,20 +107,6 @@ inline void* dynamic_tls_key_allocating_only( size_t req_size, size_t req_align 
 }
 
 /**
- * @brief to detect unexpected deallocation calling
- *
- * normally nothing to do
- * If the library compile with ALCONCURRENT_CONF_DETECT_UNEXPECTED_DEALLOC_CALLING, this function throw std::runtime_error.
- *
- * @param p_mem
- */
-inline void dynamic_tls_key_allocating_only_deallocate( void* p_mem )
-{
-	g_alloc_only_inst.detect_unexpected_deallocate( p_mem );
-	return;
-}
-
-/**
  * @brief dump log of pre-defined global dynamic_tls_key_allocating_only()
  *
  */

@@ -383,12 +383,8 @@ void* alloc_only_chamber::chked_allocate( size_t req_size, size_t req_align )
 	return p_ans;
 }
 
-void alloc_only_chamber::detect_unexpected_deallocate( void* )
+void alloc_only_chamber::deallocate( void* )
 {
-#ifdef ALCONCURRENT_CONF_DETECT_UNEXPECTED_DEALLOC_CALLING
-	throw std::runtime_error( "allocating_only_deallocate is called unexpectedly" );
-#endif
-	return;
 }
 
 alloc_chamber_statistics alloc_only_chamber::get_statistics( void ) const
