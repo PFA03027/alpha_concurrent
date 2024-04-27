@@ -90,12 +90,9 @@ sanitizer.%.sanitizer: clean
 	make BUILDTARGET=common BUILDTYPE=Debug SANITIZER_TYPE=$* test
 
 SANITIZER_P_ALL_TARGETS=$(addprefix sanitizer.p.,$(SANITIZER_ALL_IDS))
-SANITIZER_P_CONF_ALL_TARGETS=$(addprefix sanitizer.p.configure-cmake.,$(SANITIZER_ALL_IDS))
 
-sanitizer.p: sanitizer.p.configure-cmake
+sanitizer.p:
 	make -j${JOBS} sanitizer.p_internal
-
-sanitizer.p.configure-cmake: $(SANITIZER_P_CONF_ALL_TARGETS)
 
 sanitizer.p_internal: $(SANITIZER_P_ALL_TARGETS)
 
@@ -103,16 +100,19 @@ define SANITIZER_P_TEMPLATE
 sanitizer.p.configure-cmake.$(1):
 	make BUILD_DIR=build.p/$(1) BUILDTARGET=common BUILDTYPE=Debug SANITIZER_TYPE=$(1) configure-cmake
 
-sanitizer.p.$(1):
+sanitizer.p.$(1): sanitizer.p.configure-cmake.$(1)
 	make BUILD_DIR=build.p/$(1) BUILDTARGET=common BUILDTYPE=Debug SANITIZER_TYPE=$(1) sanitizer.p.test
+
+sanitizer.p.configure-cmake.$(shell expr $(1) + 1): sanitizer.p.configure-cmake.$(1)
+
 endef
+
+$(foreach pgm,$(SANITIZER_ALL_IDS),$(eval $(call SANITIZER_P_TEMPLATE,$(pgm))))
 
 sanitizer.p.test:
 	set -e; \
 	cd ${BUILD_DIR}; \
-	cmake --build . -v --target build-test; \
-	ctest -j ${JOBS} -v
-
-$(foreach pgm,$(SANITIZER_ALL_IDS),$(eval $(call SANITIZER_P_TEMPLATE,$(pgm))))
+	cmake --build . --target build-test; \
+	ctest -j $(shell expr ${JOBS} / 2) -v
 
 .PHONY: test sanitizer sanitizer.p configure-cmake
