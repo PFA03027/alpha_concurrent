@@ -275,13 +275,13 @@ public:
 	}
 
 	template <typename ALLOC_NODE_T>
-	void init_and_pre_allocate( int pre_alloc_nodes )
+	void init_and_pre_allocate( size_t pre_alloc_nodes )
 	{
 		node_pointer p_init_sentinel = (node_pointer)allocate_new_node<ALLOC_NODE_T>();
 		p_init_sentinel->teardown_by_recycle();
 		node_list_.initial_push( p_init_sentinel );
 
-		for ( int i = 0; i < pre_alloc_nodes; i++ ) {
+		for ( size_t i = 0; i < pre_alloc_nodes; i++ ) {
 			recycle( (node_pointer)allocate_new_node<ALLOC_NODE_T>() );
 		}
 	}

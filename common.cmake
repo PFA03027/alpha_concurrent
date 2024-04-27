@@ -1,6 +1,6 @@
 
 # Common compile options
-set(WARNING_OPT "-Wall -Wconversion -Werror")
+set(WARNING_OPT "-Wall -Wconversion -Wsign-conversion -Werror")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WARNING_OPT}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${WARNING_OPT}")
 

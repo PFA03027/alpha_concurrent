@@ -19,7 +19,7 @@
 #include "alconcurrent/lf_list.hpp"
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
-constexpr int            num_thread = 12;   // Tested until 128.
+constexpr unsigned int   num_thread = 12;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 2000;
 
 using test_list = alpha::concurrent::lockfree_list<std::uintptr_t>;
@@ -118,12 +118,12 @@ TEST_F( lflistTest, TC1 )
 	pthread_barrier_init( &barrier, NULL, num_thread * 2 + 1 );
 	pthread_t* threads = new pthread_t[num_thread * 2];
 
-	for ( int i = 0; i < num_thread; i++ ) {
+	for ( unsigned int i = 0; i < num_thread; i++ ) {
 		pthread_create( &threads[i], NULL, func_test_list_front2back, reinterpret_cast<void*>( &count_list ) );
 		// pthread_create( &threads[i], NULL, func_test_list_back2front, reinterpret_cast<void*>( &count_list ) );
 	}
 
-	for ( int i = 0; i < num_thread; i++ ) {
+	for ( unsigned int i = 0; i < num_thread; i++ ) {
 		// pthread_create( &threads[num_thread + i], NULL, func_test_list_front2back, reinterpret_cast<void*>( &count_list ) );
 		pthread_create( &threads[num_thread + i], NULL, func_test_list_back2front, reinterpret_cast<void*>( &count_list ) );
 	}
@@ -133,7 +133,7 @@ TEST_F( lflistTest, TC1 )
 	pthread_barrier_wait( &barrier );
 
 	uintptr_t sum = 0;
-	for ( int i = 0; i < num_thread * 2; i++ ) {
+	for ( unsigned int i = 0; i < num_thread * 2; i++ ) {
 		uintptr_t e;
 		pthread_join( threads[i], reinterpret_cast<void**>( &e ) );
 		std::cout << "Thread " << i << ": last dequeued = " << e << std::endl;
@@ -227,7 +227,7 @@ TEST_F( lflistTest, TC2 )
 	pthread_barrier_init( &barrier, NULL, num_thread + 1 );
 	pthread_t* threads = new pthread_t[num_thread];
 
-	for ( int i = 0; i < num_thread; i++ ) {
+	for ( unsigned int i = 0; i < num_thread; i++ ) {
 		pthread_create( &threads[i], NULL, func_test_list_insert_remove, reinterpret_cast<void*>( &count_list ) );
 	}
 
@@ -236,7 +236,7 @@ TEST_F( lflistTest, TC2 )
 	pthread_barrier_wait( &barrier );
 
 	uintptr_t sum = 0;
-	for ( int i = 0; i < num_thread; i++ ) {
+	for ( unsigned int i = 0; i < num_thread; i++ ) {
 		uintptr_t e;
 		pthread_join( threads[i], reinterpret_cast<void**>( &e ) );
 		std::cout << "Thread " << i << ": last dequeued = " << e << std::endl;
@@ -332,16 +332,16 @@ TEST_F( lflistTest, TC3 )
 	pthread_t* threads       = new pthread_t[num_thread * 2];
 	data_tc*   test_data_set = new data_tc[num_thread];
 
-	for ( int i = 0; i < num_thread; i++ ) {
+	for ( unsigned int i = 0; i < num_thread; i++ ) {
 		test_data_set[i].p_test_obj = &count_list;
 		test_data_set[i].tc_data    = i;
 	}
 
-	for ( int i = 0; i < num_thread; i++ ) {
+	for ( unsigned int i = 0; i < num_thread; i++ ) {
 		pthread_create( &threads[i], NULL, func_test_list_push, reinterpret_cast<void*>( &( test_data_set[i] ) ) );
 	}
 
-	for ( int i = 0; i < num_thread; i++ ) {
+	for ( unsigned int i = 0; i < num_thread; i++ ) {
 		pthread_create( &threads[num_thread + i], NULL, func_test_list_remove_all, reinterpret_cast<void*>( &( test_data_set[i] ) ) );
 	}
 
@@ -350,7 +350,7 @@ TEST_F( lflistTest, TC3 )
 	pthread_barrier_wait( &barrier );
 
 	uintptr_t sum = 0;
-	for ( int i = 0; i < num_thread * 2; i++ ) {
+	for ( unsigned int i = 0; i < num_thread * 2; i++ ) {
 		uintptr_t e;
 		pthread_join( threads[i], reinterpret_cast<void**>( &e ) );
 		std::cout << "Thread " << i << ": last dequeued = " << e << std::endl;

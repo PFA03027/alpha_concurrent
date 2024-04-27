@@ -22,7 +22,7 @@
 
 #include "test_crc32.hpp"
 
-constexpr int            num_thread = 32;   // Tested until 128.
+constexpr unsigned int   num_thread = 32;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 100000;
 
 std::atomic<bool> err_flag( false );
@@ -141,17 +141,17 @@ TEST( MsgContent, TC1 )
 {
 	test_fifo_type test_obj;
 
-	int numof_pro = num_thread / 4;
-	int numof_con = num_thread;
+	unsigned int numof_pro = num_thread / 4;
+	unsigned int numof_con = num_thread;
 
 	pthread_barrier_init( &barrier, NULL, numof_pro + numof_con + 1 );
 	pthread_t* producer_threads = new pthread_t[numof_pro];
 	pthread_t* consumer_threads = new pthread_t[numof_con];
 
-	for ( int i = 0; i < numof_pro; i++ ) {
+	for ( unsigned int i = 0; i < numof_pro; i++ ) {
 		pthread_create( &producer_threads[i], NULL, func_test_fifo_producer, reinterpret_cast<void*>( &test_obj ) );
 	}
-	for ( int i = 0; i < numof_con; i++ ) {
+	for ( unsigned int i = 0; i < numof_con; i++ ) {
 		pthread_create( &consumer_threads[i], NULL, func_test_fifo_consumer, reinterpret_cast<void*>( &test_obj ) );
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
@@ -161,17 +161,17 @@ TEST( MsgContent, TC1 )
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	pthread_barrier_wait( &barrier );
 
-	for ( int i = 0; i < numof_pro; i++ ) {
+	for ( unsigned int i = 0; i < numof_pro; i++ ) {
 		uintptr_t e;
 		pthread_join( producer_threads[i], reinterpret_cast<void**>( &e ) );
 	}
 
-	for ( int i = 0; i < numof_con; i++ ) {
+	for ( unsigned int i = 0; i < numof_con; i++ ) {
 		test_msg_obj* p_one_msg = new test_msg_obj( true );
 		test_obj.push( p_one_msg );
 	}
 
-	for ( int i = 0; i < numof_con; i++ ) {
+	for ( unsigned int i = 0; i < numof_con; i++ ) {
 		uintptr_t e;
 		pthread_join( consumer_threads[i], reinterpret_cast<void**>( &e ) );
 	}

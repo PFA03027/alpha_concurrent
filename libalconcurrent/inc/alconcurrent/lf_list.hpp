@@ -521,11 +521,11 @@ public:
 	/*!
 	 * @brief	remove all of nodes that pred return true from this list
 	 */
-	int remove_all_if(
+	size_t remove_all_if(
 		predicate_t& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
 	)
 	{
-		int                                  ans         = 0;
+		size_t                               ans         = 0;
 		typename list_type::find_predicate_t pred_common = [&pred]( const list_node_pointer a ) { return pred( a->get_value() ); };
 
 		scoped_hazard_ref hzrd_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_PREV );
