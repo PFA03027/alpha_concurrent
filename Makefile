@@ -33,14 +33,15 @@ SANITIZER_TYPE?=
 ##### internal variable
 BUILDIMPLTARGET?=all
 BUILD_DIR?=build
+#MAKEFILE_DIR := $(dir $(lastword $(MAKEFILE_LIST)))	# 相対パス名を得るならこちら。
+MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))	# 絶対パス名を得るならこちら。
 
 CPUS=$(shell grep cpu.cores /proc/cpuinfo | sort -u | sed 's/[^0-9]//g')
 JOBS=$(shell expr ${CPUS} + ${CPUS} / 2)
 
-all: build
+all: configure-cmake
 	set -e; \
 	cd ${BUILD_DIR}; \
-	cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -DSANITIZER_TYPE=${SANITIZER_TYPE} -DALCONCURRENT_BUILD_SHARED_LIBS=${ALCONCURRENT_BUILD_SHARED_LIBS} -G "Unix Makefiles" ../; \
 	cmake --build . -j ${JOBS} -v --target ${BUILDIMPLTARGET}
 
 test: build-test
@@ -51,8 +52,11 @@ test: build-test
 build-test:
 	make BUILDIMPLTARGET=build-test all
 
-build:
-	mkdir -p ${BUILD_DIR}
+configure-cmake:
+	set -e; \
+	mkdir -p ${BUILD_DIR}; \
+	cd ${BUILD_DIR}; \
+	cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -DSANITIZER_TYPE=${SANITIZER_TYPE} -DALCONCURRENT_BUILD_SHARED_LIBS=${ALCONCURRENT_BUILD_SHARED_LIBS} -G "Unix Makefiles" ${MAKEFILE_DIR}
 
 clean:
 	-rm -fr ${BUILD_DIR} build.*
@@ -73,9 +77,11 @@ profile: clean
 	cd ${BUILD_DIR}; \
 	find . -type f -executable -name "test_*" | xargs -P${JOBS} -I@ sh ../gprof_exec.sh @
 
+SANITIZER_ALL_IDS=$(shell seq 1 21)
+
 sanitizer:
 	set -e; \
-	for i in `seq 1 21`; do \
+	for i in $(SANITIZER_ALL_IDS); do \
 		make sanitizer.$$i.sanitizer; \
 		echo $$i / 21 done; \
 	done
@@ -83,13 +89,30 @@ sanitizer:
 sanitizer.%.sanitizer: clean
 	make BUILDTARGET=common BUILDTYPE=Debug SANITIZER_TYPE=$* test
 
-sanitizer.p:
+SANITIZER_P_ALL_TARGETS=$(addprefix sanitizer.p.,$(SANITIZER_ALL_IDS))
+SANITIZER_P_CONF_ALL_TARGETS=$(addprefix sanitizer.p.configure-cmake.,$(SANITIZER_ALL_IDS))
+
+sanitizer.p: sanitizer.p.configure-cmake
+	make -j${JOBS} sanitizer.p_internal
+
+sanitizer.p.configure-cmake: $(SANITIZER_P_CONF_ALL_TARGETS)
+
+sanitizer.p_internal: $(SANITIZER_P_ALL_TARGETS)
+
+define SANITIZER_P_TEMPLATE
+sanitizer.p.configure-cmake.$(1):
+	make BUILD_DIR=build.p/$(1) BUILDTARGET=common BUILDTYPE=Debug SANITIZER_TYPE=$(1) configure-cmake
+
+sanitizer.p.$(1):
+	make BUILD_DIR=build.p/$(1) BUILDTARGET=common BUILDTYPE=Debug SANITIZER_TYPE=$(1) sanitizer.p.test
+endef
+
+sanitizer.p.test:
 	set -e; \
-	seq 1 21| \
-	sed -E 's/([0-9]+)/make BUILD_DIR=build.\1 BUILDTARGET=common BUILDTYPE=Debug SANITIZER_TYPE=\1 test/' | \
-	xargs -P${JOBS} -i -d'\n' -n1 bash -c {}
+	cd ${BUILD_DIR}; \
+	cmake --build . -v --target build-test; \
+	ctest -j ${JOBS} -v
 
+$(foreach pgm,$(SANITIZER_ALL_IDS),$(eval $(call SANITIZER_P_TEMPLATE,$(pgm))))
 
-.PHONY: test build sanitizer
-
-
+.PHONY: test sanitizer sanitizer.p configure-cmake
