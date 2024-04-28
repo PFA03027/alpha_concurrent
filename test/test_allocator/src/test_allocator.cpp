@@ -198,3 +198,58 @@ TEST( Alloc_only_class, CanCall_Deallocate )
 	auto cr = alpha::concurrent::internal::alloc_only_chamber::verify_validity( p_mem );
 	EXPECT_EQ( cr, alpha::concurrent::internal::alloc_only_chamber::validity_status::kReleased );
 }
+
+TEST( Alloc_only_class, CanCall_IsBelongToThis1 )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+	void*                                           p_mem = sut.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	EXPECT_NE( p_mem, nullptr );
+
+	// Act
+	auto ret = sut.is_belong_to_this( p_mem );
+
+	// Assert
+	EXPECT_TRUE( ret );
+}
+
+TEST( Alloc_only_class, CanCall_IsBelongToThis2 )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+	alpha::concurrent::internal::alloc_only_chamber other( true, 128 );
+	void*                                           p_mem = other.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	EXPECT_NE( p_mem, nullptr );
+
+	// Act
+	auto ret = sut.is_belong_to_this( p_mem );
+
+	// Assert
+	EXPECT_FALSE( ret );
+}
+
+TEST( Alloc_only_class, CanCall_IsBelongToThis_With_Nullptr1 )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+
+	// Act
+	auto ret = sut.is_belong_to_this( nullptr );
+
+	// Assert
+	EXPECT_FALSE( ret );
+}
+
+TEST( Alloc_only_class, CanCall_IsBelongToThis_With_Nullptr2 )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+	void*                                           p_mem = sut.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	EXPECT_NE( p_mem, nullptr );
+
+	// Act
+	auto ret = sut.is_belong_to_this( nullptr );
+
+	// Assert
+	EXPECT_FALSE( ret );
+}

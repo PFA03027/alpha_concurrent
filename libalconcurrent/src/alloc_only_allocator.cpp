@@ -303,6 +303,12 @@ struct alloc_chamber {
 
 	void* allocate( size_t req_size, size_t req_align );
 
+	/**
+	 * @brief Search an associated room_boader
+	 *
+	 * @param p_mem pointer to search
+	 * @return const room_boader* pointer that is found. nullptr: does not find
+	 */
 	const room_boader* search_associated_room_boader( void* p_mem ) const;
 
 	alloc_chamber_statistics get_statistics( void ) const;
@@ -720,18 +726,18 @@ void alloc_only_chamber::deallocate( void* p_mem )
 	alloc_chamber::try_deallocate( p_mem );
 }
 
-alloc_only_chamber::validity_status alloc_only_chamber::verify_validity( void* p_mem )
+bool alloc_only_chamber::is_belong_to_this( void* p_mem ) const
 {
-	alloc_in_room* p_air = room_boader::check_and_get_pointer_to_alloc_in_room( p_mem );
-	if ( p_air == nullptr ) {
-		return validity_status::kInvalid;
+	auto p_cur_chamber = head_.load( std::memory_order_acquire );
+	while ( p_cur_chamber != nullptr ) {
+		auto p = p_cur_chamber->search_associated_room_boader( p_mem );
+		if ( p != nullptr ) {
+			return true;
+		}
+		p_cur_chamber = p_cur_chamber->next_.load( std::memory_order_acquire );
 	}
 
-	if ( p_air->is_freeed_.load( std::memory_order_acquire ) ) {
-		return validity_status::kReleased;
-	}
-
-	return validity_status::kUsed;
+	return false;
 }
 
 alloc_chamber_statistics alloc_only_chamber::get_statistics( void ) const
@@ -759,6 +765,20 @@ void alloc_only_chamber::dump_to_log( log_type lt, char c, int id )
 
 	total_statistics = get_statistics();
 	internal::LogOutput( lt, "[%d-%c] %s", id, c, total_statistics.print().c_str() );
+}
+
+alloc_only_chamber::validity_status alloc_only_chamber::verify_validity( void* p_mem )
+{
+	alloc_in_room* p_air = room_boader::check_and_get_pointer_to_alloc_in_room( p_mem );
+	if ( p_air == nullptr ) {
+		return validity_status::kInvalid;
+	}
+
+	if ( p_air->is_freeed_.load( std::memory_order_acquire ) ) {
+		return validity_status::kReleased;
+	}
+
+	return validity_status::kUsed;
 }
 
 }   // namespace internal

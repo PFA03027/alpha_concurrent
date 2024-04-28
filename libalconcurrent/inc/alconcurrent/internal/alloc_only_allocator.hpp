@@ -114,13 +114,15 @@ public:
 	 */
 	static void deallocate( void* p_mem );
 
+	bool is_belong_to_this( void* p_mem ) const;
+
+	alloc_chamber_statistics get_statistics( void ) const;
+	void                     dump_to_log( log_type lt, char c, int id );
+
 	/**
 	 * @brief Check p_mem belong to alloc_only_chamber, and is still used or already released.
 	 */
 	static validity_status verify_validity( void* p_mem );
-
-	alloc_chamber_statistics get_statistics( void ) const;
-	void                     dump_to_log( log_type lt, char c, int id );
 
 private:
 	void* chked_allocate( size_t req_size, size_t req_align );
