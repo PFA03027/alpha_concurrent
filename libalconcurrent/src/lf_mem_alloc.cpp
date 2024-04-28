@@ -789,7 +789,7 @@ void general_mem_allocator_impl_deallocate(
 	internal::slot_chk_result chk_ret = internal::chunk_header_multi_slot::get_chunk( p_mem );
 
 	if ( chk_ret.correct_ ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
 		if ( chk_ret.p_chms_ == nullptr ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
 			std::string errlog = "return value of get_chunk() is unexpected";

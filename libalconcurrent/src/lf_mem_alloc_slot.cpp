@@ -124,7 +124,7 @@ void slot_header_of_alloc::deallocate( void )
 bool_unified_slot_header_p slot_container::get_slot_header_from_assignment_p( void* p_mem )
 {
 	slot_container* p_slot_container = reinterpret_cast<slot_container*>( reinterpret_cast<uintptr_t>( p_mem ) - static_cast<uintptr_t>( sizeof( slot_container ) ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
 	if ( p_mem != reinterpret_cast<void*>( p_slot_container->mem ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
 		std::string errlog = "does not match p_mem and slot_container::mem[0]. This is logical error.";
@@ -150,7 +150,7 @@ bool_unified_slot_header_p slot_container::get_slot_header_from_assignment_p( vo
 
 void* slot_container::construct_slot_container_in_container_buffer( slot_mheader* p_bind_mh_of_slot, slot_container* p_container_top, size_t container_size, size_t n, size_t req_align )
 {
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
 	if ( !is_power_of_2( req_align ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
 		char buff[128];
@@ -179,7 +179,7 @@ void* slot_container::construct_slot_container_in_container_buffer( slot_mheader
 	// size_t ans_tail_padding_size = addr_end_of_alloc - addr_end_of_assign;
 
 	slot_container* p_slot_container = reinterpret_cast<slot_container*>( ans_addr - static_cast<uintptr_t>( sizeof( slot_container ) ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
 	if ( reinterpret_cast<void*>( ans_addr ) != reinterpret_cast<void*>( p_slot_container->mem ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
 		throw std::logic_error( "does not match assignment address and slot_container::mem[0]" );

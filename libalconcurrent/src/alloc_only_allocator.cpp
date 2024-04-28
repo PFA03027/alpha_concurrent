@@ -138,7 +138,7 @@ private:
 
 inline uintptr_t room_boader::calc_addr_of_allocated_memory_based_on_room_boader( uintptr_t base_addr, size_t req_align )
 {
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
 	if ( !is_power_of_2( req_align ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
 		char buff[128];
@@ -166,14 +166,14 @@ inline alloc_in_room* room_boader::calc_addr_of_alloc_in_room_from_allocated_mem
 	uintptr_t      addr_ans           = addr_allocated_mem - sizeof( alloc_in_room );
 	alloc_in_room* p_ans              = reinterpret_cast<alloc_in_room*>( addr_ans );
 
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
 	if ( addr_allocated_mem != reinterpret_cast<uintptr_t>( p_ans->mem ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
 		char buff[128];
 		snprintf( buff, 128, "calculated address is different to actual address 0x%zu, 0x%zu", addr_allocated_mem, reinterpret_cast<uintptr_t>( p_ans->mem ) );
 		throw std::logic_error( buff );
 #else
-		internal::LogOutput( log_type::ERR, "calculated address is different to actual address 0x%zu, 0x%zu", addr_allocated_mem, reinterpret_cast<uintptr_t>( alloc_in_room.mem ) );
+		internal::LogOutput( log_type::ERR, "calculated address is different to actual address 0x%zu, 0x%zu", addr_allocated_mem, reinterpret_cast<uintptr_t>( p_ans->mem ) );
 #endif
 	}
 #endif
@@ -210,7 +210,7 @@ room_boader::room_boader( const alloc_chamber* p_parent, size_t chopped_size_arg
 	unsigned char* p_top_tail_padding = calc_pointer_of_tail_padding_based_on_room_boarder( reinterpret_cast<uintptr_t>( this ), req_size, req_align );
 	*p_top_tail_padding               = 0xFF;   // TODO: オーバーラン書き込み検出のマーク値は仮実装
 
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
 	uintptr_t addr_end_of_room_boader   = reinterpret_cast<uintptr_t>( this ) + sizeof( room_boader );
 	uintptr_t addr_top_of_alloc_in_room = reinterpret_cast<uintptr_t>( p_alloc_in_room_ );
 	if ( addr_end_of_room_boader > addr_top_of_alloc_in_room ) {
