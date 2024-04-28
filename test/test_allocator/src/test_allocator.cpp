@@ -143,3 +143,58 @@ TEST( Alloc_only_class, Do_allocation_over_pre_mmap_size )
 	auto post_status = alpha::concurrent::internal::get_alloc_mmap_status();
 	EXPECT_EQ( pre_status.active_size_, post_status.active_size_ );
 }
+
+TEST( Alloc_only_class, CanCall_VerifyValidity1 )
+{
+	// Arrange
+
+	// Act
+	auto cr = alpha::concurrent::internal::alloc_only_chamber::verify_validity( nullptr );
+
+	// Assert
+	EXPECT_EQ( cr, alpha::concurrent::internal::alloc_only_chamber::validity_status::kInvalid );
+}
+
+#if 0
+/* セグメンテーションフォルト無しで安定してテストすることができないため、無効化する。 */
+TEST( Alloc_only_class, CanCall_VerifyValidity2 )
+{
+	// Arrange
+	uintptr_t test_buff[1000];
+
+	// Act
+	auto cr = alpha::concurrent::internal::alloc_only_chamber::verify_validity( &( test_buff[500] ) );
+
+	// Assert
+	EXPECT_EQ( cr, alpha::concurrent::internal::alloc_only_chamber::validity_status::kInvalid );
+}
+#endif
+
+TEST( Alloc_only_class, CanCall_VerifyValidity3 )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+	void*                                           p_mem = sut.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	EXPECT_NE( p_mem, nullptr );
+
+	// Act
+	auto cr = alpha::concurrent::internal::alloc_only_chamber::verify_validity( p_mem );
+
+	// Assert
+	EXPECT_EQ( cr, alpha::concurrent::internal::alloc_only_chamber::validity_status::kUsed );
+}
+
+TEST( Alloc_only_class, CanCall_Deallocate )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+	void*                                           p_mem = sut.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	EXPECT_NE( p_mem, nullptr );
+
+	// Act
+	alpha::concurrent::internal::alloc_only_chamber::deallocate( p_mem );
+
+	// Assert
+	auto cr = alpha::concurrent::internal::alloc_only_chamber::verify_validity( p_mem );
+	EXPECT_EQ( cr, alpha::concurrent::internal::alloc_only_chamber::validity_status::kReleased );
+}

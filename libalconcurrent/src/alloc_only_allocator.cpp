@@ -99,6 +99,14 @@ struct room_boader {
 
 	static bool try_marks_as_deallocated( void* p_mem );
 
+	/**
+	 * @brief calculate alloc_in_room top address from the allocated memory address, then check if it belongs to alloc_chamber or not
+	 *
+	 * @param p_mem pointer to the allocated memory that get_allocated_mem_pointer() is returned normaly.
+	 * @return alloc_in_room* nullptr: p_mem is not belongs to alloc_chamber or the allocation information of p_mem has been broken. non nullptr: valid pointer.
+	 */
+	static alloc_in_room* check_and_get_pointer_to_alloc_in_room( void* p_mem );
+
 private:
 	/**
 	 * @brief calculate allocated memory top address from base_addr that is room_boarder class with considering alignment
@@ -133,7 +141,7 @@ private:
 	 * @param p_mem pointer to the allocated memory that get_allocated_mem_pointer() is returned normaly.
 	 * @return uintptr_t allocated memory top address
 	 */
-	static alloc_in_room* calc_addr_of_alloc_in_room_from_allocated_memory( void* p_mem );
+	static alloc_in_room* calc_pointer_of_alloc_in_room_from_allocated_memory( void* p_mem );
 };
 
 inline uintptr_t room_boader::calc_addr_of_allocated_memory_based_on_room_boader( uintptr_t base_addr, size_t req_align )
@@ -160,7 +168,7 @@ inline uintptr_t room_boader::calc_addr_of_allocated_memory_based_on_room_boader
 	return addr_alloc_top;
 }
 
-inline alloc_in_room* room_boader::calc_addr_of_alloc_in_room_from_allocated_memory( void* p_mem )
+inline alloc_in_room* room_boader::calc_pointer_of_alloc_in_room_from_allocated_memory( void* p_mem )
 {
 	uintptr_t      addr_allocated_mem = reinterpret_cast<uintptr_t>( p_mem );
 	uintptr_t      addr_ans           = addr_allocated_mem - sizeof( alloc_in_room );
@@ -184,7 +192,7 @@ inline alloc_in_room* room_boader::calc_addr_of_alloc_in_room_from_allocated_mem
 inline alloc_in_room* room_boader::calc_pointer_of_alloc_in_room_based_on_room_boarder( uintptr_t base_addr, size_t req_align )
 {
 	uintptr_t addr_allocated_mem = calc_addr_of_allocated_memory_based_on_room_boader( base_addr, req_align );
-	return calc_addr_of_alloc_in_room_from_allocated_memory( reinterpret_cast<void*>( addr_allocated_mem ) );
+	return calc_pointer_of_alloc_in_room_from_allocated_memory( reinterpret_cast<void*>( addr_allocated_mem ) );
 }
 
 inline unsigned char* room_boader::calc_pointer_of_tail_padding_based_on_room_boarder( uintptr_t base_addr, size_t req_size, size_t req_align )
@@ -290,6 +298,7 @@ struct alloc_chamber {
 
 	static inline bool is_alloc_chamber( const alloc_chamber* p_test )
 	{
+		if ( p_test == nullptr ) return false;
 		return ( p_test->magic_number_ == kMagicNumber );
 	}
 
@@ -429,10 +438,21 @@ alloc_chamber_statistics alloc_chamber::get_statistics( void ) const
 	return ans;
 }
 
+inline alloc_in_room* room_boader::check_and_get_pointer_to_alloc_in_room( void* p_mem )
+{
+	if ( p_mem == nullptr ) return nullptr;
+
+	alloc_in_room* p_air = calc_pointer_of_alloc_in_room_from_allocated_memory( p_mem );
+	if ( !alloc_chamber::is_alloc_chamber( p_air->p_to_alloc_chamber_ ) ) {
+		return nullptr;
+	}
+	return p_air;
+}
+
 bool room_boader::try_marks_as_deallocated( void* p_mem )
 {
-	alloc_in_room* p_air = room_boader::calc_addr_of_alloc_in_room_from_allocated_memory( p_mem );
-	if ( !alloc_chamber::is_alloc_chamber( p_air->p_to_alloc_chamber_ ) ) {
+	alloc_in_room* p_air = check_and_get_pointer_to_alloc_in_room( p_mem );
+	if ( p_air == nullptr ) {
 		internal::LogOutput( log_type::ERR, "required address(%p) is not the allocated memory by alloc_chamber", p_mem );
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 		bt_info cur_bt_info;   //!< backtrace information when is allocated
@@ -575,6 +595,20 @@ void* alloc_only_chamber::chked_allocate( size_t req_size, size_t req_align )
 void alloc_only_chamber::deallocate( void* p_mem )
 {
 	alloc_chamber::try_deallocate( p_mem );
+}
+
+alloc_only_chamber::validity_status alloc_only_chamber::verify_validity( void* p_mem )
+{
+	alloc_in_room* p_air = room_boader::check_and_get_pointer_to_alloc_in_room( p_mem );
+	if ( p_air == nullptr ) {
+		return validity_status::kInvalid;
+	}
+
+	if ( p_air->is_freeed_.load( std::memory_order_acquire ) ) {
+		return validity_status::kReleased;
+	}
+
+	return validity_status::kUsed;
 }
 
 alloc_chamber_statistics alloc_only_chamber::get_statistics( void ) const

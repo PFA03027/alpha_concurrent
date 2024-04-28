@@ -81,6 +81,12 @@ struct alloc_chamber_statistics {
 
 class alloc_only_chamber {
 public:
+	enum class validity_status {
+		kInvalid,
+		kUsed,
+		kReleased
+	};
+
 	constexpr alloc_only_chamber( bool need_release_munmap_arg, size_t pre_alloc_size_arg )
 	  : head_( nullptr )
 	  , one_try_hint_( nullptr )
@@ -107,6 +113,11 @@ public:
 	 * This API just marks as deallocated. then it will be possible to detect double free that is unexpected.
 	 */
 	static void deallocate( void* p_mem );
+
+	/**
+	 * @brief Check p_mem belong to alloc_only_chamber, and is still used or already released.
+	 */
+	static validity_status verify_validity( void* p_mem );
 
 	alloc_chamber_statistics get_statistics( void ) const;
 	void                     dump_to_log( log_type lt, char c, int id );
