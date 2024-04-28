@@ -117,7 +117,15 @@ public:
 	bool is_belong_to_this( void* p_mem ) const;
 
 	alloc_chamber_statistics get_statistics( void ) const;
-	void                     dump_to_log( log_type lt, char c, int id );
+	void                     dump_to_log( log_type lt, char c, int id ) const;
+
+	/**
+	 * @brief inspect using memory
+	 *
+	 * @param flag_with_dump_to_log true: if using memory found, dump its information to log. false: no log dump
+	 * @return size_t number of allocated and still using memory area
+	 */
+	size_t inspect_using_memory( bool flag_with_dump_to_log = false, log_type lt = log_type::DEBUG, char c = 'a', int id = 0 ) const;
 
 	/**
 	 * @brief Check p_mem belong to alloc_only_chamber, and is still used or already released.

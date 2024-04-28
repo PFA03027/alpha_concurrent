@@ -58,7 +58,7 @@ struct alloc_in_room {
 	{
 		internal::LogOutput(
 			lt,
-			"[%d-%c]\taddr = %p, is_freeed_ = %s, p_to_alloc_chamber_ = %p",
+			"[%d-%c] alloc_in_room\taddr = %p, is_freeed_ = %s, p_to_alloc_chamber_ = %p",
 			id, c,
 			this,
 			is_freeed_.load( std::memory_order_acquire ) ? "true" : "false",
@@ -255,7 +255,7 @@ void room_boader::dump_to_log( log_type lt, char c, int id ) const
 {
 	internal::LogOutput(
 		lt,
-		"[%d-%c]\taddr = %p, chopped_size_ = 0x%zx, p_alloc_in_room_ = %p",
+		"[%d-%c] room_boader\taddr = %p, chopped_size_ = 0x%zx, p_alloc_in_room_ = %p",
 		id, c,
 		this,
 		chopped_size_,
@@ -314,6 +314,8 @@ struct alloc_chamber {
 	alloc_chamber_statistics get_statistics( void ) const;
 
 	void dump_to_log( log_type lt, char c, int id ) const;
+
+	size_t inspect_using_memory( bool flag_with_dump_to_log, log_type lt, char c, int id ) const;
 
 	static inline bool is_alloc_chamber( const alloc_chamber* p_test )
 	{
@@ -540,7 +542,7 @@ void alloc_chamber::dump_to_log( log_type lt, char c, int id ) const
 {
 	internal::LogOutput(
 		lt,
-		"[%d-%c] addr = %p, allocated_size = 0x%zx, next_ = %p, offset_ = 0x%zx, remaining = 0x%zx",
+		"[%d-%c] alloc_chamber\taddr = %p, allocated_size = 0x%zx, next_ = %p, offset_ = 0x%zx, remaining = 0x%zx",
 		id, c,
 		this,
 		chamber_size_,
@@ -555,6 +557,21 @@ void alloc_chamber::dump_to_log( log_type lt, char c, int id ) const
 	for ( const auto& e : *this ) {
 		e.dump_to_log( lt, c, id );
 	}
+}
+
+size_t alloc_chamber::inspect_using_memory( bool flag_with_dump_to_log, log_type lt, char c, int id ) const
+{
+	size_t ans = 0;
+	for ( const auto& e : *this ) {
+		if ( !( e.p_alloc_in_room_->is_freeed_.load( std::memory_order_acquire ) ) ) {
+			ans++;
+			if ( flag_with_dump_to_log ) {
+				e.dump_to_log( lt, c, id );
+			}
+		}
+	}
+
+	return ans;
 }
 
 alloc_chamber_statistics alloc_chamber::get_statistics( void ) const
@@ -753,7 +770,7 @@ alloc_chamber_statistics alloc_only_chamber::get_statistics( void ) const
 	return total_statistics;
 }
 
-void alloc_only_chamber::dump_to_log( log_type lt, char c, int id )
+void alloc_only_chamber::dump_to_log( log_type lt, char c, int id ) const
 {
 	alloc_chamber_statistics total_statistics;
 
@@ -764,7 +781,20 @@ void alloc_only_chamber::dump_to_log( log_type lt, char c, int id )
 	}
 
 	total_statistics = get_statistics();
-	internal::LogOutput( lt, "[%d-%c] %s", id, c, total_statistics.print().c_str() );
+	internal::LogOutput( lt, "[%d-%c] alloc_chamber_statistics %s", id, c, total_statistics.print().c_str() );
+}
+
+size_t alloc_only_chamber::inspect_using_memory( bool flag_with_dump_to_log, log_type lt, char c, int id ) const
+{
+	size_t ans = 0;
+
+	auto p_cur_chamber = head_.load( std::memory_order_acquire );
+	while ( p_cur_chamber != nullptr ) {
+		ans += p_cur_chamber->inspect_using_memory( flag_with_dump_to_log, lt, c, id );
+		p_cur_chamber = p_cur_chamber->next_.load( std::memory_order_acquire );
+	}
+
+	return ans;
 }
 
 alloc_only_chamber::validity_status alloc_only_chamber::verify_validity( void* p_mem )

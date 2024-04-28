@@ -253,3 +253,29 @@ TEST( Alloc_only_class, CanCall_IsBelongToThis_With_Nullptr2 )
 	// Assert
 	EXPECT_FALSE( ret );
 }
+
+TEST( Alloc_only_class, CanCall_inspect_using_memory1 )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+
+	// Act
+	auto ret = sut.inspect_using_memory();
+
+	// Assert
+	EXPECT_EQ( ret, 0 );
+}
+
+TEST( Alloc_only_class, CanCall_inspect_using_memory2 )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+	void*                                           p_mem = sut.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	EXPECT_NE( p_mem, nullptr );
+
+	// Act
+	auto ret = sut.inspect_using_memory( true, alpha::concurrent::log_type::ERR );
+
+	// Assert
+	EXPECT_EQ( ret, 1 );
+}
