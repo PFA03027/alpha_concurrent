@@ -347,12 +347,13 @@ void* alloc_chamber::allocate( size_t req_size, size_t req_align )
 	uintptr_t cur_offset             = offset_.load( std::memory_order_acquire );
 	uintptr_t final_candidate_offset = 0;
 	uintptr_t addr_chopped_room_end  = 0;
+	size_t    adapted_size           = ( req_size == 0 ) ? 1 : req_size;
 	do {
-		if ( ( static_cast<uintptr_t>( chamber_size_ ) - cur_offset ) < ( req_size + default_align_size ) ) {
+		if ( ( static_cast<uintptr_t>( chamber_size_ ) - cur_offset ) < ( adapted_size + default_align_size ) ) {
 			// 残量がなければ即座に失敗を表すnullptrで戻る。
 			return nullptr;
 		}
-		addr_chopped_room_end = calc_addr_chopped_room_end_by( cur_offset, req_size, req_align );
+		addr_chopped_room_end = calc_addr_chopped_room_end_by( cur_offset, adapted_size, req_align );
 		if ( addr_chopped_room_end <= reinterpret_cast<uintptr_t>( this ) ) {
 			// 演算がオーバーフローしてしまうようであれば、失敗を表すnullptrで戻る。
 			return nullptr;
@@ -368,7 +369,7 @@ void* alloc_chamber::allocate( size_t req_size, size_t req_align )
 	uintptr_t    addr_top_my_chopped_room = reinterpret_cast<uintptr_t>( this ) + cur_offset;
 	size_t       final_chopped_room_size  = static_cast<size_t>( addr_chopped_room_end - addr_top_my_chopped_room );
 	void*        p_top_my_chopped_room    = reinterpret_cast<void*>( addr_top_my_chopped_room );
-	room_boader* p_rb                     = new ( p_top_my_chopped_room ) room_boader( this, final_chopped_room_size, req_size, req_align );
+	room_boader* p_rb                     = new ( p_top_my_chopped_room ) room_boader( this, final_chopped_room_size, adapted_size, req_align );
 	void*        p_ans                    = p_rb->get_allocated_mem_pointer();
 	return p_ans;
 }
