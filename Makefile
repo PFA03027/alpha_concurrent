@@ -39,6 +39,12 @@ MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))	# 絶対パス名
 CPUS=$(shell grep cpu.cores /proc/cpuinfo | sort -u | sed 's/[^0-9]//g')
 JOBS=$(shell expr ${CPUS} + ${CPUS} / 2)
 
+CMAKE_CONFIGURE_OPTS  = -DCMAKE_EXPORT_COMPILE_COMMANDS=ON	# for clang-tidy
+CMAKE_CONFIGURE_OPTS += -DCMAKE_BUILD_TYPE=${BUILDTYPE}
+CMAKE_CONFIGURE_OPTS += -DBUILD_TARGET=${BUILDTARGET}
+CMAKE_CONFIGURE_OPTS += -DSANITIZER_TYPE=${SANITIZER_TYPE}
+CMAKE_CONFIGURE_OPTS += -DALCONCURRENT_BUILD_SHARED_LIBS=${ALCONCURRENT_BUILD_SHARED_LIBS} 
+
 all: configure-cmake
 	set -e; \
 	cd ${BUILD_DIR}; \
@@ -56,7 +62,7 @@ configure-cmake:
 	set -e; \
 	mkdir -p ${BUILD_DIR}; \
 	cd ${BUILD_DIR}; \
-	cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DBUILD_TARGET=${BUILDTARGET} -DSANITIZER_TYPE=${SANITIZER_TYPE} -DALCONCURRENT_BUILD_SHARED_LIBS=${ALCONCURRENT_BUILD_SHARED_LIBS} -G "Unix Makefiles" ${MAKEFILE_DIR}
+	cmake ${CMAKE_CONFIGURE_OPTS} -G "Unix Makefiles" ${MAKEFILE_DIR}
 
 clean:
 	-rm -fr ${BUILD_DIR} build.*
@@ -114,5 +120,13 @@ sanitizer.p.test:
 	cd ${BUILD_DIR}; \
 	cmake --build . --target build-test; \
 	ctest -j $(shell expr ${JOBS} / 2) -v
+
+tidy-fix: configure-cmake
+	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build --fix
+	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-format -i
+	find ./ -name '*.hpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-format -i
+
+tidy: configure-cmake
+	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build
 
 .PHONY: test sanitizer sanitizer.p configure-cmake
