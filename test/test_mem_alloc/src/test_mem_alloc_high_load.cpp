@@ -16,8 +16,8 @@
 
 #include "gtest/gtest.h"
 
+#include "alconcurrent/internal/lf_mem_alloc_internal.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
-#include "alconcurrent/lf_mem_alloc_internal.hpp"
 
 // #define TEST_WITH_SLEEP
 
@@ -108,10 +108,10 @@ void* one_load_lock_free_actual_behavior( void* p_data )
 	std::mt19937       engine( seed_gen() );
 
 	// 0以上9以下の値を等確率で発生させる
-	std::uniform_int_distribution<> num_sleep( 0, 9 );
-	std::uniform_int_distribution<> num_dist( 1, 20 );
-	std::uniform_int_distribution<> calc_load( 200, 10000 );
-	std::uniform_int_distribution<> size_dist( 1, max_alloc_size );
+	std::uniform_int_distribution<>       num_sleep( 0, 9 );
+	std::uniform_int_distribution<>       num_dist( 1, 20 );
+	std::uniform_int_distribution<>       calc_load( 200, 10000 );
+	std::uniform_int_distribution<size_t> size_dist( 1, max_alloc_size );
 
 	void* alloc_addr[max_slot_size];
 
@@ -196,9 +196,9 @@ void* one_load_lock_free_min2( void* p_data )
 	std::mt19937       engine( seed_gen() );
 
 	// 0以上9以下の値を等確率で発生させる
-	std::uniform_int_distribution<> num_sleep( 0, 9 );
-	std::uniform_int_distribution<> num_dist( 0, max_slot_size - 1 );
-	std::uniform_int_distribution<> size_dist( 1, max_alloc_size );
+	std::uniform_int_distribution<>       num_sleep( 0, 9 );
+	std::uniform_int_distribution<>       num_dist( 0, max_slot_size - 1 );
+	std::uniform_int_distribution<size_t> size_dist( 1, max_alloc_size );
 
 	void* alloc_addr[max_slot_size];
 
@@ -263,14 +263,14 @@ void* one_load_empty( void* )
 	return nullptr;
 }
 
-void load_test_lockfree( int num_of_thd )
+void load_test_lockfree( unsigned int num_of_thd )
 {
 	alpha::concurrent::general_mem_allocator test_gma( param, 7 );
 
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_create( &threads[i], NULL, one_load_lock_free_min2, &test_gma );
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
@@ -280,7 +280,7 @@ void load_test_lockfree( int num_of_thd )
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_join( threads[i], nullptr );
 	}
 
@@ -296,14 +296,14 @@ void load_test_lockfree( int num_of_thd )
 	delete[] threads;
 }
 
-void load_test_lockfree_actual_behavior( int num_of_thd )
+void load_test_lockfree_actual_behavior( unsigned int num_of_thd )
 {
 	alpha::concurrent::general_mem_allocator test_gma( param, 7 );
 
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_create( &threads[i], NULL, one_load_lock_free_actual_behavior, &test_gma );
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
@@ -313,7 +313,7 @@ void load_test_lockfree_actual_behavior( int num_of_thd )
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_join( threads[i], nullptr );
 	}
 
@@ -329,13 +329,13 @@ void load_test_lockfree_actual_behavior( int num_of_thd )
 	delete[] threads;
 }
 
-void load_test_lockfree_min2( int num_of_thd )
+void load_test_lockfree_min2( unsigned int num_of_thd )
 {
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	std::vector<std::unique_ptr<alpha::concurrent::general_mem_allocator>> free_gma_array( num_of_thd );
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 #if ( __cpp_lib_make_unique >= 201304 )
 		free_gma_array[i] = std::make_unique<alpha::concurrent::general_mem_allocator>( param2, 1 );
 #else
@@ -343,7 +343,7 @@ void load_test_lockfree_min2( int num_of_thd )
 #endif
 	}
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_create( &threads[i], NULL, one_load_lock_free_min2, free_gma_array[i].get() );
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
@@ -353,7 +353,7 @@ void load_test_lockfree_min2( int num_of_thd )
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_join( threads[i], nullptr );
 	}
 
@@ -363,28 +363,28 @@ void load_test_lockfree_min2( int num_of_thd )
 	std::cout << "thread is " << num_of_thd
 			  << " one_load_lock_free_min2() Exec time: " << diff.count() << " msec" << std::endl;
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		auto statistics = free_gma_array[i]->get_statistics();
 		printf( "%s\n", statistics.print().c_str() );
 	}
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		free_gma_array[i].reset();
 	}
 	delete[] threads;
 }
 
-void load_test_lockfree_min2_actual_behavior( int num_of_thd )
+void load_test_lockfree_min2_actual_behavior( unsigned int num_of_thd )
 {
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	alpha::concurrent::general_mem_allocator* free_gma_array[num_of_thd];
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		free_gma_array[i] = new alpha::concurrent::general_mem_allocator( param2, 1 );
 	}
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_create( &threads[i], NULL, one_load_lock_free_actual_behavior, free_gma_array[i] );
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
@@ -394,7 +394,7 @@ void load_test_lockfree_min2_actual_behavior( int num_of_thd )
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_join( threads[i], nullptr );
 	}
 
@@ -404,25 +404,25 @@ void load_test_lockfree_min2_actual_behavior( int num_of_thd )
 	std::cout << "thread is " << num_of_thd
 			  << " one_load_lock_free_actual_behavior() Exec time: " << diff.count() << " msec" << std::endl;
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		auto statistics = free_gma_array[i]->get_statistics();
 		printf( "%s\n", statistics.print().c_str() );
 	}
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		delete free_gma_array[i];
 	}
 	delete[] threads;
 }
 
-void load_test_empty( int num_of_thd )
+void load_test_empty( unsigned int num_of_thd )
 {
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	void* dummy = nullptr;
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_create( &threads[i], NULL, one_load_empty, &dummy );
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
@@ -432,7 +432,7 @@ void load_test_empty( int num_of_thd )
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_join( threads[i], nullptr );
 	}
 
@@ -445,14 +445,14 @@ void load_test_empty( int num_of_thd )
 	delete[] threads;
 }
 
-void load_test_empty_actual_behavior( int num_of_thd )
+void load_test_empty_actual_behavior( unsigned int num_of_thd )
 {
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	void* dummy = nullptr;
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_create( &threads[i], NULL, one_load_empty_actual_behavior, &dummy );
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
@@ -462,7 +462,7 @@ void load_test_empty_actual_behavior( int num_of_thd )
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_join( threads[i], nullptr );
 	}
 
@@ -476,14 +476,14 @@ void load_test_empty_actual_behavior( int num_of_thd )
 }
 
 // malloc/freeの場合のCPU負荷計測
-void load_test_malloc_free( int num_of_thd )
+void load_test_malloc_free( unsigned int num_of_thd )
 {
 	alpha::concurrent::general_mem_allocator test_gma( nullptr, 0 );
 
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_create( &threads[i], NULL, one_load_lock_free_min2, &test_gma );
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
@@ -493,7 +493,7 @@ void load_test_malloc_free( int num_of_thd )
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_join( threads[i], nullptr );
 	}
 
@@ -507,14 +507,14 @@ void load_test_malloc_free( int num_of_thd )
 }
 
 // malloc/freeの場合のCPU負荷計測
-void load_test_malloc_free_actual_behavior( int num_of_thd )
+void load_test_malloc_free_actual_behavior( unsigned int num_of_thd )
 {
 	alpha::concurrent::general_mem_allocator test_gma( nullptr, 0 );
 
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_create( &threads[i], NULL, one_load_lock_free_actual_behavior, &test_gma );
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
@@ -524,7 +524,7 @@ void load_test_malloc_free_actual_behavior( int num_of_thd )
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_join( threads[i], nullptr );
 	}
 
@@ -537,7 +537,7 @@ void load_test_malloc_free_actual_behavior( int num_of_thd )
 	delete[] threads;
 }
 
-class lfmemAllocLoadTest : public testing::TestWithParam<int> {
+class lfmemAllocLoadTest : public testing::TestWithParam<unsigned int> {
 	// You can implement all the usual fixture class members here.
 	// To access the test parameter, call GetParam() from class
 	// TestWithParam<T>.
@@ -565,7 +565,7 @@ public:
 		EXPECT_EQ( warn_cnt, 0 );
 	}
 
-	int num_thread_;
+	unsigned int num_thread_;
 };
 
 TEST_P( lfmemAllocLoadTest, load_test_empty )

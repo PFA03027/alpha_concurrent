@@ -15,9 +15,9 @@
 #include <memory>
 #include <tuple>
 
-#include "free_node_storage.hpp"
 #include "hazard_ptr.hpp"
-#include "one_way_list_node.hpp"
+#include "internal/free_node_storage.hpp"
+#include "internal/one_way_list_node.hpp"
 
 namespace alpha {
 namespace concurrent {

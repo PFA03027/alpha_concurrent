@@ -26,7 +26,8 @@
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
                 }
-            ]
+            ],
+            "preLaunchTask": "make build-test with -g"
         },
         {
             "name": "(gdb) test_mem_alloc_sanitize起動",
@@ -56,7 +57,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "make build-test"
+            "preLaunchTask": "make build-test with -g"
         },
         {
             "name": "(gdb) test_hazard_ptr起動",
@@ -86,7 +87,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "make build-test"
+            "preLaunchTask": "make build-test with -g"
         },
         {
             "name": "(gdb) test_allocator起動",
@@ -116,7 +117,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "make build-test"
+            "preLaunchTask": "make build-test with -g"
         },
         {
             "name": "(gdb) test_lf_fifo起動",
@@ -146,7 +147,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "make build-test"
+            "preLaunchTask": "make build-test with -g"
         },
         {
             "name": "(gdb) test_lf_fifo with sanitizer起動",
@@ -207,7 +208,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "make build-test"
+            "preLaunchTask": "make build-test with -g"
         },
         {
             "name": "(gdb) test_mem_alloc起動",
@@ -244,7 +245,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "make build-test"
+            "preLaunchTask": "make build-test with -g"
         },
         {
             "name": "(gdb) test_mem_alloc with sanitizer起動",

@@ -10,8 +10,8 @@
 
 #include <cstddef>
 
+#include "alconcurrent/internal/lf_mem_alloc_internal.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
-#include "alconcurrent/lf_mem_alloc_internal.hpp"
 
 namespace alpha {
 namespace concurrent {

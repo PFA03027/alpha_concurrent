@@ -22,8 +22,8 @@
 #include <mutex>
 #include <thread>
 
-#include "alloc_only_allocator.hpp"
 #include "dynamic_tls.hpp"
+#include "internal/alloc_only_allocator.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -46,9 +46,10 @@ class hazard_ptr_scoped_ref;
 template <typename T, int N>
 class hazard_ptr {
 public:
-	using hzrd_type                    = T;
-	using hzrd_pointer                 = T*;
-	static constexpr int hzrd_max_slot = N;
+	using hzrd_type                       = T;
+	using hzrd_pointer                    = T*;
+	static constexpr size_t hzrd_max_slot = N;
+	static_assert( N > 0, "N should be greater than 0(zero)" );
 
 	constexpr hazard_ptr( void )
 	  : my_allocator_( true, 4 * 1024 )
@@ -228,9 +229,9 @@ private:
 		}
 
 	private:
-		std::atomic<ocupied_status>       status_;        //!< status for used or not used yet
-		std::atomic<node_for_hazard_ptr*> next_;          //!< pointer to next node
-		std::atomic<T*>                   p_target_[N];   //!< hazard pointer strage
+		std::atomic<ocupied_status>       status_;                                           //!< status for used or not used yet
+		std::atomic<node_for_hazard_ptr*> next_;                                             //!< pointer to next node
+		std::atomic<T*>                   p_target_[static_cast<size_t>( hzrd_max_slot )];   //!< hazard pointer strage
 	};
 
 	struct hazard_node_head {

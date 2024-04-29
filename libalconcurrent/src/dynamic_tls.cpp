@@ -22,7 +22,7 @@
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/dynamic_tls.hpp"
 
-#include "alconcurrent/alloc_only_allocator.hpp"
+#include "alconcurrent/internal/alloc_only_allocator.hpp"
 #include "utility.hpp"
 
 namespace alpha {
@@ -104,20 +104,6 @@ static alloc_only_chamber g_alloc_only_inst( false, conf_pre_mmap_size );   // ã
 inline void* dynamic_tls_key_allocating_only( size_t req_size, size_t req_align = default_align_size )
 {
 	return g_alloc_only_inst.allocate( req_size, req_align );
-}
-
-/**
- * @brief to detect unexpected deallocation calling
- *
- * normally nothing to do
- * If the library compile with ALCONCURRENT_CONF_DETECT_UNEXPECTED_DEALLOC_CALLING, this function throw std::runtime_error.
- *
- * @param p_mem
- */
-inline void dynamic_tls_key_allocating_only_deallocate( void* p_mem )
-{
-	g_alloc_only_inst.detect_unexpected_deallocate( p_mem );
-	return;
 }
 
 /**

@@ -21,7 +21,7 @@
 #include "alconcurrent/lf_fifo.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
 
-#include "alconcurrent/alloc_only_allocator.hpp"
+#include "alconcurrent/internal/alloc_only_allocator.hpp"
 
 #include "mmap_allocator.hpp"
 
@@ -53,19 +53,19 @@ std::atomic<bool> err_flag( false );
 
 static pthread_barrier_t barrier;
 
-constexpr int max_slot_size  = 1000;
-constexpr int max_alloc_size = 900;
-constexpr int num_loop       = 1000;
+constexpr size_t       max_slot_size  = 1000;
+constexpr size_t       max_alloc_size = 900;
+constexpr unsigned int num_loop       = 1000;
 
 using test_fifo_type = alpha::concurrent::fifo_list<void*, true, false>;
 
 struct test_params {
 	test_fifo_type*                           p_test_obj;
 	alpha::concurrent::general_mem_allocator* p_tmg;
-	int                                       num_loop;
+	unsigned int                              num_loop;
 };
 
-class lfmemAllocFreeBwMultThread : public testing::TestWithParam<int> {
+class lfmemAllocFreeBwMultThread : public testing::TestWithParam<unsigned int> {
 	// You can implement all the usual fixture class members here.
 	// To access the test parameter, call GetParam() from class
 	// TestWithParam<T>.
@@ -102,7 +102,7 @@ public:
 #endif
 	}
 
-	int num_thread_;
+	unsigned int num_thread_;
 };
 
 /**
@@ -120,14 +120,14 @@ void* func_test_fifo( void* p_data )
 	std::mt19937       engine( seed_gen() );
 
 	// 0以上9以下の値を等確率で発生させる
-	std::uniform_int_distribution<> num_sleep( 0, 9 );
-	std::uniform_int_distribution<> num_dist( 1, max_slot_size - 1 );
-	std::uniform_int_distribution<> size_dist( 1, max_alloc_size );
+	std::uniform_int_distribution<>       num_sleep( 0, 9 );
+	std::uniform_int_distribution<>       num_dist( 1, max_slot_size - 1 );
+	std::uniform_int_distribution<size_t> size_dist( 1, max_alloc_size );
 
 	pthread_barrier_wait( &barrier );
 
 	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
-	for ( int i = 0; i < p_test_param->num_loop; i++ ) {
+	for ( unsigned int i = 0; i < p_test_param->num_loop; i++ ) {
 		int cur_alloc_num = num_dist( engine );
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
 			void* p_tmp_alloc_to_push = p_tmg->allocate( size_dist( engine ) );
@@ -177,14 +177,14 @@ void* func_test_fifo_ggmem( void* p_data )
 	std::mt19937       engine( seed_gen() );
 
 	// 0以上9以下の値を等確率で発生させる
-	std::uniform_int_distribution<> num_sleep( 0, 9 );
-	std::uniform_int_distribution<> num_dist( 1, max_slot_size - 1 );
-	std::uniform_int_distribution<> size_dist( 1, max_alloc_size );
+	std::uniform_int_distribution<>       num_sleep( 0, 9 );
+	std::uniform_int_distribution<>       num_dist( 1, max_slot_size - 1 );
+	std::uniform_int_distribution<size_t> size_dist( 1, max_alloc_size );
 
 	pthread_barrier_wait( &barrier );
 
 	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
-	for ( int i = 0; i < p_test_param->num_loop; i++ ) {
+	for ( unsigned int i = 0; i < p_test_param->num_loop; i++ ) {
 		int cur_alloc_num = num_dist( engine );
 		for ( int j = 0; j < cur_alloc_num; j++ ) {
 			void* p_tmp_alloc_to_push = alpha::concurrent::gmem_allocate( size_dist( engine ) );
@@ -224,7 +224,7 @@ void* func_test_fifo_ggmem( void* p_data )
 	return nullptr;
 }
 
-void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::general_mem_allocator* p_tmg_arg )
+void load_test_lockfree_bw_mult_thread( unsigned int num_of_thd, alpha::concurrent::general_mem_allocator* p_tmg_arg )
 {
 	test_fifo_type fifo;
 
@@ -236,7 +236,7 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_create( &threads[i], NULL, func_test_fifo, &tda );
 	}
 	pthread_barrier_wait( &barrier );
@@ -247,7 +247,7 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 	fflush( NULL );
 #endif
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_join( threads[i], nullptr );
 	}
 
@@ -274,7 +274,7 @@ void load_test_lockfree_bw_mult_thread( int num_of_thd, alpha::concurrent::gener
 
 	delete[] threads;
 }
-void load_test_lockfree_bw_mult_thread_ggmem( int num_of_thd )
+void load_test_lockfree_bw_mult_thread_ggmem( unsigned int num_of_thd )
 {
 	test_fifo_type fifo;
 
@@ -286,7 +286,7 @@ void load_test_lockfree_bw_mult_thread_ggmem( int num_of_thd )
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_create( &threads[i], NULL, func_test_fifo_ggmem, &tda );
 	}
 	pthread_barrier_wait( &barrier );
@@ -297,7 +297,7 @@ void load_test_lockfree_bw_mult_thread_ggmem( int num_of_thd )
 	fflush( NULL );
 #endif
 
-	for ( int i = 0; i < num_of_thd; i++ ) {
+	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_join( threads[i], nullptr );
 	}
 
@@ -325,9 +325,9 @@ void load_test_lockfree_bw_mult_thread_ggmem( int num_of_thd )
 	delete[] threads;
 }
 
-void load_test_lockfree_bw_mult_thread_startstop( int num_of_thd, alpha::concurrent::general_mem_allocator* p_tmg_arg )
+void load_test_lockfree_bw_mult_thread_startstop( unsigned int num_of_thd, alpha::concurrent::general_mem_allocator* p_tmg_arg )
 {
-	int            start_stop_reqeat = 2;
+	unsigned int   start_stop_reqeat = 2;
 	test_fifo_type fifo;
 
 	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 0, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
@@ -341,16 +341,16 @@ void load_test_lockfree_bw_mult_thread_startstop( int num_of_thd, alpha::concurr
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 #endif
 
-	for ( int j = 0; j < start_stop_reqeat; j++ ) {
+	for ( unsigned int j = 0; j < start_stop_reqeat; j++ ) {
 		pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 		pthread_t* threads = new pthread_t[num_of_thd];
 
-		for ( int i = 0; i < num_of_thd; i++ ) {
+		for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 			pthread_create( &threads[i], NULL, func_test_fifo, &tda );
 		}
 		pthread_barrier_wait( &barrier );
 
-		for ( int i = 0; i < num_of_thd; i++ ) {
+		for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 			pthread_join( threads[i], nullptr );
 		}
 		delete[] threads;
@@ -443,9 +443,9 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 		std::condition_variable exit_cv;
 
 		auto thd_functor1 = [&]( int num_loop ) {
-			std::random_device              seed_gen;
-			std::mt19937                    engine( seed_gen() );
-			std::uniform_int_distribution<> size_dist( 1, gmem_max_alloc_size );
+			std::random_device                    seed_gen;
+			std::mt19937                          engine( seed_gen() );
+			std::uniform_int_distribution<size_t> size_dist( 1, gmem_max_alloc_size );
 
 			for ( int i = 0; i < num_loop; i++ ) {
 				void* p_tmp_alloc_to_push = alpha::concurrent::gmem_allocate( size_dist( engine ) );
@@ -479,9 +479,9 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 		};
 
 		auto thd_functor2 = [&]( int num_loop ) {
-			std::random_device              seed_gen;
-			std::mt19937                    engine( seed_gen() );
-			std::uniform_int_distribution<> size_dist( 1, gmem_max_alloc_size );
+			std::random_device                    seed_gen;
+			std::mt19937                          engine( seed_gen() );
+			std::uniform_int_distribution<size_t> size_dist( 1, gmem_max_alloc_size );
 
 			for ( int i = 0; i < num_loop; i++ ) {
 				void* p_tmp_alloc_to_push = alpha::concurrent::gmem_allocate( size_dist( engine ) );

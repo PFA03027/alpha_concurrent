@@ -22,7 +22,7 @@ TEST( slot_array_mgr, construct_destruct )
 	std::unique_ptr<alpha::concurrent::internal::slot_array_mgr> up_sut( p_sut );
 
 	// Assert
-	for ( int i = 0; i < 32; i++ ) {
+	for ( size_t i = 0; i < 32; i++ ) {
 		auto p_ret = p_sut->get_pointer_of_slot( i )->mh_.get_mgr_pointer();
 		EXPECT_EQ( p_ret, p_sut );
 	}

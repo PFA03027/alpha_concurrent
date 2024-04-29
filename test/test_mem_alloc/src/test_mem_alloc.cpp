@@ -16,8 +16,8 @@
 
 #include "gtest/gtest.h"
 
+#include "alconcurrent/internal/lf_mem_alloc_internal.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
-#include "alconcurrent/lf_mem_alloc_internal.hpp"
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
 alpha::concurrent::param_chunk_allocation param = { 27, 2 };

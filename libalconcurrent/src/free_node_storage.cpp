@@ -8,7 +8,7 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#include "alconcurrent/free_node_storage.hpp"
+#include "alconcurrent/internal/free_node_storage.hpp"
 
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
@@ -277,20 +277,6 @@ static param_chunk_allocation param[] = {
 };
 #endif
 
-#ifdef ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC
-// not set paramter, because compile option request to use malloc/free
-#else
-#ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
-static general_mem_allocator& get_gma( void )
-{
-	static general_mem_allocator singlton;
-	return singlton;
-}
-#else
-// not set, because use gmem_allocater
-#endif
-#endif
-
 void* node_of_list::operator new( std::size_t n )   // usual new...(1)
 {
 	void* p_ans;
@@ -298,11 +284,7 @@ void* node_of_list::operator new( std::size_t n )   // usual new...(1)
 	p_ans = std::malloc( n );
 	// p_ans = ::operator new( n );
 #else
-#ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
-	p_ans = get_gma().allocate( n );
-#else
 	p_ans = gmem_allocate( n );
-#endif
 #endif
 
 	if ( p_ans == nullptr ) throw std::bad_alloc();
@@ -315,11 +297,7 @@ void node_of_list::operator delete( void* p_mem ) noexcept   // usual new...(2)
 	std::free( p_mem );
 	// ::operator delete( p_mem );
 #else
-#ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
-	get_gma().deallocate( p_mem );
-#else
 	gmem_deallocate( p_mem );
-#endif
 #endif
 	return;
 }
@@ -331,11 +309,7 @@ void* node_of_list::operator new[]( std::size_t n )   // usual new...(1)
 	p_ans = std::malloc( n );
 	// p_ans = ::operator new[]( n );
 #else
-#ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
-	p_ans = get_gma().allocate( n );
-#else
 	p_ans = gmem_allocate( n );
-#endif
 #endif
 
 	if ( p_ans == nullptr ) throw std::bad_alloc();
@@ -348,11 +322,7 @@ void node_of_list::operator delete[]( void* p_mem ) noexcept   // usual new...(2
 	std::free( p_mem );
 	// ::operator delete[]( p_mem );
 #else
-#ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
-	get_gma().deallocate( p_mem );
-#else
 	gmem_deallocate( p_mem );
-#endif
 #endif
 	return;
 }
@@ -371,11 +341,7 @@ general_mem_allocator_statistics node_of_list::get_statistics( void )
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC
 	return general_mem_allocator_statistics {};
 #else
-#ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
-	return get_gma().get_statistics();
-#else
 	return gmem_get_statistics();
-#endif
 #endif
 }
 
@@ -405,15 +371,6 @@ void set_param_to_free_nd_mem_alloc(
 	unsigned int                  num              //!< [in] array size
 )
 {
-#ifdef ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC
-	// not set paramter, because compile option request to use malloc/free
-#else
-#ifdef ALCONCURRENT_CONF_LF_ALGO_USE_LOCAL_ALLOCATER
-	internal::get_gma().set_param( p_param_array, num );
-#else
-	// not set, because use gmem_allocater
-#endif
-#endif
 }
 
 }   // namespace concurrent

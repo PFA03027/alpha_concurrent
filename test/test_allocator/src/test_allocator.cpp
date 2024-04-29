@@ -9,7 +9,7 @@
  *
  */
 
-#include "alconcurrent/alloc_only_allocator.hpp"
+#include "alconcurrent/internal/alloc_only_allocator.hpp"
 #include "mmap_allocator.hpp"
 
 #include "gtest/gtest.h"
@@ -142,4 +142,140 @@ TEST( Alloc_only_class, Do_allocation_over_pre_mmap_size )
 	}
 	auto post_status = alpha::concurrent::internal::get_alloc_mmap_status();
 	EXPECT_EQ( pre_status.active_size_, post_status.active_size_ );
+}
+
+TEST( Alloc_only_class, CanCall_VerifyValidity1 )
+{
+	// Arrange
+
+	// Act
+	auto cr = alpha::concurrent::internal::alloc_only_chamber::verify_validity( nullptr );
+
+	// Assert
+	EXPECT_EQ( cr, alpha::concurrent::internal::alloc_only_chamber::validity_status::kInvalid );
+}
+
+#if 0
+/* セグメンテーションフォルト無しで安定してテストすることができないため、無効化する。 */
+TEST( Alloc_only_class, CanCall_VerifyValidity2 )
+{
+	// Arrange
+	uintptr_t test_buff[1000];
+
+	// Act
+	auto cr = alpha::concurrent::internal::alloc_only_chamber::verify_validity( &( test_buff[500] ) );
+
+	// Assert
+	EXPECT_EQ( cr, alpha::concurrent::internal::alloc_only_chamber::validity_status::kInvalid );
+}
+#endif
+
+TEST( Alloc_only_class, CanCall_VerifyValidity3 )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+	void*                                           p_mem = sut.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	EXPECT_NE( p_mem, nullptr );
+
+	// Act
+	auto cr = alpha::concurrent::internal::alloc_only_chamber::verify_validity( p_mem );
+
+	// Assert
+	EXPECT_EQ( cr, alpha::concurrent::internal::alloc_only_chamber::validity_status::kUsed );
+}
+
+TEST( Alloc_only_class, CanCall_Deallocate )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+	void*                                           p_mem = sut.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	EXPECT_NE( p_mem, nullptr );
+
+	// Act
+	alpha::concurrent::internal::alloc_only_chamber::deallocate( p_mem );
+
+	// Assert
+	auto cr = alpha::concurrent::internal::alloc_only_chamber::verify_validity( p_mem );
+	EXPECT_EQ( cr, alpha::concurrent::internal::alloc_only_chamber::validity_status::kReleased );
+}
+
+TEST( Alloc_only_class, CanCall_IsBelongToThis1 )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+	void*                                           p_mem = sut.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	EXPECT_NE( p_mem, nullptr );
+
+	// Act
+	auto ret = sut.is_belong_to_this( p_mem );
+
+	// Assert
+	EXPECT_TRUE( ret );
+}
+
+TEST( Alloc_only_class, CanCall_IsBelongToThis2 )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+	alpha::concurrent::internal::alloc_only_chamber other( true, 128 );
+	void*                                           p_mem = other.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	EXPECT_NE( p_mem, nullptr );
+
+	// Act
+	auto ret = sut.is_belong_to_this( p_mem );
+
+	// Assert
+	EXPECT_FALSE( ret );
+}
+
+TEST( Alloc_only_class, CanCall_IsBelongToThis_With_Nullptr1 )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+
+	// Act
+	auto ret = sut.is_belong_to_this( nullptr );
+
+	// Assert
+	EXPECT_FALSE( ret );
+}
+
+TEST( Alloc_only_class, CanCall_IsBelongToThis_With_Nullptr2 )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+	void*                                           p_mem = sut.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	EXPECT_NE( p_mem, nullptr );
+
+	// Act
+	auto ret = sut.is_belong_to_this( nullptr );
+
+	// Assert
+	EXPECT_FALSE( ret );
+}
+
+TEST( Alloc_only_class, CanCall_inspect_using_memory1 )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+
+	// Act
+	auto ret = sut.inspect_using_memory();
+
+	// Assert
+	EXPECT_EQ( ret, 0 );
+}
+
+TEST( Alloc_only_class, CanCall_inspect_using_memory2 )
+{
+	// Arrange
+	alpha::concurrent::internal::alloc_only_chamber sut( true, 128 );
+	void*                                           p_mem = sut.allocate( REQ_ALLOC_SIZE, alpha::concurrent::internal::default_align_size );
+	EXPECT_NE( p_mem, nullptr );
+
+	// Act
+	auto ret = sut.inspect_using_memory( true, alpha::concurrent::log_type::ERR );
+
+	// Assert
+	EXPECT_EQ( ret, 1 );
 }

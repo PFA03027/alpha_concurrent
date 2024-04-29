@@ -20,8 +20,8 @@
 
 #include "conf_logger.hpp"
 
-#include "alloc_only_allocator.hpp"
-#include "lf_mem_alloc_internal.hpp"
+#include "internal/alloc_only_allocator.hpp"
+#include "internal/lf_mem_alloc_internal.hpp"
 #include "lf_mem_alloc_type.hpp"
 
 namespace alpha {
@@ -113,7 +113,6 @@ public:
 			for ( unsigned int i = 0; i < pr_ch_size_; i++ ) {
 				param_ch_array_[i].~chunk_list();
 			}
-			// allocating_only_allocator_.detect_unexpected_deallocate( reinterpret_cast<void*>( param_ch_array_ ) );
 		}
 	}
 

@@ -36,42 +36,6 @@ enum class log_type {
 };
 
 /*!
- * @brief	caller backtrace information
- */
-struct bt_info {
-	int   count_;                                             //!< backtrace data size. Zero: no data, Plus value: call stack information is valid, Minus value: information of previous allocation
-	void* bt_[ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE];   //!< call stack of backtrace
-
-	constexpr bt_info( void )
-	  : count_( 0 )
-	  , bt_ { 0 }
-	{
-	}
-
-	~bt_info()                          = default;
-	constexpr bt_info( const bt_info& ) = default;
-	constexpr bt_info( bt_info&& )      = default;
-#if ( __cpp_constexpr >= 201304 )
-	constexpr bt_info& operator=( const bt_info& ) = default;
-	constexpr bt_info& operator=( bt_info&& )      = default;
-#else
-	bt_info& operator=( const bt_info& ) = default;
-	bt_info& operator=( bt_info&& )      = default;
-#endif
-
-	void dump_to_log( log_type lt, char c, int id );
-};
-
-#define RECORD_BACKTRACE_GET_BACKTRACE( BT_INFO_N )                                                                    \
-	do {                                                                                                               \
-		BT_INFO_N.count_ = backtrace( BT_INFO_N.bt_, alpha::concurrent::ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE ); \
-	} while ( 0 )
-#define RECORD_BACKTRACE_INVALIDATE_BACKTRACE( BT_INFO_N ) \
-	do {                                                   \
-		BT_INFO_N.count_ = -( BT_INFO_N.count_ );          \
-	} while ( 0 )
-
-/*!
  * @brief	log output I/F class to configure the logging.
  */
 class logger_if_abst {
@@ -87,9 +51,7 @@ public:
 		const char*  p_log_str       //!< [in]	pointer log string
 		) = 0;
 
-	virtual ~logger_if_abst()
-	{
-	}
+	virtual ~logger_if_abst() = default;
 };
 
 namespace internal {
@@ -170,6 +132,42 @@ void GetErrorWarningLogCountAndReset(
 	int* p_num_err,   //!< [out] the pointer to store the number of ERR type log output
 	int* p_num_warn   //!< [out] the pointer to store the number of WARN type log output
 );
+
+/*!
+ * @brief	caller backtrace information
+ */
+struct bt_info {
+	int   count_;                                             //!< backtrace data size. Zero: no data, Plus value: call stack information is valid, Minus value: information of previous allocation
+	void* bt_[ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE];   //!< call stack of backtrace
+
+	constexpr bt_info( void )
+	  : count_( 0 )
+	  , bt_ { 0 }
+	{
+	}
+
+	~bt_info()                          = default;
+	constexpr bt_info( const bt_info& ) = default;
+	constexpr bt_info( bt_info&& )      = default;
+#if ( __cpp_constexpr >= 201304 )
+	constexpr bt_info& operator=( const bt_info& ) = default;
+	constexpr bt_info& operator=( bt_info&& )      = default;
+#else
+	bt_info& operator=( const bt_info& ) = default;
+	bt_info& operator=( bt_info&& )      = default;
+#endif
+
+	void dump_to_log( log_type lt, char c, int id );
+};
+
+#define RECORD_BACKTRACE_GET_BACKTRACE( BT_INFO_N )                                                                    \
+	do {                                                                                                               \
+		BT_INFO_N.count_ = backtrace( BT_INFO_N.bt_, alpha::concurrent::ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE ); \
+	} while ( 0 )
+#define RECORD_BACKTRACE_INVALIDATE_BACKTRACE( BT_INFO_N ) \
+	do {                                                   \
+		BT_INFO_N.count_ = -( BT_INFO_N.count_ );          \
+	} while ( 0 )
 
 }   // namespace concurrent
 }   // namespace alpha

@@ -15,8 +15,8 @@
 #include <memory>
 #include <mutex>
 
-#include "hazard_ptr.hpp"
-#include "lf_mem_alloc.hpp"
+#include "../hazard_ptr.hpp"
+#include "../lf_mem_alloc.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -275,13 +275,13 @@ public:
 	}
 
 	template <typename ALLOC_NODE_T>
-	void init_and_pre_allocate( int pre_alloc_nodes )
+	void init_and_pre_allocate( size_t pre_alloc_nodes )
 	{
 		node_pointer p_init_sentinel = (node_pointer)allocate_new_node<ALLOC_NODE_T>();
 		p_init_sentinel->teardown_by_recycle();
 		node_list_.initial_push( p_init_sentinel );
 
-		for ( int i = 0; i < pre_alloc_nodes; i++ ) {
+		for ( size_t i = 0; i < pre_alloc_nodes; i++ ) {
 			recycle( (node_pointer)allocate_new_node<ALLOC_NODE_T>() );
 		}
 	}
@@ -361,15 +361,13 @@ private:
 /*!
  * @brief	Set parameters in the lock-free memory allocator to enable the function.
  *
- * ロックフリーメモリアロケータに、パラメータを設定し機能を有効化する。
- *
- * @note
- * If this I / F parameter setting is not performed, memory allocation using malloc / free will be performed. @n
- * このI/Fによるパラメータ設定が行われない場合、malloc/freeを使用したメモリアロケーションが行われる。
- *
- * @warning if compile with ALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC, this API has no effect.
+ * @warning This is obsolated. So there is no effect.
  */
-void set_param_to_free_nd_mem_alloc(
+#if __has_cpp_attribute( deprecated )
+[[deprecated( "This is obsolated. So there is no effect." )]]
+#endif
+void
+set_param_to_free_nd_mem_alloc(
 	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
 	unsigned int                  num              //!< [in] array size
 );

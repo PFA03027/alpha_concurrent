@@ -16,9 +16,9 @@
 #include <memory>
 #include <tuple>
 
-#include "free_node_storage.hpp"
 #include "hazard_ptr.hpp"
-#include "one_way_list_node.hpp"
+#include "internal/free_node_storage.hpp"
+#include "internal/one_way_list_node.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -521,11 +521,11 @@ public:
 	/*!
 	 * @brief	remove all of nodes that pred return true from this list
 	 */
-	int remove_all_if(
+	size_t remove_all_if(
 		predicate_t& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
 	)
 	{
-		int                                  ans         = 0;
+		size_t                               ans         = 0;
 		typename list_type::find_predicate_t pred_common = [&pred]( const list_node_pointer a ) { return pred( a->get_value() ); };
 
 		scoped_hazard_ref hzrd_ref_prev( hzrd_ptr_, (int)hazard_ptr_idx::FIND_ANS_PREV );
@@ -720,9 +720,9 @@ public:
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 				auto [p_prev, p_curr] = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
 #else
-                auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
-                auto p_prev    = std::get<0>( local_ret );
-                auto p_curr    = std::get<1>( local_ret );
+				auto local_ret = base_list_.find_if( free_nd_, hzrd_ref_prev, hzrd_ref_curr, pred_common );
+				auto p_prev    = std::get<0>( local_ret );
+				auto p_curr    = std::get<1>( local_ret );
 #endif
 				if ( !base_list_.is_end_node( p_curr ) ) continue;
 				if ( base_list_.is_head_node( p_prev ) ) {

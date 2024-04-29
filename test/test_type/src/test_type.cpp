@@ -10,11 +10,11 @@
 #include <memory>
 #include <type_traits>
 
+#include "alconcurrent/internal/one_way_list_node.hpp"
 #include "alconcurrent/lf_fifo.hpp"
 #include "alconcurrent/lf_list.hpp"
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 #include "alconcurrent/lf_stack.hpp"
-#include "alconcurrent/one_way_list_node.hpp"
 
 struct test_t {
 	int a;

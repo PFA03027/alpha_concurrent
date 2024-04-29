@@ -45,7 +45,8 @@ constexpr bool is_power_of_2( T v )
 	static_assert( std::is_integral<T>::value, "T should be integral type" );
 #if ( __cpp_constexpr >= 201304 )
 	// 2のn乗かどうかを判定する。
-	if ( v < 2 ) return false;
+	if ( v < 1 ) return false;
+	if ( v == 1 ) return true;   // 2のゼロ乗と考えてtrueを返す。
 
 	// step1: 最も下位に1が立っているビットのみ残した値を抽出する
 	T v2 = -v & v;
@@ -53,7 +54,7 @@ constexpr bool is_power_of_2( T v )
 	bool ans = ( v == v2 );
 	return ans;
 #else
-	return ( ( v == ( -v & v ) ) && ( v >= 2 ) );
+	return ( ( v == ( -v & v ) ) && ( v >= 2 ) ) || ( v == 1 );
 #endif
 }
 
@@ -64,12 +65,18 @@ struct alloc_chamber_statistics {
 	size_t alloc_size_;
 	size_t consum_size_;
 	size_t free_size_;
+	size_t num_of_allocated_;
+	size_t num_of_using_allocated_;
+	size_t num_of_released_allocated_;
 
 	constexpr alloc_chamber_statistics( void )
 	  : chamber_count_( 0 )
 	  , alloc_size_( 0 )
 	  , consum_size_( 0 )
 	  , free_size_( 0 )
+	  , num_of_allocated_( 0 )
+	  , num_of_using_allocated_( 0 )
+	  , num_of_released_allocated_( 0 )
 	{
 	}
 
@@ -80,6 +87,12 @@ struct alloc_chamber_statistics {
 
 class alloc_only_chamber {
 public:
+	enum class validity_status {
+		kInvalid,
+		kUsed,
+		kReleased
+	};
+
 	constexpr alloc_only_chamber( bool need_release_munmap_arg, size_t pre_alloc_size_arg )
 	  : head_( nullptr )
 	  , one_try_hint_( nullptr )
@@ -90,11 +103,7 @@ public:
 
 	~alloc_only_chamber();
 
-	inline void* allocate( size_t req_size )
-	{
-		return chked_allocate( req_size, default_align_size );
-	}
-	void* allocate( size_t req_size, size_t req_align )
+	inline void* allocate( size_t req_size, size_t req_align = default_align_size )
 	{
 		if ( !is_power_of_2( req_align ) ) {
 			char buff[128];
@@ -104,10 +113,30 @@ public:
 		return chked_allocate( req_size, req_align );
 	}
 
-	void detect_unexpected_deallocate( void* );
+	/**
+	 * @brief Marks the area as deallocated
+	 *
+	 * This API just marks as deallocated. then it will be possible to detect double free that is unexpected.
+	 */
+	static void deallocate( void* p_mem );
+
+	bool is_belong_to_this( void* p_mem ) const;
 
 	alloc_chamber_statistics get_statistics( void ) const;
-	void                     dump_to_log( log_type lt, char c, int id );
+	void                     dump_to_log( log_type lt, char c, int id ) const;
+
+	/**
+	 * @brief inspect using memory
+	 *
+	 * @param flag_with_dump_to_log true: if using memory found, dump its information to log. false: no log dump
+	 * @return size_t number of allocated and still using memory area
+	 */
+	size_t inspect_using_memory( bool flag_with_dump_to_log = false, log_type lt = log_type::DEBUG, char c = 'a', int id = 0 ) const;
+
+	/**
+	 * @brief Check p_mem belong to alloc_only_chamber, and is still used or already released.
+	 */
+	static validity_status verify_validity( void* p_mem );
 
 private:
 	void* chked_allocate( size_t req_size, size_t req_align );
