@@ -44,7 +44,7 @@ public:
 	using value_type                    = typename node_type::value_type;
 	using ticket_type                   = typename node_type::ticket_type;
 	using node_pointer                  = node_type*;
-	using hazard_ptr_storage            = hazard_ptr<node_type, hzrd_max_slot_>;
+	using hazard_ptr_storage_t          = hazard_ptr_storage<node_type, hzrd_max_slot_>;
 
 	fifo_nd_list( void )
 	  : head_( nullptr )
@@ -218,7 +218,7 @@ private:
 	std::atomic<node_pointer> tail_;
 	std::atomic<int>          size_count_;
 
-	hazard_ptr_storage hzrd_ptr_;
+	hazard_ptr_storage_t hzrd_ptr_;
 };
 
 }   // namespace internal

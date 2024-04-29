@@ -157,8 +157,8 @@ private:
 	fifo_free_nd_list operator=( const fifo_free_nd_list& ) = delete;
 	fifo_free_nd_list operator=( fifo_free_nd_list&& )      = delete;
 
-	using hazard_ptr_storage = hazard_ptr<node_of_list, hzrd_max_slot_>;
-	using scoped_hazard_ref  = hazard_ptr_scoped_ref<node_of_list, hzrd_max_slot_>;
+	using hazard_ptr_storage_t = hazard_ptr_storage<node_of_list, hzrd_max_slot_>;
+	using scoped_hazard_ref    = hazard_ptr_scoped_ref<node_of_list, hzrd_max_slot_>;
 
 	enum class hazard_ptr_idx : int {
 		PUSH_FUNC_LAST = 0,
@@ -172,7 +172,7 @@ private:
 	std::atomic<node_pointer>                    head_;
 	std::atomic<node_pointer>                    tail_;
 
-	hazard_ptr_storage hzrd_ptr_;
+	hazard_ptr_storage_t hzrd_ptr_;
 };
 
 /*!

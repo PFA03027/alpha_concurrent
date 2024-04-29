@@ -373,9 +373,9 @@ private:
 		FOR_EACH_CURR    = 6
 	};
 	static constexpr int hzrd_max_slot_ = 7;
-	using hazard_ptr_storage            = hazard_ptr<node_type, hzrd_max_slot_>;
+	using hazard_ptr_storage_t          = hazard_ptr_storage<node_type, hzrd_max_slot_>;
 	using scoped_hazard_ref             = hazard_ptr_scoped_ref<node_type, hzrd_max_slot_>;
-	using hazard_ptr_cp_handling        = hazard_ptr<node_type, 1>;
+	using hazard_ptr_cp_handling        = hazard_ptr_storage<node_type, 1>;
 	using scoped_hazard_cp_handling_ref = hazard_ptr_scoped_ref<node_type, 1>;
 
 	lockfree_list_base( const lockfree_list_base& )           = delete;
@@ -387,7 +387,7 @@ private:
 	node_type        sentinel_node_;
 	std::atomic<int> size_count_;
 
-	hazard_ptr_storage     hzrd_ptr_;
+	hazard_ptr_storage_t   hzrd_ptr_;
 	hazard_ptr_cp_handling hzrd_ptr_cp_hdling_;
 };
 
@@ -817,7 +817,7 @@ private:
 	using free_node_pointer    = typename free_nd_storage_type::node_pointer;
 
 	static constexpr int hzrd_max_slot_ = 3;
-	using hazard_ptr_storage            = hazard_ptr<list_node_type, hzrd_max_slot_>;
+	using hazard_ptr_storage_t          = hazard_ptr_storage<list_node_type, hzrd_max_slot_>;
 	using scoped_hazard_ref             = hazard_ptr_scoped_ref<list_node_type, hzrd_max_slot_>;
 
 	enum class hazard_ptr_idx : int {
@@ -880,7 +880,7 @@ private:
 	list_type            base_list_;
 	free_nd_storage_type free_nd_;
 
-	hazard_ptr_storage hzrd_ptr_;
+	hazard_ptr_storage_t hzrd_ptr_;
 };
 
 }   // namespace concurrent

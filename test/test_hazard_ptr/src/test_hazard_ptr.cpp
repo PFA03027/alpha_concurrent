@@ -41,7 +41,7 @@ private:
 constexpr int       num_thread = 16;
 constexpr uintptr_t loop_num   = 100000;
 
-alpha::concurrent::hazard_ptr<delete_test, 1> hazard_ptr_to;
+alpha::concurrent::hazard_ptr_storage<delete_test, 1> hazard_ptr_to;
 
 pthread_barrier_t barrier;
 
@@ -54,8 +54,8 @@ void* func_refarencing( void* data )
 	std::atomic<delete_test*>* p_target = reinterpret_cast<std::atomic<delete_test*>*>( data );
 
 	alpha::concurrent::hazard_ptr_scoped_ref<
-		alpha::concurrent::hazard_ptr<delete_test, 1>::hzrd_type,
-		alpha::concurrent::hazard_ptr<delete_test, 1>::hzrd_max_slot>
+		alpha::concurrent::hazard_ptr_storage<delete_test, 1>::hzrd_type,
+		alpha::concurrent::hazard_ptr_storage<delete_test, 1>::hzrd_max_slot>
 		hzrd_ref( hazard_ptr_to, 0 );
 	//	printf( "p_target: %p\n", p_target );
 
@@ -95,8 +95,8 @@ void* func_delete_owner( void* data )
 
 	{
 		alpha::concurrent::hazard_ptr_scoped_ref<
-			alpha::concurrent::hazard_ptr<delete_test, 1>::hzrd_type,
-			alpha::concurrent::hazard_ptr<delete_test, 1>::hzrd_max_slot>
+			alpha::concurrent::hazard_ptr_storage<delete_test, 1>::hzrd_type,
+			alpha::concurrent::hazard_ptr_storage<delete_test, 1>::hzrd_max_slot>
 			hzrd_ref( hazard_ptr_to, 0 );
 
 		// printf( "p_target: %p\n", p_test_obj );
@@ -165,7 +165,7 @@ void test_case1( void )
 
 	delete[] threads;
 
-	//	auto [hzrd_size, del_size] = alpha::concurrent::hazard_ptr<delete_test>::debug_get_glist_size();
+	//	auto [hzrd_size, del_size] = alpha::concurrent::hazard_ptr_storage<delete_test>::debug_get_glist_size();
 	//	printf( "glist_size: hazard ptr=%d, del ptr=%d\n", hzrd_size, del_size );
 
 	return;

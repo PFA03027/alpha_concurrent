@@ -95,7 +95,7 @@ struct free_node_stack {
 
 	using node_type               = NODE_T;
 	using node_pointer            = NODE_T*;
-	using hzd_ptr_mgr_type        = hazard_ptr<node_type, HZD_IDX_MAX>;
+	using hzd_ptr_mgr_type        = hazard_ptr_storage<node_type, HZD_IDX_MAX>;
 	using scoped_hzd_type         = hazard_ptr_scoped_ref<node_type, HZD_IDX_MAX>;
 	using dynamic_tls_np_type     = dynamic_tls<node_pointer, threadlocal_no_allocate_handler>;
 	using scoped_np_accessor_type = typename dynamic_tls_np_type::scoped_accessor;

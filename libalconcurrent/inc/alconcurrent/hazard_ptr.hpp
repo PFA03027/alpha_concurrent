@@ -44,32 +44,32 @@ class hazard_ptr_scoped_ref;
  *
  */
 template <typename T, int N>
-class hazard_ptr {
+class hazard_ptr_storage {
 public:
 	using hzrd_type                       = T;
 	using hzrd_pointer                    = T*;
 	static constexpr size_t hzrd_max_slot = N;
 	static_assert( N > 0, "N should be greater than 0(zero)" );
 
-	constexpr hazard_ptr( void )
+	constexpr hazard_ptr_storage( void )
 	  : my_allocator_( true, 4 * 1024 )
 	  , p_allocator_( &my_allocator_ )
 	  , head_( p_allocator_ )
 	  , p_hzd_ptr_node_( threadlocal_handler_functor( this ) )
 	{
-		static_assert( std::is_standard_layout<hazard_ptr>::value, "hazard_ptr should be standard-layout type" );
+		static_assert( std::is_standard_layout<hazard_ptr_storage>::value, "hazard_ptr_storage should be standard-layout type" );
 	}
 
-	constexpr hazard_ptr( internal::alloc_only_chamber* p_allocator_arg )
+	constexpr hazard_ptr_storage( internal::alloc_only_chamber* p_allocator_arg )
 	  : my_allocator_( true, 0 )
 	  , p_allocator_( p_allocator_arg )
 	  , head_( p_allocator_ )
 	  , p_hzd_ptr_node_( threadlocal_handler_functor( this ) )
 	{
-		static_assert( std::is_standard_layout<hazard_ptr>::value, "hazard_ptr should be standard-layout type" );
+		static_assert( std::is_standard_layout<hazard_ptr_storage>::value, "hazard_ptr_storage should be standard-layout type" );
 	}
 
-	~hazard_ptr( void )
+	~hazard_ptr_storage( void )
 	{
 	}
 
@@ -337,7 +337,7 @@ private:
 	};
 
 	struct threadlocal_handler_functor {
-		threadlocal_handler_functor( hazard_ptr* p_node_list_owner_arg )
+		threadlocal_handler_functor( hazard_ptr_storage* p_node_list_owner_arg )
 		  : p_node_list_owner_( p_node_list_owner_arg )
 		{
 		}
@@ -356,7 +356,7 @@ private:
 			p_tmp->release_owner();
 		}
 
-		hazard_ptr* p_node_list_owner_;
+		hazard_ptr_storage* p_node_list_owner_;
 	};
 
 	inline hazard_node_head& get_head_instance( void )
@@ -378,14 +378,14 @@ private:
 };
 
 /*!
- * @brief	scoped reference control support class for hazard_ptr
+ * @brief	scoped reference control support class for hazard_ptr_storage
  *
  * スコープベースでの、参照権の解放制御をサポートするクラスの実体定義クラス
  */
 template <typename T, int N>
 class hazard_ptr_scoped_ref {
 public:
-	hazard_ptr_scoped_ref( hazard_ptr<T, N>& ref, int idx_arg )
+	hazard_ptr_scoped_ref( hazard_ptr_storage<T, N>& ref, int idx_arg )
 	  : idx_( idx_arg )
 	  , p_node_hzd_ptr_( ref.get_tls_node_for_hazard_ptr() )
 	{
@@ -416,8 +416,8 @@ public:
 	}
 
 private:
-	int                                             idx_;
-	typename hazard_ptr<T, N>::node_for_hazard_ptr* p_node_hzd_ptr_;
+	int                                                     idx_;
+	typename hazard_ptr_storage<T, N>::node_for_hazard_ptr* p_node_hzd_ptr_;
 };
 
 #if 0
