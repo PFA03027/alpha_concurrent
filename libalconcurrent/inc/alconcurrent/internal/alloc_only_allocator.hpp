@@ -65,12 +65,18 @@ struct alloc_chamber_statistics {
 	size_t alloc_size_;
 	size_t consum_size_;
 	size_t free_size_;
+	size_t num_of_allocated_;
+	size_t num_of_using_allocated_;
+	size_t num_of_released_allocated_;
 
 	constexpr alloc_chamber_statistics( void )
 	  : chamber_count_( 0 )
 	  , alloc_size_( 0 )
 	  , consum_size_( 0 )
 	  , free_size_( 0 )
+	  , num_of_allocated_( 0 )
+	  , num_of_using_allocated_( 0 )
+	  , num_of_released_allocated_( 0 )
 	{
 	}
 

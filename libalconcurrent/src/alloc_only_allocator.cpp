@@ -272,6 +272,10 @@ alloc_chamber_statistics& alloc_chamber_statistics::operator+=( const alloc_cham
 	alloc_size_ += op.alloc_size_;
 	consum_size_ += op.consum_size_;
 	free_size_ += op.free_size_;
+	num_of_allocated_ += op.num_of_allocated_;
+	num_of_using_allocated_ += op.num_of_using_allocated_;
+	num_of_released_allocated_ += op.num_of_released_allocated_;
+
 	return *this;
 }
 
@@ -279,12 +283,15 @@ std::string alloc_chamber_statistics::print( void ) const
 {
 	char buff[2048];
 	snprintf( buff, 2048,
-	          "chamber count = %zu, total allocated size = 0x%zx(%.2fM), consumed size = 0x%zx(%.2fM), free size = 0x%zx(%.2fM), used ratio = %2.1f %%",
+	          "chamber count = %zu, total allocated size = 0x%zx(%.2fM), consumed size = 0x%zx(%.2fM), free size = 0x%zx(%.2fM), used ratio = %2.1f %%, total allocated = %zu, using = %zu, released = %zu",
 	          chamber_count_,
 	          alloc_size_, (double)alloc_size_ / (double)( 1024 * 1024 ),
 	          consum_size_, (double)consum_size_ / (double)( 1024 * 1024 ),
 	          free_size_, (double)free_size_ / (double)( 1024 * 1024 ),
-	          ( alloc_size_ > 0 ) ? ( (double)consum_size_ / (double)alloc_size_ * 100.0f ) : 0.0f );
+	          ( alloc_size_ > 0 ) ? ( (double)consum_size_ / (double)alloc_size_ * 100.0f ) : 0.0f,
+	          num_of_allocated_,
+	          num_of_using_allocated_,
+	          num_of_released_allocated_ );
 
 	return std::string( buff );
 }
@@ -580,6 +587,15 @@ alloc_chamber_statistics alloc_chamber::get_statistics( void ) const
 	ans.alloc_size_  = chamber_size_;
 	ans.consum_size_ = static_cast<size_t>( offset_.load( std::memory_order_acquire ) );
 	ans.free_size_   = ans.alloc_size_ - ans.consum_size_;
+
+	for ( const auto& e : *this ) {
+		ans.num_of_allocated_++;
+		if ( e.p_alloc_in_room_->is_freeed_.load( std::memory_order_acquire ) ) {
+			ans.num_of_released_allocated_++;
+		} else {
+			ans.num_of_using_allocated_++;
+		}
+	}
 
 	return ans;
 }
