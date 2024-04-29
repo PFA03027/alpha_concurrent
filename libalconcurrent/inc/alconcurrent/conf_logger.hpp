@@ -158,16 +158,29 @@ struct bt_info {
 #endif
 
 	void dump_to_log( log_type lt, char c, int id );
+	void invalidate( void )
+	{
+		if ( count_ > 0 ) {
+			count_ = -count_;
+		}
+	}
+
+	static inline bt_info record_backtrace( void )
+	{
+		bt_info ans;
+		ans.count_ = backtrace( ans.bt_, ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE );
+		return ans;
+	}
 };
 
-#define RECORD_BACKTRACE_GET_BACKTRACE( BT_INFO_N )                                                                    \
-	do {                                                                                                               \
-		BT_INFO_N.count_ = backtrace( BT_INFO_N.bt_, alpha::concurrent::ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE ); \
-	} while ( 0 )
+#define RECORD_BACKTRACE_GET_BACKTRACE( BT_INFO_N )                 \
+	{                                                               \
+		BT_INFO_N = alpha::concurrent::bt_info::record_backtrace(); \
+	}
 #define RECORD_BACKTRACE_INVALIDATE_BACKTRACE( BT_INFO_N ) \
-	do {                                                   \
-		BT_INFO_N.count_ = -( BT_INFO_N.count_ );          \
-	} while ( 0 )
+	{                                                      \
+		BT_INFO_N.invalidate();                            \
+	}
 
 }   // namespace concurrent
 }   // namespace alpha
