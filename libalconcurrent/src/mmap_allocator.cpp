@@ -168,17 +168,17 @@ void print_of_mmap_allocator( void )
 
 	printf( "page_size               = %16zu = 0x%016zx\n", page_size, page_size );
 	printf( "current allocation size = %16zu = 0x%016zx %.2fG %.2fM %.0fK\n", cur_size, cur_size,
-	        (double)cur_size / (double)( 1024 * 1024 * 1024 ),
-	        (double)cur_size / (double)( 1024 * 1024 ),
-	        (double)cur_size / (double)( 1024 )
+	        static_cast<double>(cur_size) / static_cast<double>( 1024 * 1024 * 1024 ),
+	        static_cast<double>(cur_size) / static_cast<double>( 1024 * 1024 ),
+	        static_cast<double>(cur_size) / static_cast<double>( 1024 )
 	        //
 	);
 	printf( "max allocation size     = %16zu = 0x%016zx %.2fG %.2fM %.0fK\n",
 	        cur_max,
 	        cur_max,
-	        (double)cur_max / (double)( 1024 * 1024 * 1024 ),
-	        (double)cur_max / (double)( 1024 * 1024 ),
-	        (double)cur_max / (double)( 1024 )
+	        static_cast<double>(cur_max) / static_cast<double>( 1024 * 1024 * 1024 ),
+	        static_cast<double>(cur_max) / static_cast<double>( 1024 * 1024 ),
+	        static_cast<double>(cur_max) / static_cast<double>( 1024 )
 	        //
 	);
 }
