@@ -19,14 +19,14 @@
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/internal/alloc_only_allocator.hpp"
 #include "alconcurrent/internal/cpp_std_configure.hpp"
-
-#include "hazard_ptr_internal.hpp"
+#include "alconcurrent/internal/hazard_ptr_internal.hpp"
 
 namespace alpha {
 namespace concurrent {
 namespace internal {
 
-global_scope_hazard_ptr_chain global_scope_hazard_ptr_chain::g_scope_hzrd_chain_;
+global_scope_hazard_ptr_chain     global_scope_hazard_ptr_chain::g_scope_hzrd_chain_;
+thread_local bind_hazard_ptr_list tl_bhpl;
 
 ///////////////////////////////////////////////////////////////////////
 hazard_ptr_group::~hazard_ptr_group()
@@ -82,6 +82,8 @@ hazard_ptr_group::ownership_t hazard_ptr_group::try_ocupy( void )
 //////////////////////////////////////////////////////////////////////////////
 bind_hazard_ptr_list::~bind_hazard_ptr_list()
 {
+	if ( global_scope_hazard_ptr_chain::IsDestoryed() ) return;
+
 	hazard_ptr_group* p_cur_list = ownership_ticket_.get();
 	while ( p_cur_list != nullptr ) {
 		for ( auto& e : *p_cur_list ) {
@@ -174,6 +176,8 @@ hazard_ptr_group::ownership_t global_scope_hazard_ptr_chain::get_ownership( void
 
 bool global_scope_hazard_ptr_chain::check_pointer_is_hazard_pointer( void* p )
 {
+	if ( p == nullptr ) return false;
+
 	hazard_ptr_group* p_cur_chain = ap_top_hzrd_ptr_chain_.load( std::memory_order_acquire );
 
 	while ( p_cur_chain != nullptr ) {
@@ -195,6 +199,8 @@ bool global_scope_hazard_ptr_chain::check_pointer_is_hazard_pointer( void* p )
 
 void global_scope_hazard_ptr_chain::remove_all( void )
 {
+	tl_bhpl = bind_hazard_ptr_list();
+
 	hazard_ptr_group* p_cur_chain = ap_top_hzrd_ptr_chain_.load( std::memory_order_acquire );
 	ap_top_hzrd_ptr_chain_.store( nullptr, std::memory_order_release );
 

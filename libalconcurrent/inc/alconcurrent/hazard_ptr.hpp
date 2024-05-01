@@ -24,6 +24,7 @@
 
 #include "dynamic_tls.hpp"
 #include "internal/alloc_only_allocator.hpp"
+#include "internal/hazard_ptr_internal.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -427,6 +428,329 @@ private:
 template <class HZD_PTR>
 hazard_ptr_scoped_ref( HZD_PTR&, int ) -> hazard_ptr_scoped_ref<typename HZD_PTR::hzrd_type, HZD_PTR::hzrd_max_slot>;
 #endif
+
+template <typename T>
+class hazard_ptr_handler;
+
+template <typename T>
+class hazard_ptr {
+public:
+	using element_type = T;
+	using pointer      = T*;
+
+	constexpr hazard_ptr( void )
+	  : p_( nullptr )
+	  , os_( nullptr )
+	{
+	}
+	constexpr hazard_ptr( hazard_ptr&& src )
+	  : p_( src.p_ )
+	  , os_( std::move( src.os_ ) )
+	{
+		src.p_ = nullptr;
+	}
+	constexpr hazard_ptr& operator=( hazard_ptr&& src )
+	{
+		if ( this == &src ) return *this;
+
+		p_  = src.p_;
+		os_ = std::move( src.os_ );
+
+		src.p_ = nullptr;
+
+		return *this;
+	}
+
+	T* operator->() const noexcept
+	{
+		return p_;
+	}
+	T& operator*() const noexcept
+	{
+		return *p_;
+	}
+
+private:
+	constexpr hazard_ptr( T* p_arg, internal::bind_hazard_ptr_list::hzrd_slot_ownership_t&& os_arg )
+	  : p_( p_arg )
+	  , os_( std::move( os_arg ) )
+	{
+	}
+
+	T*                                                    p_;
+	internal::bind_hazard_ptr_list::hzrd_slot_ownership_t os_;
+
+	friend class hazard_ptr_handler<T>;
+
+	template <class T1, class T2>
+	friend constexpr bool operator==( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b );
+	template <class T1, class T2>
+	friend constexpr bool operator!=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b );
+	template <class T1, class T2>
+	friend constexpr bool operator<( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b );
+	template <class T1, class T2>
+	friend constexpr bool operator<=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b );
+	template <class T1, class T2>
+	friend constexpr bool operator>( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b );
+	template <class T1, class T2>
+	friend constexpr bool operator>=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b );
+
+	template <class T1>
+	friend constexpr bool operator==( const hazard_ptr<T1>& a, std::nullptr_t );
+	template <class T1>
+	friend constexpr bool operator!=( const hazard_ptr<T1>& a, std::nullptr_t );
+	template <class T1>
+	friend constexpr bool operator==( std::nullptr_t, const hazard_ptr<T1>& a );
+	template <class T1>
+	friend constexpr bool operator!=( std::nullptr_t, const hazard_ptr<T1>& a );
+
+	template <class T1, class T2>
+	friend constexpr bool operator==( const hazard_ptr<T1>& a, const T2* b );
+	template <class T1, class T2>
+	friend constexpr bool operator!=( const hazard_ptr<T1>& a, const T2* b );
+	template <class T1, class T2>
+	friend constexpr bool operator<( const hazard_ptr<T1>& a, const T2* b );
+	template <class T1, class T2>
+	friend constexpr bool operator<=( const hazard_ptr<T1>& a, const T2* b );
+	template <class T1, class T2>
+	friend constexpr bool operator>( const hazard_ptr<T1>& a, const T2* b );
+	template <class T1, class T2>
+	friend constexpr bool operator>=( const hazard_ptr<T1>& a, const T2* b );
+
+	template <class T1, class T2>
+	friend constexpr bool operator==( const T1* a, const hazard_ptr<T2>& b );
+	template <class T1, class T2>
+	friend constexpr bool operator!=( const T1* a, const hazard_ptr<T2>& b );
+	template <class T1, class T2>
+	friend constexpr bool operator<( const T1* a, const hazard_ptr<T2>& b );
+	template <class T1, class T2>
+	friend constexpr bool operator<=( const T1* a, const hazard_ptr<T2>& b );
+	template <class T1, class T2>
+	friend constexpr bool operator>( const T1* a, const hazard_ptr<T2>& b );
+	template <class T1, class T2>
+	friend constexpr bool operator>=( const T1* a, const hazard_ptr<T2>& b );
+};
+
+template <class T1, class T2>
+constexpr bool operator==( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b )
+{
+	return reinterpret_cast<void*>( a.p_ ) == reinterpret_cast<void*>( b.p_ );
+}
+
+template <class T1, class T2>
+constexpr bool operator!=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b )
+{
+	return reinterpret_cast<void*>( a.p_ ) != reinterpret_cast<void*>( b.p_ );
+}
+
+template <class T1, class T2>
+constexpr bool operator<( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b )
+{
+	return reinterpret_cast<void*>( a.p_ ) < reinterpret_cast<void*>( b.p_ );
+}
+
+template <class T1, class T2>
+constexpr bool operator<=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b )
+{
+	return reinterpret_cast<void*>( a.p_ ) <= reinterpret_cast<void*>( b.p_ );
+}
+
+template <class T1, class T2>
+constexpr bool operator>( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b )
+{
+	return reinterpret_cast<void*>( a.p_ ) > reinterpret_cast<void*>( b.p_ );
+}
+
+template <class T1, class T2>
+constexpr bool operator>=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b )
+{
+	return reinterpret_cast<void*>( a.p_ ) >= reinterpret_cast<void*>( b.p_ );
+}
+
+template <class T1>
+constexpr bool operator==( const hazard_ptr<T1>& a, std::nullptr_t )
+{
+	return reinterpret_cast<void*>( a.p_ ) == nullptr;
+}
+
+template <class T1>
+constexpr bool operator!=( const hazard_ptr<T1>& a, std::nullptr_t )
+{
+	return reinterpret_cast<void*>( a.p_ ) != nullptr;
+}
+
+template <class T1>
+constexpr bool operator==( std::nullptr_t, const hazard_ptr<T1>& a )
+{
+	return reinterpret_cast<void*>( a.p_ ) == nullptr;
+}
+
+template <class T1>
+constexpr bool operator!=( std::nullptr_t, const hazard_ptr<T1>& a )
+{
+	return reinterpret_cast<void*>( a.p_ ) != nullptr;
+}
+
+template <class T1, class T2>
+constexpr bool operator==( const hazard_ptr<T1>& a, const T2* b )
+{
+	return a.p_ == b;
+}
+template <class T1, class T2>
+constexpr bool operator!=( const hazard_ptr<T1>& a, const T2* b )
+{
+	return a.p_ != b;
+}
+template <class T1, class T2>
+constexpr bool operator<( const hazard_ptr<T1>& a, const T2* b )
+{
+	return a.p_ < b;
+}
+template <class T1, class T2>
+constexpr bool operator<=( const hazard_ptr<T1>& a, const T2* b )
+{
+	return a.p_ <= b;
+}
+template <class T1, class T2>
+constexpr bool operator>( const hazard_ptr<T1>& a, const T2* b )
+{
+	return a.p_ > b;
+}
+template <class T1, class T2>
+constexpr bool operator>=( const hazard_ptr<T1>& a, const T2* b )
+{
+	return a.p_ >= b;
+}
+
+template <class T1, class T2>
+constexpr bool operator==( const T1* a, const hazard_ptr<T2>& b )
+{
+	return a == b.p_;
+}
+template <class T1, class T2>
+constexpr bool operator!=( const T1* a, const hazard_ptr<T2>& b )
+{
+	return a != b.p_;
+}
+template <class T1, class T2>
+constexpr bool operator<( const T1* a, const hazard_ptr<T2>& b )
+{
+	return a < b.p_;
+}
+template <class T1, class T2>
+constexpr bool operator<=( const T1* a, const hazard_ptr<T2>& b )
+{
+	return a <= b.p_;
+}
+template <class T1, class T2>
+constexpr bool operator>( const T1* a, const hazard_ptr<T2>& b )
+{
+	return a > b.p_;
+}
+template <class T1, class T2>
+constexpr bool operator>=( const T1* a, const hazard_ptr<T2>& b )
+{
+	return a >= b.p_;
+}
+
+template <typename T>
+class hazard_ptr_handler {
+public:
+	using element_type = T;
+	using pointer      = T*;
+
+	constexpr hazard_ptr_handler( void )
+	  : ap_target_p_( nullptr )
+	{
+	}
+	explicit constexpr hazard_ptr_handler( T* p_desired )
+	  : ap_target_p_( p_desired )
+	{
+	}
+	constexpr hazard_ptr_handler( const hazard_ptr_handler& src )
+	  : ap_target_p_( src.ap_target_p_.load( std::memory_order_acquire ) )
+	{
+	}
+	constexpr hazard_ptr_handler( hazard_ptr_handler&& src )
+	  : ap_target_p_( src.ap_target_p_.load( std::memory_order_acquire ) )
+	{
+		src.ap_target_p_.store( nullptr, std::memory_order_release );
+	}
+	hazard_ptr_handler& operator=( const hazard_ptr_handler& src )
+	{
+		if ( this == &src ) return *this;
+
+		ap_target_p_.store( src.ap_target_p_.load( std::memory_order_acquire ), std::memory_order_release );
+
+		return *this;
+	}
+	hazard_ptr_handler& operator=( hazard_ptr_handler&& src )
+	{
+		if ( this == &src ) return *this;
+
+		ap_target_p_.store( src.ap_target_p_.load( std::memory_order_acquire ), std::memory_order_release );
+		src.ap_target_p_.store( nullptr, std::memory_order_release );
+
+		return *this;
+	}
+
+	hazard_ptr<T> get( void )
+	{
+		pointer                                               p_expect = nullptr;
+		pointer                                               p_latest = nullptr;
+		internal::bind_hazard_ptr_list::hzrd_slot_ownership_t hso;
+
+		p_latest = ap_target_p_.load( std::memory_order_acquire );
+		do {
+			p_expect = p_latest;
+			hso      = internal::tl_bhpl.assign( p_expect );
+			p_latest = ap_target_p_.load( std::memory_order_acquire );
+		} while ( p_expect != p_latest );
+
+		return hazard_ptr<T>( p_latest, std::move( hso ) );
+	}
+
+	void store( pointer p_desired, std::memory_order order = std::memory_order_seq_cst ) noexcept
+	{
+		ap_target_p_.store( p_desired, order );
+	}
+
+	bool compare_exchange_weak( pointer&          expected,
+	                            pointer           desired,
+	                            std::memory_order success,
+	                            std::memory_order failure ) noexcept
+	{
+		return ap_target_p_.compare_exchange_weak( expected, desired, success, failure );
+	}
+
+	bool compare_exchange_weak( pointer&          expected,
+	                            pointer           desired,
+	                            std::memory_order order = std::memory_order_seq_cst ) noexcept
+	{
+		return ap_target_p_.compare_exchange_weak( expected, desired, order );
+	}
+
+	bool compare_exchange_strong( pointer&          expected,
+	                              pointer           desired,
+	                              std::memory_order success,
+	                              std::memory_order failure ) noexcept
+	{
+		return ap_target_p_.compare_exchange_strong( expected, desired, success, failure );
+	}
+
+	bool compare_exchange_strong( pointer&          expected,
+	                              pointer           desired,
+	                              std::memory_order order = std::memory_order_seq_cst ) noexcept
+	{
+		return ap_target_p_.compare_exchange_strong( expected, desired, order );
+	}
+
+private:
+	// template <typename Deleter>
+	// void retire( hazard_ptr&&, Deleter dtr = Deleter {} );
+
+	std::atomic<pointer> ap_target_p_;
+};
 
 }   // namespace concurrent
 }   // namespace alpha

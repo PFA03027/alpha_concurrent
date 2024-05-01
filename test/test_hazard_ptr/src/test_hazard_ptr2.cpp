@@ -14,8 +14,9 @@
 
 #include "gtest/gtest.h"
 
-#include "../src/hazard_ptr_internal.hpp"
 #include "alconcurrent/conf_logger.hpp"
+#include "alconcurrent/hazard_ptr.hpp"
+#include "alconcurrent/internal/hazard_ptr_internal.hpp"
 
 TEST( HazardPtrGroup, CanDefaultConstruct )
 {
@@ -261,4 +262,212 @@ TEST_F( TestBindHazardPtrList, CallAssingWithFull )
 
 	// Assert
 	EXPECT_NE( righofownership, nullptr );
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+class TestHazardPtrHandler : public ::testing::Test {
+protected:
+	void SetUp() override
+	{
+		alpha::concurrent::GetErrorWarningLogCountAndReset( nullptr, nullptr );
+	}
+
+	void TearDown() override
+	{
+		alpha::concurrent::internal::global_scope_hazard_ptr_chain::DestoryAll();
+
+		int cw, ce;
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
+		EXPECT_EQ( ce, 0 );
+		EXPECT_EQ( cw, 0 );
+	}
+};
+
+TEST_F( TestHazardPtrHandler, CallDefaultConstructor )
+{
+	// Arrange
+
+	// Act
+	alpha::concurrent::hazard_ptr_handler<int> sut;
+
+	// Assert
+	auto hp2 = sut.get();
+	EXPECT_EQ( hp2, nullptr );
+	EXPECT_FALSE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( nullptr ) );
+}
+
+TEST_F( TestHazardPtrHandler, CallTransConstructor )
+{
+	// Arrange
+	int dummy1 = 1;
+
+	// Act
+	alpha::concurrent::hazard_ptr_handler<int> sut( &dummy1 );
+
+	// Assert
+	auto hp2 = sut.get();
+	EXPECT_EQ( hp2, &dummy1 );
+	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 ) );
+}
+
+TEST_F( TestHazardPtrHandler, CallCopyConstructor )
+{
+	// Arrange
+	int                                        dummy1 = 1;
+	alpha::concurrent::hazard_ptr_handler<int> src( &dummy1 );
+
+	auto hp1 = src.get();
+	EXPECT_EQ( hp1, &dummy1 );
+
+	// Act
+	alpha::concurrent::hazard_ptr_handler<int> sut( src );
+
+	// Assert
+	auto hp2 = sut.get();
+	EXPECT_EQ( hp2, &dummy1 );
+	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 ) );
+}
+
+TEST_F( TestHazardPtrHandler, CallMoveConstructor )
+{
+	// Arrange
+	int                                        dummy1 = 1;
+	alpha::concurrent::hazard_ptr_handler<int> src( &dummy1 );
+
+	auto hp1 = src.get();
+	EXPECT_EQ( hp1, &dummy1 );
+
+	// Act
+	alpha::concurrent::hazard_ptr_handler<int> sut( std::move( src ) );
+
+	// Assert
+	hp1 = src.get();
+	EXPECT_EQ( hp1, nullptr );
+	auto hp2 = sut.get();
+	EXPECT_EQ( hp2, &dummy1 );
+	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 ) );
+}
+
+TEST_F( TestHazardPtrHandler, CallCopyAssingment )
+{
+	// Arrange
+	int                                        dummy1 = 1;
+	int                                        dummy2 = 2;
+	alpha::concurrent::hazard_ptr_handler<int> src( &dummy1 );
+	alpha::concurrent::hazard_ptr_handler<int> sut( &dummy2 );
+
+	auto hp1 = src.get();
+	EXPECT_EQ( hp1, &dummy1 );
+	auto hp2 = sut.get();
+	EXPECT_EQ( hp2, &dummy2 );
+	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy2 ) );
+
+	// Act
+	sut = src;
+
+	// Assert
+	hp1 = src.get();
+	EXPECT_EQ( hp1, &dummy1 );
+	hp2 = sut.get();
+	EXPECT_EQ( hp2, &dummy1 );
+	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 ) );
+	EXPECT_FALSE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy2 ) );
+}
+
+TEST_F( TestHazardPtrHandler, CallMoveAssingment )
+{
+	// Arrange
+	int                                        dummy1 = 1;
+	int                                        dummy2 = 2;
+	alpha::concurrent::hazard_ptr_handler<int> src( &dummy1 );
+	alpha::concurrent::hazard_ptr_handler<int> sut( &dummy2 );
+
+	auto hp1 = src.get();
+	EXPECT_EQ( hp1, &dummy1 );
+	auto hp2 = sut.get();
+	EXPECT_EQ( hp2, &dummy2 );
+	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy2 ) );
+
+	// Act
+	sut = std::move( src );
+
+	// Assert
+	hp1 = src.get();
+	EXPECT_EQ( hp1, nullptr );
+	hp2 = sut.get();
+	EXPECT_EQ( hp2, &dummy1 );
+	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 ) );
+	EXPECT_FALSE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy2 ) );
+}
+
+TEST_F( TestHazardPtrHandler, Call_HazardPtr_get1 )
+{
+	// Arrange
+	int                                        dummy1 = 1;
+	alpha::concurrent::hazard_ptr_handler<int> sut( &dummy1 );
+
+	// Act
+	auto hp2 = sut.get();
+
+	// Assert
+	EXPECT_EQ( *hp2, 1 );
+}
+
+TEST_F( TestHazardPtrHandler, Call_HazardPtr_get1_and_assignment )
+{
+	// Arrange
+	int                                        dummy1 = 1;
+	alpha::concurrent::hazard_ptr_handler<int> sut( &dummy1 );
+
+	auto hp2 = sut.get();
+	EXPECT_EQ( *hp2, 1 );
+
+	// Act
+	*hp2 = 2;
+
+	// Assert
+	EXPECT_EQ( dummy1, 2 );
+}
+
+TEST_F( TestHazardPtrHandler, Call_HazardPtr_get2 )
+{
+	// Arrange
+	struct A {
+		int x;
+		int y;
+	};
+	A                                        dummy1 { 1, 2 };
+	alpha::concurrent::hazard_ptr_handler<A> sut( &dummy1 );
+
+	// Act
+	auto hp2 = sut.get();
+
+	// Assert
+	EXPECT_EQ( hp2->x, 1 );
+	EXPECT_EQ( hp2->y, 2 );
+}
+
+TEST_F( TestHazardPtrHandler, Call_HazardPtr_get2_assignment )
+{
+	// Arrange
+	struct A {
+		int x;
+		int y;
+	};
+	A                                        dummy1 { 1, 2 };
+	alpha::concurrent::hazard_ptr_handler<A> sut( &dummy1 );
+
+	auto hp2 = sut.get();
+	EXPECT_EQ( hp2->x, 1 );
+	EXPECT_EQ( hp2->y, 2 );
+
+	// Act
+	hp2->x = 3;
+	hp2->y = 4;
+
+	// Assert
+	EXPECT_EQ( dummy1.x, 3 );
+	EXPECT_EQ( dummy1.y, 4 );
 }

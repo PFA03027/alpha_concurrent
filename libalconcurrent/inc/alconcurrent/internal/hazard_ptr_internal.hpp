@@ -118,7 +118,7 @@ class bind_hazard_ptr_list {
 public:
 	using hzrd_slot_ownership_t = hazard_ptr_group::hzrd_slot_ownership_t;
 
-	bind_hazard_ptr_list( void )                              = default;
+	constexpr bind_hazard_ptr_list( void )                    = default;
 	bind_hazard_ptr_list( bind_hazard_ptr_list&& )            = default;
 	bind_hazard_ptr_list& operator=( bind_hazard_ptr_list&& ) = default;
 	~bind_hazard_ptr_list();
@@ -128,6 +128,8 @@ public:
 private:
 	hazard_ptr_group::ownership_t ownership_ticket_;
 };
+
+extern thread_local bind_hazard_ptr_list tl_bhpl;
 
 /////////////////////////////////////////////////////////////////
 class global_scope_hazard_ptr_chain {
@@ -152,11 +154,26 @@ public:
 	 *
 	 * This API is for debug and test purpose.
 	 *
-	 * @pre all object of bind_hazard_ptr_list are destructed
+	 * @pre this API should be called from main thread. And, all other threads should be exited before call this API.
 	 */
 	static inline void DestoryAll( void )
 	{
 		return g_scope_hzrd_chain_.remove_all();
+	}
+
+	/**
+	 * @brief check empty or not
+	 *
+	 * @warning this API has race condition. Therefore, this API is test purpose only.
+	 *
+	 * @return true hazard pointer related resouce is Empty
+	 * @return false hazard pointer related resouce is Not Empty
+	 *
+	 * @todo introduce exclusive control by mutex b/w DestroyAll() and IsDestoryed()
+	 */
+	static inline bool IsDestoryed( void )
+	{
+		return g_scope_hzrd_chain_.ap_top_hzrd_ptr_chain_.load( std::memory_order_acquire ) == nullptr;
 	}
 
 private:
