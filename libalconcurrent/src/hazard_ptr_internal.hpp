@@ -142,6 +142,11 @@ public:
 		return g_scope_hzrd_chain_.get_ownership();
 	}
 
+	static inline bool CheckPtrIsHazardPtr( void* p )
+	{
+		return g_scope_hzrd_chain_.check_pointer_is_hazard_pointer( p );
+	}
+
 	/**
 	 * @brief remove all hazard_ptr_group from internal global variable
 	 *
@@ -180,6 +185,8 @@ private:
 	 * @return hazard_ptr_group::ownership_t ownership data. this api does not return nullptr
 	 */
 	hazard_ptr_group::ownership_t get_ownership( void );
+
+	bool check_pointer_is_hazard_pointer( void* p );
 
 	/**
 	 * @brief remove all hazard_ptr_group

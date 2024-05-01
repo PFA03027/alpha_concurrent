@@ -172,6 +172,27 @@ hazard_ptr_group::ownership_t global_scope_hazard_ptr_chain::get_ownership( void
 	return ans;
 }
 
+bool global_scope_hazard_ptr_chain::check_pointer_is_hazard_pointer( void* p )
+{
+	hazard_ptr_group* p_cur_chain = ap_top_hzrd_ptr_chain_.load( std::memory_order_acquire );
+
+	while ( p_cur_chain != nullptr ) {
+		hazard_ptr_group* p_next_chain = p_cur_chain->ap_chain_next_.load( std::memory_order_acquire );
+		hazard_ptr_group* p_cur_list   = p_cur_chain;
+		while ( p_cur_list != nullptr ) {
+			for ( auto& e : *p_cur_list ) {
+				// if hazard_ptr_group has a pointer that is same to p, p is hazard pointer
+				if ( e.load( std::memory_order_acquire ) == p ) return true;
+			}
+			hazard_ptr_group* p_next_list = p_cur_list->ap_list_next_.load( std::memory_order_acquire );
+			p_cur_list                    = p_next_list;
+		}
+		p_cur_chain = p_next_chain;
+	}
+
+	return false;
+}
+
 void global_scope_hazard_ptr_chain::remove_all( void )
 {
 	hazard_ptr_group* p_cur_chain = ap_top_hzrd_ptr_chain_.load( std::memory_order_acquire );
