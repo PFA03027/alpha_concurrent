@@ -14,6 +14,7 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <string>
 #include <thread>
 
 #include "alconcurrent/conf_logger.hpp"
@@ -25,6 +26,13 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+// configuration value
+constexpr size_t conf_pre_mmap_size = 16 * 1024;
+
+static alloc_only_chamber g_alloc_only_inst_for_hzrd_ptr_module( false, conf_pre_mmap_size );   // グローバルインスタンスは、プロセス終了までメモリ領域を維持するために、デストラクタが呼ばれてもmmapした領域を解放しない。
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 global_scope_hazard_ptr_chain     global_scope_hazard_ptr_chain::g_scope_hzrd_chain_;
 thread_local bind_hazard_ptr_list tl_bhpl;
 
@@ -78,6 +86,148 @@ hazard_ptr_group::ownership_t hazard_ptr_group::try_ocupy( void )
 
 	return ownership_t( nullptr );
 }
+
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+#else
+#if __cpp_aligned_new
+ALCC_INTERNAL_NODISCARD_ATTR void* hazard_ptr_group::operator new( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
+{
+	void* p_ans = g_alloc_only_inst_for_hzrd_ptr_module.allocate( size, static_cast<size_t>( alignment ) );
+	if ( p_ans == nullptr ) {
+		throw std::bad_alloc();
+	}
+	return p_ans;
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* hazard_ptr_group::operator new( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++17
+{
+	return g_alloc_only_inst_for_hzrd_ptr_module.allocate( size, static_cast<size_t>( alignment ) );
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* hazard_ptr_group::operator new[]( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
+{
+	void* p_ans = g_alloc_only_inst_for_hzrd_ptr_module.allocate( size, static_cast<size_t>( alignment ) );
+	if ( p_ans == nullptr ) {
+		throw std::bad_alloc();
+	}
+	return p_ans;
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* hazard_ptr_group::operator new[]( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++17
+{
+	return g_alloc_only_inst_for_hzrd_ptr_module.allocate( size, static_cast<size_t>( alignment ) );
+}
+#endif
+ALCC_INTERNAL_NODISCARD_ATTR void* hazard_ptr_group::operator new( std::size_t size )   // possible throw std::bad_alloc, from C++11
+{
+	void* p_ans = g_alloc_only_inst_for_hzrd_ptr_module.allocate( size );
+	if ( p_ans == nullptr ) {
+		throw std::bad_alloc();
+	}
+	return p_ans;
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* hazard_ptr_group::operator new( std::size_t size, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++11
+{
+	return g_alloc_only_inst_for_hzrd_ptr_module.allocate( size );
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* hazard_ptr_group::operator new[]( std::size_t size )   // possible throw std::bad_alloc, from C++11
+{
+	void* p_ans = g_alloc_only_inst_for_hzrd_ptr_module.allocate( size );
+	if ( p_ans == nullptr ) {
+		throw std::bad_alloc();
+	}
+	return p_ans;
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* hazard_ptr_group::operator new[]( std::size_t size, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++11
+{
+	return g_alloc_only_inst_for_hzrd_ptr_module.allocate( size );
+}
+
+ALCC_INTERNAL_NODISCARD_ATTR void* hazard_ptr_group::operator new( std::size_t size, void* ptr ) noexcept   // placement new, from C++11
+{
+	return ptr;
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* hazard_ptr_group::operator new[]( std::size_t size, void* ptr ) noexcept   // placement new for array, from C++11
+{
+	return ptr;
+}
+
+#if __cpp_aligned_new
+void hazard_ptr_group::operator delete( void* ptr, std::align_val_t alignment ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+void hazard_ptr_group::operator delete( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept   // from C++17
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+void hazard_ptr_group::operator delete[]( void* ptr, std::align_val_t alignment ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+void hazard_ptr_group::operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept   // from C++17
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+void hazard_ptr_group::operator delete( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+void hazard_ptr_group::operator delete( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+void hazard_ptr_group::operator delete[]( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+void hazard_ptr_group::operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+#endif
+void hazard_ptr_group::operator delete( void* ptr ) noexcept   // from C++11
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+void hazard_ptr_group::operator delete[]( void* ptr ) noexcept   // from C++11
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+
+void hazard_ptr_group::operator delete( void* ptr, std::size_t size ) noexcept   // from C++14
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+void hazard_ptr_group::operator delete[]( void* ptr, std::size_t size ) noexcept   // from C++14
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+
+void hazard_ptr_group::operator delete( void* ptr, const std::nothrow_t& ) noexcept   // from C++11
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+void hazard_ptr_group::operator delete[]( void* ptr, const std::nothrow_t& ) noexcept   // from C++11
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+
+void hazard_ptr_group::operator delete( void* ptr, std::size_t size, const std::nothrow_t& ) noexcept   // from C++14
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+void hazard_ptr_group::operator delete[]( void* ptr, std::size_t size, const std::nothrow_t& ) noexcept   // from C++14
+{
+	g_alloc_only_inst_for_hzrd_ptr_module.deallocate( ptr );
+}
+
+void hazard_ptr_group::operator delete( void* ptr, void* ) noexcept   // delete for area that is initialized by placement new.
+{
+	// nothing to do
+}
+void hazard_ptr_group::operator delete[]( void* ptr, void* ) noexcept   // delete for area that is initialized by placement new.
+{
+	// nothing to do
+}
+#endif
 
 //////////////////////////////////////////////////////////////////////////////
 bind_hazard_ptr_list::~bind_hazard_ptr_list()
@@ -214,6 +364,17 @@ void global_scope_hazard_ptr_chain::remove_all( void )
 		}
 		p_cur_chain = p_next_chain;
 	}
+
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+#else
+	alloc_chamber_statistics chk_ret = g_alloc_only_inst_for_hzrd_ptr_module.get_statistics();
+	log_type                 lg      = log_type::INFO;
+	if ( chk_ret.num_of_using_allocated_ > 0 ) {
+		lg = log_type::ERR;
+	}
+	std::string chk_ret_log = chk_ret.print();
+	LogOutput( lg, chk_ret_log.c_str() );
+#endif
 }
 
 }   // namespace internal

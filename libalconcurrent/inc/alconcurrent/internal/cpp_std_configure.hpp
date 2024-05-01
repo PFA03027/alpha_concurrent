@@ -12,10 +12,18 @@
 #ifndef ALCONCURRENT_INTERNAL_CPP_STD_CONFIGURE_HPP_
 #define ALCONCURRENT_INTERNAL_CPP_STD_CONFIGURE_HPP_
 
+// configuration for constexpr adaptation
 #if __cplusplus >= 201703L
 #define ALCC_INTERNAL_CPPSTD17_CONSTEXPR constexpr
 #else
 #define ALCC_INTERNAL_CPPSTD17_CONSTEXPR
+#endif
+
+// configura for nodiscard attribute adaptation
+#if __has_cpp_attribute( nodiscard )
+#define ALCC_INTERNAL_NODISCARD_ATTR [[nodiscard]]
+#else
+#define ALCC_INTERNAL_NODISCARD_ATTR
 #endif
 
 #endif
