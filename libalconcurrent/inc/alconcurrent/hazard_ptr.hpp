@@ -427,6 +427,7 @@ private:
 template <class HZD_PTR>
 hazard_ptr_scoped_ref( HZD_PTR&, int ) -> hazard_ptr_scoped_ref<typename HZD_PTR::hzrd_type, HZD_PTR::hzrd_max_slot>;
 #endif
+
 }   // namespace concurrent
 }   // namespace alpha
 

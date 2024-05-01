@@ -85,7 +85,7 @@ bool is_allowed_to_output(
 }   // namespace internal
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-void bt_info::dump_to_log( log_type lt, char c, int id )
+void bt_info::dump_to_log( log_type lt, char c, int id ) const
 {
 	if ( count_ == 0 ) {
 		internal::LogOutput( lt, "[%d-%c] no back trace. this slot has not allocated yet.", id, c );

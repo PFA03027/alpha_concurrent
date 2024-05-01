@@ -157,7 +157,7 @@ struct bt_info {
 	bt_info& operator=( bt_info&& )      = default;
 #endif
 
-	void dump_to_log( log_type lt, char c, int id );
+	void dump_to_log( log_type lt, char c, int id ) const;
 	void invalidate( void )
 	{
 		if ( count_ > 0 ) {
