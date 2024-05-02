@@ -470,6 +470,11 @@ public:
 		return *p_;
 	}
 
+	T* get() const noexcept
+	{
+		return p_;
+	}
+
 private:
 	constexpr hazard_ptr( T* p_arg, internal::bind_hazard_ptr_list::hzrd_slot_ownership_t&& os_arg )
 	  : p_( p_arg )
@@ -483,172 +488,172 @@ private:
 	friend class hazard_ptr_handler<T>;
 
 	template <class T1, class T2>
-	friend constexpr bool operator==( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b );
+	friend constexpr bool operator==( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept;
 	template <class T1, class T2>
-	friend constexpr bool operator!=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b );
+	friend constexpr bool operator!=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept;
 	template <class T1, class T2>
-	friend constexpr bool operator<( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b );
+	friend constexpr bool operator<( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept;
 	template <class T1, class T2>
-	friend constexpr bool operator<=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b );
+	friend constexpr bool operator<=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept;
 	template <class T1, class T2>
-	friend constexpr bool operator>( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b );
+	friend constexpr bool operator>( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept;
 	template <class T1, class T2>
-	friend constexpr bool operator>=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b );
+	friend constexpr bool operator>=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept;
 
 	template <class T1>
-	friend constexpr bool operator==( const hazard_ptr<T1>& a, std::nullptr_t );
+	friend constexpr bool operator==( const hazard_ptr<T1>& a, std::nullptr_t ) noexcept;
 	template <class T1>
-	friend constexpr bool operator!=( const hazard_ptr<T1>& a, std::nullptr_t );
+	friend constexpr bool operator!=( const hazard_ptr<T1>& a, std::nullptr_t ) noexcept;
 	template <class T1>
-	friend constexpr bool operator==( std::nullptr_t, const hazard_ptr<T1>& a );
+	friend constexpr bool operator==( std::nullptr_t, const hazard_ptr<T1>& a ) noexcept;
 	template <class T1>
-	friend constexpr bool operator!=( std::nullptr_t, const hazard_ptr<T1>& a );
+	friend constexpr bool operator!=( std::nullptr_t, const hazard_ptr<T1>& a ) noexcept;
 
 	template <class T1, class T2>
-	friend constexpr bool operator==( const hazard_ptr<T1>& a, const T2* b );
+	friend constexpr bool operator==( const hazard_ptr<T1>& a, const T2* b ) noexcept;
 	template <class T1, class T2>
-	friend constexpr bool operator!=( const hazard_ptr<T1>& a, const T2* b );
+	friend constexpr bool operator!=( const hazard_ptr<T1>& a, const T2* b ) noexcept;
 	template <class T1, class T2>
-	friend constexpr bool operator<( const hazard_ptr<T1>& a, const T2* b );
+	friend constexpr bool operator<( const hazard_ptr<T1>& a, const T2* b ) noexcept;
 	template <class T1, class T2>
-	friend constexpr bool operator<=( const hazard_ptr<T1>& a, const T2* b );
+	friend constexpr bool operator<=( const hazard_ptr<T1>& a, const T2* b ) noexcept;
 	template <class T1, class T2>
-	friend constexpr bool operator>( const hazard_ptr<T1>& a, const T2* b );
+	friend constexpr bool operator>( const hazard_ptr<T1>& a, const T2* b ) noexcept;
 	template <class T1, class T2>
-	friend constexpr bool operator>=( const hazard_ptr<T1>& a, const T2* b );
+	friend constexpr bool operator>=( const hazard_ptr<T1>& a, const T2* b ) noexcept;
 
 	template <class T1, class T2>
-	friend constexpr bool operator==( const T1* a, const hazard_ptr<T2>& b );
+	friend constexpr bool operator==( const T1* a, const hazard_ptr<T2>& b ) noexcept;
 	template <class T1, class T2>
-	friend constexpr bool operator!=( const T1* a, const hazard_ptr<T2>& b );
+	friend constexpr bool operator!=( const T1* a, const hazard_ptr<T2>& b ) noexcept;
 	template <class T1, class T2>
-	friend constexpr bool operator<( const T1* a, const hazard_ptr<T2>& b );
+	friend constexpr bool operator<( const T1* a, const hazard_ptr<T2>& b ) noexcept;
 	template <class T1, class T2>
-	friend constexpr bool operator<=( const T1* a, const hazard_ptr<T2>& b );
+	friend constexpr bool operator<=( const T1* a, const hazard_ptr<T2>& b ) noexcept;
 	template <class T1, class T2>
-	friend constexpr bool operator>( const T1* a, const hazard_ptr<T2>& b );
+	friend constexpr bool operator>( const T1* a, const hazard_ptr<T2>& b ) noexcept;
 	template <class T1, class T2>
-	friend constexpr bool operator>=( const T1* a, const hazard_ptr<T2>& b );
+	friend constexpr bool operator>=( const T1* a, const hazard_ptr<T2>& b ) noexcept;
 };
 
 template <class T1, class T2>
-constexpr bool operator==( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b )
+constexpr bool operator==( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept
 {
 	return reinterpret_cast<void*>( a.p_ ) == reinterpret_cast<void*>( b.p_ );
 }
 
 template <class T1, class T2>
-constexpr bool operator!=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b )
+constexpr bool operator!=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept
 {
 	return reinterpret_cast<void*>( a.p_ ) != reinterpret_cast<void*>( b.p_ );
 }
 
 template <class T1, class T2>
-constexpr bool operator<( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b )
+constexpr bool operator<( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept
 {
 	return reinterpret_cast<void*>( a.p_ ) < reinterpret_cast<void*>( b.p_ );
 }
 
 template <class T1, class T2>
-constexpr bool operator<=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b )
+constexpr bool operator<=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept
 {
 	return reinterpret_cast<void*>( a.p_ ) <= reinterpret_cast<void*>( b.p_ );
 }
 
 template <class T1, class T2>
-constexpr bool operator>( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b )
+constexpr bool operator>( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept
 {
 	return reinterpret_cast<void*>( a.p_ ) > reinterpret_cast<void*>( b.p_ );
 }
 
 template <class T1, class T2>
-constexpr bool operator>=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b )
+constexpr bool operator>=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept
 {
 	return reinterpret_cast<void*>( a.p_ ) >= reinterpret_cast<void*>( b.p_ );
 }
 
 template <class T1>
-constexpr bool operator==( const hazard_ptr<T1>& a, std::nullptr_t )
+constexpr bool operator==( const hazard_ptr<T1>& a, std::nullptr_t ) noexcept
 {
 	return reinterpret_cast<void*>( a.p_ ) == nullptr;
 }
 
 template <class T1>
-constexpr bool operator!=( const hazard_ptr<T1>& a, std::nullptr_t )
+constexpr bool operator!=( const hazard_ptr<T1>& a, std::nullptr_t ) noexcept
 {
 	return reinterpret_cast<void*>( a.p_ ) != nullptr;
 }
 
 template <class T1>
-constexpr bool operator==( std::nullptr_t, const hazard_ptr<T1>& a )
+constexpr bool operator==( std::nullptr_t, const hazard_ptr<T1>& a ) noexcept
 {
 	return reinterpret_cast<void*>( a.p_ ) == nullptr;
 }
 
 template <class T1>
-constexpr bool operator!=( std::nullptr_t, const hazard_ptr<T1>& a )
+constexpr bool operator!=( std::nullptr_t, const hazard_ptr<T1>& a ) noexcept
 {
 	return reinterpret_cast<void*>( a.p_ ) != nullptr;
 }
 
 template <class T1, class T2>
-constexpr bool operator==( const hazard_ptr<T1>& a, const T2* b )
+constexpr bool operator==( const hazard_ptr<T1>& a, const T2* b ) noexcept
 {
 	return a.p_ == b;
 }
 template <class T1, class T2>
-constexpr bool operator!=( const hazard_ptr<T1>& a, const T2* b )
+constexpr bool operator!=( const hazard_ptr<T1>& a, const T2* b ) noexcept
 {
 	return a.p_ != b;
 }
 template <class T1, class T2>
-constexpr bool operator<( const hazard_ptr<T1>& a, const T2* b )
+constexpr bool operator<( const hazard_ptr<T1>& a, const T2* b ) noexcept
 {
 	return a.p_ < b;
 }
 template <class T1, class T2>
-constexpr bool operator<=( const hazard_ptr<T1>& a, const T2* b )
+constexpr bool operator<=( const hazard_ptr<T1>& a, const T2* b ) noexcept
 {
 	return a.p_ <= b;
 }
 template <class T1, class T2>
-constexpr bool operator>( const hazard_ptr<T1>& a, const T2* b )
+constexpr bool operator>( const hazard_ptr<T1>& a, const T2* b ) noexcept
 {
 	return a.p_ > b;
 }
 template <class T1, class T2>
-constexpr bool operator>=( const hazard_ptr<T1>& a, const T2* b )
+constexpr bool operator>=( const hazard_ptr<T1>& a, const T2* b ) noexcept
 {
 	return a.p_ >= b;
 }
 
 template <class T1, class T2>
-constexpr bool operator==( const T1* a, const hazard_ptr<T2>& b )
+constexpr bool operator==( const T1* a, const hazard_ptr<T2>& b ) noexcept
 {
 	return a == b.p_;
 }
 template <class T1, class T2>
-constexpr bool operator!=( const T1* a, const hazard_ptr<T2>& b )
+constexpr bool operator!=( const T1* a, const hazard_ptr<T2>& b ) noexcept
 {
 	return a != b.p_;
 }
 template <class T1, class T2>
-constexpr bool operator<( const T1* a, const hazard_ptr<T2>& b )
+constexpr bool operator<( const T1* a, const hazard_ptr<T2>& b ) noexcept
 {
 	return a < b.p_;
 }
 template <class T1, class T2>
-constexpr bool operator<=( const T1* a, const hazard_ptr<T2>& b )
+constexpr bool operator<=( const T1* a, const hazard_ptr<T2>& b ) noexcept
 {
 	return a <= b.p_;
 }
 template <class T1, class T2>
-constexpr bool operator>( const T1* a, const hazard_ptr<T2>& b )
+constexpr bool operator>( const T1* a, const hazard_ptr<T2>& b ) noexcept
 {
 	return a > b.p_;
 }
 template <class T1, class T2>
-constexpr bool operator>=( const T1* a, const hazard_ptr<T2>& b )
+constexpr bool operator>=( const T1* a, const hazard_ptr<T2>& b ) noexcept
 {
 	return a >= b.p_;
 }
@@ -708,6 +713,12 @@ public:
 		} while ( p_expect != p_latest );
 
 		return hazard_ptr<T>( p_latest, std::move( hso ) );
+	}
+
+	// TODO: このI/Fを本当に用意していいのか？ get()に限定しなくてよいのか？
+	pointer load( std::memory_order order = std::memory_order_seq_cst ) noexcept
+	{
+		return ap_target_p_.load( order );
 	}
 
 	void store( pointer p_desired, std::memory_order order = std::memory_order_seq_cst ) noexcept

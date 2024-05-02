@@ -189,6 +189,13 @@ public:
 		return g_scope_hzrd_chain_.get_ownership();
 	}
 
+	/**
+	 * @brief Check if p is still in hazard pointer list or not
+	 *
+	 * @param p
+	 * @return true p is still listed in hazard pointer list
+	 * @return false p is not hazard pointer
+	 */
 	static inline bool CheckPtrIsHazardPtr( void* p )
 	{
 		return g_scope_hzrd_chain_.check_pointer_is_hazard_pointer( p );
@@ -248,6 +255,13 @@ private:
 	 */
 	hazard_ptr_group::ownership_t get_ownership( void );
 
+	/**
+	 * @brief Check if p is still in hazard pointer list or not
+	 *
+	 * @param p
+	 * @return true p is still listed in hazard pointer list
+	 * @return false p is not hazard pointer
+	 */
 	bool check_pointer_is_hazard_pointer( void* p );
 
 	/**
@@ -258,6 +272,76 @@ private:
 	std::atomic<hazard_ptr_group*> ap_top_hzrd_ptr_chain_;
 
 	static global_scope_hazard_ptr_chain g_scope_hzrd_chain_;
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+struct retire_node_abst {
+	retire_node_abst* p_next_ = nullptr;
+
+	constexpr retire_node_abst( void ) = default;
+	virtual ~retire_node_abst()        = default;
+
+	virtual void* get_retire_pointer( void ) const noexcept = 0;
+};
+
+/**
+ * @brief
+ *
+ * @tparam T
+ * @tparam Deleter please refer to std::deleter<T>. this class should not throw execption
+ */
+template <typename T, typename Deleter>
+struct retire_node : public retire_node_abst {
+	static_assert( std::is_nothrow_default_constructible<Deleter>::value &&
+	                   std::is_nothrow_copy_constructible<Deleter>::value &&
+	                   std::is_nothrow_move_constructible<Deleter>::value,
+	               "Deleter should be nothrow of constructors" );
+
+	T*      p_retire_;
+	Deleter deleter_;
+
+	constexpr retire_node( T* p_retire_arg, const Deleter& deleter_arg ) noexcept
+	  : retire_node_abst {}
+	  , p_retire_( p_retire_arg )
+	  , deleter_( deleter_arg )
+	{
+	}
+	constexpr retire_node( T* p_retire_arg, Deleter&& deleter_arg ) noexcept
+	  : retire_node_abst {}
+	  , p_retire_( p_retire_arg )
+	  , deleter_( std::move( deleter_arg ) )
+	{
+	}
+
+	~retire_node() override
+	{
+		deleter_( p_retire_ );
+	}
+
+	void* get_retire_pointer( void ) const noexcept override
+	{
+		return reinterpret_cast<void*>( p_retire_ );
+	}
+};
+
+/**
+ * @brief retire管理用I/Fクラス（Facadeクラス）
+ *
+ * @todo シングルトン化すべきか？
+ */
+class retire_mgr {
+public:
+	template <typename T, typename Deleter = std::default_delete<T>>
+	static void retire( T* p_retire_obj, Deleter&& deleter_arg = std::default_delete<T> {} )
+	{
+		retire_node_abst* p_new_retire = new retire_node<T, Deleter>( p_retire_obj, std::forward<Deleter>( deleter_arg ) );
+		retire( p_new_retire );
+	}
+
+	static void recycle( void );
+
+private:
+	static void retire( retire_node_abst* p_new_retire );
 };
 
 }   // namespace internal

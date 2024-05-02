@@ -372,6 +372,91 @@ private:
 	free_nd_storage_type free_nd_;
 };
 
+template <typename T>
+class x_stack_list {
+public:
+	static_assert( std::is_move_constructible<T>::value && std::is_default_constructible<T>::value, "T should be move constructible at least" );
+
+	using value_type = T;
+
+	constexpr x_stack_list( void )
+	  : hph_head_( nullptr )
+	{
+	}
+
+	template <bool IsCopyConstructivle = std::is_copy_constructible<T>::value, typename std::enable_if<IsCopyConstructivle>::type* = nullptr>
+	void push( T& v_arg )
+	{
+		lilo_node* p_expected = hph_head_.load( std::memory_order_acquire );
+		lilo_node* p_new_node = new lilo_node { v_arg, hazard_ptr_handler<lilo_node>( p_expected ) };
+		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_node, std::memory_order_release, std::memory_order_relaxed ) ) {
+			p_new_node->hph_next_.store( p_expected, std::memory_order_release );
+		}
+	}
+	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, typename std::enable_if<IsMoveConstructivle>::type* = nullptr>
+	void push( T&& v_arg )
+	{
+		lilo_node* p_expected = hph_head_.load( std::memory_order_acquire );
+		lilo_node* p_new_node = new lilo_node { std::move( v_arg ), hazard_ptr_handler<lilo_node>( p_expected ) };
+		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_node, std::memory_order_release, std::memory_order_relaxed ) ) {
+			p_new_node->hph_next_.store( p_expected, std::memory_order_release );
+		}
+	}
+
+	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, typename std::enable_if<IsMoveConstructivle>::type* = nullptr>
+	std::tuple<bool, value_type> pop( void )
+	{
+		// TがMove可能である場合に選択されるAPI実装
+		lilo_node* p_poped_node = pop_impl();
+		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
+
+		std::tuple<bool, value_type> ans { true, std::move( p_poped_node->v_ ) };
+		internal::retire_mgr::retire( p_poped_node );
+		return ans;
+	}
+	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, bool IsCopyConstructivle = std::is_copy_constructible<T>::value,
+	          typename std::enable_if<!IsMoveConstructivle && IsCopyConstructivle>::type* = nullptr>
+	std::tuple<bool, value_type> pop( void )
+	{
+		// TがMove不可能であるが、Copy可能である場合に選択されるAPI実装
+		lilo_node* p_poped_node = pop_impl();
+		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
+
+		std::tuple<bool, value_type> ans { true, p_poped_node->v_ };
+		internal::retire_mgr::retire( p_poped_node );
+		return ans;
+	}
+
+private:
+	struct lilo_node {
+		value_type                    v_;
+		hazard_ptr_handler<lilo_node> hph_next_;
+	};
+
+	lilo_node* pop_impl( void )
+	{
+		hazard_ptr<lilo_node> hp_cur_head = hph_head_.get();
+		lilo_node*            p_expected  = hp_cur_head.get();
+		if ( p_expected == nullptr ) return nullptr;
+
+		lilo_node* p_new_head = hp_cur_head->hph_next_.load( std::memory_order_acquire );
+		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_head, std::memory_order_release, std::memory_order_relaxed ) ) {
+			hp_cur_head = hph_head_.get();
+			p_expected  = hp_cur_head.get();
+			p_new_head  = hp_cur_head->hph_next_.load( std::memory_order_acquire );
+		}
+
+		// ここに来た時点で、hp_cur_head で保持されているノードの所有権を確保できた。
+		// ※ 確保しているノードへのポインタを他スレッドでも持っているかもしれないが、
+		//    メンバ変数 v_ を参照しないアルゴリズムになっているので、以降は参照してよい。
+		//    hph_next_ は他スレッドで読みだされているため、書き換えてはならない。
+		//    なお、hp_cur_headは、他スレッドでもハザードポインタとして登録中であるため、ハザードポインタとしての登録がなくなるまで破棄してはならない。
+		return hp_cur_head.get();
+	}
+
+	hazard_ptr_handler<lilo_node> hph_head_;
+};
+
 }   // namespace concurrent
 }   // namespace alpha
 
