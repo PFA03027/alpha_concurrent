@@ -67,11 +67,11 @@ public:
 
 	static constexpr size_t size = BUFF_SIZE;
 
-	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR fixedbuff_string( void ) noexcept
+	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR_BODY fixedbuff_string( void ) noexcept
 	{
 		buff_[0] = 0;
 	}
-	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR fixedbuff_string( const char* p ) noexcept
+	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR_BODY fixedbuff_string( const char* p ) noexcept
 	{
 		if ( p == nullptr ) {
 			buff_[0] = 0;

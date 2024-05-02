@@ -27,17 +27,17 @@ struct param_chunk_allocation {
 	size_t size_of_one_piece_;   //!< size of one piece in a chunk
 	size_t num_of_pieces_;       //!< number of pieces in a chunk
 
-	constexpr param_chunk_allocation( void )
+	constexpr param_chunk_allocation( void ) noexcept
 	  : size_of_one_piece_( 0 )
 	  , num_of_pieces_( 0 )
 	{
 	}
-	constexpr param_chunk_allocation( int )
+	constexpr param_chunk_allocation( int ) noexcept
 	  : size_of_one_piece_( 0 )
 	  , num_of_pieces_( 0 )
 	{
 	}
-	constexpr param_chunk_allocation( size_t size_of_one_piece_arg, size_t num_of_pieces_arg )
+	constexpr param_chunk_allocation( size_t size_of_one_piece_arg, size_t num_of_pieces_arg ) noexcept
 	  : size_of_one_piece_( size_of_one_piece_arg )
 	  , num_of_pieces_( num_of_pieces_arg )
 	{
@@ -50,6 +50,8 @@ struct param_chunk_allocation {
  * This is used for optimization for a paramters
  */
 struct chunk_statistics {
+	using print_string_t = internal::fixedbuff_string<1024>;
+
 	param_chunk_allocation alloc_conf_;        //!< chunk configuration
 	std::size_t            chunk_num_;         //!< number of current allocated chunks
 	std::size_t            valid_chunk_num_;   //!< number of valid chunks
@@ -69,7 +71,7 @@ struct chunk_statistics {
 	/*!
 	 * @brief	make std::string of statistics information
 	 */
-	std::string print( void ) const;
+	print_string_t print( void ) const noexcept;
 };
 
 }   // namespace concurrent

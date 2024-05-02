@@ -14,9 +14,9 @@
 
 // configuration for constexpr constructor
 #if __cpp_constexpr >= 201304L
-#define ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR constexpr
+#define ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR_BODY constexpr
 #else
-#define ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR
+#define ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR_BODY
 #endif
 
 // configuration for constexpr adaptation

@@ -38,7 +38,7 @@ constexpr size_t STRERROR_BUFF_SIZE = 256;
 static std::atomic<int> cur_count_of_tls_keys( 0 );
 static std::atomic<int> max_count_of_tls_keys( 0 );
 
-void error_log_output( int errno_arg, const char* p_func_name )
+void error_log_output( int errno_arg, const char* p_func_name ) noexcept
 {
 	char buff[STRERROR_BUFF_SIZE];
 
@@ -576,7 +576,7 @@ public:
 		}
 	}
 
-	dynamic_tls_key* allocate_key( void* p_param, uintptr_t ( *allocator )( void* p_param ), void ( *deallocator )( uintptr_t p_obj, void* p_param ) )
+	dynamic_tls_key* allocate_key( void* p_param, uintptr_t ( *allocator )( void* p_param ), void ( *deallocator )( uintptr_t p_obj, void* p_param ) ) noexcept
 	{
 		if ( num_of_free_.load( std::memory_order_acquire ) <= 0 ) {
 			return nullptr;
@@ -641,7 +641,7 @@ private:
 
 class dynamic_tls_mgr {
 public:
-	static inline dynamic_tls_mgr& get_instance( void );
+	static inline dynamic_tls_mgr& get_instance( void ) noexcept;
 
 	dynamic_tls_key* allocate_key( void* p_param, uintptr_t ( *allocator )( void* p_param ), void ( *deallocator )( uintptr_t p_obj, void* p_param ) )
 	{
@@ -739,7 +739,7 @@ private:
 #ifdef ALCONCURRENT_CONF_USE_THREAD_LOCAL
 	class tl_content_head {
 	public:
-		constexpr tl_content_head( void )
+		constexpr tl_content_head( void ) noexcept
 		  : p_tl_cnt_head_( nullptr )
 		{
 		}
@@ -767,13 +767,13 @@ private:
 #else
 	class tl_content_head {
 	public:
-		tl_content_head( void )
+		tl_content_head( void ) noexcept
 		{
 			int status = pthread_key_create( &key_, dynamic_tls_mgr::destructor );
 			if ( status != 0 ) {
 				error_log_output( status, "pthread_key_create()" );
 				internal::LogOutput( log_type::ERR, "PTHREAD_KEYS_MAX: %d", PTHREAD_KEYS_MAX );
-				std::abort();   // because of the critical error, let's exit. TODO: should throw std::runtime_error ?
+				terminate();   // because of the critical error, let's exit. TODO: should throw std::runtime_error ?
 			}
 			return;
 		}
@@ -807,7 +807,7 @@ private:
 	constexpr
 #else
 #endif
-		dynamic_tls_mgr( void )
+		dynamic_tls_mgr( void ) noexcept
 	  : next_base_idx_( 0 )
 	  , p_top_dtls_key_array_( nullptr )
 	  , p_top_dtls_content_head_( nullptr )
@@ -846,7 +846,7 @@ private:
 		dtls_key_array_cnt_++;
 	}
 
-	dynamic_tls_key* search_key( void* p_param, uintptr_t ( *allocator )( void* p_param ), void ( *deallocator )( uintptr_t p_obj, void* p_param ) )
+	dynamic_tls_key* search_key( void* p_param, uintptr_t ( *allocator )( void* p_param ), void ( *deallocator )( uintptr_t p_obj, void* p_param ) ) noexcept
 	{
 		dynamic_tls_key*       p_ans         = nullptr;
 		dynamic_tls_key_array* p_cur_dtls_ka = p_top_dtls_key_array_.load( std::memory_order_acquire );
@@ -899,7 +899,7 @@ void dynamic_tls_mgr::destructor( void* p_data )
 	return;
 }
 
-inline dynamic_tls_mgr& dynamic_tls_mgr::get_instance( void )
+inline dynamic_tls_mgr& dynamic_tls_mgr::get_instance( void ) noexcept
 {
 #ifdef ALCONCURRENT_CONF_USE_THREAD_LOCAL
 #else
