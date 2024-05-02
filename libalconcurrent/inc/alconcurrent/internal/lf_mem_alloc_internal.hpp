@@ -274,7 +274,7 @@ public:
 
 	void* operator new( std::size_t n, internal::alloc_only_chamber& allocator_arg )   // placement new
 	{
-		return allocator_arg.allocate( n, sizeof( uintptr_t ) );
+		return allocator_arg.allocate<sizeof( uintptr_t )>( n );
 	}
 	void operator delete( void* p, internal::alloc_only_chamber& allocator_arg ) noexcept   // placement delete...(3)
 	{

@@ -173,10 +173,10 @@ If compile with ALCONCURRENT_CONF_ENABLE_CHECK_OVERRUN_WRITING, write over run i
 
 ### Internal use build option
 #### ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
-If compile with ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR, it will detect logical error. This is only for internal debugging or porting activity.
+If compile with ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR, it will detect logical error and output error log. This is only for internal debugging or porting activity.
 
-#### ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
-If compile with ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION, it throw std::logic_error when detect logical error. This is only for internal debugging or porting activity.
+#### ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+If compile with ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION, call std::terminate() via alpha::concurrent::internal::terminate() when detect logical error. This is only for internal debugging or porting activity.
 
 #### ALCONCURRENT_CONF_ENABLE_MALLOC_INSTEAD_OF_MMAP
 When doing memory sanitizer test for internal lf_mem_alloc, this option is needed. In case of defined this option, lf_mem_alloc will call malloc/free instead of mmap/munmap. This is only for internal debugging or porting activity.
@@ -201,3 +201,45 @@ https://patents.google.com/patent/US20040107227
 
 # License
 Please see "LICENSE.txt"
+
+# TODO
+* 全般的な改善
+-- コールスタック管理クラスのベース部品クラス化
+-- ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION と ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERRORのどちらかでロジックエラー検査が有効になるようにする。
+-- -Wsign-conversion対応の追加
+** コンストラクタのconstexpr対応
+** atomic<>変数系の、std::hardware_destructive_interference_size 対応
+
+* alloc_only_chamberの改善
+-- サイズ0要求の場合に最低サイズ1で確保する対応。アドレスが必ず異なるようにする要件を保証するため。
+-- deallocateのI/F追加。基本的には、削除済みマーキングをするだけ。2重フリー、リークチェックできるようにするため
+-- allocate時とdeallcate時のコールスタックを記録する機能の追加。
+-- 2重フリーの場合のエラー及びコールスタック情報の出力。
+-- noexceptを積極的に付与する
+-- デバッグ機能追加
+--- 使用中、解放済みをチェックする機能の追加。
+--- 内容のdump機能
+--- 特定のアドレスに特化した内容のdump機能
+--- room_boader内メンバ変数のconst化(is_freed_を除く)
+--- room_boaderのI/Fのconst化、constexpr化
+--- メイン関数の最後に呼び出す等の方法による、解放漏れによる簡易リークチェック機能の追加。
+
+* dynamic_tlsクラスの改善
+** メモリ効率改善など、計算で求められるアドレス情報の省略など
+
+* ハザードポインタ管理クラスの改善
+-- RAIIによるハザードポインタ登録管理用クラスの作成
+-- atomic<T*>用のRAIIによるハザードポインタ登録管理用クラスの作成 -> 単純なatomic<T*>ではなく、atomic<T*>を内包したhazard_ptrクラスを作る。
+-- このクラスでretireは扱わない。ガベージコレクタクラスで扱うべき。
+-- ハザードポインタ管理クラスは、alloc_only_chamberにのみ依存するようにする（べき？）
+-- 強制リソース解放＆初期化のI/F追加。alloc_only_chamberでのリークチェック用機能を使用してデバッグするため。
+
+* lf_mem_allocクラスの改善
+** サイズ0要求の場合に最低サイズ1で確保する対応。アドレスが必ず異なるようにする要件を保証するため。
+** allocate/deallocateに特化させる。
+** 遅延解放処理となるretire系を独立化させる。デストラクタ処理やメモリ開放の遅延実行に対応するためには、別スレッドを建てるなどの対応が必要となるため。
+** 同期解放のI/Fは、デストラクタ処理と解放をその場で実行する。（分離しても良いが、あまり意味はないと思われる。）
+** 同期開放のI/Fは、ハザードポインタをチェックし、ハザードポインタがなくなるまで、その場で処理遅延を行う。（自スレッドのハザードポインタはチェック対象から外す）
+
+* 各種ロックフリーアルゴリズムの改善
+** フリーノード管理クラスをどうするか？ retire系に一任する？

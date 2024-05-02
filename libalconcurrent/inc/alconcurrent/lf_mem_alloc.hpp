@@ -185,7 +185,7 @@ public:
 			return;
 		}
 
-		void* p_tmp     = allocating_only_allocator_.allocate( sizeof( internal::chunk_list[num] ), sizeof( uintptr_t ) );
+		void* p_tmp     = allocating_only_allocator_.allocate<sizeof( uintptr_t )>( sizeof( internal::chunk_list[num] ) );
 		param_ch_array_ = reinterpret_cast<internal::chunk_list*>( p_tmp );
 		for ( unsigned int i = 0; i < num; i++ ) {
 			new ( &( param_ch_array_[i] ) ) internal::chunk_list( p_param_array[i], &allocating_only_allocator_ );

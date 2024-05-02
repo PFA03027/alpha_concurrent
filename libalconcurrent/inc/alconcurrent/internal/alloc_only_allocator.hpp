@@ -30,7 +30,7 @@ namespace internal {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 // internal I/F
-constexpr size_t default_align_size = 32;
+constexpr size_t default_align_size = 32;   // default_align_size should be power of 2
 
 /**
  * @brief is power of 2 ?
@@ -105,14 +105,30 @@ public:
 
 	~alloc_only_chamber();
 
-	inline void* allocate( size_t req_size, size_t req_align = default_align_size )
+	ALCC_INTERNAL_NODISCARD_ATTR inline void* allocate( size_t req_size, size_t req_align ) noexcept
 	{
 		if ( !is_power_of_2( req_align ) ) {
-			char buff[128];
-			snprintf( buff, 128, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
-			throw std::logic_error( buff );
+			LogOutput( log_type::WARN, "ignore req_align, becuase req_align is not power of 2. req_align is %zu, 0x%zX", req_align, req_align );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+			terminate();
+#else
+			static_assert( is_power_of_2( default_align_size ), "default_align_size should be power of 2" );
+			req_align = default_align_size;
+#endif
 		}
 		return chked_allocate( req_size, req_align );
+	}
+
+	template <size_t REQ_ALIGN>
+	ALCC_INTERNAL_NODISCARD_ATTR inline void* allocate( size_t req_size ) noexcept
+	{
+		static_assert( is_power_of_2( REQ_ALIGN ), "REQ_ALIGN should be power of 2" );
+		return chked_allocate( req_size, REQ_ALIGN );
+	}
+
+	ALCC_INTERNAL_NODISCARD_ATTR inline void* allocate( size_t req_size ) noexcept
+	{
+		return allocate<default_align_size>( req_size );
 	}
 
 	/**
