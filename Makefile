@@ -50,6 +50,9 @@ all: configure-cmake
 	cd ${BUILD_DIR}; \
 	cmake --build . -j ${JOBS} -v --target ${BUILDIMPLTARGET}
 
+build:
+	mkdir -p ${BUILD_DIR}
+
 test: build-test
 	set -e; \
 	cd ${BUILD_DIR}; \
@@ -57,6 +60,14 @@ test: build-test
 
 build-test:
 	make BUILDIMPLTARGET=build-test all
+
+sample: build-sample
+	echo finish make sample
+	build/sample/perf_stack/perf_stack
+	# build/sample/perf_fifo/perf_fifo
+
+build-sample:
+	make BUILDIMPLTARGET=build-sample all
 
 configure-cmake:
 	set -e; \

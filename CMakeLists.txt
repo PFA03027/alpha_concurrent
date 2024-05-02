@@ -13,3 +13,4 @@ enable_testing()
 add_subdirectory(libalconcurrent)
 
 add_subdirectory(test)
+add_subdirectory(sample)

@@ -49,6 +49,28 @@
             }
         },
         {
+            "label": "debug make build-sample",
+            "type": "shell",
+            "command": "make build-sample BUILDTYPE=Debug",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+            }
+        },
+        {
+            "label": "debug make build-sample-sanitizer",
+            "type": "shell",
+            "command": "make build-sample BUILDTYPE=Debug SANITIZER_TYPE=2",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+            }
+        },
+        {
             "label": "make all and exec test",
             "type": "shell",
             "command": "bash make_linux.sh test",

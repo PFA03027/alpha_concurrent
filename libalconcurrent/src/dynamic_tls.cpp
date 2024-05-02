@@ -363,8 +363,9 @@ public:
 		return cnt_it->destruct_tls_by_key_release( key );
 	}
 
-	void* operator new( std::size_t n );             // usual new...(1)
-	void  operator delete( void* p_mem ) noexcept;   // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
+	void* operator new( std::size_t n );                               // usual new...(1)
+	void* operator new( std::size_t n, std::align_val_t alignment );   // usual new with alignment...(1) C++11/C++14 just ignore. C++17 and after uses this.
+	void  operator delete( void* p_mem ) noexcept;                     // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
 
 	void* operator new[]( std::size_t n );             // usual new...(1)
 	void  operator delete[]( void* p_mem ) noexcept;   // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
@@ -530,8 +531,9 @@ public:
 
 	void call_destructor_and_release_ownership( void );
 
-	void* operator new( std::size_t n );             // usual new...(1)
-	void  operator delete( void* p_mem ) noexcept;   // usual delete...(2)	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放しない
+	void* operator new( std::size_t n );                               // usual new...(1)
+	void* operator new( std::size_t n, std::align_val_t alignment );   // usual new with alignment...(1) C++11/C++14 just ignore. C++17 and after uses this.
+	void  operator delete( void* p_mem ) noexcept;                     // usual delete...(2)	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放しない
 
 	void* operator new[]( std::size_t n );             // usual new...(1)
 	void  operator delete[]( void* p_mem ) noexcept;   // usual delete...(2)	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放しない
@@ -968,6 +970,16 @@ void* dynamic_tls_content_head::operator new( std::size_t n )   // usual new...(
 
 	return p_ans;
 }
+void* dynamic_tls_content_head::operator new( std::size_t n, std::align_val_t alignment )   // usual new with alignment...(1) C++11/C++14 just ignore. C++17 and after uses this.
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	void* p_ans = dynamic_tls_key_allocating_only( n, static_cast<size_t>( alignment ) );
+	if ( p_ans == nullptr ) {
+		throw std::bad_alloc();
+	}
+
+	return p_ans;
+}
 void dynamic_tls_content_head::operator delete( void* p_mem ) noexcept   // usual delete...(2)
 {
 	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
@@ -1005,6 +1017,16 @@ void* dynamic_tls_content_array::operator new( std::size_t n )   // usual new...
 {
 	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
 	void* p_ans = dynamic_tls_key_allocating_only( n );
+	if ( p_ans == nullptr ) {
+		throw std::bad_alloc();
+	}
+
+	return p_ans;
+}
+void* dynamic_tls_content_array::operator new( std::size_t n, std::align_val_t alignment )   // usual new with alignment...(1) C++11/C++14 just ignore. C++17 and after uses this.
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	void* p_ans = dynamic_tls_key_allocating_only( n, static_cast<size_t>( alignment ) );
 	if ( p_ans == nullptr ) {
 		throw std::bad_alloc();
 	}
