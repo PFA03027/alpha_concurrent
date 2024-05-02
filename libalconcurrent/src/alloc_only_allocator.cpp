@@ -20,7 +20,9 @@
 #include "alconcurrent/conf_logger.hpp"
 
 #include "alconcurrent/internal/alloc_only_allocator.hpp"
+
 #include "mmap_allocator.hpp"
+#include "utility.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -154,14 +156,11 @@ private:
 
 inline uintptr_t room_boader::calc_addr_of_allocated_memory_based_on_room_boader( uintptr_t base_addr, size_t req_align )
 {
-#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
 	if ( !is_power_of_2( req_align ) ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
-		char buff[128];
-		snprintf( buff, 128, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
-		throw std::logic_error( buff );
-#else
 		internal::LogOutput( log_type::ERR, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+		terminate();
 #endif
 	}
 #endif
@@ -182,14 +181,11 @@ inline alloc_in_room* room_boader::calc_pointer_of_alloc_in_room_from_allocated_
 	uintptr_t      addr_ans           = addr_allocated_mem - sizeof( alloc_in_room );
 	alloc_in_room* p_ans              = reinterpret_cast<alloc_in_room*>( addr_ans );
 
-#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
 	if ( addr_allocated_mem != reinterpret_cast<uintptr_t>( p_ans->mem ) ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
-		char buff[128];
-		snprintf( buff, 128, "calculated address is different to actual address 0x%zu, 0x%zu", addr_allocated_mem, reinterpret_cast<uintptr_t>( p_ans->mem ) );
-		throw std::logic_error( buff );
-#else
 		internal::LogOutput( log_type::ERR, "calculated address is different to actual address 0x%zu, 0x%zu", addr_allocated_mem, reinterpret_cast<uintptr_t>( p_ans->mem ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+		terminate();
 #endif
 	}
 #endif
@@ -226,16 +222,13 @@ room_boader::room_boader( const alloc_chamber* p_parent, size_t chopped_size_arg
 {
 	*p_tail_padding_ = 0xFF;   // TODO: オーバーラン書き込み検出のマーク値は仮実装
 
-#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
 	uintptr_t addr_end_of_room_boader   = reinterpret_cast<uintptr_t>( this ) + sizeof( room_boader );
 	uintptr_t addr_top_of_alloc_in_room = reinterpret_cast<uintptr_t>( p_alloc_in_room_ );
 	if ( addr_end_of_room_boader > addr_top_of_alloc_in_room ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
-		char buff[128];
-		snprintf( buff, 128, "room_boader and alloc_in_room is overlapped, addr_end_of_room_boader = 0x%zu, addr_top_of_alloc_in_room = 0x%zu", addr_end_of_room_boader, addr_top_of_alloc_in_room );
-		throw std::logic_error( buff );
-#else
 		internal::LogOutput( log_type::ERR, "room_boader and alloc_in_room is overlapped, addr_end_of_room_boader = 0x%zu, addr_top_of_alloc_in_room = 0x%zu", addr_end_of_room_boader, addr_top_of_alloc_in_room );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+		terminate();
 #endif
 	}
 #endif
@@ -266,7 +259,7 @@ void room_boader::dump_to_log( log_type lt, char c, int id ) const
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-alloc_chamber_statistics& alloc_chamber_statistics::operator+=( const alloc_chamber_statistics& op )
+alloc_chamber_statistics& alloc_chamber_statistics::operator+=( const alloc_chamber_statistics& op ) noexcept
 {
 	chamber_count_++;
 	alloc_size_ += op.alloc_size_;
@@ -285,10 +278,10 @@ std::string alloc_chamber_statistics::print( void ) const
 	snprintf( buff, 2048,
 	          "chamber count = %zu, total allocated size = 0x%zx(%.2fM), consumed size = 0x%zx(%.2fM), free size = 0x%zx(%.2fM), used ratio = %2.1f %%, total allocated = %zu, using = %zu, released = %zu",
 	          chamber_count_,
-	          alloc_size_, static_cast<double>(alloc_size_) / static_cast<double>( 1024 * 1024 ),
-	          consum_size_, static_cast<double>(consum_size_) / static_cast<double>( 1024 * 1024 ),
-	          free_size_, static_cast<double>(free_size_) / static_cast<double>( 1024 * 1024 ),
-	          ( alloc_size_ > 0 ) ? ( static_cast<double>(consum_size_) / static_cast<double>(alloc_size_) * 100.0f ) : 0.0f,
+	          alloc_size_, static_cast<double>( alloc_size_ ) / static_cast<double>( 1024 * 1024 ),
+	          consum_size_, static_cast<double>( consum_size_ ) / static_cast<double>( 1024 * 1024 ),
+	          free_size_, static_cast<double>( free_size_ ) / static_cast<double>( 1024 * 1024 ),
+	          ( alloc_size_ > 0 ) ? ( static_cast<double>( consum_size_ ) / static_cast<double>( alloc_size_ ) * 100.0f ) : 0.0f,
 	          num_of_allocated_,
 	          num_of_using_allocated_,
 	          num_of_released_allocated_ );

@@ -8,8 +8,8 @@
  * Copyright (C) 2020 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#ifndef SRC_FREE_NODE_STORAGE_HPP_
-#define SRC_FREE_NODE_STORAGE_HPP_
+#ifndef ALCONCURRENT_INTERNAL_FREE_NODE_STORAGE_HPP_
+#define ALCONCURRENT_INTERNAL_FREE_NODE_STORAGE_HPP_
 
 #include <atomic>
 #include <memory>

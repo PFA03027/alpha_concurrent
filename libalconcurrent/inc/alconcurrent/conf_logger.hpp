@@ -173,10 +173,21 @@ struct bt_info {
 	}
 };
 
+/**
+ * @brief this macro function has obsolated
+ *
+ * please use alpha::concurrent::bt_info::record_backtrace()
+ */
 #define RECORD_BACKTRACE_GET_BACKTRACE( BT_INFO_N )                 \
 	{                                                               \
 		BT_INFO_N = alpha::concurrent::bt_info::record_backtrace(); \
 	}
+
+/**
+ * @brief this macro function has obsolated
+ *
+ * please use bt_info::invalidate()
+ */
 #define RECORD_BACKTRACE_INVALIDATE_BACKTRACE( BT_INFO_N ) \
 	{                                                      \
 		BT_INFO_N.invalidate();                            \

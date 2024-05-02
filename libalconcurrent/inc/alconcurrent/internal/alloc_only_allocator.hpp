@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef ALLOC_ONLY_ALLOCATOR_HPP_
-#define ALLOC_ONLY_ALLOCATOR_HPP_
+#ifndef ALCONCURRENT_INTERNAL_ALLOC_ONLY_ALLOCATOR_HPP_
+#define ALCONCURRENT_INTERNAL_ALLOC_ONLY_ALLOCATOR_HPP_
 
 #include <cstdint>
 #include <cstdlib>
@@ -80,7 +80,7 @@ struct alloc_chamber_statistics {
 	{
 	}
 
-	alloc_chamber_statistics& operator+=( const alloc_chamber_statistics& op );
+	alloc_chamber_statistics& operator+=( const alloc_chamber_statistics& op ) noexcept;
 
 	std::string print( void ) const;
 };
@@ -93,7 +93,7 @@ public:
 		kReleased
 	};
 
-	constexpr alloc_only_chamber( bool need_release_munmap_arg, size_t pre_alloc_size_arg )
+	constexpr alloc_only_chamber( bool need_release_munmap_arg, size_t pre_alloc_size_arg ) noexcept
 	  : head_( nullptr )
 	  , one_try_hint_( nullptr )
 	  , need_release_munmap_( need_release_munmap_arg )

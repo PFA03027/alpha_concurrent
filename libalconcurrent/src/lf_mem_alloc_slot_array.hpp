@@ -117,33 +117,7 @@ struct slot_array_mgr {
 	 * @return void* 割り当てられたメモリへのアドレス。
 	 * @retval nullptr 空きスロットがなく割り当てできなかった。
 	 */
-	void* allocate( size_t n, size_t req_alignsize )
-	{
-		if ( ( expected_n_per_slot_ + default_slot_alignsize ) < ( n + req_alignsize ) ) {
-			// サイズ不足のため、確保に失敗
-			return nullptr;
-		}
-		slot_header_of_array* p_free_slot = free_slots_storage_.pop();
-		if ( p_free_slot == nullptr ) {
-			// フリースロットがないため、確保に失敗
-			return nullptr;
-		}
-
-		bool_size_t chk_ret_free_slot_idx = get_slot_idx_from_slot_header_of_array( p_free_slot );
-#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
-		if ( !chk_ret_free_slot_idx.is_ok_ ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
-			std::string errlog = "recieved free slot is not belong to this slot_array_mgr";
-			throw std::logic_error( errlog );
-#else
-			internal::LogOutput( log_type::ERR, "recieved free slot is not belong to this slot_array_mgr" );
-			return nullptr;
-#endif
-		}
-#endif
-
-		return p_free_slot->allocate( unchk_get_pointer_of_slot_container( chk_ret_free_slot_idx.idx_ ), slot_container_size_of_this_, n, req_alignsize );
-	}
+	void* allocate( size_t n, size_t req_alignsize );
 
 	/**
 	 * @brief 割り当てられたメモリに対応するslot_header_of_arrayの解放処理を行う

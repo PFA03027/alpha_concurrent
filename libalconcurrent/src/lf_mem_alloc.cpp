@@ -21,12 +21,11 @@
 #include "alconcurrent/internal/lf_mem_alloc_internal.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
 
-#include "mmap_allocator.hpp"
-#include "utility.hpp"
-
 #include "lf_mem_alloc_basic_allocator.hpp"
 #include "lf_mem_alloc_slot.hpp"
 #include "lf_mem_alloc_slot_array.hpp"
+#include "mmap_allocator.hpp"
+#include "utility.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -789,13 +788,12 @@ void general_mem_allocator_impl_deallocate(
 	internal::slot_chk_result chk_ret = internal::chunk_header_multi_slot::get_chunk( p_mem );
 
 	if ( chk_ret.correct_ ) {
-#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
 		if ( chk_ret.p_chms_ == nullptr ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
-			std::string errlog = "return value of get_chunk() is unexpected";
-			throw std::logic_error( errlog );
-#else
 			internal::LogOutput( log_type::ERR, "return value of get_chunk() is unexpected" );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+			terminate();
+#else
 			return;
 #endif
 		}

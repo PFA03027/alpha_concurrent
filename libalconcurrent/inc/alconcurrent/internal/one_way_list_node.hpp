@@ -8,8 +8,8 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#ifndef ONE_WAY_LIST_NODE_HPP_
-#define ONE_WAY_LIST_NODE_HPP_
+#ifndef ALCONCURRENT_INTERNAL_ONE_WAY_LIST_NODE_HPP_
+#define ALCONCURRENT_INTERNAL_ONE_WAY_LIST_NODE_HPP_
 
 #include <cassert>
 

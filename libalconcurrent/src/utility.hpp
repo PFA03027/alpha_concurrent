@@ -9,8 +9,10 @@
  *
  */
 
-#ifndef UTILITY_HPP_
-#define UTILITY_HPP_
+#ifndef ALCONCURRENT_SRC_UTILITY_HPP_
+#define ALCONCURRENT_SRC_UTILITY_HPP_
+
+#include <atomic>
 
 namespace alpha {
 namespace concurrent {
@@ -34,6 +36,9 @@ public:
 private:
 	std::atomic<int>& atomic_couter_ref;
 };
+
+////////////////////////////////////////////////////////////////////////////////
+[[noreturn]] void terminate( void );
 
 }   // namespace internal
 }   // namespace concurrent

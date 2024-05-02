@@ -9,8 +9,10 @@
  *
  */
 
-#include "lf_mem_alloc_slot.hpp"
 #include "alconcurrent/internal/alloc_only_allocator.hpp"
+
+#include "lf_mem_alloc_slot.hpp"
+#include "utility.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -124,13 +126,12 @@ void slot_header_of_alloc::deallocate( void )
 bool_unified_slot_header_p slot_container::get_slot_header_from_assignment_p( void* p_mem )
 {
 	slot_container* p_slot_container = reinterpret_cast<slot_container*>( reinterpret_cast<uintptr_t>( p_mem ) - static_cast<uintptr_t>( sizeof( slot_container ) ) );
-#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
 	if ( p_mem != reinterpret_cast<void*>( p_slot_container->mem ) ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
-		std::string errlog = "does not match p_mem and slot_container::mem[0]. This is logical error.";
-		throw std::logic_error( errlog );
-#else
 		internal::LogOutput( log_type::ERR, "does not match p_mem and slot_container::mem[0]. This is logical error." );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+		terminate();
+#else
 		return { false, nullptr };
 #endif
 	}
@@ -150,14 +151,11 @@ bool_unified_slot_header_p slot_container::get_slot_header_from_assignment_p( vo
 
 void* slot_container::construct_slot_container_in_container_buffer( slot_mheader* p_bind_mh_of_slot, slot_container* p_container_top, size_t container_size, size_t n, size_t req_align )
 {
-#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
 	if ( !is_power_of_2( req_align ) ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
-		char buff[128];
-		snprintf( buff, 128, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
-		throw std::logic_error( buff );
-#else
 		internal::LogOutput( log_type::ERR, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+		terminate();
 #endif
 	}
 #endif
@@ -179,12 +177,11 @@ void* slot_container::construct_slot_container_in_container_buffer( slot_mheader
 	// size_t ans_tail_padding_size = addr_end_of_alloc - addr_end_of_assign;
 
 	slot_container* p_slot_container = reinterpret_cast<slot_container*>( ans_addr - static_cast<uintptr_t>( sizeof( slot_container ) ) );
-#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
 	if ( reinterpret_cast<void*>( ans_addr ) != reinterpret_cast<void*>( p_slot_container->mem ) ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
-		throw std::logic_error( "does not match assignment address and slot_container::mem[0]" );
-#else
 		internal::LogOutput( log_type::ERR, "does not match assignment address and slot_container::mem[0]" );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+		terminate();
 #endif
 	}
 #endif
