@@ -438,18 +438,18 @@ public:
 	using element_type = T;
 	using pointer      = T*;
 
-	constexpr hazard_ptr( void )
+	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR hazard_ptr( void )
 	  : p_( nullptr )
 	  , os_( nullptr )
 	{
 	}
-	constexpr hazard_ptr( hazard_ptr&& src )
+	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR hazard_ptr( hazard_ptr&& src )
 	  : p_( src.p_ )
 	  , os_( std::move( src.os_ ) )
 	{
 		src.p_ = nullptr;
 	}
-	constexpr hazard_ptr& operator=( hazard_ptr&& src )
+	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR hazard_ptr& operator=( hazard_ptr&& src )
 	{
 		if ( this == &src ) return *this;
 
@@ -471,7 +471,7 @@ public:
 	}
 
 private:
-	constexpr hazard_ptr( T* p_arg, internal::bind_hazard_ptr_list::hzrd_slot_ownership_t&& os_arg )
+	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR hazard_ptr( T* p_arg, internal::bind_hazard_ptr_list::hzrd_slot_ownership_t&& os_arg )
 	  : p_( p_arg )
 	  , os_( std::move( os_arg ) )
 	{
@@ -659,19 +659,19 @@ public:
 	using element_type = T;
 	using pointer      = T*;
 
-	constexpr hazard_ptr_handler( void )
+	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR hazard_ptr_handler( void )
 	  : ap_target_p_( nullptr )
 	{
 	}
-	explicit constexpr hazard_ptr_handler( T* p_desired )
+	explicit ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR hazard_ptr_handler( T* p_desired )
 	  : ap_target_p_( p_desired )
 	{
 	}
-	constexpr hazard_ptr_handler( const hazard_ptr_handler& src )
+	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR hazard_ptr_handler( const hazard_ptr_handler& src )
 	  : ap_target_p_( src.ap_target_p_.load( std::memory_order_acquire ) )
 	{
 	}
-	constexpr hazard_ptr_handler( hazard_ptr_handler&& src )
+	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR hazard_ptr_handler( hazard_ptr_handler&& src )
 	  : ap_target_p_( src.ap_target_p_.load( std::memory_order_acquire ) )
 	{
 		src.ap_target_p_.store( nullptr, std::memory_order_release );
