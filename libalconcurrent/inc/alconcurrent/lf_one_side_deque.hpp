@@ -8,8 +8,8 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#ifndef INC_LF_ONE_SIDE_DEQUE_HPP_
-#define INC_LF_ONE_SIDE_DEQUE_HPP_
+#ifndef ALCONCCURRENT_INC_LF_ONE_SIDE_DEQUE_HPP_
+#define ALCONCCURRENT_INC_LF_ONE_SIDE_DEQUE_HPP_
 
 #include <atomic>
 #include <memory>
@@ -212,10 +212,10 @@ public:
 	}
 
 private:
-	one_side_deque( const one_side_deque& ) = delete;
-	one_side_deque( one_side_deque&& )      = delete;
+	one_side_deque( const one_side_deque& )            = delete;
+	one_side_deque( one_side_deque&& )                 = delete;
 	one_side_deque& operator=( const one_side_deque& ) = delete;
-	one_side_deque& operator=( one_side_deque&& ) = delete;
+	one_side_deque& operator=( one_side_deque&& )      = delete;
 
 	head_stack_t head_side_;
 	tail_fifo_t  tail_size_;

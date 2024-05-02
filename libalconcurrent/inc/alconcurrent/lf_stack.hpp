@@ -8,8 +8,8 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#ifndef SRC_LF_STACK_HPP_
-#define SRC_LF_STACK_HPP_
+#ifndef ALCONCCURRENT_INC_LF_STACK_HPP_
+#define ALCONCCURRENT_INC_LF_STACK_HPP_
 
 #include <atomic>
 #include <memory>

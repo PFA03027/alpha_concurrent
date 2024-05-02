@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef LIFO_FREE_NODE_STACK_HPP_
-#define LIFO_FREE_NODE_STACK_HPP_
+#ifndef ALCONCCURRENT_SRC_LIFO_FREE_NODE_STACK_HPP_
+#define ALCONCCURRENT_SRC_LIFO_FREE_NODE_STACK_HPP_
 
 #include <mutex>
 #include <type_traits>

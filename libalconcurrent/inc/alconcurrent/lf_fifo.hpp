@@ -8,8 +8,8 @@
  * Copyright (C) 2020 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#ifndef SRC_LF_FIFO_HPP_
-#define SRC_LF_FIFO_HPP_
+#ifndef ALCONCCURRENT_INC_LF_FIFO_HPP_
+#define ALCONCCURRENT_INC_LF_FIFO_HPP_
 
 #include <atomic>
 #include <memory>

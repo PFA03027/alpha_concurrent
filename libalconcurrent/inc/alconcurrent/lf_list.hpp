@@ -8,8 +8,8 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#ifndef INC_LF_LIST_HPP_
-#define INC_LF_LIST_HPP_
+#ifndef ALCONCCURRENT_INC_LF_LIST_HPP_
+#define ALCONCCURRENT_INC_LF_LIST_HPP_
 
 #include <atomic>
 #include <functional>

@@ -8,8 +8,8 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#ifndef INC_CONF_LOGGER_HPP_
-#define INC_CONF_LOGGER_HPP_
+#ifndef ALCONCCURRENT_INC_CONF_LOGGER_HPP_
+#define ALCONCCURRENT_INC_CONF_LOGGER_HPP_
 
 #include <execinfo.h>
 #include <string.h>

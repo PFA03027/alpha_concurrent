@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef LF_MEM_ALLOC_SLOT_ARRAY_HPP_
-#define LF_MEM_ALLOC_SLOT_ARRAY_HPP_
+#ifndef ALCONCCURRENT_SRC_LF_MEM_ALLOC_SLOT_ARRAY_HPP_
+#define ALCONCCURRENT_SRC_LF_MEM_ALLOC_SLOT_ARRAY_HPP_
 
 #include <atomic>
 #include <cstddef>

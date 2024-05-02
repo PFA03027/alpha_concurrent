@@ -11,8 +11,8 @@
  * Copyright (C) 2020 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#ifndef SRC_HAZARD_PTR_HPP_
-#define SRC_HAZARD_PTR_HPP_
+#ifndef ALCONCCURRENT_INC_HAZARD_PTR_HPP_
+#define ALCONCCURRENT_INC_HAZARD_PTR_HPP_
 
 #include <pthread.h>
 

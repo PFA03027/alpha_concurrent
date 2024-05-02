@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef MMAP_ALLOCATOR_HPP_
-#define MMAP_ALLOCATOR_HPP_
+#ifndef ALCONCCURRENT_SRC_MMAP_ALLOCATOR_HPP_
+#define ALCONCCURRENT_SRC_MMAP_ALLOCATOR_HPP_
 
 #include <cstdlib>
 #include <limits>
