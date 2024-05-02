@@ -372,8 +372,7 @@ void global_scope_hazard_ptr_chain::remove_all( void )
 	if ( chk_ret.num_of_using_allocated_ > 0 ) {
 		lg = log_type::ERR;
 	}
-	std::string chk_ret_log = chk_ret.print();
-	LogOutput( lg, chk_ret_log.c_str() );
+	LogOutput( lg, chk_ret.print().c_str() );
 #endif
 }
 

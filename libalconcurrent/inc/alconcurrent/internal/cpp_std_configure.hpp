@@ -12,6 +12,13 @@
 #ifndef ALCONCURRENT_INTERNAL_CPP_STD_CONFIGURE_HPP_
 #define ALCONCURRENT_INTERNAL_CPP_STD_CONFIGURE_HPP_
 
+// configuration for constexpr constructor
+#if __cpp_constexpr >= 201304L
+#define ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR constexpr
+#else
+#define ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR
+#endif
+
 // configuration for constexpr adaptation
 #if __cplusplus >= 201703L
 #define ALCC_INTERNAL_CPPSTD17_CONSTEXPR constexpr

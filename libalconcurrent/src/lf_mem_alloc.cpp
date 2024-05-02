@@ -18,8 +18,9 @@
 #include <vector>
 
 #include "alconcurrent/conf_logger.hpp"
-#include "alconcurrent/internal/lf_mem_alloc_internal.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
+
+#include "alconcurrent/internal/lf_mem_alloc_internal.hpp"
 
 #include "lf_mem_alloc_basic_allocator.hpp"
 #include "lf_mem_alloc_slot.hpp"
@@ -899,7 +900,7 @@ std::string general_mem_allocator_statistics::print( void ) const
 		ans += e.print();
 		ans += "\n";
 	};
-	ans += al_st_.print();
+	ans += al_st_.print().c_str();
 	return ans;
 }
 

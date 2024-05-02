@@ -61,6 +61,8 @@ constexpr bool is_power_of_2( T v )
 class alloc_chamber;
 
 struct alloc_chamber_statistics {
+	using print_string_t = fixedbuff_string<1024>;
+
 	size_t chamber_count_;
 	size_t alloc_size_;
 	size_t consum_size_;
@@ -82,7 +84,7 @@ struct alloc_chamber_statistics {
 
 	alloc_chamber_statistics& operator+=( const alloc_chamber_statistics& op ) noexcept;
 
-	std::string print( void ) const;
+	print_string_t print( void ) const noexcept;
 };
 
 class alloc_only_chamber {
@@ -118,12 +120,13 @@ public:
 	 *
 	 * This API just marks as deallocated. then it will be possible to detect double free that is unexpected.
 	 */
-	static void deallocate( void* p_mem );
+	static void deallocate( void* p_mem ) noexcept;
 
-	bool is_belong_to_this( void* p_mem ) const;
+	bool is_belong_to_this( void* p_mem ) const noexcept;
 
-	alloc_chamber_statistics get_statistics( void ) const;
-	void                     dump_to_log( log_type lt, char c, int id ) const;
+	alloc_chamber_statistics get_statistics( void ) const noexcept;
+
+	void dump_to_log( log_type lt, char c, int id ) const noexcept;
 
 	/**
 	 * @brief inspect using memory
@@ -131,18 +134,18 @@ public:
 	 * @param flag_with_dump_to_log true: if using memory found, dump its information to log. false: no log dump
 	 * @return size_t number of allocated and still using memory area
 	 */
-	size_t inspect_using_memory( bool flag_with_dump_to_log = false, log_type lt = log_type::DEBUG, char c = 'a', int id = 0 ) const;
+	size_t inspect_using_memory( bool flag_with_dump_to_log = false, log_type lt = log_type::DEBUG, char c = 'a', int id = 0 ) const noexcept;
 
 	/**
 	 * @brief Check p_mem belong to alloc_only_chamber, and is still used or already released.
 	 */
-	static validity_status verify_validity( void* p_mem );
+	static validity_status verify_validity( void* p_mem ) noexcept;
 
 private:
-	void* chked_allocate( size_t req_size, size_t req_align );
-	void* try_allocate( size_t req_size, size_t req_align );
-	void  push_alloc_mem( void* p_alloced_mem, size_t allocated_size );
-	void  munmap_alloc_chamber( alloc_chamber* p_ac );
+	void* chked_allocate( size_t req_size, size_t req_align ) noexcept;
+	void* try_allocate( size_t req_size, size_t req_align ) noexcept;
+	void  push_alloc_mem( void* p_alloced_mem, size_t allocated_size ) noexcept;
+	void  munmap_alloc_chamber( alloc_chamber* p_ac ) noexcept;
 
 	std::atomic<alloc_chamber*> head_;                  //!< alloc_chamberのスタックリスト上のheadのalloc_chamber
 	std::atomic<alloc_chamber*> one_try_hint_;          //!< alloc_chamberのスタックリスト上、一度だけチェックを行う先を示すポインタ。

@@ -41,7 +41,7 @@ struct alloc_in_room {
 	const alloc_chamber* p_to_alloc_chamber_;   //!< このchopped roomが属するalloc_chamberへのポインタ
 	unsigned char        mem[0];                //!< allocateしたメモリ領域
 
-	explicit alloc_in_room( const alloc_chamber* p_ac )
+	explicit alloc_in_room( const alloc_chamber* p_ac ) noexcept
 	  :
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	  alloc_bt_info_()
@@ -56,7 +56,7 @@ struct alloc_in_room {
 #endif
 	}
 
-	void dump_to_log( log_type lt, char c, int id ) const
+	void dump_to_log( log_type lt, char c, int id ) const noexcept
 	{
 		internal::LogOutput(
 			lt,
@@ -83,18 +83,18 @@ struct room_boader {
 	static constexpr unsigned char kTailMagicNumber = 0xFF;
 
 	//////////////
-	room_boader( const alloc_chamber* p_parent, size_t chopped_size_arg, size_t req_size, size_t req_align );
+	room_boader( const alloc_chamber* p_parent, size_t chopped_size_arg, size_t req_size, size_t req_align ) noexcept;
 
 	/**
 	 * @brief Get the allocated memory addr that is assigned to caller
 	 *
 	 * @return void* the allocated memory addr
 	 */
-	void* get_allocated_mem_pointer( void ) const;
+	void* get_allocated_mem_pointer( void ) const noexcept;
 
-	bool is_belong_to_this( void* p_mem ) const;
+	bool is_belong_to_this( void* p_mem ) const noexcept;
 
-	void dump_to_log( log_type lt, char c, int id ) const;
+	void dump_to_log( log_type lt, char c, int id ) const noexcept;
 
 	//////////////
 	/**
@@ -105,9 +105,9 @@ struct room_boader {
 	 * @param req_align considering alignment. req_align should be the power of 2
 	 * @return uintptr_t address of end of tail padding
 	 */
-	static uintptr_t calc_addr_of_end_of_tail_padding_based_on_room_boader( uintptr_t base_addr, size_t req_size, size_t req_align );
+	static uintptr_t calc_addr_of_end_of_tail_padding_based_on_room_boader( uintptr_t base_addr, size_t req_size, size_t req_align ) noexcept;
 
-	static bool try_marks_as_deallocated( void* p_mem );
+	static bool try_marks_as_deallocated( void* p_mem ) noexcept;
 
 	/**
 	 * @brief calculate alloc_in_room top address from the allocated memory address, then check if it belongs to alloc_chamber or not
@@ -115,7 +115,7 @@ struct room_boader {
 	 * @param p_mem pointer to the allocated memory that get_allocated_mem_pointer() is returned normaly.
 	 * @return alloc_in_room* nullptr: p_mem is not belongs to alloc_chamber or the allocation information of p_mem has been broken. non nullptr: valid pointer.
 	 */
-	static alloc_in_room* check_and_get_pointer_to_alloc_in_room( void* p_mem );
+	static alloc_in_room* check_and_get_pointer_to_alloc_in_room( void* p_mem ) noexcept;
 
 private:
 	/**
@@ -125,7 +125,7 @@ private:
 	 * @param req_align considering alignment. req_align should be the power of 2
 	 * @return uintptr_t allocated memory top address
 	 */
-	static uintptr_t calc_addr_of_allocated_memory_based_on_room_boader( uintptr_t base_addr, size_t req_align );
+	static uintptr_t calc_addr_of_allocated_memory_based_on_room_boader( uintptr_t base_addr, size_t req_align ) noexcept;
 
 	/**
 	 * @brief calculate alloc_in_room top address from base_addr that is room_boarder class with considering alignment
@@ -134,7 +134,7 @@ private:
 	 * @param req_align considering alignment. req_align should be the power of 2
 	 * @return uintptr_t allocated memory top address
 	 */
-	static alloc_in_room* calc_pointer_of_alloc_in_room_based_on_room_boarder( uintptr_t base_addr, size_t req_align );
+	static alloc_in_room* calc_pointer_of_alloc_in_room_based_on_room_boarder( uintptr_t base_addr, size_t req_align ) noexcept;
 
 	/**
 	 * @brief calculate alloc_in_room top address from base_addr that is room_boarder class with considering alignment
@@ -143,7 +143,7 @@ private:
 	 * @param req_align considering alignment. req_align should be the power of 2
 	 * @return uintptr_t allocated memory top address
 	 */
-	static unsigned char* calc_pointer_of_tail_padding_based_on_room_boarder( uintptr_t base_addr, size_t req_size, size_t req_align );
+	static unsigned char* calc_pointer_of_tail_padding_based_on_room_boarder( uintptr_t base_addr, size_t req_size, size_t req_align ) noexcept;
 
 	/**
 	 * @brief calculate alloc_in_room top address from the allocated memory address
@@ -151,10 +151,10 @@ private:
 	 * @param p_mem pointer to the allocated memory that get_allocated_mem_pointer() is returned normaly.
 	 * @return uintptr_t allocated memory top address
 	 */
-	static alloc_in_room* calc_pointer_of_alloc_in_room_from_allocated_memory( void* p_mem );
+	static alloc_in_room* calc_pointer_of_alloc_in_room_from_allocated_memory( void* p_mem ) noexcept;
 };
 
-inline uintptr_t room_boader::calc_addr_of_allocated_memory_based_on_room_boader( uintptr_t base_addr, size_t req_align )
+inline uintptr_t room_boader::calc_addr_of_allocated_memory_based_on_room_boader( uintptr_t base_addr, size_t req_align ) noexcept
 {
 #if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
 	if ( !is_power_of_2( req_align ) ) {
@@ -175,7 +175,7 @@ inline uintptr_t room_boader::calc_addr_of_allocated_memory_based_on_room_boader
 	return addr_alloc_top;
 }
 
-inline alloc_in_room* room_boader::calc_pointer_of_alloc_in_room_from_allocated_memory( void* p_mem )
+inline alloc_in_room* room_boader::calc_pointer_of_alloc_in_room_from_allocated_memory( void* p_mem ) noexcept
 {
 	uintptr_t      addr_allocated_mem = reinterpret_cast<uintptr_t>( p_mem );
 	uintptr_t      addr_ans           = addr_allocated_mem - sizeof( alloc_in_room );
@@ -193,20 +193,20 @@ inline alloc_in_room* room_boader::calc_pointer_of_alloc_in_room_from_allocated_
 	return p_ans;
 }
 
-inline alloc_in_room* room_boader::calc_pointer_of_alloc_in_room_based_on_room_boarder( uintptr_t base_addr, size_t req_align )
+inline alloc_in_room* room_boader::calc_pointer_of_alloc_in_room_based_on_room_boarder( uintptr_t base_addr, size_t req_align ) noexcept
 {
 	uintptr_t addr_allocated_mem = calc_addr_of_allocated_memory_based_on_room_boader( base_addr, req_align );
 	return calc_pointer_of_alloc_in_room_from_allocated_memory( reinterpret_cast<void*>( addr_allocated_mem ) );
 }
 
-inline unsigned char* room_boader::calc_pointer_of_tail_padding_based_on_room_boarder( uintptr_t base_addr, size_t req_size, size_t req_align )
+inline unsigned char* room_boader::calc_pointer_of_tail_padding_based_on_room_boarder( uintptr_t base_addr, size_t req_size, size_t req_align ) noexcept
 {
 	uintptr_t addr_allocated_mem = calc_addr_of_allocated_memory_based_on_room_boader( base_addr, req_align );
 	uintptr_t addr_tail_padding  = addr_allocated_mem + req_size;
 	return reinterpret_cast<unsigned char*>( addr_tail_padding );
 }
 
-inline uintptr_t room_boader::calc_addr_of_end_of_tail_padding_based_on_room_boader( uintptr_t base_addr, size_t req_size, size_t req_align )
+inline uintptr_t room_boader::calc_addr_of_end_of_tail_padding_based_on_room_boader( uintptr_t base_addr, size_t req_size, size_t req_align ) noexcept
 {
 	uintptr_t addr_alloc_top        = calc_addr_of_allocated_memory_based_on_room_boader( base_addr, req_align );
 	uintptr_t addr_alloc_end        = addr_alloc_top + req_size;
@@ -215,7 +215,7 @@ inline uintptr_t room_boader::calc_addr_of_end_of_tail_padding_based_on_room_boa
 	return addr_chopped_room_end;
 }
 
-room_boader::room_boader( const alloc_chamber* p_parent, size_t chopped_size_arg, size_t req_size, size_t req_align )
+room_boader::room_boader( const alloc_chamber* p_parent, size_t chopped_size_arg, size_t req_size, size_t req_align ) noexcept
   : chopped_size_( chopped_size_arg )
   , p_alloc_in_room_( new( calc_pointer_of_alloc_in_room_based_on_room_boarder( reinterpret_cast<uintptr_t>( this ), req_align ) ) alloc_in_room( p_parent ) )
   , p_tail_padding_( calc_pointer_of_tail_padding_based_on_room_boarder( reinterpret_cast<uintptr_t>( this ), req_size, req_align ) )
@@ -234,17 +234,17 @@ room_boader::room_boader( const alloc_chamber* p_parent, size_t chopped_size_arg
 #endif
 }
 
-inline void* room_boader::get_allocated_mem_pointer( void ) const
+inline void* room_boader::get_allocated_mem_pointer( void ) const noexcept
 {
 	return reinterpret_cast<void*>( p_alloc_in_room_->mem );
 }
 
-bool room_boader::is_belong_to_this( void* p_mem ) const
+bool room_boader::is_belong_to_this( void* p_mem ) const noexcept
 {
 	return ( p_alloc_in_room_->mem <= p_mem ) && ( p_mem < p_tail_padding_ );
 }
 
-void room_boader::dump_to_log( log_type lt, char c, int id ) const
+void room_boader::dump_to_log( log_type lt, char c, int id ) const noexcept
 {
 	internal::LogOutput(
 		lt,
@@ -272,21 +272,18 @@ alloc_chamber_statistics& alloc_chamber_statistics::operator+=( const alloc_cham
 	return *this;
 }
 
-std::string alloc_chamber_statistics::print( void ) const
+alloc_chamber_statistics::print_string_t alloc_chamber_statistics::print( void ) const noexcept
 {
-	char buff[2048];
-	snprintf( buff, 2048,
-	          "chamber count = %zu, total allocated size = 0x%zx(%.2fM), consumed size = 0x%zx(%.2fM), free size = 0x%zx(%.2fM), used ratio = %2.1f %%, total allocated = %zu, using = %zu, released = %zu",
-	          chamber_count_,
-	          alloc_size_, static_cast<double>( alloc_size_ ) / static_cast<double>( 1024 * 1024 ),
-	          consum_size_, static_cast<double>( consum_size_ ) / static_cast<double>( 1024 * 1024 ),
-	          free_size_, static_cast<double>( free_size_ ) / static_cast<double>( 1024 * 1024 ),
-	          ( alloc_size_ > 0 ) ? ( static_cast<double>( consum_size_ ) / static_cast<double>( alloc_size_ ) * 100.0f ) : 0.0f,
-	          num_of_allocated_,
-	          num_of_using_allocated_,
-	          num_of_released_allocated_ );
-
-	return std::string( buff );
+	return print_string_t(
+		"chamber count = %zu, total allocated size = 0x%zx(%.2fM), consumed size = 0x%zx(%.2fM), free size = 0x%zx(%.2fM), used ratio = %2.1f %%, total allocated = %zu, using = %zu, released = %zu",
+		chamber_count_,
+		alloc_size_, static_cast<double>( alloc_size_ ) / static_cast<double>( 1024 * 1024 ),
+		consum_size_, static_cast<double>( consum_size_ ) / static_cast<double>( 1024 * 1024 ),
+		free_size_, static_cast<double>( free_size_ ) / static_cast<double>( 1024 * 1024 ),
+		( alloc_size_ > 0 ) ? ( static_cast<double>( consum_size_ ) / static_cast<double>( alloc_size_ ) * 100.0f ) : 0.0f,
+		num_of_allocated_,
+		num_of_using_allocated_,
+		num_of_released_allocated_ );
 }
 
 struct alloc_chamber {
@@ -299,9 +296,9 @@ struct alloc_chamber {
 #endif
 	unsigned char roomtop_[0];
 
-	explicit alloc_chamber( size_t chamber_size_arg );
+	explicit alloc_chamber( size_t chamber_size_arg ) noexcept;
 
-	void* allocate( size_t req_size, size_t req_align );
+	void* allocate( size_t req_size, size_t req_align ) noexcept;
 
 	/**
 	 * @brief Search an associated room_boader
@@ -309,21 +306,21 @@ struct alloc_chamber {
 	 * @param p_mem pointer to search
 	 * @return const room_boader* pointer that is found. nullptr: does not find
 	 */
-	const room_boader* search_associated_room_boader( void* p_mem ) const;
+	const room_boader* search_associated_room_boader( void* p_mem ) const noexcept;
 
-	alloc_chamber_statistics get_statistics( void ) const;
+	alloc_chamber_statistics get_statistics( void ) const noexcept;
 
-	void dump_to_log( log_type lt, char c, int id ) const;
+	void dump_to_log( log_type lt, char c, int id ) const noexcept;
 
-	size_t inspect_using_memory( bool flag_with_dump_to_log, log_type lt, char c, int id ) const;
+	size_t inspect_using_memory( bool flag_with_dump_to_log, log_type lt, char c, int id ) const noexcept;
 
-	static inline bool is_alloc_chamber( const alloc_chamber* p_test )
+	static inline bool is_alloc_chamber( const alloc_chamber* p_test ) noexcept
 	{
 		if ( p_test == nullptr ) return false;
 		return ( p_test->magic_number_ == kMagicNumber );
 	}
 
-	static inline bool try_deallocate( void* p_mem )
+	static inline bool try_deallocate( void* p_mem ) noexcept
 	{
 		return room_boader::try_marks_as_deallocated( p_mem );
 	}
@@ -361,8 +358,8 @@ private:
 		uintptr_t       addr_cur_rb_;         //!< このiteratorが見ているroom_boaderへのアドレス
 		const uintptr_t addr_end_sentinel_;   //!< このiteratorのend側番兵としてのアドレス
 
-		friend bool operator==( const iterator& a, const iterator& b );
-		friend bool operator!=( const iterator& a, const iterator& b );
+		friend bool operator==( const iterator& a, const iterator& b ) noexcept;
+		friend bool operator!=( const iterator& a, const iterator& b ) noexcept;
 	};
 
 	class const_iterator {
@@ -397,43 +394,43 @@ private:
 		uintptr_t       addr_cur_rb_;         //!< このiteratorが見ているroom_boaderへのアドレス
 		const uintptr_t addr_end_sentinel_;   //!< このiteratorのend側番兵としてのアドレス
 
-		friend bool operator==( const const_iterator& a, const const_iterator& b );
-		friend bool operator!=( const const_iterator& a, const const_iterator& b );
+		friend bool operator==( const const_iterator& a, const const_iterator& b ) noexcept;
+		friend bool operator!=( const const_iterator& a, const const_iterator& b ) noexcept;
 	};
 
-	iterator       begin( void );
-	const_iterator begin( void ) const;
-	iterator       end( void );
-	const_iterator end( void ) const;
+	iterator       begin( void ) noexcept;
+	const_iterator begin( void ) const noexcept;
+	iterator       end( void ) noexcept;
+	const_iterator end( void ) const noexcept;
 
-	uintptr_t calc_addr_chopped_room_end_by( uintptr_t expected_offset_, size_t req_size, size_t req_align );
+	uintptr_t calc_addr_chopped_room_end_by( uintptr_t expected_offset_, size_t req_size, size_t req_align ) noexcept;
 
 #if ( __cpp_constexpr >= 201304 )
-	static constexpr uintptr_t calc_init_offset( void );
+	static constexpr uintptr_t calc_init_offset( void ) noexcept;
 #else
-	static inline uintptr_t calc_init_offset( void );
+	static inline uintptr_t calc_init_offset( void ) noexcept;
 #endif
 	static constexpr uintptr_t kMagicNumber = 0x416c6c6343686d62;   //!< 'AllcChmb'
 
-	friend bool operator==( const alloc_chamber::iterator& a, const alloc_chamber::iterator& b );
-	friend bool operator!=( const alloc_chamber::iterator& a, const alloc_chamber::iterator& b );
-	friend bool operator==( const alloc_chamber::const_iterator& a, const alloc_chamber::const_iterator& b );
-	friend bool operator!=( const alloc_chamber::const_iterator& a, const alloc_chamber::const_iterator& b );
+	friend bool operator==( const alloc_chamber::iterator& a, const alloc_chamber::iterator& b ) noexcept;
+	friend bool operator!=( const alloc_chamber::iterator& a, const alloc_chamber::iterator& b ) noexcept;
+	friend bool operator==( const alloc_chamber::const_iterator& a, const alloc_chamber::const_iterator& b ) noexcept;
+	friend bool operator!=( const alloc_chamber::const_iterator& a, const alloc_chamber::const_iterator& b ) noexcept;
 };
 
-inline bool operator==( const alloc_chamber::iterator& a, const alloc_chamber::iterator& b )
+inline bool operator==( const alloc_chamber::iterator& a, const alloc_chamber::iterator& b ) noexcept
 {
 	return ( a.addr_cur_rb_ == b.addr_cur_rb_ );
 }
-inline bool operator!=( const alloc_chamber::iterator& a, const alloc_chamber::iterator& b )
+inline bool operator!=( const alloc_chamber::iterator& a, const alloc_chamber::iterator& b ) noexcept
 {
 	return ( a.addr_cur_rb_ != b.addr_cur_rb_ );
 }
-inline bool operator==( const alloc_chamber::const_iterator& a, const alloc_chamber::const_iterator& b )
+inline bool operator==( const alloc_chamber::const_iterator& a, const alloc_chamber::const_iterator& b ) noexcept
 {
 	return ( a.addr_cur_rb_ == b.addr_cur_rb_ );
 }
-inline bool operator!=( const alloc_chamber::const_iterator& a, const alloc_chamber::const_iterator& b )
+inline bool operator!=( const alloc_chamber::const_iterator& a, const alloc_chamber::const_iterator& b ) noexcept
 {
 	return ( a.addr_cur_rb_ != b.addr_cur_rb_ );
 }
@@ -444,14 +441,14 @@ constexpr
 inline
 #endif
 	uintptr_t
-	alloc_chamber::calc_init_offset( void )
+	alloc_chamber::calc_init_offset( void ) noexcept
 {
 	size_t n = sizeof( alloc_chamber ) / default_align_size;   // TODO: ビットマスクを使った演算で多分軽量化できるが、まずは真面目に計算する。
 	size_t r = sizeof( alloc_chamber ) % default_align_size;   // ただ、ここは、default_slot_alignsizeは定数かつ2^n上である数値なので、コンパイラの最適化がかかっていると思われる。
 	return default_align_size * ( n + ( ( r == 0 ) ? 0 : 1 ) );
 }
 
-alloc_chamber::alloc_chamber( size_t chamber_size_arg )
+alloc_chamber::alloc_chamber( size_t chamber_size_arg ) noexcept
   : magic_number_( kMagicNumber )
   , chamber_size_( chamber_size_arg )
   , next_( nullptr )
@@ -465,36 +462,36 @@ alloc_chamber::alloc_chamber( size_t chamber_size_arg )
 #endif
 }
 
-alloc_chamber::iterator alloc_chamber::begin( void )
+alloc_chamber::iterator alloc_chamber::begin( void ) noexcept
 {
 	uintptr_t addr_cur_rb        = reinterpret_cast<uintptr_t>( this ) + calc_init_offset();
 	uintptr_t addr_top_free_room = offset_.load( std::memory_order_acquire ) + reinterpret_cast<uintptr_t>( this );
 	return alloc_chamber::iterator( addr_cur_rb, addr_top_free_room );
 }
-alloc_chamber::const_iterator alloc_chamber::begin( void ) const
+alloc_chamber::const_iterator alloc_chamber::begin( void ) const noexcept
 {
 	uintptr_t addr_cur_rb        = reinterpret_cast<uintptr_t>( this ) + calc_init_offset();
 	uintptr_t addr_top_free_room = offset_.load( std::memory_order_acquire ) + reinterpret_cast<uintptr_t>( this );
 	return alloc_chamber::const_iterator( addr_cur_rb, addr_top_free_room );
 }
-alloc_chamber::iterator alloc_chamber::end( void )
+alloc_chamber::iterator alloc_chamber::end( void ) noexcept
 {
 	uintptr_t addr_top_free_room = offset_.load( std::memory_order_acquire ) + reinterpret_cast<uintptr_t>( this );
 	return alloc_chamber::iterator( addr_top_free_room, addr_top_free_room );
 }
-alloc_chamber::const_iterator alloc_chamber::end( void ) const
+alloc_chamber::const_iterator alloc_chamber::end( void ) const noexcept
 {
 	uintptr_t addr_top_free_room = offset_.load( std::memory_order_acquire ) + reinterpret_cast<uintptr_t>( this );
 	return alloc_chamber::const_iterator( addr_top_free_room, addr_top_free_room );
 }
 
-inline uintptr_t alloc_chamber::calc_addr_chopped_room_end_by( uintptr_t expected_offset_, size_t req_size, size_t req_align )
+inline uintptr_t alloc_chamber::calc_addr_chopped_room_end_by( uintptr_t expected_offset_, size_t req_size, size_t req_align ) noexcept
 {
 	uintptr_t base_addr = expected_offset_ + reinterpret_cast<uintptr_t>( this );
 	return room_boader::calc_addr_of_end_of_tail_padding_based_on_room_boader( base_addr, req_size, req_align );
 }
 
-void* alloc_chamber::allocate( size_t req_size, size_t req_align )
+void* alloc_chamber::allocate( size_t req_size, size_t req_align ) noexcept
 {
 	uintptr_t cur_offset             = offset_.load( std::memory_order_acquire );
 	uintptr_t final_candidate_offset = 0;
@@ -526,7 +523,7 @@ void* alloc_chamber::allocate( size_t req_size, size_t req_align )
 	return p_ans;
 }
 
-const room_boader* alloc_chamber::search_associated_room_boader( void* p_mem ) const
+const room_boader* alloc_chamber::search_associated_room_boader( void* p_mem ) const noexcept
 {
 	for ( const auto& e : *this ) {
 		if ( e.is_belong_to_this( p_mem ) ) {
@@ -538,7 +535,7 @@ const room_boader* alloc_chamber::search_associated_room_boader( void* p_mem ) c
 	return nullptr;
 }
 
-void alloc_chamber::dump_to_log( log_type lt, char c, int id ) const
+void alloc_chamber::dump_to_log( log_type lt, char c, int id ) const noexcept
 {
 	internal::LogOutput(
 		lt,
@@ -559,7 +556,7 @@ void alloc_chamber::dump_to_log( log_type lt, char c, int id ) const
 	}
 }
 
-size_t alloc_chamber::inspect_using_memory( bool flag_with_dump_to_log, log_type lt, char c, int id ) const
+size_t alloc_chamber::inspect_using_memory( bool flag_with_dump_to_log, log_type lt, char c, int id ) const noexcept
 {
 	size_t ans = 0;
 	for ( const auto& e : *this ) {
@@ -574,7 +571,7 @@ size_t alloc_chamber::inspect_using_memory( bool flag_with_dump_to_log, log_type
 	return ans;
 }
 
-alloc_chamber_statistics alloc_chamber::get_statistics( void ) const
+alloc_chamber_statistics alloc_chamber::get_statistics( void ) const noexcept
 {
 	alloc_chamber_statistics ans;
 	ans.alloc_size_  = chamber_size_;
@@ -593,7 +590,7 @@ alloc_chamber_statistics alloc_chamber::get_statistics( void ) const
 	return ans;
 }
 
-inline alloc_in_room* room_boader::check_and_get_pointer_to_alloc_in_room( void* p_mem )
+inline alloc_in_room* room_boader::check_and_get_pointer_to_alloc_in_room( void* p_mem ) noexcept
 {
 	if ( p_mem == nullptr ) return nullptr;
 
@@ -604,7 +601,7 @@ inline alloc_in_room* room_boader::check_and_get_pointer_to_alloc_in_room( void*
 	return p_air;
 }
 
-bool room_boader::try_marks_as_deallocated( void* p_mem )
+bool room_boader::try_marks_as_deallocated( void* p_mem ) noexcept
 {
 	alloc_in_room* p_air = check_and_get_pointer_to_alloc_in_room( p_mem );
 	if ( p_air == nullptr ) {
@@ -652,7 +649,7 @@ alloc_only_chamber::~alloc_only_chamber()
 	}
 }
 
-void* alloc_only_chamber::try_allocate( size_t req_size, size_t req_align )
+void* alloc_only_chamber::try_allocate( size_t req_size, size_t req_align ) noexcept
 {
 	alloc_chamber* p_cur_focusing_ch = head_.load( std::memory_order_acquire );
 	if ( p_cur_focusing_ch == nullptr ) {
@@ -689,7 +686,7 @@ void* alloc_only_chamber::try_allocate( size_t req_size, size_t req_align )
 	return nullptr;
 }
 
-void alloc_only_chamber::push_alloc_mem( void* p_alloced_mem, size_t allocated_size )
+void alloc_only_chamber::push_alloc_mem( void* p_alloced_mem, size_t allocated_size ) noexcept
 {
 	if ( p_alloced_mem == nullptr ) return;
 
@@ -703,7 +700,7 @@ void alloc_only_chamber::push_alloc_mem( void* p_alloced_mem, size_t allocated_s
 	return;
 }
 
-void alloc_only_chamber::munmap_alloc_chamber( alloc_chamber* p_ac )
+void alloc_only_chamber::munmap_alloc_chamber( alloc_chamber* p_ac ) noexcept
 {
 	size_t chamber_size_of_p_ac = p_ac->chamber_size_;
 	int    ret                  = deallocate_by_munmap( p_ac, chamber_size_of_p_ac );
@@ -721,7 +718,7 @@ void alloc_only_chamber::munmap_alloc_chamber( alloc_chamber* p_ac )
 	return;
 }
 
-void* alloc_only_chamber::chked_allocate( size_t req_size, size_t req_align )
+void* alloc_only_chamber::chked_allocate( size_t req_size, size_t req_align ) noexcept
 {
 	void* p_ans = try_allocate( req_size, req_align );
 
@@ -747,12 +744,12 @@ void* alloc_only_chamber::chked_allocate( size_t req_size, size_t req_align )
 	return p_ans;
 }
 
-void alloc_only_chamber::deallocate( void* p_mem )
+void alloc_only_chamber::deallocate( void* p_mem ) noexcept
 {
 	alloc_chamber::try_deallocate( p_mem );
 }
 
-bool alloc_only_chamber::is_belong_to_this( void* p_mem ) const
+bool alloc_only_chamber::is_belong_to_this( void* p_mem ) const noexcept
 {
 	auto p_cur_chamber = head_.load( std::memory_order_acquire );
 	while ( p_cur_chamber != nullptr ) {
@@ -766,7 +763,7 @@ bool alloc_only_chamber::is_belong_to_this( void* p_mem ) const
 	return false;
 }
 
-alloc_chamber_statistics alloc_only_chamber::get_statistics( void ) const
+alloc_chamber_statistics alloc_only_chamber::get_statistics( void ) const noexcept
 {
 	alloc_chamber_statistics total_statistics;
 
@@ -779,7 +776,7 @@ alloc_chamber_statistics alloc_only_chamber::get_statistics( void ) const
 	return total_statistics;
 }
 
-void alloc_only_chamber::dump_to_log( log_type lt, char c, int id ) const
+void alloc_only_chamber::dump_to_log( log_type lt, char c, int id ) const noexcept
 {
 	alloc_chamber_statistics total_statistics;
 
@@ -793,7 +790,7 @@ void alloc_only_chamber::dump_to_log( log_type lt, char c, int id ) const
 	internal::LogOutput( lt, "[%d-%c] alloc_chamber_statistics %s", id, c, total_statistics.print().c_str() );
 }
 
-size_t alloc_only_chamber::inspect_using_memory( bool flag_with_dump_to_log, log_type lt, char c, int id ) const
+size_t alloc_only_chamber::inspect_using_memory( bool flag_with_dump_to_log, log_type lt, char c, int id ) const noexcept
 {
 	size_t ans = 0;
 
@@ -806,7 +803,7 @@ size_t alloc_only_chamber::inspect_using_memory( bool flag_with_dump_to_log, log
 	return ans;
 }
 
-alloc_only_chamber::validity_status alloc_only_chamber::verify_validity( void* p_mem )
+alloc_only_chamber::validity_status alloc_only_chamber::verify_validity( void* p_mem ) noexcept
 {
 	alloc_in_room* p_air = room_boader::check_and_get_pointer_to_alloc_in_room( p_mem );
 	if ( p_air == nullptr ) {

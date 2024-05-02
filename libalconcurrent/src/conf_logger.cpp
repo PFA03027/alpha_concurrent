@@ -26,7 +26,7 @@ public:
 		const log_type,              //!< [in]	log type for logger
 		const size_t max_buf_size,   //!< [in]	max string buffer size of 3rd parameter
 		const char*  p_log_str       //!< [in]	pointer log string
-		) override
+		) noexcept override
 	{
 		printf( "%s\n", p_log_str );
 		//		fflush( NULL );
@@ -85,7 +85,7 @@ bool is_allowed_to_output(
 }   // namespace internal
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-void bt_info::dump_to_log( log_type lt, char c, int id ) const
+void bt_info::dump_to_log( log_type lt, char c, int id ) const noexcept
 {
 	if ( count_ == 0 ) {
 		internal::LogOutput( lt, "[%d-%c] no back trace. this slot has not allocated yet.", id, c );
