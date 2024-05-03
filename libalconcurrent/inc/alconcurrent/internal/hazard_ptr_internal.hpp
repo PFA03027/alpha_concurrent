@@ -177,8 +177,8 @@ public:
 
 private:
 	std::atomic<bool> is_used_;
-	hzrd_p_array_t    hzrd_ptr_array_;
-	iterator          next_assign_hint_it_;
+	alignas( internal::atomic_variable_align ) hzrd_p_array_t hzrd_ptr_array_;
+	alignas( internal::atomic_variable_align ) iterator next_assign_hint_it_;
 };
 
 /**
