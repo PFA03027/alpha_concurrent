@@ -26,6 +26,12 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
+#ifdef __cpp_lib_hardware_interference_size
+constexpr size_t atomic_variable_align = std::hardware_destructive_interference_size;   // it is better to be equal to std::hardware_destructive_interference_size
+#else
+constexpr size_t atomic_variable_align = 64;   // it is better to be equal to std::hardware_destructive_interference_size
+#endif
+
 class hazard_ptr_group {
 public:
 	static constexpr size_t kArraySize = 32;
@@ -152,6 +158,11 @@ public:
 
 	std::atomic<hazard_ptr_group*> ap_chain_next_;
 	std::atomic<hazard_ptr_group*> ap_list_next_;
+
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+	static std::atomic<size_t> call_count_try_assign_;
+	static std::atomic<size_t> loop_count_in_try_assign_;
+#endif
 
 private:
 	std::atomic<bool> is_used_;
@@ -334,8 +345,12 @@ public:
 	template <typename T, typename Deleter = std::default_delete<T>>
 	static void retire( T* p_retire_obj, Deleter&& deleter_arg = std::default_delete<T> {} )
 	{
-		retire_node_abst* p_new_retire = new retire_node<T, Deleter>( p_retire_obj, std::forward<Deleter>( deleter_arg ) );
-		retire( p_new_retire );
+		if ( internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( p_retire_obj ) ) {
+			retire_node_abst* p_new_retire = new retire_node<T, Deleter>( p_retire_obj, std::forward<Deleter>( deleter_arg ) );
+			retire( p_new_retire );
+		} else {
+			deleter_arg( p_retire_obj );
+		}
 	}
 
 	static void recycle( void );

@@ -37,6 +37,11 @@ global_scope_hazard_ptr_chain     global_scope_hazard_ptr_chain::g_scope_hzrd_ch
 thread_local bind_hazard_ptr_list tl_bhpl;
 
 ///////////////////////////////////////////////////////////////////////
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+std::atomic<size_t> hazard_ptr_group::call_count_try_assign_( 0 );
+std::atomic<size_t> hazard_ptr_group::loop_count_in_try_assign_( 0 );
+#endif
+
 hazard_ptr_group::~hazard_ptr_group()
 {
 	for ( auto& e : *this ) {
@@ -48,7 +53,26 @@ hazard_ptr_group::~hazard_ptr_group()
 
 hazard_ptr_group::hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 {
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+	call_count_try_assign_++;
+#endif
+
+	{
+		void* expected_p = nullptr;
+		if ( next_assign_hint_it_->compare_exchange_strong( expected_p, p, std::memory_order_release, std::memory_order_relaxed ) ) {
+			hzrd_slot_ownership_t ans( &( *next_assign_hint_it_ ) );
+			++next_assign_hint_it_;
+			if ( next_assign_hint_it_ == end() ) {
+				next_assign_hint_it_ = begin();
+			}
+			return ans;
+		}
+	}
+
 	for ( auto it = next_assign_hint_it_; it != end(); it++ ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+		loop_count_in_try_assign_++;
+#endif
 		void* expected_p = nullptr;
 		if ( it->compare_exchange_strong( expected_p, p, std::memory_order_release, std::memory_order_relaxed ) ) {
 			hzrd_slot_ownership_t ans( &( *it ) );
@@ -62,6 +86,9 @@ hazard_ptr_group::hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 	}
 	auto wraparound_end = next_assign_hint_it_;
 	for ( auto it = begin(); it != wraparound_end; it++ ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+		loop_count_in_try_assign_++;
+#endif
 		void* expected_p = nullptr;
 		if ( it->compare_exchange_strong( expected_p, p, std::memory_order_release, std::memory_order_relaxed ) ) {
 			hzrd_slot_ownership_t ans( &( *it ) );
@@ -373,6 +400,11 @@ void global_scope_hazard_ptr_chain::remove_all( void )
 		lg = log_type::ERR;
 	}
 	LogOutput( lg, chk_ret.print().c_str() );
+#endif
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+	LogOutput( log_type::DUMP, "Profile of hazard_ptr_group:" );
+	LogOutput( log_type::DUMP, "\tcall count of hazard_ptr_group::try_assign() -> %zu", hazard_ptr_group::call_count_try_assign_.load() );
+	LogOutput( log_type::DUMP, "\tloop count in hazard_ptr_group::try_assign() -> %zu", hazard_ptr_group::loop_count_in_try_assign_.load() );
 #endif
 }
 

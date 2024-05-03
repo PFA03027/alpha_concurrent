@@ -23,7 +23,6 @@
             ],
             "group": {
                 "kind": "build",
-                "isDefault": true
             }
         },
         {
@@ -35,6 +34,7 @@
             ],
             "group": {
                 "kind": "build",
+                "isDefault": true
             }
         },
         {

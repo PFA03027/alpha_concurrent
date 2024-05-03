@@ -30,20 +30,29 @@ ALCONCURRENT_BUILD_SHARED_LIBS?=OFF
 # 
 SANITIZER_TYPE?=
 
+# GoogleTest Option
+TEST_OPTS?=
+
 ##### internal variable
 BUILDIMPLTARGET?=all
 BUILD_DIR?=build
 #MAKEFILE_DIR := $(dir $(lastword $(MAKEFILE_LIST)))	# 相対パス名を得るならこちら。
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))	# 絶対パス名を得るならこちら。
 
-CPUS=$(shell grep cpu.cores /proc/cpuinfo | sort -u | sed 's/[^0-9]//g')
-JOBS=$(shell expr ${CPUS} + ${CPUS} / 2)
+SANITIZER_ALL_IDS=$(shell seq 1 21)
+SANITIZER_P_ALL_TARGETS=$(addprefix sanitizer.p.,$(SANITIZER_ALL_IDS))
+
+#TEST_EXECS = $(shell find ${BUILD_DIR} -type f -executable -name "test_*")
+TEST_EXECS = $(shell find . -type f -executable -name "test_*")
 
 CMAKE_CONFIGURE_OPTS  = -DCMAKE_EXPORT_COMPILE_COMMANDS=ON  # for clang-tidy
 CMAKE_CONFIGURE_OPTS += -DCMAKE_BUILD_TYPE=${BUILDTYPE}
 CMAKE_CONFIGURE_OPTS += -DBUILD_TARGET=${BUILDTARGET}
 CMAKE_CONFIGURE_OPTS += -DSANITIZER_TYPE=${SANITIZER_TYPE}
 CMAKE_CONFIGURE_OPTS += -DALCONCURRENT_BUILD_SHARED_LIBS=${ALCONCURRENT_BUILD_SHARED_LIBS} 
+
+CPUS=$(shell grep cpu.cores /proc/cpuinfo | sort -u | sed 's/[^0-9]//g')
+JOBS?=$(shell expr ${CPUS} + ${CPUS} / 2)
 
 all: configure-cmake
 	set -e; \
@@ -69,12 +78,6 @@ sample: build-sample
 build-sample:
 	make BUILDIMPLTARGET=build-sample all
 
-configure-cmake:
-	set -e; \
-	mkdir -p ${BUILD_DIR}; \
-	cd ${BUILD_DIR}; \
-	cmake ${CMAKE_CONFIGURE_OPTS} -G "Unix Makefiles" ${MAKEFILE_DIR}
-
 clean:
 	-rm -fr ${BUILD_DIR} build.*
 
@@ -88,13 +91,8 @@ coverage: clean
 	lcov --rc lcov_branch_coverage=1 -b -c -d . -r tmp2.info  '*/test/*' -o output.info; \
 	genhtml --branch-coverage -o OUTPUT -p . -f output.info
 
-profile: clean
-	set -e; \
-	make BUILDTARGET=gprof BUILDTYPE=Release test;  \
-	cd ${BUILD_DIR}; \
-	find . -type f -executable -name "test_*" | xargs -P${JOBS} -I@ sh ../gprof_exec.sh @
-
-SANITIZER_ALL_IDS=$(shell seq 1 21)
+profile: exec-profile
+	make -j ${JOBS} make-profile-out
 
 sanitizer:
 	set -e; \
@@ -103,13 +101,35 @@ sanitizer:
 		echo $$i / 21 done; \
 	done
 
+sanitizer.p:
+	make -j${JOBS} sanitizer.p_internal
+
 sanitizer.%.sanitizer: clean
 	make BUILDTARGET=common BUILDTYPE=Debug SANITIZER_TYPE=$* test
 
-SANITIZER_P_ALL_TARGETS=$(addprefix sanitizer.p.,$(SANITIZER_ALL_IDS))
+tidy-fix: configure-cmake
+	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build --fix
+	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-format -i
+	find ./ -name '*.hpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-format -i
 
-sanitizer.p:
-	make -j${JOBS} sanitizer.p_internal
+tidy: configure-cmake
+	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build
+
+############################################################################
+configure-cmake:
+	set -e; \
+	mkdir -p ${BUILD_DIR}; \
+	cd ${BUILD_DIR}; \
+	cmake ${CMAKE_CONFIGURE_OPTS} -G "Unix Makefiles" ${MAKEFILE_DIR}
+
+build-profile:
+	make BUILDTARGET=gprof BUILDTYPE=Release build-test
+
+exec-profile: build-profile
+	set -e; \
+	cd ${BUILD_DIR}; \
+	ctest -j ${JOBS} -v
+
 
 sanitizer.p_internal: $(SANITIZER_P_ALL_TARGETS)
 
@@ -126,18 +146,37 @@ endef
 
 $(foreach pgm,$(SANITIZER_ALL_IDS),$(eval $(call SANITIZER_P_TEMPLATE,$(pgm))))
 
+ifeq ($(strip $(TEST_EXECS)),)
+## $(TEST_EXECS)が空の場合＝buildが実行されていない状況
+test.%: build-test
+	make test.$*
+
+profile.%: build-profile
+	make profile.$*
+
+else
+## $(TEST_EXECS)になんらかの値が入っている場合=buildが実行されている状況
+define TEST_EXEC_TEMPLATE
+test.$(1): build-test
+	$(3) $(TEST_OPTS)
+
+profile.$(1): build-profile
+	set -e; \
+	(cd $(2); ./$(1) $(TEST_OPTS)); \
+	gprof $(3) $(2)gmon.out > $(2)prof.out.txt
+
+endef
+
+$(foreach pgm,$(TEST_EXECS),$(eval $(call TEST_EXEC_TEMPLATE,$(notdir $(pgm)),$(dir $(pgm)),$(pgm))))
+
+endif
+
+make-profile-out: $(addprefix profile.,$(notdir $(TEST_EXECS)))
+
 sanitizer.p.test:
 	set -e; \
 	cd ${BUILD_DIR}; \
 	cmake --build . --target build-test; \
 	ctest -j $(shell expr ${JOBS} / 2) -v
-
-tidy-fix: configure-cmake
-	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build --fix
-	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-format -i
-	find ./ -name '*.hpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-format -i
-
-tidy: configure-cmake
-	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build
 
 .PHONY: test sanitizer sanitizer.p configure-cmake

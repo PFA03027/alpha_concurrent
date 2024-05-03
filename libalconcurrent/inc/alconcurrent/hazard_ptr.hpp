@@ -757,9 +757,9 @@ public:
 	}
 
 private:
-	// template <typename Deleter>
-	// void retire( hazard_ptr&&, Deleter dtr = Deleter {} );
-
+#if 0
+	alignas( internal::atomic_variable_align )
+#endif
 	std::atomic<pointer> ap_target_p_;
 };
 

@@ -653,11 +653,12 @@ int main( void )
 		std::cout << "hardware_concurrency is unknown, therefore let's select templary value. " << std::endl;
 		nworker = 10;
 	}
-	alpha::concurrent::stack_list<TestType> sut1( ReserveSize );
-	vec_mutex_stack<TestType>               sut2;
-	list_mutex_stack<TestType>              sut3;
-	fixsize_lf_stack<TestType>              sut4;
-	newop_lf_stack<TestType>                sut5;
+	alpha::concurrent::stack_list<TestType>   sut1( ReserveSize );
+	vec_mutex_stack<TestType>                 sut2;
+	list_mutex_stack<TestType>                sut3;
+	fixsize_lf_stack<TestType>                sut4;
+	newop_lf_stack<TestType>                  sut5;
+	alpha::concurrent::x_stack_list<TestType> sut6;
 
 	std::cout << "--- newop_lf_stack ---" << std::endl;
 	// nwoker_perf_test_stack<newop_lf_stack<TestType>>( nworker * 2, sut5 );
@@ -707,6 +708,13 @@ int main( void )
 	nwoker_perf_test_stack<list_mutex_stack<TestType>>( nworker / 2, sut3 );
 	nwoker_perf_test_stack<list_mutex_stack<TestType>>( 4, sut3 );
 	nwoker_perf_test_stack<list_mutex_stack<TestType>>( 1, sut3 );
+
+	std::cout << "--- x_stack_list ---" << std::endl;
+	nwoker_perf_test_stack<alpha::concurrent::x_stack_list<TestType>>( nworker * 2, sut6 );
+	nwoker_perf_test_stack<alpha::concurrent::x_stack_list<TestType>>( nworker, sut6 );
+	nwoker_perf_test_stack<alpha::concurrent::x_stack_list<TestType>>( nworker / 2, sut6 );
+	nwoker_perf_test_stack<alpha::concurrent::x_stack_list<TestType>>( 4, sut6 );
+	nwoker_perf_test_stack<alpha::concurrent::x_stack_list<TestType>>( 1, sut6 );
 
 	return EXIT_SUCCESS;
 }
