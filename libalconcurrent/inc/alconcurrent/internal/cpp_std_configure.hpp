@@ -12,6 +12,17 @@
 #ifndef ALCONCURRENT_INC_INTERNAL_CPP_STD_CONFIGURE_HPP_
 #define ALCONCURRENT_INC_INTERNAL_CPP_STD_CONFIGURE_HPP_
 
+#if __has_include( <version>)
+#include <version>
+#endif
+
+// configuration for constinit
+#if __cpp_constinit >= 201907L
+#define ALCC_INTERNAL_CONSTINIT constinit
+#else
+#define ALCC_INTERNAL_CONSTINIT
+#endif
+
 // configuration for constexpr constructor
 #if __cpp_constexpr >= 201304L
 #define ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR_BODY constexpr

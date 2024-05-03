@@ -205,7 +205,7 @@ private:
 extern thread_local bind_hazard_ptr_list tl_bhpl;
 
 /////////////////////////////////////////////////////////////////
-class global_scope_hazard_ptr_chain {
+class alignas( internal::atomic_variable_align ) global_scope_hazard_ptr_chain {
 public:
 	/**
 	 * @brief Get ownership from unused hazard_ptr_group list

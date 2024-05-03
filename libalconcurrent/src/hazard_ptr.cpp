@@ -30,11 +30,11 @@ namespace internal {
 // configuration value
 constexpr size_t conf_pre_mmap_size = 16 * 1024;
 
-static alloc_only_chamber g_alloc_only_inst_for_hzrd_ptr_module( false, conf_pre_mmap_size );   // グローバルインスタンスは、プロセス終了までメモリ領域を維持するために、デストラクタが呼ばれてもmmapした領域を解放しない。
+static ALCC_INTERNAL_CONSTINIT alloc_only_chamber g_alloc_only_inst_for_hzrd_ptr_module( false, conf_pre_mmap_size );   // グローバルインスタンスは、プロセス終了までメモリ領域を維持するために、デストラクタが呼ばれてもmmapした領域を解放しない。
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-global_scope_hazard_ptr_chain     global_scope_hazard_ptr_chain::g_scope_hzrd_chain_;
-thread_local bind_hazard_ptr_list tl_bhpl;
+ALCC_INTERNAL_CONSTINIT global_scope_hazard_ptr_chain     global_scope_hazard_ptr_chain::g_scope_hzrd_chain_;
+thread_local ALCC_INTERNAL_CONSTINIT bind_hazard_ptr_list tl_bhpl;
 
 ///////////////////////////////////////////////////////////////////////
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
@@ -415,10 +415,10 @@ void global_scope_hazard_ptr_chain::remove_all( void )
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
- * @brief スレッドローカルストレージ専用のretire pointer管理クラス
+ * @brief グローバル変数専用のretire pointer管理クラス
  *
  */
-class global_retire_mgr {
+class alignas( internal::atomic_variable_align ) global_retire_mgr {
 public:
 	class locker {
 	public:
@@ -545,7 +545,7 @@ private:
  * このクラスのインスタンスが終了するとき、まだ保持しているretire pointerが残っている場合、
  * グローバルストレージ専用クラスにリストを移管してから、デストラクタを終了する。
  */
-class thread_local_retire_mgr {
+class alignas( internal::atomic_variable_align ) thread_local_retire_mgr {
 public:
 	explicit constexpr thread_local_retire_mgr( global_retire_mgr& transfer_distination_arg ) noexcept
 	  : transfer_distination_( transfer_distination_arg )
@@ -634,8 +634,8 @@ private:
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////
-global_retire_mgr                    g_retire_mgr_inst;
-thread_local thread_local_retire_mgr tl_reitre_mgr_insts { g_retire_mgr_inst };
+ALCC_INTERNAL_CONSTINIT global_retire_mgr                    g_retire_mgr_inst;
+thread_local ALCC_INTERNAL_CONSTINIT thread_local_retire_mgr tl_reitre_mgr_insts { g_retire_mgr_inst };
 
 void retire_mgr::recycle( void )
 {
