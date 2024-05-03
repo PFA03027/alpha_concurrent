@@ -4,10 +4,10 @@ echo $@
 # 1. please prepare XXXX.cmake that includes build options
 # 2. provide file information of XXXX.cmake like below to CMakeLists.txt
 #    with -D option like below
-#        $ cmake -D BUILD_TARGET=`pwd`/../XXXX
-#    common.cmake is default configurations
+#        $ cmake -D BUILD_TARGET=normal
+#    normal.cmake is the configuration for normal build
 # 
-BUILDTARGET=common
+BUILDTARGET=normal
 
 # Debug or Release or ...
 #BUILDTYPE=Debug

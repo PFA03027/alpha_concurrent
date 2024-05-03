@@ -3,7 +3,7 @@ project(alpha_concurrent CXX)
 set(CMAKE_VERBOSE_MAKEFILE 1)
 
 # Switch build target
-set(BUILD_TARGET common CACHE STRING "Build target?")
+set(BUILD_TARGET normal CACHE STRING "Build target?")
 message("[BUILD] ${BUILD_TARGET}")
 include(${BUILD_TARGET}.cmake)
 

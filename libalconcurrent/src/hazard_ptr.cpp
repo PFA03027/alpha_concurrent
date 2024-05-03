@@ -40,6 +40,9 @@ thread_local bind_hazard_ptr_list tl_bhpl;
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 std::atomic<size_t> hazard_ptr_group::call_count_try_assign_( 0 );
 std::atomic<size_t> hazard_ptr_group::loop_count_in_try_assign_( 0 );
+
+std::atomic<size_t> call_count_hazard_ptr_get_( 0 );
+std::atomic<size_t> loop_count_in_hazard_ptr_get_( 0 );
 #endif
 
 hazard_ptr_group::~hazard_ptr_group()
@@ -56,7 +59,6 @@ hazard_ptr_group::hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 	call_count_try_assign_++;
 #endif
-
 	{
 		void* expected_p = nullptr;
 		if ( next_assign_hint_it_->compare_exchange_strong( expected_p, p, std::memory_order_release, std::memory_order_relaxed ) ) {
@@ -275,7 +277,7 @@ bind_hazard_ptr_list::~bind_hazard_ptr_list()
 	}
 }
 
-bind_hazard_ptr_list::hzrd_slot_ownership_t bind_hazard_ptr_list::assign( void* p )
+bind_hazard_ptr_list::hzrd_slot_ownership_t bind_hazard_ptr_list::slot_assign( void* p )
 {
 	hazard_ptr_group* p_pre_list = nullptr;
 	hazard_ptr_group* p_cur_list = ownership_ticket_.get();
@@ -405,6 +407,8 @@ void global_scope_hazard_ptr_chain::remove_all( void )
 	LogOutput( log_type::DUMP, "Profile of hazard_ptr_group:" );
 	LogOutput( log_type::DUMP, "\tcall count of hazard_ptr_group::try_assign() -> %zu", hazard_ptr_group::call_count_try_assign_.load() );
 	LogOutput( log_type::DUMP, "\tloop count in hazard_ptr_group::try_assign() -> %zu", hazard_ptr_group::loop_count_in_try_assign_.load() );
+	LogOutput( log_type::DUMP, "\tcall count of hazard_ptr<T>::get() -> %zu", call_count_hazard_ptr_get_.load() );
+	LogOutput( log_type::DUMP, "\tloop count in hazard_ptr<T>::get() -> %zu", loop_count_in_hazard_ptr_get_.load() );
 #endif
 }
 

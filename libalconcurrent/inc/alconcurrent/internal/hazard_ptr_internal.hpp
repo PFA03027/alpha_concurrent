@@ -32,9 +32,14 @@ constexpr size_t atomic_variable_align = std::hardware_destructive_interference_
 constexpr size_t atomic_variable_align = 64;   // it is better to be equal to std::hardware_destructive_interference_size
 #endif
 
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+extern std::atomic<size_t> call_count_hazard_ptr_get_;
+extern std::atomic<size_t> loop_count_in_hazard_ptr_get_;
+#endif
+
 class hazard_ptr_group {
 public:
-	static constexpr size_t kArraySize = 32;
+	static constexpr size_t kArraySize = 16;
 	using hzrd_p_array_t               = std::array<std::atomic<void*>, kArraySize>;
 	using reference                    = hzrd_p_array_t::reference;
 	using const_reference              = hzrd_p_array_t::const_reference;
@@ -60,6 +65,12 @@ public:
 
 	class hzrd_slot_releaser {
 	public:
+		constexpr hzrd_slot_releaser( void )                                 = default;
+		constexpr hzrd_slot_releaser( const hzrd_slot_releaser& )            = default;
+		constexpr hzrd_slot_releaser( hzrd_slot_releaser&& )                 = default;
+		constexpr hzrd_slot_releaser& operator=( const hzrd_slot_releaser& ) = default;
+		constexpr hzrd_slot_releaser& operator=( hzrd_slot_releaser&& )      = default;
+
 		void operator()( std::atomic<void*>* ptr ) const
 		{
 			if ( ptr == nullptr ) return;
@@ -170,6 +181,12 @@ private:
 	iterator          next_assign_hint_it_;
 };
 
+/**
+ * @brief スレッドとhazard_ptr_listを紐づけるクラス
+ *
+ * スレッドローカルストレージで使用される前提
+ *
+ */
 class bind_hazard_ptr_list {
 public:
 	using hzrd_slot_ownership_t = hazard_ptr_group::hzrd_slot_ownership_t;
@@ -179,7 +196,7 @@ public:
 	bind_hazard_ptr_list& operator=( bind_hazard_ptr_list&& ) = default;
 	~bind_hazard_ptr_list();
 
-	hzrd_slot_ownership_t assign( void* p );
+	hzrd_slot_ownership_t slot_assign( void* p );
 
 private:
 	hazard_ptr_group::ownership_t ownership_ticket_;

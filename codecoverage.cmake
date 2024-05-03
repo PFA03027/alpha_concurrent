@@ -1,9 +1,7 @@
 
 # Common compile options
 
-#set(CMAKE_CXX_STANDARD 11)	# for test purpose
-#set(CMAKE_CXX_STANDARD 14)	# for test purpose
-#set(CMAKE_CXX_STANDARD 17)	# for test purpose
+include(common.cmake)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DALCONCURRENT_CONF_USE_THREAD_LOCAL")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP")

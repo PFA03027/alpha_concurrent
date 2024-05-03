@@ -7,10 +7,12 @@
 #    or
 #        $ make BUILDTARGET=XXXX
 # 
-#    common.cmake is default configurations
+#    common.cmake is common configurations
+#    normal.cmake is the configuration for normal build
+#    gprof.cmake is the configuration for profile and analysis
 #    codecoverage.cmake is the configuration for code coverage of gcov
 # 
-BUILDTARGET?=common
+BUILDTARGET?=normal
 
 # Debug or Release or ...
 # BUILDTYPE=Debug
@@ -26,7 +28,7 @@ ALCONCURRENT_BUILD_SHARED_LIBS?=OFF
 # Sanitizer test option:
 # SANITIZER_TYPE= 1 ~ 20 or ""
 #
-# Please see common.cmake for detail
+# Please see normal.cmake for detail
 # 
 SANITIZER_TYPE?=
 
@@ -91,7 +93,7 @@ coverage: clean
 	lcov --rc lcov_branch_coverage=1 -b -c -d . -r tmp2.info  '*/test/*' -o output.info; \
 	genhtml --branch-coverage -o OUTPUT -p . -f output.info
 
-profile: exec-profile
+profile: build-profile
 	make -j ${JOBS} make-profile-out
 
 sanitizer:
@@ -105,7 +107,7 @@ sanitizer.p:
 	make -j${JOBS} sanitizer.p_internal
 
 sanitizer.%.sanitizer: clean
-	make BUILDTARGET=common BUILDTYPE=Debug SANITIZER_TYPE=$* test
+	make BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$* test
 
 tidy-fix: configure-cmake
 	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build --fix
@@ -135,10 +137,10 @@ sanitizer.p_internal: $(SANITIZER_P_ALL_TARGETS)
 
 define SANITIZER_P_TEMPLATE
 sanitizer.p.configure-cmake.$(1):
-	make BUILD_DIR=build.p/$(1) BUILDTARGET=common BUILDTYPE=Debug SANITIZER_TYPE=$(1) configure-cmake
+	make BUILD_DIR=build.p/$(1) BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$(1) configure-cmake
 
 sanitizer.p.$(1): sanitizer.p.configure-cmake.$(1)
-	make BUILD_DIR=build.p/$(1) BUILDTARGET=common BUILDTYPE=Debug SANITIZER_TYPE=$(1) sanitizer.p.test
+	make BUILD_DIR=build.p/$(1) BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$(1) sanitizer.p.test
 
 sanitizer.p.configure-cmake.$(shell expr $(1) + 1): sanitizer.p.configure-cmake.$(1)
 
@@ -161,9 +163,10 @@ test.$(1): build-test
 	$(3) $(TEST_OPTS)
 
 profile.$(1): build-profile
-	set -e; \
-	(cd $(2); ./$(1) $(TEST_OPTS)); \
+	-rm -f $(2)gmon.out
+	set -e; (cd $(2); ./$(1) $(TEST_OPTS))
 	gprof $(3) $(2)gmon.out > $(2)prof.out.txt
+	gprof -A $(3) $(2)gmon.out > $(2)prof_func.out.txt
 
 endef
 

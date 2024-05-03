@@ -71,6 +71,17 @@
             }
         },
         {
+            "label": "make build-profile",
+            "type": "shell",
+            "command": "make build-profile",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+            }
+        },
+        {
             "label": "make all and exec test",
             "type": "shell",
             "command": "bash make_linux.sh test",

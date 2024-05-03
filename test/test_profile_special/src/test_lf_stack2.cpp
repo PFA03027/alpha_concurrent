@@ -42,8 +42,8 @@ protected:
 	}
 };
 
-constexpr unsigned int   num_thread = 1;   // Tested until 128.
-constexpr std::uintptr_t loop_num   = 20000000;
+constexpr unsigned int   num_thread = 10;   // Tested until 128.
+constexpr std::uintptr_t loop_num   = 2000000;
 
 pthread_barrier_t barrier2;
 
