@@ -37,7 +37,7 @@ extern std::atomic<size_t> call_count_hazard_ptr_get_;
 extern std::atomic<size_t> loop_count_in_hazard_ptr_get_;
 #endif
 
-class hazard_ptr_group {
+class alignas( atomic_variable_align ) hazard_ptr_group {
 public:
 	static constexpr size_t kArraySize = 16;
 	using hzrd_p_array_t               = std::array<std::atomic<void*>, kArraySize>;
@@ -122,6 +122,11 @@ public:
 		return hzrd_ptr_array_.end();
 	}
 
+	bool is_used( void ) const
+	{
+		return is_used_.load( std::memory_order_acquire );
+	}
+
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else
 #if __cpp_aligned_new
@@ -187,7 +192,7 @@ private:
  * スレッドローカルストレージで使用される前提
  *
  */
-class bind_hazard_ptr_list {
+class alignas( atomic_variable_align ) bind_hazard_ptr_list {
 public:
 	using hzrd_slot_ownership_t = hazard_ptr_group::hzrd_slot_ownership_t;
 

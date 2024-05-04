@@ -362,9 +362,10 @@ private:
 template <typename T>
 class x_free_od_node_storage {
 public:
-	using node_type    = od_node<T>;
-	using value_type   = typename od_node<T>::value_type;
-	using node_pointer = od_node<T>*;
+	using node_type            = od_node<T>;
+	using value_type           = typename od_node<T>::value_type;
+	using node_pointer         = od_node<T>*;
+	using hazard_ptr_handler_t = typename od_node<T>::hazard_ptr_handler_t;
 
 	bool recycle( node_pointer p_retire_node )
 	{
@@ -374,42 +375,44 @@ public:
 	}
 
 	template <bool IsDefaultConstructivle = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructivle>::type* = nullptr>
-	node_pointer allocate( void )
+	node_pointer allocate( node_pointer p_next_node_arg = nullptr )
 	{
 		// リサイクルストレージからノードを取り出す
-		node_pointer p_ans = allocate_from_recycle_storage();
-		if ( p_ans != nullptr ) return p_ans;
+		node_pointer p_ans = allocate_from_recycle_storage( p_next_node_arg );
+		if ( p_ans != nullptr ) {
+			return p_ans;
+		}
 
 		// ノードをリサイクルできなかったので、ノードをアロケートする
-		return new node_type { nullptr, value_type {} };
+		return new node_type { hazard_ptr_handler_t { p_next_node_arg }, value_type {} };
 	}
 
 	template <bool IsCopyable = std::is_copy_constructible<value_type>::value && std::is_copy_assignable<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
-	node_pointer allocate( const value_type& init_v_arg )
+	node_pointer allocate( const value_type& init_v_arg, node_pointer p_next_node_arg = nullptr )
 	{
 		// リサイクルストレージからノードを取り出す
-		node_pointer p_ans = allocate_from_recycle_storage();
+		node_pointer p_ans = allocate_from_recycle_storage( p_next_node_arg );
 		if ( p_ans != nullptr ) {
 			p_ans->v_ = init_v_arg;
 			return p_ans;
 		}
 
 		// ノードをリサイクルできなかったので、ノードをアロケートする
-		return new node_type { nullptr, init_v_arg };
+		return new node_type { hazard_ptr_handler_t { p_next_node_arg }, init_v_arg };
 	}
 
 	template <bool IsMovable = std::is_move_constructible<value_type>::value && std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
-	node_pointer allocate( value_type&& init_v_arg )
+	node_pointer allocate( value_type&& init_v_arg, node_pointer p_next_node_arg = nullptr )
 	{
 		// リサイクルストレージからノードを取り出す
-		node_pointer p_ans = allocate_from_recycle_storage();
+		node_pointer p_ans = allocate_from_recycle_storage( p_next_node_arg );
 		if ( p_ans != nullptr ) {
 			p_ans->v_ = std::move( init_v_arg );
 			return p_ans;
 		}
 
 		// ノードをリサイクルできなかったので、ノードをアロケートする
-		return new node_type { nullptr, std::move( init_v_arg ) };
+		return new node_type { hazard_ptr_handler_t { p_next_node_arg }, std::move( init_v_arg ) };
 	}
 
 private:
@@ -419,16 +422,23 @@ private:
 	 * @return node_pointer リサイクルストレージから取り出したノード
 	 * @retval nullptr ストレージからノードを取り出せなかった。
 	 */
-	node_pointer allocate_from_recycle_storage( void ) noexcept
+	node_pointer allocate_from_recycle_storage( node_pointer p_next_node_arg ) noexcept
 	{
 		// ローカルストレージからノードをリサイクルする。
 		node_pointer p_ans = x_free_od_node_storage<T>::tl_fn_list_.node_list_.pop_front();
-		if ( p_ans != nullptr ) return p_ans;
+		if ( p_ans != nullptr ) {
+			p_ans->hph_next_.store( p_next_node_arg );
+			return p_ans;
+		}
 
 		// グローバルストレージからノードをリサイクルする。
 		auto lk = x_free_od_node_storage<T>::g_fn_list_.try_lock();
 		if ( lk.owns_lock() ) {
 			p_ans = lk.ref().pop_front();
+			if ( p_ans != nullptr ) {
+				p_ans->hph_next_.store( p_next_node_arg );
+				return p_ans;
+			}
 		}
 
 		return p_ans;
@@ -572,7 +582,7 @@ private:
 		constexpr recycler& operator=( recycler&& ) noexcept      = default;
 		~recycler()                                               = default;
 
-		void operator()( node_pointer* p_nd )
+		void operator()( node_pointer p_nd )
 		{
 			thread_local_od_node_list* p_this_thread_instance = &( x_free_od_node_storage<T>::tl_fn_list_ );
 			if ( p_this_thread_instance == p_recycle_tl_target_ ) {

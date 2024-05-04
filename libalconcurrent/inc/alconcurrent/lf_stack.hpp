@@ -381,7 +381,7 @@ public:
 
 	using value_type = T;
 
-	constexpr x_stack_list( void )
+	constexpr x_stack_list( void ) noexcept
 	  : hph_head_( nullptr )
 	{
 	}
@@ -389,8 +389,8 @@ public:
 	template <bool IsCopyConstructivle = std::is_copy_constructible<T>::value, typename std::enable_if<IsCopyConstructivle>::type* = nullptr>
 	void push( T& v_arg )
 	{
-		lilo_node_t* p_expected = hph_head_.load();
-		lilo_node_t* p_new_node = new lilo_node_t { hazard_ptr_handler<lilo_node_t>( p_expected ), v_arg };
+		node_pointer p_expected = hph_head_.load();
+		node_pointer p_new_node = free_node_storage_.allocate( v_arg, p_expected );
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_node, std::memory_order_release, std::memory_order_relaxed ) ) {
 			p_new_node->hph_next_.store( p_expected );
 		}
@@ -398,8 +398,8 @@ public:
 	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, typename std::enable_if<IsMoveConstructivle>::type* = nullptr>
 	void push( T&& v_arg )
 	{
-		lilo_node_t* p_expected = hph_head_.load();
-		lilo_node_t* p_new_node = new lilo_node_t { hazard_ptr_handler<lilo_node_t>( p_expected ), std::move( v_arg ) };
+		node_pointer p_expected = hph_head_.load();
+		node_pointer p_new_node = free_node_storage_.allocate( std::move( v_arg ), p_expected );
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_node, std::memory_order_release, std::memory_order_relaxed ) ) {
 			p_new_node->hph_next_.store( p_expected );
 		}
@@ -409,11 +409,11 @@ public:
 	std::tuple<bool, value_type> pop( void )
 	{
 		// TがMove可能である場合に選択されるAPI実装
-		lilo_node_t* p_poped_node = pop_impl();
+		node_pointer p_poped_node = pop_impl();
 		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
 		std::tuple<bool, value_type> ans { true, std::move( p_poped_node->v_ ) };
-		internal::retire_mgr::retire( p_poped_node );
+		free_node_storage_.recycle( p_poped_node );
 		return ans;
 	}
 	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, bool IsCopyConstructivle = std::is_copy_constructible<T>::value,
@@ -421,24 +421,25 @@ public:
 	std::tuple<bool, value_type> pop( void )
 	{
 		// TがMove不可能であるが、Copy可能である場合に選択されるAPI実装
-		lilo_node_t* p_poped_node = pop_impl();
+		node_pointer p_poped_node = pop_impl();
 		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
 		std::tuple<bool, value_type> ans { true, p_poped_node->v_ };
-		internal::retire_mgr::retire( p_poped_node );
+		free_node_storage_.recycle( p_poped_node );
 		return ans;
 	}
 
 private:
-	using lilo_node_t = internal::od_node<T>;
+	using node_type    = typename internal::x_free_od_node_storage<T>::node_type;
+	using node_pointer = typename internal::x_free_od_node_storage<T>::node_pointer;
 
-	lilo_node_t* pop_impl( void )
+	node_type* pop_impl( void )
 	{
-		hazard_ptr<lilo_node_t> hp_cur_head = hph_head_.get();
-		lilo_node_t*            p_expected  = hp_cur_head.get();
+		hazard_ptr<node_type> hp_cur_head = hph_head_.get();
+		node_pointer          p_expected  = hp_cur_head.get();
 		if ( p_expected == nullptr ) return nullptr;
 
-		lilo_node_t* p_new_head = hp_cur_head->hph_next_.load( std::memory_order_acquire );
+		node_pointer p_new_head = hp_cur_head->hph_next_.load( std::memory_order_acquire );
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_head, std::memory_order_release, std::memory_order_relaxed ) ) {
 			hp_cur_head = hph_head_.get();
 			p_expected  = hp_cur_head.get();
@@ -453,8 +454,13 @@ private:
 		return hp_cur_head.get();
 	}
 
-	hazard_ptr_handler<lilo_node_t> hph_head_;
+	hazard_ptr_handler<node_type> hph_head_;
+
+	static internal::x_free_od_node_storage<T> free_node_storage_;
 };
+
+template <typename T>
+internal::x_free_od_node_storage<T> x_stack_list<T>::free_node_storage_;
 
 }   // namespace concurrent
 }   // namespace alpha

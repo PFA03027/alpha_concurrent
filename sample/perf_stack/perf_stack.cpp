@@ -660,6 +660,9 @@ int main( void )
 	newop_lf_stack<TestType>                  sut5;
 	alpha::concurrent::x_stack_list<TestType> sut6;
 
+	std::cout << "--- x_stack_list ---" << std::endl;
+	nwoker_perf_test_stack<alpha::concurrent::x_stack_list<TestType>>( 1, sut6 );
+
 	std::cout << "--- newop_lf_stack ---" << std::endl;
 	// nwoker_perf_test_stack<newop_lf_stack<TestType>>( nworker * 2, sut5 );
 	// nwoker_perf_test_stack<newop_lf_stack<TestType>>( nworker, sut5 );

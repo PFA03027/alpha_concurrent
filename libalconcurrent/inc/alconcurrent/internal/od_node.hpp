@@ -28,8 +28,9 @@ namespace internal {
  * @tparam T value type kept in this class
  */
 template <typename T>
-struct od_node {
-	using value_type = T;
+struct alignas( atomic_variable_align ) od_node {
+	using value_type           = T;
+	using hazard_ptr_handler_t = hazard_ptr_handler<od_node>;
 
 	hazard_ptr_handler<od_node> hph_next_;
 	value_type                  v_;
