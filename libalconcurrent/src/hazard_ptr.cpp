@@ -520,7 +520,7 @@ private:
 		}
 
 		if ( internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( p_head_->get_retire_pointer() ) ) {
-			// because pointer is in hazard pointer list, therefore recycle is impossible for head
+			// because pointer is in hazard pointer list, therefore prune is impossible for head
 			return false;
 		}
 
@@ -616,7 +616,7 @@ public:
 				p_transfer->p_next_          = nullptr;   // important!!
 				locker_handle.transfer( p_transfer );
 			}
-			// because pointer is in hazard pointer list, therefore recycle is impossible for head
+			// because pointer is in hazard pointer list, therefore prune is impossible for head
 			return false;
 		}
 
@@ -637,7 +637,7 @@ private:
 ALCC_INTERNAL_CONSTINIT global_retire_mgr                    g_retire_mgr_inst;
 thread_local ALCC_INTERNAL_CONSTINIT thread_local_retire_mgr tl_reitre_mgr_insts { g_retire_mgr_inst };
 
-void retire_mgr::recycle( void )
+void retire_mgr::prune( void )
 {
 	tl_reitre_mgr_insts.recycle_one();
 	auto locker_handle = g_retire_mgr_inst.try_lock();

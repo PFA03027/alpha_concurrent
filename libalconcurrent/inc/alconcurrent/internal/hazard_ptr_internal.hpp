@@ -370,7 +370,7 @@ public:
 		}
 	}
 
-	static void recycle( void );
+	static void prune( void );
 
 private:
 	static void retire( retire_node_abst* p_new_retire );
