@@ -719,12 +719,12 @@ public:
 	}
 
 	// TODO: このI/Fを本当に用意していいのか？ get()に限定しなくてよいのか？
-	pointer load( std::memory_order order = std::memory_order_seq_cst ) noexcept
+	pointer load( std::memory_order order = std::memory_order_acquire ) noexcept
 	{
 		return ap_target_p_.load( order );
 	}
 
-	void store( pointer p_desired, std::memory_order order = std::memory_order_seq_cst ) noexcept
+	void store( pointer p_desired, std::memory_order order = std::memory_order_release ) noexcept
 	{
 		ap_target_p_.store( p_desired, order );
 	}

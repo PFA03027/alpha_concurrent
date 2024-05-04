@@ -389,19 +389,19 @@ public:
 	template <bool IsCopyConstructivle = std::is_copy_constructible<T>::value, typename std::enable_if<IsCopyConstructivle>::type* = nullptr>
 	void push( T& v_arg )
 	{
-		lilo_node_t* p_expected = hph_head_.load( std::memory_order_acquire );
+		lilo_node_t* p_expected = hph_head_.load();
 		lilo_node_t* p_new_node = new lilo_node_t { hazard_ptr_handler<lilo_node_t>( p_expected ), v_arg };
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_node, std::memory_order_release, std::memory_order_relaxed ) ) {
-			p_new_node->hph_next_.store( p_expected, std::memory_order_release );
+			p_new_node->hph_next_.store( p_expected );
 		}
 	}
 	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, typename std::enable_if<IsMoveConstructivle>::type* = nullptr>
 	void push( T&& v_arg )
 	{
-		lilo_node_t* p_expected = hph_head_.load( std::memory_order_acquire );
+		lilo_node_t* p_expected = hph_head_.load();
 		lilo_node_t* p_new_node = new lilo_node_t { hazard_ptr_handler<lilo_node_t>( p_expected ), std::move( v_arg ) };
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_node, std::memory_order_release, std::memory_order_relaxed ) ) {
-			p_new_node->hph_next_.store( p_expected, std::memory_order_release );
+			p_new_node->hph_next_.store( p_expected );
 		}
 	}
 
