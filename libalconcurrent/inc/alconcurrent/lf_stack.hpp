@@ -19,6 +19,8 @@
 #include "internal/free_node_storage.hpp"
 #include "internal/one_way_list_node.hpp"
 
+#include "internal/od_node.hpp"
+
 namespace alpha {
 namespace concurrent {
 
@@ -387,8 +389,8 @@ public:
 	template <bool IsCopyConstructivle = std::is_copy_constructible<T>::value, typename std::enable_if<IsCopyConstructivle>::type* = nullptr>
 	void push( T& v_arg )
 	{
-		lilo_node* p_expected = hph_head_.load( std::memory_order_acquire );
-		lilo_node* p_new_node = new lilo_node { hazard_ptr_handler<lilo_node>( p_expected ), v_arg };
+		lilo_node_t* p_expected = hph_head_.load( std::memory_order_acquire );
+		lilo_node_t* p_new_node = new lilo_node_t { hazard_ptr_handler<lilo_node_t>( p_expected ), v_arg };
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_node, std::memory_order_release, std::memory_order_relaxed ) ) {
 			p_new_node->hph_next_.store( p_expected, std::memory_order_release );
 		}
@@ -396,8 +398,8 @@ public:
 	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, typename std::enable_if<IsMoveConstructivle>::type* = nullptr>
 	void push( T&& v_arg )
 	{
-		lilo_node* p_expected = hph_head_.load( std::memory_order_acquire );
-		lilo_node* p_new_node = new lilo_node { hazard_ptr_handler<lilo_node>( p_expected ), std::move( v_arg ) };
+		lilo_node_t* p_expected = hph_head_.load( std::memory_order_acquire );
+		lilo_node_t* p_new_node = new lilo_node_t { hazard_ptr_handler<lilo_node_t>( p_expected ), std::move( v_arg ) };
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_node, std::memory_order_release, std::memory_order_relaxed ) ) {
 			p_new_node->hph_next_.store( p_expected, std::memory_order_release );
 		}
@@ -407,7 +409,7 @@ public:
 	std::tuple<bool, value_type> pop( void )
 	{
 		// TがMove可能である場合に選択されるAPI実装
-		lilo_node* p_poped_node = pop_impl();
+		lilo_node_t* p_poped_node = pop_impl();
 		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
 		std::tuple<bool, value_type> ans { true, std::move( p_poped_node->v_ ) };
@@ -419,7 +421,7 @@ public:
 	std::tuple<bool, value_type> pop( void )
 	{
 		// TがMove不可能であるが、Copy可能である場合に選択されるAPI実装
-		lilo_node* p_poped_node = pop_impl();
+		lilo_node_t* p_poped_node = pop_impl();
 		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
 		std::tuple<bool, value_type> ans { true, p_poped_node->v_ };
@@ -428,165 +430,15 @@ public:
 	}
 
 private:
-	struct lilo_node {
-		hazard_ptr_handler<lilo_node> hph_next_;
-		value_type                    v_;
+	using lilo_node_t = internal::od_node<T>;
 
-#ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
-#else
-#if 0   // too slow...
-#if __cpp_aligned_new
-		ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
-		{
-			void* p_ans = gmem_allocate( size, static_cast<size_t>( alignment ) );
-			if ( p_ans == nullptr ) {
-				throw std::bad_alloc();
-			}
-			return p_ans;
-		}
-		ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++17
-		{
-			return gmem_allocate( size, static_cast<size_t>( alignment ) );
-		}
-		ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
-		{
-			void* p_ans = gmem_allocate( size, static_cast<size_t>( alignment ) );
-			if ( p_ans == nullptr ) {
-				throw std::bad_alloc();
-			}
-			return p_ans;
-		}
-		ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++17
-		{
-			return gmem_allocate( size, static_cast<size_t>( alignment ) );
-		}
-#endif
-		ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size )   // possible throw std::bad_alloc, from C++11
-		{
-			void* p_ans = gmem_allocate( size );
-			if ( p_ans == nullptr ) {
-				throw std::bad_alloc();
-			}
-			return p_ans;
-		}
-		ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++11
-		{
-			return gmem_allocate( size );
-		}
-		ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size )   // possible throw std::bad_alloc, from C++11
-		{
-			void* p_ans = gmem_allocate( size );
-			if ( p_ans == nullptr ) {
-				throw std::bad_alloc();
-			}
-			return p_ans;
-		}
-		ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++11
-		{
-			return gmem_allocate( size );
-		}
-
-		ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, void* ptr ) noexcept   // placement new, from C++11
-		{
-			return ptr;
-		}
-		ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, void* ptr ) noexcept   // placement new for array, from C++11
-		{
-			return ptr;
-		}
-
-#if __cpp_aligned_new
-		void operator delete( void* ptr, std::align_val_t alignment ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
-		{
-			gmem_deallocate( ptr );
-		}
-		void operator delete[]( void* ptr, std::align_val_t alignment ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
-		{
-			gmem_deallocate( ptr );
-		}
-
-		void operator delete( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept   // from C++17
-		{
-			gmem_deallocate( ptr );
-		}
-		void operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept   // from C++17
-		{
-			gmem_deallocate( ptr );
-		}
-
-		void operator delete( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
-		{
-			gmem_deallocate( ptr );
-		}
-		void operator delete[]( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
-		{
-			gmem_deallocate( ptr );
-		}
-
-		void operator delete( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17
-		{
-			gmem_deallocate( ptr );
-		}
-		void operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17
-		{
-			gmem_deallocate( ptr );
-		}
-#endif
-		void operator delete( void* ptr ) noexcept   // from C++11
-		{
-			gmem_deallocate( ptr );
-		}
-		void operator delete[]( void* ptr ) noexcept   // from C++11
-		{
-			gmem_deallocate( ptr );
-		}
-
-		void operator delete( void* ptr, std::size_t size ) noexcept   // from C++14
-		{
-			gmem_deallocate( ptr );
-		}
-		void operator delete[]( void* ptr, std::size_t size ) noexcept   // from C++14
-		{
-			gmem_deallocate( ptr );
-		}
-
-		void operator delete( void* ptr, const std::nothrow_t& ) noexcept   // from C++11
-		{
-			gmem_deallocate( ptr );
-		}
-		void operator delete[]( void* ptr, const std::nothrow_t& ) noexcept   // from C++11
-		{
-			gmem_deallocate( ptr );
-		}
-
-		void operator delete( void* ptr, std::size_t size, const std::nothrow_t& ) noexcept   // from C++14
-		{
-			gmem_deallocate( ptr );
-		}
-		void operator delete[]( void* ptr, std::size_t size, const std::nothrow_t& ) noexcept   // from C++14
-		{
-			gmem_deallocate( ptr );
-		}
-
-		void operator delete( void* ptr, void* ) noexcept   // delete for area that is initialized by placement new.
-		{
-			// nothing to do
-		}
-		void operator delete[]( void* ptr, void* ) noexcept   // delete for area that is initialized by placement new.
-		{
-			// nothing to do
-		}
-#endif
-#endif
-	};
-
-	lilo_node* pop_impl( void )
+	lilo_node_t* pop_impl( void )
 	{
-		hazard_ptr<lilo_node> hp_cur_head = hph_head_.get();
-		lilo_node*            p_expected  = hp_cur_head.get();
+		hazard_ptr<lilo_node_t> hp_cur_head = hph_head_.get();
+		lilo_node_t*            p_expected  = hp_cur_head.get();
 		if ( p_expected == nullptr ) return nullptr;
 
-		lilo_node* p_new_head = hp_cur_head->hph_next_.load( std::memory_order_acquire );
+		lilo_node_t* p_new_head = hp_cur_head->hph_next_.load( std::memory_order_acquire );
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_head, std::memory_order_release, std::memory_order_relaxed ) ) {
 			hp_cur_head = hph_head_.get();
 			p_expected  = hp_cur_head.get();
@@ -601,7 +453,7 @@ private:
 		return hp_cur_head.get();
 	}
 
-	hazard_ptr_handler<lilo_node> hph_head_;
+	hazard_ptr_handler<lilo_node_t> hph_head_;
 };
 
 }   // namespace concurrent
