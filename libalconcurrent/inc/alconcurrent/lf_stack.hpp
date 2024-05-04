@@ -386,6 +386,12 @@ public:
 	{
 	}
 
+	x_stack_list( size_t reserve_size ) noexcept
+	  : hph_head_( nullptr )
+	{
+		free_node_storage_.pre_allocate( reserve_size );
+	}
+
 	template <bool IsCopyConstructivle = std::is_copy_constructible<T>::value, typename std::enable_if<IsCopyConstructivle>::type* = nullptr>
 	void push( T& v_arg )
 	{

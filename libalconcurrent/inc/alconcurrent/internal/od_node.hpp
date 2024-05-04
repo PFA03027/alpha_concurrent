@@ -196,7 +196,11 @@ public:
 	using node_pointer = od_node<T>*;
 
 	constexpr od_node_list( void ) noexcept = default;
-	od_node_list( const od_node_list& )     = delete;
+	explicit constexpr od_node_list( node_pointer p_head_arg ) noexcept
+	  : p_head_( p_head_arg )
+	{
+	}
+	od_node_list( const od_node_list& ) = delete;
 	constexpr od_node_list( od_node_list&& src ) noexcept
 	  : p_head_( src.p_head_ )
 	{
@@ -233,18 +237,18 @@ public:
 
 	void merge_push_front( od_node_list& src ) noexcept
 	{
-		if ( src.p_head_ == nullptr ) return;
+		node_pointer p_src_head = src.p_head_;
+		src.p_head_             = nullptr;
 
-		od_node_list<T>::node_pointer p_cur = src.p_head_;
-		od_node_list<T>::node_pointer p_nxt = p_cur->hph_next_.load();
-		while ( p_nxt != nullptr ) {
-			p_cur = p_nxt;
-			p_nxt = p_cur->hph_next_.load();
-		}
+		merge_push_front_node_pointer_as_list_head( p_src_head );
+	}
 
-		p_cur->hph_next_.store( p_head_ );
-		p_head_     = src.p_head_;
-		src.p_head_ = nullptr;
+	void merge_push_front( od_node_list&& src ) noexcept
+	{
+		node_pointer p_src_head = src.p_head_;
+		src.p_head_             = nullptr;
+
+		merge_push_front_node_pointer_as_list_head( p_src_head );
 	}
 
 	node_pointer pop_front( void ) noexcept
@@ -259,6 +263,21 @@ public:
 	}
 
 private:
+	void merge_push_front_node_pointer_as_list_head( node_pointer p_nd ) noexcept
+	{
+		if ( p_nd == nullptr ) return;
+
+		node_pointer p_cur = p_nd;
+		node_pointer p_nxt = p_cur->hph_next_.load();
+		while ( p_nxt != nullptr ) {
+			p_cur = p_nxt;
+			p_nxt = p_cur->hph_next_.load();
+		}
+
+		p_cur->hph_next_.store( p_head_ );
+		p_head_ = p_nd;
+	}
+
 	node_pointer p_head_ = nullptr;
 };
 

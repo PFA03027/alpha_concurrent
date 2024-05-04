@@ -367,6 +367,20 @@ public:
 	using node_pointer         = od_node<T>*;
 	using hazard_ptr_handler_t = typename od_node<T>::hazard_ptr_handler_t;
 
+	void pre_allocate( size_t reserve_size ) noexcept
+	{
+		node_pointer p_pre_head = nullptr;
+		try {
+			for ( size_t i = 0; i < reserve_size; i++ ) {
+				node_pointer p_new_head = new node_type { hazard_ptr_handler_t { p_pre_head }, value_type {} };
+				p_pre_head              = p_new_head;
+			}
+		} catch ( ... ) {
+			LogOutput( log_type::ERR, "pre_allocate finished partly" );
+		}
+		x_free_od_node_storage<T>::g_fn_list_.lock().ref().merge_push_front( od_node_list<T>( p_pre_head ) );
+	}
+
 	bool recycle( node_pointer p_retire_node )
 	{
 		internal::retire_mgr::retire( p_retire_node, recycler( &( x_free_od_node_storage<T>::tl_fn_list_ ) ) );

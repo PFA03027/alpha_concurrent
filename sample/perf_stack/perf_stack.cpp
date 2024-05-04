@@ -658,7 +658,7 @@ int main( void )
 	list_mutex_stack<TestType>                sut3;
 	fixsize_lf_stack<TestType>                sut4;
 	newop_lf_stack<TestType>                  sut5;
-	alpha::concurrent::x_stack_list<TestType> sut6;
+	alpha::concurrent::x_stack_list<TestType> sut6( ReserveSize );
 
 	std::cout << "--- x_stack_list ---" << std::endl;
 	nwoker_perf_test_stack<alpha::concurrent::x_stack_list<TestType>>( 1, sut6 );
