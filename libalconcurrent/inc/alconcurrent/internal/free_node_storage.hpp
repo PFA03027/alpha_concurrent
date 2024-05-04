@@ -18,6 +18,8 @@
 #include "../hazard_ptr.hpp"
 #include "../lf_mem_alloc.hpp"
 
+#include "od_node.hpp"
+
 namespace alpha {
 namespace concurrent {
 
@@ -356,6 +358,249 @@ private:
 
 	dynamic_tls<thread_local_fifo_list, rcv_fifo_list_handler> tls_fifo_;   //!< dynamic_tlsで指定しているrcv_fifo_list_handlerによって、デストラクタ実行時にrcv_thread_local_fifo_list_に残留データをpushする。そのため、メンバ変数rcv_thread_local_fifo_list_よりも後に変数宣言を行っている。
 };
+
+template <typename T>
+class x_free_od_node_storage {
+public:
+	using node_type    = od_node<T>;
+	using value_type   = typename od_node<T>::value_type;
+	using node_pointer = od_node<T>*;
+
+	bool recycle( node_pointer p_retire_node )
+	{
+		internal::retire_mgr::retire( p_retire_node, recycler( &( x_free_od_node_storage<T>::tl_fn_list_ ) ) );
+
+		return false;
+	}
+
+	template <bool IsDefaultConstructivle = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructivle>::type* = nullptr>
+	node_pointer allocate( void )
+	{
+		// リサイクルストレージからノードを取り出す
+		node_pointer p_ans = allocate_from_recycle_storage();
+		if ( p_ans != nullptr ) return p_ans;
+
+		// ノードをリサイクルできなかったので、ノードをアロケートする
+		return new node_type { nullptr, value_type {} };
+	}
+
+	template <bool IsCopyable = std::is_copy_constructible<value_type>::value && std::is_copy_assignable<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
+	node_pointer allocate( const value_type& init_v_arg )
+	{
+		// リサイクルストレージからノードを取り出す
+		node_pointer p_ans = allocate_from_recycle_storage();
+		if ( p_ans != nullptr ) {
+			p_ans->v_ = init_v_arg;
+			return p_ans;
+		}
+
+		// ノードをリサイクルできなかったので、ノードをアロケートする
+		return new node_type { nullptr, init_v_arg };
+	}
+
+	template <bool IsMovable = std::is_move_constructible<value_type>::value && std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+	node_pointer allocate( value_type&& init_v_arg )
+	{
+		// リサイクルストレージからノードを取り出す
+		node_pointer p_ans = allocate_from_recycle_storage();
+		if ( p_ans != nullptr ) {
+			p_ans->v_ = std::move( init_v_arg );
+			return p_ans;
+		}
+
+		// ノードをリサイクルできなかったので、ノードをアロケートする
+		return new node_type { nullptr, std::move( init_v_arg ) };
+	}
+
+private:
+	/**
+	 * @brief リサイクル用のストレージからノードのリサイクルを試みる
+	 *
+	 * @return node_pointer リサイクルストレージから取り出したノード
+	 * @retval nullptr ストレージからノードを取り出せなかった。
+	 */
+	node_pointer allocate_from_recycle_storage( void ) noexcept
+	{
+		// ローカルストレージからノードをリサイクルする。
+		node_pointer p_ans = x_free_od_node_storage<T>::tl_fn_list_.node_list_.pop_front();
+		if ( p_ans != nullptr ) return p_ans;
+
+		// グローバルストレージからノードをリサイクルする。
+		auto lk = x_free_od_node_storage<T>::g_fn_list_.try_lock();
+		if ( lk.owns_lock() ) {
+			p_ans = lk.ref().pop_front();
+		}
+
+		return p_ans;
+	}
+
+	/**
+	 * @brief グローバル変数専用クラス
+	 *
+	 */
+	class global_od_node_list : private od_node_list<T> {
+	public:
+		class locker {
+		public:
+			locker( const locker& ) = delete;
+			locker( locker&& src )
+			  : reftarget_( src.reftarget_ )
+			  , lg_( std::move( src.lg_ ) )
+			{
+			}
+			locker& operator=( const locker& ) = delete;
+			locker& operator=( locker&& src )
+			{
+				reftarget_ = src.reftarget_;
+				lg_        = std::move( src.lg_ );
+			}
+			~locker() = default;
+
+			bool owns_lock( void ) const noexcept
+			{
+				return lg_.owns_lock();
+			}
+
+			od_node_list<T>& ref( void )
+			{
+				if ( !lg_.owns_lock() ) {
+					throw std::logic_error( "no lock access is logic error" );
+				}
+				return reftarget_;
+			}
+
+		private:
+			locker( od_node_list<T>& reftarget_arg, std::mutex& mtx_arg )
+			  : reftarget_( reftarget_arg )
+			  , lg_( mtx_arg )
+			{
+			}
+			locker( od_node_list<T>& reftarget_arg, std::mutex& mtx_arg, std::try_to_lock_t )
+			  : reftarget_( reftarget_arg )
+			  , lg_( mtx_arg, std::try_to_lock )
+			{
+			}
+
+			od_node_list<T>&             reftarget_;
+			std::unique_lock<std::mutex> lg_;
+
+			friend class x_free_od_node_storage::global_od_node_list;
+		};
+
+		constexpr global_od_node_list( void ) noexcept    = default;
+		global_od_node_list( const global_od_node_list& ) = delete;
+		constexpr global_od_node_list( global_od_node_list&& src ) noexcept
+		  : od_node_list<T>( std::move( src.lock().ref() ) )
+		  , mtx_()
+		{
+		}
+		global_od_node_list&           operator=( const global_od_node_list& ) = delete;
+		constexpr global_od_node_list& operator=( global_od_node_list&& src ) noexcept
+		{
+			// need the dead-lock
+			od_node_list<T> tmp( std::move( src.lock().ref() ) );
+			lock().ref().swap( tmp );
+		}
+		~global_od_node_list() = default;
+
+		void swap( global_od_node_list& src ) noexcept
+		{
+			// need to avoid the dead-lock
+			od_node_list<T> tmp1( std::move( lock().ref() ) );
+			od_node_list<T> tmp2( std::move( src.lock().ref() ) );
+
+			tmp1.swap( tmp2 );
+
+			tmp1.swap( lock().ref() );
+			tmp2.swap( src.lock().ref() );
+		}
+
+		locker lock( void )
+		{
+			return locker( *this, mtx_ );
+		}
+		locker try_lock( void )
+		{
+			return locker( *this, mtx_, std::try_to_lock );
+		}
+
+	private:
+		std::mutex mtx_;
+	};
+
+	/**
+	 * @brief スレッドローカルストレージ専用クラス
+	 *
+	 * @note
+	 * このクラスの変数宣言はグローバル変数専用クラスの変数の直後に宣言すること。
+	 * この制約は変数のデストラクタが呼ばれる順序を制御するため。
+	 */
+	class thread_local_od_node_list {
+	public:
+		constexpr thread_local_od_node_list( global_od_node_list& center_list_arg )
+		  : center_list_( center_list_arg )
+		{
+		}
+
+		~thread_local_od_node_list()
+		{
+			center_list_.lock().ref().merge_push_front( node_list_ );
+		}
+
+		od_node_list<T> node_list_;
+
+	private:
+		global_od_node_list& center_list_;
+	};
+
+	static global_od_node_list                    g_fn_list_;
+	static thread_local thread_local_od_node_list tl_fn_list_;
+
+	class recycler {
+	public:
+		constexpr recycler( void ) noexcept
+		  : p_recycle_tl_target_( nullptr )
+		{
+		}
+		constexpr recycler( thread_local_od_node_list* p_recycle_tl_target_arg ) noexcept
+		  : p_recycle_tl_target_( p_recycle_tl_target_arg )
+		{
+		}
+		constexpr recycler( const recycler& ) noexcept            = default;
+		constexpr recycler( recycler&& ) noexcept                 = default;
+		constexpr recycler& operator=( const recycler& ) noexcept = default;
+		constexpr recycler& operator=( recycler&& ) noexcept      = default;
+		~recycler()                                               = default;
+
+		void operator()( node_pointer* p_nd )
+		{
+			thread_local_od_node_list* p_this_thread_instance = &( x_free_od_node_storage<T>::tl_fn_list_ );
+			if ( p_this_thread_instance == p_recycle_tl_target_ ) {
+				p_recycle_tl_target_->node_list_.push_front( p_nd );
+			} else {
+				// 通常はこちらには来ない。
+				// こちらに来るのは、retire_mgrのスレッドローカルストレージに残っていたまま、スレッドが終了した場合に
+				// グローバルストレージに移管された後、別スレッドでrecycleが呼ばれた場合にここにくる。
+				auto lk = x_free_od_node_storage<T>::g_fn_list_.try_lock();
+				if ( lk.owns_lock() ) {
+					lk.ref().push_front( p_nd );
+				} else {
+					// ロックが取得できない場合、リサイクルせずにあきらめて、ノードをdeleteする。
+					delete p_nd;
+				}
+			}
+		}
+
+	private:
+		thread_local_od_node_list* p_recycle_tl_target_;
+	};
+};
+
+template <typename T>
+ALCC_INTERNAL_CONSTINIT typename x_free_od_node_storage<T>::global_od_node_list x_free_od_node_storage<T>::g_fn_list_;
+
+template <typename T>
+thread_local ALCC_INTERNAL_CONSTINIT typename x_free_od_node_storage<T>::thread_local_od_node_list x_free_od_node_storage<T>::tl_fn_list_( x_free_od_node_storage<T>::g_fn_list_ );
 
 }   // namespace internal
 

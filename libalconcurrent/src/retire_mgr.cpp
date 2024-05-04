@@ -168,10 +168,9 @@ public:
 
 	~thread_local_retire_mgr()
 	{
-		while ( recycle_one() ) {}
-		if ( p_head_ == nullptr ) {
-			return;
-		}
+		// スレッドローカルストレージを参照しているようなdeleterの場合、スレッドが終了時にはdeleterが正常に動作しなくなるため、
+		// 単純にグローバルストレージに移管することだけを行う。
+		if ( p_head_ == nullptr ) return;
 
 		transfer_distination_.transfer( p_head_ );
 		p_head_ = nullptr;

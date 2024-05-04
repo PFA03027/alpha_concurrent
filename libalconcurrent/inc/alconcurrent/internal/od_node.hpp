@@ -182,6 +182,85 @@ struct od_node {
 #endif
 };
 
+/**
+ * @brief list by od_node<T> with header pointer
+ *
+ * @tparam T value type kept in od_node class
+ */
+template <typename T>
+class od_node_list {
+public:
+	using node_type    = od_node<T>;
+	using value_type   = typename od_node<T>::value_type;
+	using node_pointer = od_node<T>*;
+
+	constexpr od_node_list( void ) noexcept = default;
+	od_node_list( const od_node_list& )     = delete;
+	constexpr od_node_list( od_node_list&& src ) noexcept
+	  : p_head_( src.p_head_ )
+	{
+		src.p_head_ = nullptr;
+	}
+	od_node_list&           operator=( const od_node_list& ) = delete;
+	constexpr od_node_list& operator=( od_node_list&& src ) noexcept
+	{
+		od_node_list( std::move( src ) ).swap( *this );
+	}
+	~od_node_list()
+	{
+		node_pointer p_cur = p_head_;
+		p_head_            = nullptr;
+		while ( p_cur != nullptr ) {
+			node_pointer p_nxt = p_cur->hph_next_.load();
+			delete p_cur;
+			p_cur = p_nxt;
+		}
+	}
+
+	void swap( od_node_list& src ) noexcept
+	{
+		node_pointer p_tmp = p_head_;
+		p_head_            = src.p_head_;
+		src.p_head_        = p_tmp;
+	}
+
+	void push_front( node_pointer p_nd ) noexcept
+	{
+		p_nd->hph_next_.store( p_head_ );
+		p_head_ = p_nd;
+	}
+
+	void merge_push_front( od_node_list& src ) noexcept
+	{
+		if ( src.p_head_ == nullptr ) return;
+
+		od_node_list<T>::node_pointer p_cur = src.p_head_;
+		od_node_list<T>::node_pointer p_nxt = p_cur->hph_next_.load();
+		while ( p_nxt != nullptr ) {
+			p_cur = p_nxt;
+			p_nxt = p_cur->hph_next_.load();
+		}
+
+		p_cur->hph_next_.store( p_head_ );
+		p_head_     = src.p_head_;
+		src.p_head_ = nullptr;
+	}
+
+	node_pointer pop_front( void ) noexcept
+	{
+		node_pointer p_ans = p_head_;
+		if ( p_ans == nullptr ) return p_ans;
+
+		p_head_ = p_ans->hph_next_.load();
+		p_ans->hph_next_.store( nullptr );
+
+		return p_ans;
+	}
+
+private:
+	node_pointer p_head_ = nullptr;
+};
+
 }   // namespace internal
 }   // namespace concurrent
 }   // namespace alpha

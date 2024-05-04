@@ -377,7 +377,7 @@ private:
 template <typename T>
 class x_stack_list {
 public:
-	static_assert( std::is_move_constructible<T>::value && std::is_default_constructible<T>::value, "T should be move constructible at least" );
+	static_assert( std::is_default_constructible<T>::value && std::is_move_constructible<T>::value && std::is_move_assignable<T>::value, "T should be default/move constructible and move assignable at least" );
 
 	using value_type = T;
 

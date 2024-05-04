@@ -226,6 +226,14 @@ struct retire_node : public retire_node_abst {
  */
 class retire_mgr {
 public:
+	/**
+	 * @brief
+	 *
+	 * @tparam T
+	 * @tparam Deleter please refer to std::deleter<T>. this class should not throw execption
+	 * @param p_retire_obj
+	 * @param deleter_arg
+	 */
 	template <typename T, typename Deleter = std::default_delete<T>>
 	static void retire( T* p_retire_obj, Deleter&& deleter_arg = std::default_delete<T> {} )
 	{
