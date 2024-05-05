@@ -21,6 +21,7 @@
 #include "alconcurrent/internal/alloc_only_allocator.hpp"
 #include "alconcurrent/internal/cpp_std_configure.hpp"
 #include "alconcurrent/internal/hazard_ptr_internal.hpp"
+#include "alconcurrent/internal/retire_mgr.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -76,7 +77,8 @@ public:
 	};
 
 	constexpr global_retire_mgr( void ) noexcept
-	  : mtx_()
+	  : ap_lockfree_head_( nullptr )
+	  , mtx_()
 	  , p_head_( nullptr )
 	{
 	}
@@ -144,6 +146,8 @@ private:
 
 		return true;
 	}
+
+	std::atomic<retire_node_abst*> ap_lockfree_head_;
 
 	std::mutex        mtx_;
 	retire_node_abst* p_head_;
