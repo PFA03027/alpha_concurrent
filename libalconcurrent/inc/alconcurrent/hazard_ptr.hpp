@@ -705,8 +705,12 @@ public:
 		internal::call_count_hazard_ptr_get_++;
 #endif
 
-		pointer                                               p_expect = ap_target_p_.load( std::memory_order_acquire );
-		internal::bind_hazard_ptr_list::hzrd_slot_ownership_t hso      = internal::tl_bhpl.slot_assign( p_expect );
+		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
+		if ( p_expect == nullptr ) {
+			return hazard_ptr<T>( p_expect, nullptr );
+		}
+
+		internal::bind_hazard_ptr_list::hzrd_slot_ownership_t hso = internal::tl_bhpl.slot_assign( p_expect );
 
 		while ( !ap_target_p_.compare_exchange_weak( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE

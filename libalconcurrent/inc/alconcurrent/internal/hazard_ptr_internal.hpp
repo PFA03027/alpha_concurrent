@@ -94,7 +94,12 @@ public:
 	 * @brief try to assing a pointer, p, as hazard pointer
 	 *
 	 * @param p
-	 * @return std::atomic<void*>* pointer to hazard ptr slot. nullptr: fail to get hazard pointer slot. non nullptr: success to get hazard pointer slot
+	 * @return std::atomic<void*>* pointer to hazard ptr slot.
+	 * @retval nullptr: fail to get hazard pointer slot.
+	 * @retval non-nullptr: success to get hazard pointer slot
+	 *
+	 * @warning
+	 * if p is nullptr, this api will be fail and return nullptr.
 	 */
 	hzrd_slot_ownership_t try_assign( void* p );
 
@@ -201,6 +206,14 @@ public:
 	bind_hazard_ptr_list& operator=( bind_hazard_ptr_list&& ) = default;
 	~bind_hazard_ptr_list();
 
+	/**
+	 * @brief assign a slot of hazard pointer and set the pointer
+	 *
+	 * @param p pointer to a object. should not be nullptr
+	 * @return hzrd_slot_ownership_t pointer to hazard pointer slot
+	 * @retval nullptr fail to assign or p is nullptr
+	 * @retval non-nullptr success to assign
+	 */
 	hzrd_slot_ownership_t slot_assign( void* p );
 
 private:

@@ -41,6 +41,18 @@ TEST( HazardPtrGroup, CanTryAssing )
 	EXPECT_NE( righofownership, nullptr );
 }
 
+TEST( HazardPtrGroup, CanTryAssingForNullptr )
+{
+	// Arrange
+	alpha::concurrent::internal::hazard_ptr_group sut;
+
+	// Act
+	auto righofownership = sut.try_assign( nullptr );
+
+	// Assert
+	EXPECT_EQ( righofownership, nullptr );
+}
+
 TEST( HazardPtrGroup, CanTryAssingWithFull )
 {
 	// Arrange
@@ -243,6 +255,18 @@ TEST_F( TestBindHazardPtrList, CallAssing1 )
 
 	// Assert
 	EXPECT_NE( ownership, nullptr );
+}
+
+TEST_F( TestBindHazardPtrList, CallAssingForNullptr )
+{
+	// Arrange
+	alpha::concurrent::internal::bind_hazard_ptr_list sut;
+
+	// Act
+	auto ownership = sut.slot_assign( nullptr );
+
+	// Assert
+	EXPECT_EQ( ownership, nullptr );
 }
 
 TEST_F( TestBindHazardPtrList, CallAssingWithFull )
@@ -470,4 +494,16 @@ TEST_F( TestHazardPtrHandler, Call_HazardPtr_get2_assignment )
 	// Assert
 	EXPECT_EQ( dummy1.x, 3 );
 	EXPECT_EQ( dummy1.y, 4 );
+}
+
+TEST_F( TestHazardPtrHandler, Call_HazardPtr_get_for_nullptr )
+{
+	// Arrange
+	alpha::concurrent::hazard_ptr_handler<int> sut( nullptr );
+
+	// Act
+	auto hp2 = sut.get();
+
+	// Assert
+	EXPECT_EQ( hp2.get(), nullptr );
 }

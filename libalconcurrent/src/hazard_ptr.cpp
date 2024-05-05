@@ -59,6 +59,10 @@ hazard_ptr_group::hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 	call_count_try_assign_++;
 #endif
+	if ( p == nullptr ) {
+		return nullptr;
+	}
+
 	{
 		void* expected_p = nullptr;
 		if ( next_assign_hint_it_->compare_exchange_strong( expected_p, p, std::memory_order_release, std::memory_order_relaxed ) ) {
@@ -279,6 +283,10 @@ bind_hazard_ptr_list::~bind_hazard_ptr_list()
 
 bind_hazard_ptr_list::hzrd_slot_ownership_t bind_hazard_ptr_list::slot_assign( void* p )
 {
+	if ( p == nullptr ) {
+		return nullptr;
+	}
+
 	hazard_ptr_group* p_pre_list = nullptr;
 	hazard_ptr_group* p_cur_list = ownership_ticket_.get();
 	while ( p_cur_list != nullptr ) {
