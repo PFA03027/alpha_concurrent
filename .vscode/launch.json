@@ -336,7 +336,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "make build-profile"
+            "preLaunchTask": "make build-test with -g"
         },
     ]
 }

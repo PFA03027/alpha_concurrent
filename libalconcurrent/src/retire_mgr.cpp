@@ -258,7 +258,7 @@ void retire_mgr::prune( void )
 	}
 }
 
-void retire_mgr::retire( retire_node_abst* p_new_retire )
+void retire_mgr::retire_impl( retire_node_abst* p_new_retire )
 {
 	tl_reitre_mgr_insts.retire( p_new_retire );
 }

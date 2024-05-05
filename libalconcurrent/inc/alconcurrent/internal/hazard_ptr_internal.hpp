@@ -369,16 +369,23 @@ public:
 	{
 		if ( internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( p_retire_obj ) ) {
 			retire_node_abst* p_new_retire = new retire_node<T, Deleter>( p_retire_obj, std::forward<Deleter>( deleter_arg ) );
-			retire( p_new_retire );
+			retire_impl( p_new_retire );
 		} else {
 			deleter_arg( p_retire_obj );
 		}
 	}
 
+	template <typename T, typename Deleter = std::default_delete<T>>
+	static void retire_always_store( T* p_retire_obj, Deleter&& deleter_arg = std::default_delete<T> {} )
+	{
+		retire_node_abst* p_new_retire = new retire_node<T, Deleter>( p_retire_obj, std::forward<Deleter>( deleter_arg ) );
+		retire_impl( p_new_retire );
+	}
+
 	static void prune( void );
 
 private:
-	static void retire( retire_node_abst* p_new_retire );
+	static void retire_impl( retire_node_abst* p_new_retire );
 };
 
 }   // namespace internal

@@ -369,16 +369,36 @@ public:
 
 	void pre_allocate( size_t reserve_size ) noexcept
 	{
-		node_pointer p_pre_head = nullptr;
-		try {
-			for ( size_t i = 0; i < reserve_size; i++ ) {
-				node_pointer p_new_head = new node_type { hazard_ptr_handler_t { p_pre_head }, value_type {} };
-				p_pre_head              = p_new_head;
-			}
-		} catch ( ... ) {
-			LogOutput( log_type::ERR, "pre_allocate finished partly" );
+		if ( reserve_size < 2 ) {
+			reserve_size = 2;
 		}
-		x_free_od_node_storage<T>::g_fn_list_.lock().ref().merge_push_front( od_node_list<T>( p_pre_head ) );
+
+		{
+			node_pointer p_pre_head = nullptr;
+			try {
+				for ( size_t i = 0; i < reserve_size / 2; i++ ) {
+					node_pointer p_new_head = new node_type { hazard_ptr_handler_t { p_pre_head }, value_type {} };
+					p_pre_head              = p_new_head;
+				}
+			} catch ( ... ) {
+				LogOutput( log_type::ERR, "pre_allocate finished partly" );
+			}
+			x_free_od_node_storage<T>::g_fn_list_.lock().ref().merge_push_front( p_pre_head );
+			x_free_od_node_storage<T>::g_fn_list_help_flag_.store( false );
+		}
+		{
+			node_pointer p_pre_head = nullptr;
+			try {
+				for ( size_t i = 0; i < reserve_size / 2; i++ ) {
+					node_pointer p_new_head = new node_type { hazard_ptr_handler_t { p_pre_head }, value_type {} };
+					p_pre_head              = p_new_head;
+				}
+			} catch ( ... ) {
+				LogOutput( log_type::ERR, "pre_allocate finished partly" );
+			}
+			x_free_od_node_storage<T>::g_fn_list_lockfree_.merge_push_front( p_pre_head );
+			x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_.store( false );
+		}
 	}
 
 	bool recycle( node_pointer p_retire_node )
@@ -445,7 +465,7 @@ private:
 			return p_ans;
 		}
 
-		// グローバルストレージからノードをリサイクルする。
+		// グローバルストレージのロック付きリストからノードをリサイクルする。
 		auto lk = x_free_od_node_storage<T>::g_fn_list_.try_lock();
 		if ( lk.owns_lock() ) {
 			p_ans = lk.ref().pop_front();
@@ -453,7 +473,19 @@ private:
 				p_ans->hph_next_.store( p_next_node_arg );
 				return p_ans;
 			}
+			x_free_od_node_storage<T>::g_fn_list_help_flag_.store( true );
 		}
+
+		p_ans = x_free_od_node_storage<T>::g_fn_list_lockfree_.pop_front();
+		while ( p_ans != nullptr ) {
+			if ( !internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( p_ans ) ) {
+				p_ans->hph_next_.store( p_next_node_arg );
+				return p_ans;
+			}
+			internal::retire_mgr::retire_always_store( p_ans, recycler( &( x_free_od_node_storage<T>::tl_fn_list_ ) ) );
+			p_ans = x_free_od_node_storage<T>::g_fn_list_lockfree_.pop_front();
+		}
+		x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_.store( true );
 
 		return p_ans;
 	}
@@ -527,18 +559,6 @@ private:
 		}
 		~global_od_node_list() = default;
 
-		void swap( global_od_node_list& src ) noexcept
-		{
-			// need to avoid the dead-lock
-			od_node_list<T> tmp1( std::move( lock().ref() ) );
-			od_node_list<T> tmp2( std::move( src.lock().ref() ) );
-
-			tmp1.swap( tmp2 );
-
-			tmp1.swap( lock().ref() );
-			tmp2.swap( src.lock().ref() );
-		}
-
 		locker lock( void )
 		{
 			return locker( *this, mtx_ );
@@ -577,7 +597,10 @@ private:
 		global_od_node_list& center_list_;
 	};
 
+	static od_node_list_lockfree<T>               g_fn_list_lockfree_;
+	static std::atomic<bool>                      g_fn_list_lockfree_help_flag_;
 	static global_od_node_list                    g_fn_list_;
+	static std::atomic<bool>                      g_fn_list_help_flag_;
 	static thread_local thread_local_od_node_list tl_fn_list_;
 
 	class recycler {
@@ -598,9 +621,31 @@ private:
 
 		void operator()( node_pointer p_nd )
 		{
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
+			p_nd->hph_next_.store( nullptr );   // this line make slower the performance about 3%. therefore this line only enable in case of debug option
+#endif
+
+			// グローバルストレージのロックフリーリストでヘルプフラグが立っているので、そこにノードを回す。
+			if ( x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_.load() ) {
+				g_fn_list_lockfree_.push_front( p_nd );
+				x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_.store( false );
+				return;
+			}
+
+			// グローバルストレージのロック付きリストでヘルプフラグが立っているので、そこにノードを回す。
+			if ( x_free_od_node_storage<T>::g_fn_list_help_flag_.load() ) {
+				auto lk = x_free_od_node_storage<T>::g_fn_list_.try_lock();
+				if ( lk.owns_lock() ) {
+					lk.ref().push_front( p_nd );
+					x_free_od_node_storage<T>::g_fn_list_help_flag_.store( false );
+					return;
+				}
+			}
+
 			thread_local_od_node_list* p_this_thread_instance = &( x_free_od_node_storage<T>::tl_fn_list_ );
 			if ( p_this_thread_instance == p_recycle_tl_target_ ) {
 				p_recycle_tl_target_->node_list_.push_front( p_nd );
+				return;
 			} else {
 				// 通常はこちらには来ない。
 				// こちらに来るのは、retire_mgrのスレッドローカルストレージに残っていたまま、スレッドが終了した場合に
@@ -609,8 +654,9 @@ private:
 				if ( lk.owns_lock() ) {
 					lk.ref().push_front( p_nd );
 				} else {
-					// ロックが取得できない場合、リサイクルせずにあきらめて、ノードをdeleteする。
-					delete p_nd;
+					// ロックが取得できない場合、ロックフリーリストに、ノードをpushする。
+					g_fn_list_lockfree_.push_front( p_nd );
+					x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_.store( false );
 				}
 			}
 		}
@@ -621,7 +667,16 @@ private:
 };
 
 template <typename T>
+ALCC_INTERNAL_CONSTINIT od_node_list_lockfree<T> x_free_od_node_storage<T>::g_fn_list_lockfree_;
+
+template <typename T>
+ALCC_INTERNAL_CONSTINIT std::atomic<bool> x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_( false );
+
+template <typename T>
 ALCC_INTERNAL_CONSTINIT typename x_free_od_node_storage<T>::global_od_node_list x_free_od_node_storage<T>::g_fn_list_;
+
+template <typename T>
+ALCC_INTERNAL_CONSTINIT std::atomic<bool> x_free_od_node_storage<T>::g_fn_list_help_flag_( false );
 
 template <typename T>
 thread_local ALCC_INTERNAL_CONSTINIT typename x_free_od_node_storage<T>::thread_local_od_node_list x_free_od_node_storage<T>::tl_fn_list_( x_free_od_node_storage<T>::g_fn_list_ );

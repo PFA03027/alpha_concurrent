@@ -184,7 +184,9 @@ struct alignas( atomic_variable_align ) od_node {
 };
 
 /**
- * @brief list by od_node<T> with header pointer
+ * @brief list that has od_node<T> pointer has header pointer
+ *
+ * @warning this class is not thread safe
  *
  * @tparam T value type kept in od_node class
  */
@@ -231,6 +233,12 @@ public:
 
 	void push_front( node_pointer p_nd ) noexcept
 	{
+		if ( p_nd == nullptr ) return;
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
+		if ( p_nd->hph_next_.load() != nullptr ) {
+			LogOutput( log_type::WARN, "od_node_list::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
+		}
+#endif
 		p_nd->hph_next_.store( p_head_ );
 		p_head_ = p_nd;
 	}
@@ -240,7 +248,7 @@ public:
 		node_pointer p_src_head = src.p_head_;
 		src.p_head_             = nullptr;
 
-		merge_push_front_node_pointer_as_list_head( p_src_head );
+		merge_push_front( p_src_head );
 	}
 
 	void merge_push_front( od_node_list&& src ) noexcept
@@ -248,22 +256,10 @@ public:
 		node_pointer p_src_head = src.p_head_;
 		src.p_head_             = nullptr;
 
-		merge_push_front_node_pointer_as_list_head( p_src_head );
+		merge_push_front( p_src_head );
 	}
 
-	node_pointer pop_front( void ) noexcept
-	{
-		node_pointer p_ans = p_head_;
-		if ( p_ans == nullptr ) return p_ans;
-
-		p_head_ = p_ans->hph_next_.load();
-		p_ans->hph_next_.store( nullptr );
-
-		return p_ans;
-	}
-
-private:
-	void merge_push_front_node_pointer_as_list_head( node_pointer p_nd ) noexcept
+	void merge_push_front( node_pointer p_nd ) noexcept
 	{
 		if ( p_nd == nullptr ) return;
 
@@ -278,7 +274,133 @@ private:
 		p_head_ = p_nd;
 	}
 
+	node_pointer pop_front( void ) noexcept
+	{
+		node_pointer p_ans = p_head_;
+		if ( p_ans == nullptr ) return p_ans;
+
+		p_head_ = p_ans->hph_next_.load();
+		p_ans->hph_next_.store( nullptr );
+
+		return p_ans;
+	}
+
+private:
 	node_pointer p_head_ = nullptr;
+};
+
+/**
+ * @brief list that has hazard_ptr_handler of od_node<T> has header pointer
+ *
+ * this class support lock-free behavior
+ *
+ * @tparam T value type kept in od_node class
+ */
+template <typename T>
+class od_node_list_lockfree {
+public:
+	using node_type    = od_node<T>;
+	using value_type   = typename od_node<T>::value_type;
+	using node_pointer = od_node<T>*;
+
+	constexpr od_node_list_lockfree( void ) noexcept = default;
+	explicit constexpr od_node_list_lockfree( node_pointer p_head_arg ) noexcept
+	  : hph_head_( p_head_arg )
+	{
+	}
+	od_node_list_lockfree( const od_node_list_lockfree& ) = delete;
+	constexpr od_node_list_lockfree( od_node_list_lockfree&& src ) noexcept
+	  : hph_head_( std::move( src.hph_head_ ) )
+	{
+	}
+	od_node_list_lockfree& operator=( const od_node_list_lockfree& ) = delete;
+	od_node_list_lockfree& operator=( od_node_list_lockfree&& src )  = delete;
+	~od_node_list_lockfree()
+	{
+		node_pointer p_cur = hph_head_.load();
+		hph_head_.store( nullptr );
+		while ( p_cur != nullptr ) {
+			node_pointer p_nxt = p_cur->hph_next_.load();
+			delete p_cur;
+			p_cur = p_nxt;
+		}
+	}
+
+	/**
+	 * @brief ノードリストの先頭に、ノード一つを追加する
+	 *
+	 * @pre
+	 * p_ndは、他スレッドからアクセスされない。
+	 * 自インスタンスは、他スレッドからアクセスされない。
+	 *
+	 * @param p_nd
+	 */
+	void push_front( node_pointer p_nd ) noexcept
+	{
+		if ( p_nd == nullptr ) return;
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
+		if ( p_nd->hph_next_.load() != nullptr ) {
+			LogOutput( log_type::WARN, "od_node_list_lockfree::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
+		}
+#endif
+		node_pointer p_expected = hph_head_.load();
+		p_nd->hph_next_.store( p_expected );
+		while ( !hph_head_.compare_exchange_weak( p_expected, p_nd, std::memory_order_release, std::memory_order_relaxed ) ) {
+			p_nd->hph_next_.store( p_expected );
+		}
+	}
+
+	/**
+	 * @brief p_ndからつながるノードリストを自インスタンスのノードリストの先頭に追加する。
+	 *
+	 * @param p_nd
+	 */
+	void merge_push_front( node_pointer p_nd ) noexcept
+	{
+		if ( p_nd == nullptr ) return;
+
+		node_pointer p_last = p_nd;
+		node_pointer p_next = p_last->hph_next_.load();
+		while ( p_next != nullptr ) {
+			p_last = p_next;
+			p_next = p_last->hph_next_.load();
+		}
+
+		node_pointer p_expected = hph_head_.load();
+		p_last->hph_next_.store( p_expected );
+		while ( !hph_head_.compare_exchange_weak( p_expected, p_nd, std::memory_order_release, std::memory_order_relaxed ) ) {
+			p_last->hph_next_.store( p_expected );
+		}
+	}
+
+	node_pointer pop_front( void ) noexcept
+	{
+		hazard_ptr<node_type> hp_cur_head = hph_head_.get();
+		node_pointer          p_expected  = hp_cur_head.get();
+		if ( p_expected == nullptr ) return nullptr;
+
+		node_pointer p_new_head = hp_cur_head->hph_next_.load( std::memory_order_acquire );
+		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_head, std::memory_order_release, std::memory_order_relaxed ) ) {
+			hp_cur_head = hph_head_.get();
+			p_expected  = hp_cur_head.get();
+			if ( p_expected == nullptr ) {
+				return nullptr;
+			}
+			p_new_head = hp_cur_head->hph_next_.load( std::memory_order_acquire );
+		}
+
+		// ここに来た時点で、hp_cur_head で保持されているノードの所有権を確保できた。
+		// ※ 確保しているノードへのポインタを他スレッドでも持っているかもしれないが、
+		//    メンバ変数 v_ を参照しないアルゴリズムになっているので、以降は参照してよい。
+		//    hph_next_ は他スレッドで読みだされているため、書き換えてはならない。
+		//    なお、hp_cur_headは、他スレッドでもハザードポインタとして登録中であるため、ハザードポインタとしての登録がなくなるまで破棄してはならない。
+		return hp_cur_head.get();
+	}
+
+private:
+	using hazard_ptr_handler_t = typename od_node<T>::hazard_ptr_handler_t;
+
+	hazard_ptr_handler_t hph_head_;
 };
 
 }   // namespace internal
