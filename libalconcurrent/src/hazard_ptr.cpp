@@ -59,14 +59,17 @@ hazard_ptr_group::hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 	call_count_try_assign_++;
 #endif
+
+	hazard_ptr_group::hzrd_slot_ownership_t ans( nullptr );   // expect RVO
+
 	if ( p == nullptr ) {
-		return nullptr;
+		return ans;
 	}
 
 	{
 		void* expected_p = nullptr;
 		if ( next_assign_hint_it_->compare_exchange_strong( expected_p, p, std::memory_order_release, std::memory_order_relaxed ) ) {
-			hzrd_slot_ownership_t ans( &( *next_assign_hint_it_ ) );
+			ans = hzrd_slot_ownership_t( &( *next_assign_hint_it_ ) );
 			++next_assign_hint_it_;
 			if ( next_assign_hint_it_ == end() ) {
 				next_assign_hint_it_ = begin();
@@ -81,7 +84,7 @@ hazard_ptr_group::hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 #endif
 		void* expected_p = nullptr;
 		if ( it->compare_exchange_strong( expected_p, p, std::memory_order_release, std::memory_order_relaxed ) ) {
-			hzrd_slot_ownership_t ans( &( *it ) );
+			ans = hzrd_slot_ownership_t( &( *it ) );
 			++it;
 			if ( it == end() ) {
 				it = begin();
@@ -97,7 +100,7 @@ hazard_ptr_group::hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 #endif
 		void* expected_p = nullptr;
 		if ( it->compare_exchange_strong( expected_p, p, std::memory_order_release, std::memory_order_relaxed ) ) {
-			hzrd_slot_ownership_t ans( &( *it ) );
+			ans = hzrd_slot_ownership_t( &( *it ) );
 			++it;
 			if ( it == end() ) {
 				it = begin();
@@ -107,7 +110,7 @@ hazard_ptr_group::hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 		}
 	}
 
-	return hzrd_slot_ownership_t( nullptr );
+	return ans;
 }
 
 hazard_ptr_group::ownership_t hazard_ptr_group::try_ocupy( void )
