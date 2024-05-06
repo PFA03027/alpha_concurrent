@@ -79,7 +79,7 @@ public:
 		}
 	}
 
-	bool recycle_one( void )
+	bool recycle_head_one( void )
 	{
 		if ( p_head_ == nullptr ) {
 			return false;
@@ -159,10 +159,10 @@ public:
 	};
 
 	global_retire_mgr( void ) noexcept
-	  : ap_lockfree_head_( nullptr )
-	  , mtx_()
+	  : mtx_()
 	  , cv()
 	  , retire_list_()
+	  , ap_lockfree_head_( nullptr )
 	{
 	}
 
@@ -195,6 +195,29 @@ public:
 		cv.notify_all();
 	}
 
+	/**
+	 * @brief ロックフリーリストの先頭へ、１つのノードの追加を試みる
+	 *
+	 * @param p_list_head retire_node_abstのリストの先頭ノードへのポインタ
+	 * @return retire_node_abst* 追加が成功した場合、p_list_headの次のノードのポインタを返す。追加に失敗した場合、p_list_headを返す
+	 */
+	retire_node_abst* push_lockfree_one_try( retire_node_abst* const p_list_head )
+	{
+		if ( p_list_head == nullptr ) return nullptr;
+
+		retire_node_abst* const p_next_of_head = p_list_head->p_next_;
+
+		retire_node_abst* p_expect = ap_lockfree_head_.load( std::memory_order_acquire );
+		p_list_head->p_next_       = p_expect;
+		if ( ap_lockfree_head_.compare_exchange_weak( p_expect, p_list_head, std::memory_order_release, std::memory_order_relaxed ) ) {
+			cv.notify_all();
+			return p_next_of_head;
+		}
+
+		p_list_head->p_next_ = p_next_of_head;
+		return p_list_head;
+	}
+
 	retire_node_abst* parge_lockfree( void )
 	{
 		retire_node_abst* p_expect = ap_lockfree_head_.load( std::memory_order_acquire );
@@ -207,11 +230,11 @@ public:
 	static void notify_prune_thread( void );
 
 private:
-	std::atomic<retire_node_abst*> ap_lockfree_head_;
-
 	std::mutex              mtx_;
 	std::condition_variable cv;
 	retire_node_list        retire_list_;
+
+	alignas( internal::atomic_variable_align ) std::atomic<retire_node_abst*> ap_lockfree_head_;
 };
 
 /**
@@ -243,7 +266,6 @@ public:
 
 	void retire( retire_node_abst* p_new_retire )
 	{
-#if 0
 		recycle_one();
 
 		if ( p_head_ == nullptr ) {
@@ -257,16 +279,9 @@ public:
 			p_cur->p_next_ = p_new_retire;
 		}
 
-		recycle_one();
+#ifdef ALCONCURRENT_CONF_ENABLE_PRUNE_THREAD
 #else
-		auto locker_handle = transfer_distination_.try_lock();
-		if ( locker_handle.owns_lock() ) {
-			locker_handle.ref().merge_push_back( p_new_retire );
-			return;
-		}
-
-		transfer_distination_.push_lockfree( p_new_retire );
-
+		recycle_one();
 #endif
 	}
 
@@ -288,10 +303,27 @@ public:
 	 */
 	bool recycle_one( void )
 	{
+#ifdef ALCONCURRENT_CONF_ENABLE_PRUNE_THREAD
+		if ( p_head_ == nullptr ) {
+			return false;
+		}
+
+		auto locker_handle = transfer_distination_.try_lock();
+		if ( locker_handle.owns_lock() ) {
+			locker_handle.ref().merge_push_back( p_head_ );
+			p_head_ = nullptr;
+			return true;
+		}
+
+		retire_node_abst* p_orig_head = p_head_;
+		p_head_                       = transfer_distination_.push_lockfree_one_try( p_head_ );
+		return ( p_head_ == p_orig_head ) ? false : true;
+#else
+		// pruneスレッドに任せるのではなく、個々のスレッドと共同でリサイクルを行う場合のアルゴリズム。
 		if ( p_head_ == nullptr ) {
 			auto locker_handle = transfer_distination_.try_lock();
 			if ( locker_handle.owns_lock() ) {
-				locker_handle.ref().recycle_one();
+				locker_handle.ref().recycle_head_one();
 			}
 			return false;
 		}
@@ -314,6 +346,7 @@ public:
 		delete p_parge;
 
 		return true;
+#endif
 	}
 
 private:
@@ -396,8 +429,14 @@ thread_local ALCC_INTERNAL_CONSTINIT thread_local_retire_mgr tl_reitre_mgr_insts
 
 void retire_mgr::retire_impl( retire_node_abst* p_new_retire )
 {
+#ifdef ALCONCURRENT_CONF_ENABLE_PRUNE_THREAD
 	static prune_thread_mgr pt_mgr_obj;
 	pt_mgr_obj.increment_call_count();
+#else
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+	g_call_count_retire++;
+#endif
+#endif
 
 	tl_reitre_mgr_insts.retire( p_new_retire );
 }
@@ -414,7 +453,7 @@ void global_retire_mgr::prune_thread( void )
 
 	recycle_list.merge_push_back( g_retire_mgr_inst.parge_lockfree() );
 
-	while ( recycle_list.recycle_one() ) {}
+	while ( recycle_list.recycle_head_one() ) {}
 
 	g_retire_mgr_inst.lock().ref().merge_push_back( std::move( recycle_list ) );
 }
