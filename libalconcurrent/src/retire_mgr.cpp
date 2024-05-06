@@ -32,16 +32,20 @@ class retire_node_list {
 public:
 	constexpr retire_node_list( void ) noexcept
 	  : p_head_( nullptr )
+	  , p_tail_( nullptr )
 	{
 	}
 	explicit constexpr retire_node_list( retire_node_abst* p_node ) noexcept
 	  : p_head_( p_node )
+	  , p_tail_( find_tail_pointer( p_node ) )
 	{
 	}
 	retire_node_list( retire_node_list&& src ) noexcept
 	  : p_head_( src.p_head_ )
+	  , p_tail_( src.p_tail_ )
 	{
 		src.p_head_ = nullptr;
+		src.p_tail_ = nullptr;
 	}
 
 	~retire_node_list()
@@ -51,27 +55,35 @@ public:
 
 	void merge_push_back( retire_node_abst* p_node )
 	{
+		if ( p_node == nullptr ) return;
+
+		// add new node to last
 		if ( p_head_ == nullptr ) {
 			p_head_ = p_node;
 		} else {
-			// add new node to last
-			retire_node_abst* p_cur = p_head_;
-			while ( p_cur->p_next_ != nullptr ) {
-				p_cur = p_cur->p_next_;
-			}
-			p_cur->p_next_ = p_node;
+			p_tail_->p_next_ = p_node;
 		}
+		p_tail_ = find_tail_pointer( p_node );
 	}
 	void merge_push_back( retire_node_list&& src )
 	{
-		retire_node_abst* p = src.p_head_;
-		src.p_head_         = nullptr;
-		merge_push_back( p );
+		if ( src.p_head_ == nullptr ) return;
+
+		if ( p_head_ == nullptr ) {
+			p_head_ = src.p_head_;
+			p_tail_ = src.p_tail_;
+		} else {
+			p_tail_->p_next_ = src.p_head_;
+			p_tail_          = src.p_tail_;
+		}
+		src.p_head_ = nullptr;
+		src.p_tail_ = nullptr;
 	}
 	void clear( void ) noexcept
 	{
 		retire_node_abst* p_cur = p_head_;
 		p_head_                 = nullptr;
+		p_tail_                 = nullptr;
 		while ( p_cur != nullptr ) {
 			retire_node_abst* p_nxt = p_cur->p_next_;
 			delete p_cur;
@@ -92,13 +104,34 @@ public:
 
 		retire_node_abst* p_parge = p_head_;
 		p_head_                   = p_parge->p_next_;
+		if ( p_head_ == nullptr ) {
+			p_tail_ = nullptr;
+		}
 
 		delete p_parge;
 
 		return true;
 	}
 
+	bool is_empty( void ) const noexcept
+	{
+		return p_head_ == nullptr;
+	}
+
+private:
+	static constexpr retire_node_abst* find_tail_pointer( retire_node_abst* p_head_arg ) noexcept
+	{
+		if ( p_head_arg == nullptr ) return nullptr;
+
+		retire_node_abst* p_cur = p_head_arg;
+		while ( p_cur->p_next_ != nullptr ) {
+			p_cur = p_cur->p_next_;
+		}
+		return p_cur;
+	}
+
 	retire_node_abst* p_head_;
+	retire_node_abst* p_tail_;
 };
 
 /**
@@ -132,7 +165,7 @@ public:
 
 		~locker()
 		{
-			if ( target_node_list_.p_head_ != nullptr ) {
+			if ( !target_node_list_.is_empty() ) {
 				parent_.cv.notify_all();
 			}
 		}
