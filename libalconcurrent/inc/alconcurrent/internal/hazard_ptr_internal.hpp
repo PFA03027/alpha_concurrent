@@ -110,24 +110,24 @@ public:
 	 */
 	ownership_t try_ocupy( void );
 
-	ALCC_INTERNAL_CPPSTD17_CONSTEXPR iterator begin( void )
+	ALCC_INTERNAL_CPPSTD17_CONSTEXPR iterator begin( void ) noexcept
 	{
 		return hzrd_ptr_array_.begin();
 	}
-	ALCC_INTERNAL_CPPSTD17_CONSTEXPR const_iterator begin( void ) const
+	ALCC_INTERNAL_CPPSTD17_CONSTEXPR const_iterator begin( void ) const noexcept
 	{
 		return hzrd_ptr_array_.begin();
 	}
-	ALCC_INTERNAL_CPPSTD17_CONSTEXPR iterator end( void )
+	ALCC_INTERNAL_CPPSTD17_CONSTEXPR iterator end( void ) noexcept
 	{
 		return hzrd_ptr_array_.end();
 	}
-	ALCC_INTERNAL_CPPSTD17_CONSTEXPR const_iterator end( void ) const
+	ALCC_INTERNAL_CPPSTD17_CONSTEXPR const_iterator end( void ) const noexcept
 	{
 		return hzrd_ptr_array_.end();
 	}
 
-	bool is_used( void ) const
+	bool is_used( void ) const noexcept
 	{
 		return is_used_.load( std::memory_order_acquire );
 	}
@@ -242,7 +242,7 @@ public:
 	 * @return true p is still listed in hazard pointer list
 	 * @return false p is not hazard pointer
 	 */
-	static inline bool CheckPtrIsHazardPtr( void* p )
+	static inline bool CheckPtrIsHazardPtr( void* p ) noexcept
 	{
 		return g_scope_hzrd_chain_.check_pointer_is_hazard_pointer( p );
 	}
@@ -309,7 +309,7 @@ private:
 	 * @return true p is still listed in hazard pointer list
 	 * @return false p is not hazard pointer
 	 */
-	bool check_pointer_is_hazard_pointer( void* p );
+	bool check_pointer_is_hazard_pointer( void* p ) noexcept;
 
 	/**
 	 * @brief remove all hazard_ptr_group

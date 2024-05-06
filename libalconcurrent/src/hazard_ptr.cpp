@@ -361,7 +361,7 @@ hazard_ptr_group::ownership_t global_scope_hazard_ptr_chain::get_ownership( void
 	return ans;
 }
 
-bool global_scope_hazard_ptr_chain::check_pointer_is_hazard_pointer( void* p )
+bool global_scope_hazard_ptr_chain::check_pointer_is_hazard_pointer( void* p ) noexcept
 {
 	if ( p == nullptr ) return false;
 

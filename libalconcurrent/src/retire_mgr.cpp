@@ -91,7 +91,7 @@ public:
 		}
 	}
 
-	bool recycle_head_one( void )
+	bool recycle_head_one( void ) noexcept
 	{
 		if ( p_head_ == nullptr ) {
 			return false;
