@@ -653,6 +653,9 @@ int main( void )
 		std::cout << "hardware_concurrency is unknown, therefore let's select templary value. " << std::endl;
 		nworker = 10;
 	}
+
+	std::thread prune_( alpha::concurrent::internal::retire_mgr::prune_thread );
+
 	alpha::concurrent::stack_list<TestType>   sut1( ReserveSize );
 	vec_mutex_stack<TestType>                 sut2;
 	list_mutex_stack<TestType>                sut3;
@@ -718,6 +721,11 @@ int main( void )
 	nwoker_perf_test_stack<alpha::concurrent::x_stack_list<TestType>>( nworker / 2, sut6 );
 	nwoker_perf_test_stack<alpha::concurrent::x_stack_list<TestType>>( 4, sut6 );
 	nwoker_perf_test_stack<alpha::concurrent::x_stack_list<TestType>>( 1, sut6 );
+
+	alpha::concurrent::internal::retire_mgr::stop_prune_thread();
+	if ( prune_.joinable() ) {
+		prune_.join();
+	}
 
 	return EXIT_SUCCESS;
 }

@@ -10,6 +10,7 @@
  */
 
 #include <atomic>
+#include <condition_variable>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -27,95 +28,28 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
-/**
- * @brief グローバル変数専用のretire pointer管理クラス
- *
- */
-class alignas( internal::atomic_variable_align ) global_retire_mgr {
+class retire_node_list {
 public:
-	class locker {
-	public:
-		bool owns_lock() const noexcept
-		{
-			return ul_.owns_lock();
-		}
-
-		void transfer( retire_node_abst* p_list_head )
-		{
-			if ( !owns_lock() ) {
-				throw std::logic_error( "Need to get mutex lock" );
-			}
-			parent_.unlock_append_node( p_list_head );
-		}
-
-		bool recycle_one( void )
-		{
-			if ( !owns_lock() ) {
-				LogOutput( log_type::ERR, "Need to get mutex lock" );
-				return false;
-			}
-
-			return parent_.unlock_recycle_one();
-		}
-
-	private:
-		locker( global_retire_mgr& parent_arg )
-		  : parent_( parent_arg )
-		  , ul_( parent_.mtx_ )
-		{
-		}
-		locker( global_retire_mgr& parent_arg, std::try_to_lock_t )
-		  : parent_( parent_arg )
-		  , ul_( parent_.mtx_, std::try_to_lock )
-		{
-		}
-
-		global_retire_mgr&           parent_;
-		std::unique_lock<std::mutex> ul_;
-
-		friend class global_retire_mgr;
-	};
-
-	constexpr global_retire_mgr( void ) noexcept
-	  : ap_lockfree_head_( nullptr )
-	  , mtx_()
-	  , p_head_( nullptr )
+	constexpr retire_node_list( void ) noexcept
+	  : p_head_( nullptr )
 	{
 	}
-
-	~global_retire_mgr()
+	explicit constexpr retire_node_list( retire_node_abst* p_node ) noexcept
+	  : p_head_( p_node )
 	{
-		// delete all without any check
-		retire_node_abst* p_cur = p_head_;
-		while ( p_cur != nullptr ) {
-			retire_node_abst* p_nxt = p_cur->p_next_;
-			delete p_cur;
-			p_cur = p_nxt;
-		}
+	}
+	retire_node_list( retire_node_list&& src ) noexcept
+	  : p_head_( src.p_head_ )
+	{
+		src.p_head_ = nullptr;
 	}
 
-	/**
-	 * @brief receive retire node list
-	 *
-	 * @pre p_next_ of last node in p_list_head should be nullptr;
-	 *
-	 * @warning this API is NOT lock-free
-	 *
-	 * @param p_list_head
-	 */
-	void transfer( retire_node_abst* p_list_head )
+	~retire_node_list()
 	{
-		std::lock_guard<std::mutex> lg( mtx_ );
-		unlock_append_node( p_list_head );
+		clear();
 	}
 
-	locker try_lock( void )
-	{
-		return locker( *this, std::try_to_lock );
-	}
-
-private:
-	void unlock_append_node( retire_node_abst* p_node )
+	void merge_push_back( retire_node_abst* p_node )
 	{
 		if ( p_head_ == nullptr ) {
 			p_head_ = p_node;
@@ -128,7 +62,24 @@ private:
 			p_cur->p_next_ = p_node;
 		}
 	}
-	bool unlock_recycle_one( void )
+	void merge_push_back( retire_node_list&& src )
+	{
+		retire_node_abst* p = src.p_head_;
+		src.p_head_         = nullptr;
+		merge_push_back( p );
+	}
+	void clear( void ) noexcept
+	{
+		retire_node_abst* p_cur = p_head_;
+		p_head_                 = nullptr;
+		while ( p_cur != nullptr ) {
+			retire_node_abst* p_nxt = p_cur->p_next_;
+			delete p_cur;
+			p_cur = p_nxt;
+		}
+	}
+
+	bool recycle_one( void )
 	{
 		if ( p_head_ == nullptr ) {
 			return false;
@@ -147,10 +98,120 @@ private:
 		return true;
 	}
 
+	retire_node_abst* p_head_;
+};
+
+/**
+ * @brief グローバル変数専用のretire pointer管理クラス
+ *
+ */
+class alignas( internal::atomic_variable_align ) global_retire_mgr {
+public:
+	class locker {
+	public:
+		bool owns_lock() const noexcept
+		{
+			return ul_.owns_lock();
+		}
+
+		retire_node_list& ref( void )
+		{
+			if ( !owns_lock() ) {
+				throw std::logic_error( "Need to get mutex lock" );
+			}
+			return target_node_list_;
+		}
+
+		void wait_notify( void )
+		{
+			if ( !owns_lock() ) {
+				throw std::logic_error( "Need to get mutex lock" );
+			}
+			parent_.cv.wait( ul_ );
+		}
+
+		~locker()
+		{
+			if ( target_node_list_.p_head_ != nullptr ) {
+				parent_.cv.notify_all();
+			}
+		}
+
+	private:
+		locker( global_retire_mgr& parent_arg, retire_node_list& target_node_list_arg )
+		  : parent_( parent_arg )
+		  , target_node_list_( target_node_list_arg )
+		  , ul_( parent_.mtx_ )
+		{
+		}
+		locker( global_retire_mgr& parent_arg, retire_node_list& target_node_list_arg, std::try_to_lock_t )
+		  : parent_( parent_arg )
+		  , target_node_list_( target_node_list_arg )
+		  , ul_( parent_.mtx_, std::try_to_lock )
+		{
+		}
+
+		global_retire_mgr&           parent_;
+		retire_node_list&            target_node_list_;
+		std::unique_lock<std::mutex> ul_;
+
+		friend class global_retire_mgr;
+	};
+
+	global_retire_mgr( void ) noexcept
+	  : ap_lockfree_head_( nullptr )
+	  , mtx_()
+	  , cv()
+	  , retire_list_()
+	{
+	}
+
+	~global_retire_mgr()
+	{
+		// delete all without any check
+		retire_node_list { ap_lockfree_head_.load( std::memory_order_acquire ) };
+		ap_lockfree_head_.store( nullptr, std::memory_order_release );
+	}
+
+	locker try_lock( void )
+	{
+		return locker( *this, retire_list_, std::try_to_lock );
+	}
+
+	locker lock( void )
+	{
+		return locker( *this, retire_list_ );
+	}
+
+	void push_lockfree( retire_node_abst* p_list_head )
+	{
+		if ( p_list_head == nullptr ) return;
+
+		retire_node_abst* p_expect = ap_lockfree_head_.load( std::memory_order_acquire );
+		p_list_head->p_next_       = p_expect;
+		while ( !ap_lockfree_head_.compare_exchange_weak( p_expect, p_list_head, std::memory_order_release, std::memory_order_relaxed ) ) {
+			p_list_head->p_next_ = p_expect;
+		}
+		cv.notify_all();
+	}
+
+	retire_node_abst* parge_lockfree( void )
+	{
+		retire_node_abst* p_expect = ap_lockfree_head_.load( std::memory_order_acquire );
+		while ( !ap_lockfree_head_.compare_exchange_weak( p_expect, nullptr, std::memory_order_release, std::memory_order_relaxed ) ) {
+		}
+		return p_expect;
+	}
+
+	static void prune_thread( void );
+	static void notify_prune_thread( void );
+
+private:
 	std::atomic<retire_node_abst*> ap_lockfree_head_;
 
-	std::mutex        mtx_;
-	retire_node_abst* p_head_;
+	std::mutex              mtx_;
+	std::condition_variable cv;
+	retire_node_list        retire_list_;
 };
 
 /**
@@ -176,12 +237,13 @@ public:
 		// 単純にグローバルストレージに移管することだけを行う。
 		if ( p_head_ == nullptr ) return;
 
-		transfer_distination_.transfer( p_head_ );
+		transfer_distination_.lock().ref().merge_push_back( p_head_ );
 		p_head_ = nullptr;
 	}
 
 	void retire( retire_node_abst* p_new_retire )
 	{
+#if 0
 		recycle_one();
 
 		if ( p_head_ == nullptr ) {
@@ -196,6 +258,16 @@ public:
 		}
 
 		recycle_one();
+#else
+		auto locker_handle = transfer_distination_.try_lock();
+		if ( locker_handle.owns_lock() ) {
+			locker_handle.ref().merge_push_back( p_new_retire );
+			return;
+		}
+
+		transfer_distination_.push_lockfree( p_new_retire );
+
+#endif
 	}
 
 	/**
@@ -219,7 +291,7 @@ public:
 		if ( p_head_ == nullptr ) {
 			auto locker_handle = transfer_distination_.try_lock();
 			if ( locker_handle.owns_lock() ) {
-				locker_handle.recycle_one();
+				locker_handle.ref().recycle_one();
 			}
 			return false;
 		}
@@ -230,7 +302,7 @@ public:
 				retire_node_abst* p_transfer = p_head_;
 				p_head_                      = p_transfer->p_next_;
 				p_transfer->p_next_          = nullptr;   // important!!
-				locker_handle.transfer( p_transfer );
+				locker_handle.ref().merge_push_back( p_transfer );
 			}
 			// because pointer is in hazard pointer list, therefore recycle is impossible for head
 			return false;
@@ -250,21 +322,127 @@ private:
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+ALCC_INTERNAL_CONSTINIT alignas( internal::atomic_variable_align ) std::atomic<size_t> g_call_count_retire( 0 );
+#endif
+
+class prune_thread_inst_t {
+public:
+	prune_thread_inst_t( void )
+	  : prune_thread_obj_()
+	{
+	}
+
+	void start( void )
+	{
+		prune_thread_obj_ = std::thread( retire_mgr::prune_thread );
+	}
+
+	void stop( void )
+	{
+		retire_mgr::request_stop_prune_thread();
+		if ( prune_thread_obj_.joinable() ) {
+			prune_thread_obj_.join();
+		}
+	}
+
+	~prune_thread_inst_t()
+	{
+		retire_mgr::request_stop_prune_thread();
+		if ( prune_thread_obj_.joinable() ) {
+			prune_thread_obj_.join();
+		}
+	}
+
+	void increment_call_count( void )
+	{
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+		g_call_count_retire++;
+#endif
+	}
+
+private:
+	std::thread prune_thread_obj_;
+};
+
+static prune_thread_inst_t g_prune_thread_obj;
+
+class prune_thread_mgr {
+public:
+	prune_thread_mgr( void )
+	{
+		g_prune_thread_obj.start();
+	}
+
+	~prune_thread_mgr()
+	{
+		g_prune_thread_obj.stop();
+	}
+
+	void increment_call_count( void )
+	{
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+		g_call_count_retire++;
+#endif
+	}
+
+private:
+	std::thread prune_thread_obj_;
+};
+
+///////////////////////////////////////////////////////////////////////////////////////
 ALCC_INTERNAL_CONSTINIT global_retire_mgr                    g_retire_mgr_inst;
 thread_local ALCC_INTERNAL_CONSTINIT thread_local_retire_mgr tl_reitre_mgr_insts { g_retire_mgr_inst };
 
-void retire_mgr::prune( void )
+void retire_mgr::retire_impl( retire_node_abst* p_new_retire )
 {
-	tl_reitre_mgr_insts.recycle_one();
-	auto locker_handle = g_retire_mgr_inst.try_lock();
-	if ( locker_handle.owns_lock() ) {
-		while ( locker_handle.recycle_one() ) {}
+	static prune_thread_mgr pt_mgr_obj;
+	pt_mgr_obj.increment_call_count();
+
+	tl_reitre_mgr_insts.retire( p_new_retire );
+}
+
+void global_retire_mgr::prune_thread( void )
+{
+	retire_node_list recycle_list;
+	{
+		auto lk = g_retire_mgr_inst.lock();
+		lk.wait_notify();
+
+		recycle_list.merge_push_back( std::move( lk.ref() ) );
+	}
+
+	recycle_list.merge_push_back( g_retire_mgr_inst.parge_lockfree() );
+
+	while ( recycle_list.recycle_one() ) {}
+
+	g_retire_mgr_inst.lock().ref().merge_push_back( std::move( recycle_list ) );
+}
+
+void global_retire_mgr::notify_prune_thread( void )
+{
+	g_retire_mgr_inst.cv.notify_all();
+}
+
+std::atomic<bool> retire_mgr::loop_flag_prune_thread_( true );
+
+void retire_mgr::prune_thread( void )
+{
+	loop_flag_prune_thread_.store( true );
+	while ( loop_flag_prune_thread_.load() ) {
+		global_retire_mgr::prune_thread();
 	}
 }
 
-void retire_mgr::retire_impl( retire_node_abst* p_new_retire )
+void retire_mgr::request_stop_prune_thread( void )
 {
-	tl_reitre_mgr_insts.retire( p_new_retire );
+	loop_flag_prune_thread_.store( false );
+	global_retire_mgr::notify_prune_thread();
+}
+
+void retire_mgr::stop_prune_thread( void )
+{
+	g_prune_thread_obj.stop();
 }
 
 }   // namespace internal

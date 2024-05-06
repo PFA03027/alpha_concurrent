@@ -16,6 +16,7 @@
 #include <future>
 #include <iostream>
 #include <mutex>
+#include <thread>
 #include <vector>
 
 #include "gtest/gtest.h"
@@ -33,6 +34,8 @@ protected:
 
 	void TearDown() override
 	{
+		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
+
 		alpha::concurrent::internal::global_scope_hazard_ptr_chain::DestoryAll();
 
 		int cw, ce;

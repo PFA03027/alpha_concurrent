@@ -17,6 +17,7 @@
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/hazard_ptr.hpp"
 #include "alconcurrent/internal/hazard_ptr_internal.hpp"
+#include "alconcurrent/internal/retire_mgr.hpp"
 
 TEST( HazardPtrGroup, CanDefaultConstruct )
 {
@@ -107,6 +108,7 @@ protected:
 
 	void TearDown() override
 	{
+		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
 		alpha::concurrent::internal::global_scope_hazard_ptr_chain::DestoryAll();
 
 		int cw, ce;
@@ -134,6 +136,8 @@ TEST_F( TestGlobalScopeHazardPtrChain, CallDestroyAll )
 		EXPECT_NE( righofownership1, nullptr );
 		auto righofownership2 = sut2.slot_assign( &dummy2 );
 		EXPECT_NE( righofownership2, nullptr );
+
+		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
 	}
 
 	// Act
@@ -224,6 +228,7 @@ protected:
 
 	void TearDown() override
 	{
+		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
 		alpha::concurrent::internal::global_scope_hazard_ptr_chain::DestoryAll();
 
 		int cw, ce;
@@ -298,6 +303,7 @@ protected:
 
 	void TearDown() override
 	{
+		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
 		alpha::concurrent::internal::global_scope_hazard_ptr_chain::DestoryAll();
 
 		int cw, ce;
