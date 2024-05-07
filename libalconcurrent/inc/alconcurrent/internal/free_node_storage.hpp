@@ -408,20 +408,6 @@ public:
 
 		return false;
 	}
-
-	template <bool IsDefaultConstructivle = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructivle>::type* = nullptr>
-	node_pointer allocate( node_pointer p_next_node_arg = nullptr )
-	{
-		// リサイクルストレージからノードを取り出す
-		node_pointer p_ans = allocate_from_recycle_storage( p_next_node_arg );
-		if ( p_ans != nullptr ) {
-			return p_ans;
-		}
-
-		// ノードをリサイクルできなかったので、ノードをアロケートする
-		return new node_type { hazard_ptr_handler_t { p_next_node_arg }, value_type {} };
-	}
-
 	template <bool IsCopyable = std::is_copy_constructible<value_type>::value && std::is_copy_assignable<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
 	node_pointer allocate( const value_type& init_v_arg, node_pointer p_next_node_arg = nullptr )
 	{
@@ -477,6 +463,7 @@ private:
 			x_free_od_node_storage<T>::g_fn_list_help_flag_.store( true );
 		}
 
+		// グローバルストレージのロックフリーリストからノードをリサイクルする。
 		p_ans = x_free_od_node_storage<T>::g_fn_list_lockfree_.pop_front();
 		while ( p_ans != nullptr ) {
 			if ( !internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( p_ans ) ) {
@@ -668,7 +655,7 @@ private:
 };
 
 template <typename T>
-ALCC_INTERNAL_CONSTINIT od_node_list_lockfree<T> x_free_od_node_storage<T>::g_fn_list_lockfree_;
+od_node_list_lockfree<T> x_free_od_node_storage<T>::g_fn_list_lockfree_;
 
 template <typename T>
 ALCC_INTERNAL_CONSTINIT std::atomic<bool> x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_( false );

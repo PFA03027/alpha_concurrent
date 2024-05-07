@@ -664,21 +664,25 @@ public:
 	using element_type = T;
 	using pointer      = T*;
 
-	constexpr hazard_ptr_handler( void )
-	  : ap_target_p_( nullptr )
+	hazard_ptr_handler( void )
+	  : ap_target_p_()
 	{
+		ap_target_p_.store( nullptr, std::memory_order_release );
 	}
-	explicit constexpr hazard_ptr_handler( T* p_desired )
-	  : ap_target_p_( p_desired )
+	explicit hazard_ptr_handler( T* p_desired )
+	  : ap_target_p_()
 	{
+		ap_target_p_.store( p_desired, std::memory_order_release );
 	}
-	constexpr hazard_ptr_handler( const hazard_ptr_handler& src )
-	  : ap_target_p_( src.ap_target_p_.load( std::memory_order_acquire ) )
+	hazard_ptr_handler( const hazard_ptr_handler& src )
+	  : ap_target_p_()
 	{
+		ap_target_p_.store( src.ap_target_p_.load( std::memory_order_acquire ), std::memory_order_release );
 	}
-	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR_BODY hazard_ptr_handler( hazard_ptr_handler&& src )
-	  : ap_target_p_( src.ap_target_p_.load( std::memory_order_acquire ) )
+	hazard_ptr_handler( hazard_ptr_handler&& src )
+	  : ap_target_p_()
 	{
+		ap_target_p_.store( src.ap_target_p_.load( std::memory_order_acquire ), std::memory_order_release );
 		src.ap_target_p_.store( nullptr, std::memory_order_release );
 	}
 	hazard_ptr_handler& operator=( const hazard_ptr_handler& src )

@@ -25,13 +25,14 @@ namespace internal {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 struct retire_node_abst {
-	retire_node_abst* p_next_;
-	void*             p_retire_;
+	void*                          p_retire_;
+	std::atomic<retire_node_abst*> p_next_;
 
 	constexpr retire_node_abst( void* p_retire_arg ) noexcept
-	  : p_next_( nullptr )
-	  , p_retire_( p_retire_arg )
+	  : p_retire_( p_retire_arg )
+	  , p_next_()
 	{
+		p_next_.store( nullptr, std::memory_order_release );
 	}
 	virtual ~retire_node_abst() = default;
 

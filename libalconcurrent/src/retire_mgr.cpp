@@ -31,21 +31,27 @@ namespace internal {
 class retire_node_list {
 public:
 	constexpr retire_node_list( void ) noexcept
-	  : p_head_( nullptr )
-	  , p_tail_( nullptr )
+	  : p_head_()
+	  , p_tail_()
 	{
+		p_head_.store( nullptr, std::memory_order_release );
+		p_tail_.store( nullptr, std::memory_order_release );
 	}
 	explicit constexpr retire_node_list( retire_node_abst* p_node ) noexcept
-	  : p_head_( p_node )
-	  , p_tail_( find_tail_pointer( p_node ) )
+	  : p_head_()
+	  , p_tail_()
 	{
+		p_head_.store( p_node, std::memory_order_release );
+		p_tail_.store( find_tail_pointer( p_node ), std::memory_order_release );
 	}
 	retire_node_list( retire_node_list&& src ) noexcept
-	  : p_head_( src.p_head_ )
-	  , p_tail_( src.p_tail_ )
+	  : p_head_()
+	  , p_tail_()
 	{
-		src.p_head_ = nullptr;
-		src.p_tail_ = nullptr;
+		p_head_.store( src.p_head_.load( std::memory_order_acquire ), std::memory_order_release );
+		p_tail_.store( src.p_tail_.load( std::memory_order_acquire ), std::memory_order_release );
+		src.p_head_.store( nullptr, std::memory_order_release );
+		src.p_tail_.store( nullptr, std::memory_order_release );
 	}
 
 	~retire_node_list()
@@ -58,34 +64,34 @@ public:
 		if ( p_node == nullptr ) return;
 
 		// add new node to last
-		if ( p_head_ == nullptr ) {
-			p_head_ = p_node;
+		if ( p_head_.load( std::memory_order_acquire ) == nullptr ) {
+			p_head_.store( p_node, std::memory_order_release );
 		} else {
-			p_tail_->p_next_ = p_node;
+			p_tail_.load( std::memory_order_acquire )->p_next_.store( p_node, std::memory_order_release );
 		}
-		p_tail_ = find_tail_pointer( p_node );
+		p_tail_.store( find_tail_pointer( p_node ), std::memory_order_release );
 	}
 	void merge_push_back( retire_node_list&& src )
 	{
-		if ( src.p_head_ == nullptr ) return;
+		if ( src.p_head_.load( std::memory_order_acquire ) == nullptr ) return;
 
-		if ( p_head_ == nullptr ) {
-			p_head_ = src.p_head_;
-			p_tail_ = src.p_tail_;
+		if ( p_head_.load( std::memory_order_acquire ) == nullptr ) {
+			p_head_.store( src.p_head_.load( std::memory_order_acquire ), std::memory_order_release );
 		} else {
-			p_tail_->p_next_ = src.p_head_;
-			p_tail_          = src.p_tail_;
+			p_tail_.load( std::memory_order_acquire )->p_next_.store( src.p_head_.load( std::memory_order_acquire ), std::memory_order_release );
 		}
-		src.p_head_ = nullptr;
-		src.p_tail_ = nullptr;
+		p_tail_.store( src.p_tail_.load( std::memory_order_acquire ), std::memory_order_release );
+
+		src.p_head_.store( nullptr, std::memory_order_release );
+		src.p_tail_.store( nullptr, std::memory_order_release );
 	}
 	void clear( void ) noexcept
 	{
-		retire_node_abst* p_cur = p_head_;
-		p_head_                 = nullptr;
-		p_tail_                 = nullptr;
+		retire_node_abst* p_cur = p_head_.load( std::memory_order_acquire );
+		p_head_.store( nullptr, std::memory_order_release );
+		p_tail_.store( nullptr, std::memory_order_release );
 		while ( p_cur != nullptr ) {
-			retire_node_abst* p_nxt = p_cur->p_next_;
+			retire_node_abst* p_nxt = p_cur->p_next_.load( std::memory_order_acquire );
 			delete p_cur;
 			p_cur = p_nxt;
 		}
@@ -93,19 +99,22 @@ public:
 
 	bool recycle_head_one( void ) noexcept
 	{
-		if ( p_head_ == nullptr ) {
+		retire_node_abst* p_cur_head = p_head_.load( std::memory_order_acquire );
+		if ( p_cur_head == nullptr ) {
 			return false;
 		}
 
-		if ( internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( p_head_->get_retire_pointer() ) ) {
+		if ( internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( p_cur_head->get_retire_pointer() ) ) {
 			// because pointer is in hazard pointer list, therefore recycle is impossible for head
 			return false;
 		}
 
-		retire_node_abst* p_parge = p_head_;
-		p_head_                   = p_parge->p_next_;
-		if ( p_head_ == nullptr ) {
-			p_tail_ = nullptr;
+		retire_node_abst* p_parge    = p_cur_head;
+		retire_node_abst* p_new_head = p_parge->p_next_.load( std::memory_order_acquire );
+
+		p_head_.store( p_new_head, std::memory_order_release );
+		if ( p_new_head == nullptr ) {
+			p_tail_.store( nullptr, std::memory_order_release );
 		}
 
 		delete p_parge;
@@ -115,7 +124,7 @@ public:
 
 	bool is_empty( void ) const noexcept
 	{
-		return p_head_ == nullptr;
+		return p_head_.load( std::memory_order_acquire ) == nullptr;
 	}
 
 private:
@@ -124,14 +133,16 @@ private:
 		if ( p_head_arg == nullptr ) return nullptr;
 
 		retire_node_abst* p_cur = p_head_arg;
-		while ( p_cur->p_next_ != nullptr ) {
-			p_cur = p_cur->p_next_;
+		retire_node_abst* p_nxt = p_cur->p_next_.load( std::memory_order_acquire );
+		while ( p_nxt != nullptr ) {
+			p_cur = p_nxt;
+			p_nxt = p_cur->p_next_.load( std::memory_order_acquire );
 		}
 		return p_cur;
 	}
 
-	retire_node_abst* p_head_;
-	retire_node_abst* p_tail_;
+	std::atomic<retire_node_abst*> p_head_;
+	std::atomic<retire_node_abst*> p_tail_;
 };
 
 /**
@@ -165,6 +176,10 @@ public:
 
 		~locker()
 		{
+			if ( !owns_lock() ) {
+				return;
+			}
+
 			if ( !target_node_list_.is_empty() ) {
 				parent_.cv.notify_all();
 			}
