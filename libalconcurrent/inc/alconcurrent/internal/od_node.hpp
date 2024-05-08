@@ -28,12 +28,50 @@ namespace internal {
  * @tparam T value type kept in this class
  */
 template <typename T>
-struct alignas( atomic_variable_align ) od_node {
+class alignas( atomic_variable_align ) od_node {
+public:
 	using value_type           = T;
 	using hazard_ptr_handler_t = hazard_ptr_handler<od_node>;
 
+private:
+	value_type v_;
+
+public:
 	hazard_ptr_handler<od_node> hph_next_;
-	value_type                  v_;
+
+	template <bool IsCopyable = std::is_copy_constructible<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
+	od_node( od_node* p_next_arg, const value_type& v_arg ) noexcept( std::is_nothrow_copy_constructible<value_type>::value )
+	  : v_( v_arg )
+	  , hph_next_( p_next_arg )
+	{
+	}
+
+	template <bool IsMovable = std::is_move_constructible<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+	od_node( od_node* p_next_arg, value_type&& v_arg ) noexcept( std::is_nothrow_move_constructible<value_type>::value )
+	  : v_( std::move( v_arg ) )
+	  , hph_next_( p_next_arg )
+	{
+	}
+
+	template <bool IsCopyable = std::is_copy_assignable<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
+	void set( const value_type& v_arg, od_node* p_next_arg ) noexcept( std::is_nothrow_copy_assignable<value_type>::value )
+	{
+		v_ = v_arg;
+		hph_next_.store( p_next_arg );
+	}
+
+	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+	void set( value_type&& v_arg, od_node* p_next_arg ) noexcept( std::is_nothrow_move_assignable<value_type>::value )
+	{
+		v_ = std::move( v_arg );
+		hph_next_.store( p_next_arg );
+	}
+
+	value_type get( void )
+	{
+		// ALCC_INTERNAL_MAYBE_UNUSED_ATTR auto tmp_p = hph_next_.load();	// TODO: is this mandatory code?
+		return v_;
+	}
 
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else

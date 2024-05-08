@@ -418,7 +418,7 @@ public:
 		node_pointer p_poped_node = pop_impl();
 		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
-		std::tuple<bool, value_type> ans { true, std::move( p_poped_node->v_ ) };
+		std::tuple<bool, value_type> ans { true, std::move( p_poped_node->get() ) };
 		free_node_storage_.recycle( p_poped_node );
 		return ans;
 	}
@@ -430,7 +430,7 @@ public:
 		node_pointer p_poped_node = pop_impl();
 		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
-		std::tuple<bool, value_type> ans { true, p_poped_node->v_ };
+		std::tuple<bool, value_type> ans { true, p_poped_node->get() };
 		free_node_storage_.recycle( p_poped_node );
 		return ans;
 	}

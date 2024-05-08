@@ -664,28 +664,28 @@ public:
 	using element_type = T;
 	using pointer      = T*;
 
-	hazard_ptr_handler( void )
+	hazard_ptr_handler( void ) noexcept
 	  : ap_target_p_()
 	{
 		ap_target_p_.store( nullptr, std::memory_order_release );
 	}
-	explicit hazard_ptr_handler( T* p_desired )
+	explicit hazard_ptr_handler( T* p_desired ) noexcept
 	  : ap_target_p_()
 	{
 		ap_target_p_.store( p_desired, std::memory_order_release );
 	}
-	hazard_ptr_handler( const hazard_ptr_handler& src )
+	hazard_ptr_handler( const hazard_ptr_handler& src ) noexcept
 	  : ap_target_p_()
 	{
 		ap_target_p_.store( src.ap_target_p_.load( std::memory_order_acquire ), std::memory_order_release );
 	}
-	hazard_ptr_handler( hazard_ptr_handler&& src )
+	hazard_ptr_handler( hazard_ptr_handler&& src ) noexcept
 	  : ap_target_p_()
 	{
 		ap_target_p_.store( src.ap_target_p_.load( std::memory_order_acquire ), std::memory_order_release );
 		src.ap_target_p_.store( nullptr, std::memory_order_release );
 	}
-	hazard_ptr_handler& operator=( const hazard_ptr_handler& src )
+	hazard_ptr_handler& operator=( const hazard_ptr_handler& src ) noexcept
 	{
 		if ( this == &src ) return *this;
 
@@ -693,7 +693,7 @@ public:
 
 		return *this;
 	}
-	hazard_ptr_handler& operator=( hazard_ptr_handler&& src )
+	hazard_ptr_handler& operator=( hazard_ptr_handler&& src ) noexcept
 	{
 		if ( this == &src ) return *this;
 

@@ -412,28 +412,28 @@ public:
 	node_pointer allocate( const value_type& init_v_arg, node_pointer p_next_node_arg = nullptr )
 	{
 		// リサイクルストレージからノードを取り出す
-		node_pointer p_ans = allocate_from_recycle_storage( p_next_node_arg );
+		node_pointer p_ans = allocate_from_recycle_storage();
 		if ( p_ans != nullptr ) {
-			p_ans->v_ = init_v_arg;
+			p_ans->set( init_v_arg, p_next_node_arg );
 			return p_ans;
 		}
 
 		// ノードをリサイクルできなかったので、ノードをアロケートする
-		return new node_type { hazard_ptr_handler_t { p_next_node_arg }, init_v_arg };
+		return new node_type { p_next_node_arg, init_v_arg };
 	}
 
 	template <bool IsMovable = std::is_move_constructible<value_type>::value && std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
 	node_pointer allocate( value_type&& init_v_arg, node_pointer p_next_node_arg = nullptr )
 	{
 		// リサイクルストレージからノードを取り出す
-		node_pointer p_ans = allocate_from_recycle_storage( p_next_node_arg );
+		node_pointer p_ans = allocate_from_recycle_storage();
 		if ( p_ans != nullptr ) {
-			p_ans->v_ = std::move( init_v_arg );
+			p_ans->set( std::move( init_v_arg ), p_next_node_arg );
 			return p_ans;
 		}
 
 		// ノードをリサイクルできなかったので、ノードをアロケートする
-		return new node_type { hazard_ptr_handler_t { p_next_node_arg }, std::move( init_v_arg ) };
+		return new node_type { p_next_node_arg, std::move( init_v_arg ) };
 	}
 
 private:
@@ -443,12 +443,11 @@ private:
 	 * @return node_pointer リサイクルストレージから取り出したノード
 	 * @retval nullptr ストレージからノードを取り出せなかった。
 	 */
-	node_pointer allocate_from_recycle_storage( node_pointer p_next_node_arg ) noexcept
+	node_pointer allocate_from_recycle_storage() noexcept
 	{
 		// ローカルストレージからノードをリサイクルする。
 		node_pointer p_ans = x_free_od_node_storage<T>::tl_fn_list_.node_list_.pop_front();
 		if ( p_ans != nullptr ) {
-			p_ans->hph_next_.store( p_next_node_arg );
 			return p_ans;
 		}
 
@@ -457,7 +456,6 @@ private:
 		if ( lk.owns_lock() ) {
 			p_ans = lk.ref().pop_front();
 			if ( p_ans != nullptr ) {
-				p_ans->hph_next_.store( p_next_node_arg );
 				return p_ans;
 			}
 			x_free_od_node_storage<T>::g_fn_list_help_flag_.store( true );
@@ -467,7 +465,6 @@ private:
 		p_ans = x_free_od_node_storage<T>::g_fn_list_lockfree_.pop_front();
 		while ( p_ans != nullptr ) {
 			if ( !internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( p_ans ) ) {
-				p_ans->hph_next_.store( p_next_node_arg );
 				return p_ans;
 			}
 			internal::retire_mgr::retire_always_store( p_ans, recycler( &( x_free_od_node_storage<T>::tl_fn_list_ ) ) );
