@@ -73,27 +73,14 @@ public:
 	 */
 	ownership_t try_ocupy( void );
 
-	ALCC_INTERNAL_CPPSTD17_CONSTEXPR iterator begin( void ) noexcept
-	{
-		return hzrd_ptr_array_.begin();
-	}
-	ALCC_INTERNAL_CPPSTD17_CONSTEXPR const_iterator begin( void ) const noexcept
-	{
-		return hzrd_ptr_array_.begin();
-	}
-	ALCC_INTERNAL_CPPSTD17_CONSTEXPR iterator end( void ) noexcept
-	{
-		return hzrd_ptr_array_.end();
-	}
-	ALCC_INTERNAL_CPPSTD17_CONSTEXPR const_iterator end( void ) const noexcept
-	{
-		return hzrd_ptr_array_.end();
-	}
-
 	bool is_used( void ) const noexcept
 	{
 		return is_used_.load( std::memory_order_acquire );
 	}
+
+	void force_clear( void ) noexcept;
+
+	bool check_pointer_is_hazard_pointer( void* p ) noexcept;
 
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else
@@ -149,6 +136,23 @@ public:
 #endif
 
 private:
+	ALCC_INTERNAL_CPPSTD17_CONSTEXPR iterator begin( void ) noexcept
+	{
+		return hzrd_ptr_array_.begin();
+	}
+	ALCC_INTERNAL_CPPSTD17_CONSTEXPR const_iterator begin( void ) const noexcept
+	{
+		return hzrd_ptr_array_.begin();
+	}
+	ALCC_INTERNAL_CPPSTD17_CONSTEXPR iterator end( void ) noexcept
+	{
+		return hzrd_ptr_array_.end();
+	}
+	ALCC_INTERNAL_CPPSTD17_CONSTEXPR const_iterator end( void ) const noexcept
+	{
+		return hzrd_ptr_array_.end();
+	}
+
 	std::atomic<bool> is_used_;
 	alignas( internal::atomic_variable_align ) hzrd_p_array_t hzrd_ptr_array_;
 	alignas( internal::atomic_variable_align ) iterator next_assign_hint_it_;

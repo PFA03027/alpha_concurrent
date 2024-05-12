@@ -51,7 +51,7 @@ hazard_ptr_group::~hazard_ptr_group()
 {
 	for ( auto& e : *this ) {
 		if ( e.load( std::memory_order_acquire ) != nullptr ) {
-			LogOutput( log_type::ERR, "hazard pointer is still exist." );
+			LogOutput( log_type::ERR, "Called the destructor of hazard pointer slots. but, hazard pointer is still exist." );
 		}
 	}
 }
@@ -123,6 +123,26 @@ hazard_ptr_group::ownership_t hazard_ptr_group::try_ocupy( void )
 	}
 
 	return ownership_t( nullptr );
+}
+
+void hazard_ptr_group::force_clear( void ) noexcept
+{
+	for ( auto& e : *this ) {
+		if ( e.load( std::memory_order_acquire ) != nullptr ) {
+			LogOutput( log_type::ERR, "hazard pointer is still exist." );
+		}
+		e.store( nullptr, std::memory_order_release );
+	}
+}
+
+bool hazard_ptr_group::check_pointer_is_hazard_pointer( void* p ) noexcept
+{
+	for ( auto& e : *this ) {
+		// if hazard_ptr_group has a pointer that is same to p, p is hazard pointer
+		if ( e.load( std::memory_order_acquire ) == p ) return true;
+	}
+
+	return false;
 }
 
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
@@ -274,12 +294,7 @@ bind_hazard_ptr_list::~bind_hazard_ptr_list()
 
 	hazard_ptr_group* p_cur_list = ownership_ticket_.get();
 	while ( p_cur_list != nullptr ) {
-		for ( auto& e : *p_cur_list ) {
-			if ( e.load( std::memory_order_acquire ) != nullptr ) {
-				LogOutput( log_type::ERR, "hazard pointer is still exist." );
-			}
-			e.store( nullptr, std::memory_order_release );
-		}
+		p_cur_list->force_clear();
 
 		hazard_ptr_group* p_next_list = p_cur_list->ap_list_next_.load( std::memory_order_acquire );
 		p_cur_list                    = p_next_list;
@@ -381,9 +396,8 @@ bool global_scope_hazard_ptr_chain::check_pointer_is_hazard_pointer( void* p ) n
 		if ( p_cur_chain->is_used() ) {
 			hazard_ptr_group* p_cur_list = p_cur_chain;
 			while ( p_cur_list != nullptr ) {
-				for ( auto& e : *p_cur_list ) {
-					// if hazard_ptr_group has a pointer that is same to p, p is hazard pointer
-					if ( e.load( std::memory_order_acquire ) == p ) return true;
+				if ( p_cur_list->check_pointer_is_hazard_pointer( p ) ) {
+					return true;
 				}
 				hazard_ptr_group* p_next_list = p_cur_list->ap_list_next_.load( std::memory_order_acquire );
 				p_cur_list                    = p_next_list;
