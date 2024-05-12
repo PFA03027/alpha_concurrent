@@ -104,7 +104,7 @@ public:
 			return false;
 		}
 
-		if ( internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( p_cur_head->get_retire_pointer() ) ) {
+		if ( internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_cur_head->get_retire_pointer() ) ) {
 			// because pointer is in hazard pointer list, therefore recycle is impossible for head
 			return false;
 		}

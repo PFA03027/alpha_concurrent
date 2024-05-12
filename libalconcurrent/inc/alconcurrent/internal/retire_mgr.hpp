@@ -231,7 +231,7 @@ public:
 	template <typename T, typename Deleter = std::default_delete<T>>
 	static void retire( T* p_retire_obj, Deleter&& deleter_arg = std::default_delete<T> {} )
 	{
-		if ( internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( p_retire_obj ) ) {
+		if ( internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_retire_obj ) ) {
 			retire_node_abst* p_new_retire = new retire_node<T, Deleter>( p_retire_obj, std::forward<Deleter>( deleter_arg ) );
 			retire_impl( p_new_retire );
 		} else {

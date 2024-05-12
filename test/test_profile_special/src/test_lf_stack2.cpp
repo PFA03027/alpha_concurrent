@@ -36,7 +36,7 @@ protected:
 	{
 		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
 
-		alpha::concurrent::internal::global_scope_hazard_ptr_chain::DestoryAll();
+		alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
 
 		int cw, ce;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );

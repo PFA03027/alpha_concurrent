@@ -464,7 +464,7 @@ private:
 		// グローバルストレージのロックフリーリストからノードをリサイクルする。
 		p_ans = x_free_od_node_storage<T>::g_fn_list_lockfree_.pop_front();
 		while ( p_ans != nullptr ) {
-			if ( !internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( p_ans ) ) {
+			if ( !internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
 				return p_ans;
 			}
 			internal::retire_mgr::retire_always_store( p_ans, recycler( &( x_free_od_node_storage<T>::tl_fn_list_ ) ) );
@@ -676,8 +676,7 @@ thread_local ALCC_INTERNAL_CONSTINIT typename x_free_od_node_storage<T>::thread_
 #if __has_cpp_attribute( deprecated )
 [[deprecated( "This is obsolated. So there is no effect." )]]
 #endif
-void
-set_param_to_free_nd_mem_alloc(
+void set_param_to_free_nd_mem_alloc(
 	const param_chunk_allocation* p_param_array,   //!< [in] pointer to parameter array
 	unsigned int                  num              //!< [in] array size
 );

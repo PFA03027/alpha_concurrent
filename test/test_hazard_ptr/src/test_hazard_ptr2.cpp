@@ -109,7 +109,7 @@ protected:
 	void TearDown() override
 	{
 		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
-		alpha::concurrent::internal::global_scope_hazard_ptr_chain::DestoryAll();
+		alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
 
 		int cw, ce;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
@@ -141,7 +141,7 @@ TEST_F( TestGlobalScopeHazardPtrChain, CallDestroyAll )
 	}
 
 	// Act
-	alpha::concurrent::internal::global_scope_hazard_ptr_chain::DestoryAll();
+	alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
 
 	// Assert
 	// no memory leak
@@ -158,8 +158,8 @@ TEST_F( TestGlobalScopeHazardPtrChain, CallCheckPtrIsHazardPtr1 )
 	EXPECT_NE( righofownership1, nullptr );
 
 	// Act
-	bool ret1 = alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 );
-	bool ret2 = alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy2 );
+	bool ret1 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 );
+	bool ret2 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 );
 
 	// Assert
 	EXPECT_TRUE( ret1 );
@@ -174,12 +174,12 @@ TEST_F( TestGlobalScopeHazardPtrChain, CallCheckPtrIsHazardPtr2 )
 	char dummy1           = 1;
 	auto righofownership1 = sut1.slot_assign( &dummy1 );
 	EXPECT_NE( righofownership1, nullptr );
-	bool ret1 = alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 );
+	bool ret1 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 );
 	EXPECT_TRUE( ret1 );
 	righofownership1 = alpha::concurrent::internal::hzrd_slot_ownership_t {};
 
 	// Act
-	bool ret2 = alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 );
+	bool ret2 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 );
 
 	// Assert
 	EXPECT_FALSE( ret2 );
@@ -206,10 +206,10 @@ TEST_F( TestGlobalScopeHazardPtrChain, CallCheckPtrIsHazardPtr3 )
 	EXPECT_NE( righofownership2, nullptr );
 
 	// Act
-	bool ret1 = alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 );
-	bool ret2 = alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy2 );
-	bool ret3 = alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy3 );
-	bool ret4 = alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy_array[0] );
+	bool ret1 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 );
+	bool ret2 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 );
+	bool ret3 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy3 );
+	bool ret4 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy_array[0] );
 
 	// Assert
 	EXPECT_TRUE( ret1 );
@@ -229,7 +229,7 @@ protected:
 	void TearDown() override
 	{
 		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
-		alpha::concurrent::internal::global_scope_hazard_ptr_chain::DestoryAll();
+		alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
 
 		int cw, ce;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
@@ -304,7 +304,7 @@ protected:
 	void TearDown() override
 	{
 		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
-		alpha::concurrent::internal::global_scope_hazard_ptr_chain::DestoryAll();
+		alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
 
 		int cw, ce;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
@@ -323,7 +323,7 @@ TEST_F( TestHazardPtrHandler, CallDefaultConstructor )
 	// Assert
 	auto hp2 = sut.get();
 	EXPECT_EQ( hp2, nullptr );
-	EXPECT_FALSE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( nullptr ) );
+	EXPECT_FALSE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( nullptr ) );
 }
 
 TEST_F( TestHazardPtrHandler, CallTransConstructor )
@@ -337,7 +337,7 @@ TEST_F( TestHazardPtrHandler, CallTransConstructor )
 	// Assert
 	auto hp2 = sut.get();
 	EXPECT_EQ( hp2, &dummy1 );
-	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
 }
 
 TEST_F( TestHazardPtrHandler, CallCopyConstructor )
@@ -355,7 +355,7 @@ TEST_F( TestHazardPtrHandler, CallCopyConstructor )
 	// Assert
 	auto hp2 = sut.get();
 	EXPECT_EQ( hp2, &dummy1 );
-	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
 }
 
 TEST_F( TestHazardPtrHandler, CallMoveConstructor )
@@ -375,7 +375,7 @@ TEST_F( TestHazardPtrHandler, CallMoveConstructor )
 	EXPECT_EQ( hp1, nullptr );
 	auto hp2 = sut.get();
 	EXPECT_EQ( hp2, &dummy1 );
-	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
 }
 
 TEST_F( TestHazardPtrHandler, CallCopyAssingment )
@@ -390,8 +390,8 @@ TEST_F( TestHazardPtrHandler, CallCopyAssingment )
 	EXPECT_EQ( hp1, &dummy1 );
 	auto hp2 = sut.get();
 	EXPECT_EQ( hp2, &dummy2 );
-	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 ) );
-	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy2 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 ) );
 
 	// Act
 	sut = src;
@@ -401,8 +401,8 @@ TEST_F( TestHazardPtrHandler, CallCopyAssingment )
 	EXPECT_EQ( hp1, &dummy1 );
 	hp2 = sut.get();
 	EXPECT_EQ( hp2, &dummy1 );
-	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 ) );
-	EXPECT_FALSE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy2 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
+	EXPECT_FALSE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 ) );
 }
 
 TEST_F( TestHazardPtrHandler, CallMoveAssingment )
@@ -417,8 +417,8 @@ TEST_F( TestHazardPtrHandler, CallMoveAssingment )
 	EXPECT_EQ( hp1, &dummy1 );
 	auto hp2 = sut.get();
 	EXPECT_EQ( hp2, &dummy2 );
-	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 ) );
-	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy2 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 ) );
 
 	// Act
 	sut = std::move( src );
@@ -428,8 +428,8 @@ TEST_F( TestHazardPtrHandler, CallMoveAssingment )
 	EXPECT_EQ( hp1, nullptr );
 	hp2 = sut.get();
 	EXPECT_EQ( hp2, &dummy1 );
-	EXPECT_TRUE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 ) );
-	EXPECT_FALSE( alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy2 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
+	EXPECT_FALSE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 ) );
 }
 
 TEST_F( TestHazardPtrHandler, Call_HazardPtr_get1 )

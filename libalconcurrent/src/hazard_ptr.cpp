@@ -33,7 +33,7 @@ constexpr size_t conf_pre_mmap_size = 16 * 1024;
 static ALCC_INTERNAL_CONSTINIT alloc_only_chamber g_alloc_only_inst_for_hzrd_ptr_module( false, conf_pre_mmap_size );   // グローバルインスタンスは、プロセス終了までメモリ領域を維持するために、デストラクタが呼ばれてもmmapした領域を解放しない。
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-ALCC_INTERNAL_CONSTINIT global_scope_hazard_ptr_chain     global_scope_hazard_ptr_chain::g_scope_hzrd_chain_;
+ALCC_INTERNAL_CONSTINIT global_scope_hazard_ptr_chain     g_scope_hzrd_chain_;
 thread_local ALCC_INTERNAL_CONSTINIT bind_hazard_ptr_list tl_bhpl;
 
 ///////////////////////////////////////////////////////////////////////
@@ -268,7 +268,7 @@ void hazard_ptr_group::operator delete[]( void* ptr, void* ) noexcept   // delet
 //////////////////////////////////////////////////////////////////////////////
 bind_hazard_ptr_list::~bind_hazard_ptr_list()
 {
-	if ( global_scope_hazard_ptr_chain::IsDestoryed() ) return;
+	if ( hazard_ptr_mgr::IsDestoryed() ) return;
 
 	hazard_ptr_group* p_cur_list = ownership_ticket_.get();
 	while ( p_cur_list != nullptr ) {
@@ -323,6 +323,10 @@ hzrd_slot_ownership_t bind_hazard_ptr_list::slot_assign( void* p )
 }
 
 //////////////////////////////////////////////////////////////////////////////
+hazard_ptr_group::ownership_t global_scope_hazard_ptr_chain::GetOwnership( void )
+{
+	return g_scope_hzrd_chain_.get_ownership();
+}
 
 hazard_ptr_group::ownership_t global_scope_hazard_ptr_chain::try_get_ownership( void )
 {
@@ -423,6 +427,61 @@ void global_scope_hazard_ptr_chain::remove_all( void )
 	LogOutput( log_type::DUMP, "\tcall count of hazard_ptr<T>::get() -> %zu", call_count_hazard_ptr_get_.load() );
 	LogOutput( log_type::DUMP, "\tloop count in hazard_ptr<T>::get() -> %zu", loop_count_in_hazard_ptr_get_.load() );
 #endif
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+/**
+ * @brief assign a slot of hazard pointer and set the pointer
+ *
+ * @param p pointer to a object. should not be nullptr
+ * @return hzrd_slot_ownership_t pointer to hazard pointer slot
+ * @retval nullptr fail to assign or p is nullptr
+ * @retval non-nullptr success to assign
+ */
+hzrd_slot_ownership_t hazard_ptr_mgr::AssignHazardPtrSlot( void* p )
+{
+	return internal::tl_bhpl.slot_assign( p );
+}
+
+/**
+ * @brief Check if p is still in hazard pointer list or not
+ *
+ * @param p
+ * @return true p is still listed in hazard pointer list
+ * @return false p is not hazard pointer
+ */
+bool hazard_ptr_mgr::CheckPtrIsHazardPtr( void* p ) noexcept
+{
+	return g_scope_hzrd_chain_.check_pointer_is_hazard_pointer( p );
+}
+
+/**
+ * @brief remove all hazard_ptr_group from internal global variable
+ *
+ * This API is for debug and test purpose.
+ *
+ * @pre this API should be called from main thread. And, all other threads should be exited before call this API.
+ *      at least, caller side shold call alpha::concurrent::internal::retire_mgr::stop_prune_thread() before calling this API
+ */
+void hazard_ptr_mgr::DestoryAll( void )
+{
+	return g_scope_hzrd_chain_.remove_all();
+}
+
+/**
+ * @brief check empty or not
+ *
+ * @warning this API has race condition. Therefore, this API is test purpose only.
+ *
+ * @return true hazard pointer related resouce is Empty
+ * @return false hazard pointer related resouce is Not Empty
+ *
+ * @todo introduce exclusive control by mutex b/w DestroyAll() and IsDestoryed()
+ */
+bool hazard_ptr_mgr::IsDestoryed( void )
+{
+	return g_scope_hzrd_chain_.is_empty();
 }
 
 }   // namespace internal

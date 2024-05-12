@@ -217,15 +217,17 @@ extern thread_local bind_hazard_ptr_list tl_bhpl;
 /////////////////////////////////////////////////////////////////
 class alignas( internal::atomic_variable_align ) global_scope_hazard_ptr_chain {
 public:
+	constexpr global_scope_hazard_ptr_chain( void )
+	  : ap_top_hzrd_ptr_chain_( nullptr )
+	{
+	}
+
 	/**
 	 * @brief Get ownership from unused hazard_ptr_group list
 	 *
 	 * @return hazard_ptr_group::ownership_t ownership data. this api does not return nullptr
 	 */
-	static inline hazard_ptr_group::ownership_t GetOwnership( void )
-	{
-		return g_scope_hzrd_chain_.get_ownership();
-	}
+	static inline hazard_ptr_group::ownership_t GetOwnership( void );
 
 	/**
 	 * @brief Check if p is still in hazard pointer list or not
@@ -234,45 +236,19 @@ public:
 	 * @return true p is still listed in hazard pointer list
 	 * @return false p is not hazard pointer
 	 */
-	static inline bool CheckPtrIsHazardPtr( void* p ) noexcept
-	{
-		return g_scope_hzrd_chain_.check_pointer_is_hazard_pointer( p );
-	}
+	bool check_pointer_is_hazard_pointer( void* p ) noexcept;
 
 	/**
-	 * @brief remove all hazard_ptr_group from internal global variable
-	 *
-	 * This API is for debug and test purpose.
-	 *
-	 * @pre this API should be called from main thread. And, all other threads should be exited before call this API.
-	 *      at least, caller side shold call alpha::concurrent::internal::retire_mgr::stop_prune_thread() before calling this API
+	 * @brief remove all hazard_ptr_group
 	 */
-	static inline void DestoryAll( void )
-	{
-		return g_scope_hzrd_chain_.remove_all();
-	}
+	void remove_all( void );
 
-	/**
-	 * @brief check empty or not
-	 *
-	 * @warning this API has race condition. Therefore, this API is test purpose only.
-	 *
-	 * @return true hazard pointer related resouce is Empty
-	 * @return false hazard pointer related resouce is Not Empty
-	 *
-	 * @todo introduce exclusive control by mutex b/w DestroyAll() and IsDestoryed()
-	 */
-	static inline bool IsDestoryed( void )
+	bool is_empty( void )
 	{
-		return g_scope_hzrd_chain_.ap_top_hzrd_ptr_chain_.load( std::memory_order_acquire ) == nullptr;
+		return ap_top_hzrd_ptr_chain_.load( std::memory_order_acquire ) == nullptr;
 	}
 
 private:
-	constexpr global_scope_hazard_ptr_chain( void )
-	  : ap_top_hzrd_ptr_chain_( nullptr )
-	{
-	}
-
 	/**
 	 * @brief try to get ownership from unused hazard_ptr_group list
 	 *
@@ -294,6 +270,22 @@ private:
 	 */
 	hazard_ptr_group::ownership_t get_ownership( void );
 
+	std::atomic<hazard_ptr_group*> ap_top_hzrd_ptr_chain_;
+};
+
+/////////////////////////////////////////////////////////////////
+class hazard_ptr_mgr {
+public:
+	/**
+	 * @brief assign a slot of hazard pointer and set the pointer
+	 *
+	 * @param p pointer to a object. should not be nullptr
+	 * @return hzrd_slot_ownership_t pointer to hazard pointer slot
+	 * @retval nullptr fail to assign or p is nullptr
+	 * @retval non-nullptr success to assign
+	 */
+	static hzrd_slot_ownership_t AssignHazardPtrSlot( void* p );
+
 	/**
 	 * @brief Check if p is still in hazard pointer list or not
 	 *
@@ -301,16 +293,29 @@ private:
 	 * @return true p is still listed in hazard pointer list
 	 * @return false p is not hazard pointer
 	 */
-	bool check_pointer_is_hazard_pointer( void* p ) noexcept;
+	static bool CheckPtrIsHazardPtr( void* p ) noexcept;
 
 	/**
-	 * @brief remove all hazard_ptr_group
+	 * @brief remove all hazard_ptr_group from internal global variable
+	 *
+	 * This API is for debug and test purpose.
+	 *
+	 * @pre this API should be called from main thread. And, all other threads should be exited before call this API.
+	 *      at least, caller side shold call alpha::concurrent::internal::retire_mgr::stop_prune_thread() before calling this API
 	 */
-	void remove_all( void );
+	static void DestoryAll( void );
 
-	std::atomic<hazard_ptr_group*> ap_top_hzrd_ptr_chain_;
-
-	static global_scope_hazard_ptr_chain g_scope_hzrd_chain_;
+	/**
+	 * @brief check empty or not
+	 *
+	 * @warning this API has race condition. Therefore, this API is test purpose only.
+	 *
+	 * @return true hazard pointer related resouce is Empty
+	 * @return false hazard pointer related resouce is Not Empty
+	 *
+	 * @todo introduce exclusive control by mutex b/w DestroyAll() and IsDestoryed()
+	 */
+	static bool IsDestoryed( void );
 };
 
 }   // namespace internal
