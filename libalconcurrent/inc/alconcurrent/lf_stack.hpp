@@ -449,7 +449,8 @@ private:
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_head, std::memory_order_release, std::memory_order_relaxed ) ) {
 			hp_cur_head = hph_head_.get();
 			p_expected  = hp_cur_head.get();
-			p_new_head  = hp_cur_head->hph_next_.load( std::memory_order_acquire );
+			if ( p_expected == nullptr ) return nullptr;
+			p_new_head = hp_cur_head->hph_next_.load( std::memory_order_acquire );
 		}
 
 		// ここに来た時点で、hp_cur_head で保持されているノードの所有権を確保できた。

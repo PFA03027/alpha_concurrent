@@ -720,9 +720,14 @@ public:
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 			internal::loop_count_in_hazard_ptr_get_++;
 #endif
-			hso->store( p_expect, std::memory_order_release );
+			if ( p_expect != nullptr ) {
+				hso->store( p_expect, std::memory_order_release );
+			}
 		}
 
+		if ( p_expect == nullptr ) {
+			return hazard_ptr<T>( p_expect, nullptr );
+		}
 		return hazard_ptr<T>( p_expect, std::move( hso ) );
 	}
 
