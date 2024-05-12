@@ -137,6 +137,8 @@ void hazard_ptr_group::force_clear( void ) noexcept
 
 bool hazard_ptr_group::check_pointer_is_hazard_pointer( void* p ) noexcept
 {
+	if ( p == nullptr ) return false;
+
 	for ( auto& e : *this ) {
 		// if hazard_ptr_group has a pointer that is same to p, p is hazard pointer
 		if ( e.load( std::memory_order_acquire ) == p ) return true;

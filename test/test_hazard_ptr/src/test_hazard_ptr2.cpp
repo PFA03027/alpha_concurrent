@@ -18,10 +18,25 @@
 #include "alconcurrent/hazard_ptr.hpp"
 #include "alconcurrent/internal/hazard_ptr_internal.hpp"
 #include "alconcurrent/internal/retire_mgr.hpp"
-
 #include "hazard_ptr_impl.hpp"
 
-TEST( HazardPtrGroup, CanDefaultConstruct )
+class TestHazardPtrGroup : public ::testing::Test {
+protected:
+	void SetUp() override
+	{
+		alpha::concurrent::GetErrorWarningLogCountAndReset( nullptr, nullptr );
+	}
+
+	void TearDown() override
+	{
+		int cw, ce;
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
+		EXPECT_EQ( ce, 0 );
+		EXPECT_EQ( cw, 0 );
+	}
+};
+
+TEST_F( TestHazardPtrGroup, CanDefaultConstruct )
 {
 	// Arrange
 
@@ -31,7 +46,7 @@ TEST( HazardPtrGroup, CanDefaultConstruct )
 	// Assert
 }
 
-TEST( HazardPtrGroup, CanTryAssing )
+TEST_F( TestHazardPtrGroup, CanTryAssing )
 {
 	// Arrange
 	alpha::concurrent::internal::hazard_ptr_group sut;
@@ -44,7 +59,7 @@ TEST( HazardPtrGroup, CanTryAssing )
 	EXPECT_NE( righofownership, nullptr );
 }
 
-TEST( HazardPtrGroup, CanTryAssingForNullptr )
+TEST_F( TestHazardPtrGroup, CanTryAssingForNullptr )
 {
 	// Arrange
 	alpha::concurrent::internal::hazard_ptr_group sut;
@@ -56,7 +71,7 @@ TEST( HazardPtrGroup, CanTryAssingForNullptr )
 	EXPECT_EQ( righofownership, nullptr );
 }
 
-TEST( HazardPtrGroup, CanTryAssingWithFull )
+TEST_F( TestHazardPtrGroup, CanTryAssingWithFull )
 {
 	// Arrange
 	alpha::concurrent::internal::hazard_ptr_group      sut;
@@ -75,224 +90,126 @@ TEST( HazardPtrGroup, CanTryAssingWithFull )
 	EXPECT_EQ( righofownership, nullptr );
 }
 
-TEST( HazardPtrGroup, CanTryOcupy1 )
+TEST_F( TestHazardPtrGroup, CallChkHazardNullptr )
 {
 	// Arrange
 	alpha::concurrent::internal::hazard_ptr_group sut;
 
 	// Act
-	auto ownership = sut.try_ocupy();
+	bool ret = sut.check_pointer_is_hazard_pointer( nullptr );
 
 	// Assert
-	EXPECT_NE( ownership, nullptr );
+	EXPECT_FALSE( ret );
 }
 
-TEST( HazardPtrGroup, CanTryOcupy2 )
+TEST_F( TestHazardPtrGroup, CallChkHazardPtr1 )
 {
 	// Arrange
 	alpha::concurrent::internal::hazard_ptr_group sut;
-	auto                                          ownership1 = sut.try_ocupy();
+	char                                          dummy = 1;
 
 	// Act
-	auto ownership2 = sut.try_ocupy();
+	bool ret = sut.check_pointer_is_hazard_pointer( &dummy );
 
 	// Assert
-	EXPECT_EQ( ownership2, nullptr );
+	EXPECT_FALSE( ret );
 }
 
-/////////////////////////////////////////////////////////////////////////////////
-class TestGlobalScopeHazardPtrChain : public ::testing::Test {
-protected:
-	void SetUp() override
-	{
-		alpha::concurrent::GetErrorWarningLogCountAndReset( nullptr, nullptr );
-	}
-
-	void TearDown() override
-	{
-		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
-		alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
-
-		int cw, ce;
-		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
-		EXPECT_EQ( ce, 0 );
-		EXPECT_EQ( cw, 0 );
-	}
-};
-TEST_F( TestGlobalScopeHazardPtrChain, CallDestroyAll )
-{
-	{
-		// Arrange
-		alpha::concurrent::internal::bind_hazard_ptr_list sut1;
-		alpha::concurrent::internal::bind_hazard_ptr_list sut2;
-
-		char                                               dummy1 = 1;
-		char                                               dummy2 = 2;
-		int                                                dummy_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
-		alpha::concurrent::internal::hzrd_slot_ownership_t righofownership_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
-		for ( size_t i = 0; i < alpha::concurrent::internal::hazard_ptr_group::kArraySize; i++ ) {
-			righofownership_array[i] = sut1.slot_assign( &dummy_array[i] );
-			EXPECT_NE( righofownership_array[i], nullptr );
-		}
-		auto righofownership1 = sut1.slot_assign( &dummy1 );
-		EXPECT_NE( righofownership1, nullptr );
-		auto righofownership2 = sut2.slot_assign( &dummy2 );
-		EXPECT_NE( righofownership2, nullptr );
-
-		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
-	}
-
-	// Act
-	alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
-
-	// Assert
-	// no memory leak
-}
-
-TEST_F( TestGlobalScopeHazardPtrChain, CallCheckPtrIsHazardPtr1 )
+TEST_F( TestHazardPtrGroup, CallChkHazardPtr2 )
 {
 	// Arrange
-	alpha::concurrent::internal::bind_hazard_ptr_list sut1;
-
-	char dummy1           = 1;
-	char dummy2           = 2;
-	auto righofownership1 = sut1.slot_assign( &dummy1 );
-	EXPECT_NE( righofownership1, nullptr );
+	alpha::concurrent::internal::hazard_ptr_group sut;
+	char                                          dummy           = 1;
+	auto                                          righofownership = sut.try_assign( &dummy );
+	EXPECT_NE( righofownership, nullptr );
 
 	// Act
-	bool ret1 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 );
-	bool ret2 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 );
+	bool ret = sut.check_pointer_is_hazard_pointer( &dummy );
 
 	// Assert
-	EXPECT_TRUE( ret1 );
-	EXPECT_FALSE( ret2 );
+	EXPECT_TRUE( ret );
 }
 
-TEST_F( TestGlobalScopeHazardPtrChain, CallCheckPtrIsHazardPtr2 )
+TEST_F( TestHazardPtrGroup, CallChkHazardPtrFull )
 {
 	// Arrange
-	alpha::concurrent::internal::bind_hazard_ptr_list sut1;
-
-	char dummy1           = 1;
-	auto righofownership1 = sut1.slot_assign( &dummy1 );
-	EXPECT_NE( righofownership1, nullptr );
-	bool ret1 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 );
-	EXPECT_TRUE( ret1 );
-	righofownership1 = alpha::concurrent::internal::hzrd_slot_ownership_t {};
+	alpha::concurrent::internal::hazard_ptr_group sut;
+	char                                          dummy1          = 1;
+	char                                          dummy2          = 2;
+	auto                                          righofownership = sut.try_assign( &dummy1 );
+	EXPECT_NE( righofownership, nullptr );
 
 	// Act
-	bool ret2 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 );
+	bool ret = sut.check_pointer_is_hazard_pointer( &dummy2 );
 
 	// Assert
-	EXPECT_FALSE( ret2 );
+	EXPECT_FALSE( ret );
 }
 
-TEST_F( TestGlobalScopeHazardPtrChain, CallCheckPtrIsHazardPtr3 )
+TEST_F( TestHazardPtrGroup, CallChkHazardPtr4 )
 {
-	// Arrange
-	alpha::concurrent::internal::bind_hazard_ptr_list sut1;
-	alpha::concurrent::internal::bind_hazard_ptr_list sut2;
-
-	char                                               dummy1 = 1;
-	char                                               dummy2 = 2;
-	char                                               dummy3 = 3;
-	int                                                dummy_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
-	alpha::concurrent::internal::hzrd_slot_ownership_t righofownership_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
-	for ( size_t i = 0; i < alpha::concurrent::internal::hazard_ptr_group::kArraySize; i++ ) {
-		righofownership_array[i] = sut1.slot_assign( &dummy_array[i] );
-		EXPECT_NE( righofownership_array[i], nullptr );
-	}
-	auto righofownership1 = sut1.slot_assign( &dummy1 );
-	EXPECT_NE( righofownership1, nullptr );
-	auto righofownership2 = sut2.slot_assign( &dummy2 );
-	EXPECT_NE( righofownership2, nullptr );
-
-	// Act
-	bool ret1 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 );
-	bool ret2 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 );
-	bool ret3 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy3 );
-	bool ret4 = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy_array[0] );
-
-	// Assert
-	EXPECT_TRUE( ret1 );
-	EXPECT_TRUE( ret2 );
-	EXPECT_FALSE( ret3 );
-	EXPECT_TRUE( ret4 );
-}
-
-/////////////////////////////////////////////////////////////////////////////////
-class TestBindHazardPtrList : public ::testing::Test {
-protected:
-	void SetUp() override
-	{
-		alpha::concurrent::GetErrorWarningLogCountAndReset( nullptr, nullptr );
-	}
-
-	void TearDown() override
-	{
-		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
-		alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
-
-		int cw, ce;
-		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
-		EXPECT_EQ( ce, 0 );
-		EXPECT_EQ( cw, 0 );
-	}
-};
-
-TEST_F( TestBindHazardPtrList, CallConstructor )
-{
-	// Arrange
-
-	// Act
-	alpha::concurrent::internal::bind_hazard_ptr_list sut;
-
-	// Assert
-}
-
-TEST_F( TestBindHazardPtrList, CallAssing1 )
-{
-	// Arrange
-	// alpha::concurrent::internal::bind_hazard_ptr_list sut( p_hpg1_->try_ocupy() );
-	alpha::concurrent::internal::bind_hazard_ptr_list sut;
-	char                                              dummy;
-
-	// Act
-	auto ownership = sut.slot_assign( &dummy );
-
-	// Assert
-	EXPECT_NE( ownership, nullptr );
-}
-
-TEST_F( TestBindHazardPtrList, CallAssingForNullptr )
-{
-	// Arrange
-	alpha::concurrent::internal::bind_hazard_ptr_list sut;
-
-	// Act
-	auto ownership = sut.slot_assign( nullptr );
-
-	// Assert
-	EXPECT_EQ( ownership, nullptr );
-}
-
-TEST_F( TestBindHazardPtrList, CallAssingWithFull )
-{
-	// Arrange
-	alpha::concurrent::internal::bind_hazard_ptr_list  sut;
+	alpha::concurrent::internal::hazard_ptr_group      sut;
 	char                                               dummy = 1;
 	int                                                dummy_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
 	alpha::concurrent::internal::hzrd_slot_ownership_t righofownership_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
 	for ( size_t i = 0; i < alpha::concurrent::internal::hazard_ptr_group::kArraySize; i++ ) {
-		righofownership_array[i] = sut.slot_assign( &dummy_array[i] );
+		righofownership_array[i] = sut.try_assign( &dummy_array[i] );
 		EXPECT_NE( righofownership_array[i], nullptr );
 	}
 
+	for ( size_t i = 0; i < alpha::concurrent::internal::hazard_ptr_group::kArraySize; i++ ) {
+
+		// Act
+		bool ret = sut.check_pointer_is_hazard_pointer( &dummy_array[i] );
+
+		// Assert
+		EXPECT_TRUE( ret );
+	}
+
 	// Act
-	auto righofownership = sut.slot_assign( &dummy );
+	bool ret = sut.check_pointer_is_hazard_pointer( &dummy );
 
 	// Assert
-	EXPECT_NE( righofownership, nullptr );
+	EXPECT_FALSE( ret );
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+class TestGlobalScopeHazardPtrChain : public ::testing::Test {
+public:
+	TestGlobalScopeHazardPtrChain( void )
+	  : ::testing::Test()
+	  , sut_()
+	{
+	}
+
+protected:
+	void SetUp() override
+	{
+		alpha::concurrent::GetErrorWarningLogCountAndReset( nullptr, nullptr );
+	}
+
+	void TearDown() override
+	{
+		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
+
+		int cw, ce;
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
+		EXPECT_EQ( ce, 0 );
+		EXPECT_EQ( cw, 0 );
+	}
+
+	alpha::concurrent::internal::global_scope_hazard_ptr_chain sut_;
+};
+
+TEST_F( TestGlobalScopeHazardPtrChain, CallRemoveAll )
+{
+	// Arrange
+
+	// Act
+	sut_.remove_all();
+
+	// Assert
+	EXPECT_TRUE( sut_.is_empty() );
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -514,4 +431,143 @@ TEST_F( TestHazardPtrHandler, Call_HazardPtr_get_for_nullptr )
 
 	// Assert
 	EXPECT_EQ( hp2.get(), nullptr );
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+class TestHazardPtr : public ::testing::Test {
+protected:
+	using test_type = int;
+
+	void SetUp() override
+	{
+		alpha::concurrent::GetErrorWarningLogCountAndReset( nullptr, nullptr );
+
+		dummy_ = 1;
+		hph_.store( &dummy_ );
+	}
+
+	void TearDown() override
+	{
+		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
+		alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
+
+		int cw, ce;
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
+		EXPECT_EQ( ce, 0 );
+		EXPECT_EQ( cw, 0 );
+	}
+
+	test_type                                        dummy_;
+	alpha::concurrent::hazard_ptr_handler<test_type> hph_;
+};
+
+TEST_F( TestHazardPtr, Call_GetHazardPtr1 )
+{
+	// Arrange
+	auto sut = hph_.get();
+
+	// Act
+	test_type* p_ret = sut.get();
+
+	// Assert
+	EXPECT_NE( p_ret, nullptr );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ret ) );
+}
+
+TEST_F( TestHazardPtr, Call_GetHazardPtr2 )
+{
+	// Arrange
+	auto sut1 = hph_.get();
+	auto sut2 = hph_.get();
+
+	// Act
+	test_type* p_ret1 = sut1.get();
+	test_type* p_ret2 = sut2.get();
+
+	// Assert
+	EXPECT_NE( p_ret1, nullptr );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ret1 ) );
+	EXPECT_NE( p_ret2, nullptr );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ret2 ) );
+}
+
+TEST_F( TestHazardPtr, Call_ReleaseHazardPtr_by_destructor1 )
+{
+	// Arrange
+	test_type* p_ret;
+	{
+		auto sut = hph_.get();
+		p_ret    = sut.get();
+		EXPECT_NE( p_ret, nullptr );
+		EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ret ) );
+	}
+
+	// Act
+	bool ret = alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ret );
+
+	// Assert
+	EXPECT_FALSE( ret );
+}
+
+TEST_F( TestHazardPtr, Call_ReleaseHazardPtr_by_destructor2 )
+{
+	// Arrange
+	test_type* p_ret1;
+	test_type* p_ret2;
+	auto       sut1 = hph_.get();
+	{
+		auto sut2 = hph_.get();
+
+		// Act
+		p_ret1 = sut1.get();
+		p_ret2 = sut2.get();
+	}
+
+	// Assert
+	EXPECT_NE( p_ret1, nullptr );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ret1 ) );
+	EXPECT_NE( p_ret2, nullptr );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ret2 ) );
+}
+
+TEST_F( TestHazardPtr, Call_ReleaseHazardPtr_by_destructor3 )
+{
+	// Arrange
+	test_type* p_ret1;
+	test_type* p_ret2;
+	{
+		auto sut1 = hph_.get();
+		auto sut2 = hph_.get();
+
+		// Act
+		p_ret1 = sut1.get();
+		p_ret2 = sut2.get();
+	}
+
+	// Assert
+	EXPECT_NE( p_ret1, nullptr );
+	EXPECT_FALSE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ret1 ) );
+	EXPECT_NE( p_ret2, nullptr );
+	EXPECT_FALSE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ret2 ) );
+}
+
+TEST_F( TestHazardPtr, Call_ReleaseHazardPtr_by_assignment )
+{
+	// Arrange
+	test_type* p_ret1;
+	test_type* p_ret2;
+	auto       sut = hph_.get();
+	p_ret1         = sut.get();
+	EXPECT_NE( p_ret1, nullptr );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ret1 ) );
+	int dummy2 = 2;
+	hph_.store( &dummy2 );
+
+	// Act
+	sut = hph_.get();
+
+	// Assert
+	EXPECT_FALSE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ret1 ) );
+	p_ret2 = sut.get();
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ret2 ) );
 }
