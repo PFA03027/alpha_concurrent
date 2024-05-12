@@ -22,6 +22,8 @@
 #include "alconcurrent/internal/cpp_std_configure.hpp"
 #include "alconcurrent/internal/hazard_ptr_internal.hpp"
 
+#include "hazard_ptr_impl.hpp"
+
 namespace alpha {
 namespace concurrent {
 namespace internal {
