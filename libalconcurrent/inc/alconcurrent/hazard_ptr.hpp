@@ -714,7 +714,7 @@ public:
 			return hazard_ptr<T>( p_expect, nullptr );
 		}
 
-		internal::hzrd_slot_ownership_t hso = internal::tl_bhpl.slot_assign( p_expect );
+		internal::hzrd_slot_ownership_t hso = internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_expect );
 
 		while ( !ap_target_p_.compare_exchange_weak( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE

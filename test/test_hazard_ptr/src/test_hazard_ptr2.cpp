@@ -19,6 +19,8 @@
 #include "alconcurrent/internal/hazard_ptr_internal.hpp"
 #include "alconcurrent/internal/retire_mgr.hpp"
 
+#include "hazard_ptr_impl.hpp"
+
 TEST( HazardPtrGroup, CanDefaultConstruct )
 {
 	// Arrange
