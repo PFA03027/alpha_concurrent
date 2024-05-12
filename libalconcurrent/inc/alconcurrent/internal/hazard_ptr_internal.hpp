@@ -37,6 +37,16 @@ extern std::atomic<size_t> call_count_hazard_ptr_get_;
 extern std::atomic<size_t> loop_count_in_hazard_ptr_get_;
 #endif
 
+class hzrd_slot_releaser {
+public:
+	void operator()( std::atomic<void*>* ptr ) const
+	{
+		if ( ptr == nullptr ) return;
+		ptr->store( nullptr, std::memory_order_release );
+	}
+};
+using hzrd_slot_ownership_t = std::unique_ptr<std::atomic<void*>, hzrd_slot_releaser>;
+
 class alignas( atomic_variable_align ) hazard_ptr_group {
 public:
 	static constexpr size_t kArraySize = 16;
@@ -62,22 +72,6 @@ public:
 		}
 	};
 	using ownership_t = std::unique_ptr<hazard_ptr_group, ownership_releaser>;
-
-	class hzrd_slot_releaser {
-	public:
-		constexpr hzrd_slot_releaser( void )                                 = default;
-		constexpr hzrd_slot_releaser( const hzrd_slot_releaser& )            = default;
-		constexpr hzrd_slot_releaser( hzrd_slot_releaser&& )                 = default;
-		constexpr hzrd_slot_releaser& operator=( const hzrd_slot_releaser& ) = default;
-		constexpr hzrd_slot_releaser& operator=( hzrd_slot_releaser&& )      = default;
-
-		void operator()( std::atomic<void*>* ptr ) const
-		{
-			if ( ptr == nullptr ) return;
-			ptr->store( nullptr, std::memory_order_release );
-		}
-	};
-	using hzrd_slot_ownership_t = std::unique_ptr<std::atomic<void*>, hzrd_slot_releaser>;
 
 	ALCC_INTERNAL_CPPSTD17_CONSTEXPR hazard_ptr_group( void )
 	  : ap_chain_next_( nullptr )
@@ -199,8 +193,6 @@ private:
  */
 class alignas( atomic_variable_align ) bind_hazard_ptr_list {
 public:
-	using hzrd_slot_ownership_t = hazard_ptr_group::hzrd_slot_ownership_t;
-
 	constexpr bind_hazard_ptr_list( void )                    = default;
 	bind_hazard_ptr_list( bind_hazard_ptr_list&& )            = default;
 	bind_hazard_ptr_list& operator=( bind_hazard_ptr_list&& ) = default;

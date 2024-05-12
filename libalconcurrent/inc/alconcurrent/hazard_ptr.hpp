@@ -476,14 +476,14 @@ public:
 	}
 
 private:
-	constexpr hazard_ptr( T* p_arg, internal::bind_hazard_ptr_list::hzrd_slot_ownership_t&& os_arg )
+	constexpr hazard_ptr( T* p_arg, internal::hzrd_slot_ownership_t&& os_arg )
 	  : p_( p_arg )
 	  , os_( std::move( os_arg ) )
 	{
 	}
 
-	T*                                                    p_;
-	internal::bind_hazard_ptr_list::hzrd_slot_ownership_t os_;
+	T*                              p_;
+	internal::hzrd_slot_ownership_t os_;
 
 	friend class hazard_ptr_handler<T>;
 
@@ -714,7 +714,7 @@ public:
 			return hazard_ptr<T>( p_expect, nullptr );
 		}
 
-		internal::bind_hazard_ptr_list::hzrd_slot_ownership_t hso = internal::tl_bhpl.slot_assign( p_expect );
+		internal::hzrd_slot_ownership_t hso = internal::tl_bhpl.slot_assign( p_expect );
 
 		while ( !ap_target_p_.compare_exchange_weak( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE

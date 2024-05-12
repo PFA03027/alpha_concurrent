@@ -57,10 +57,10 @@ TEST( HazardPtrGroup, CanTryAssingForNullptr )
 TEST( HazardPtrGroup, CanTryAssingWithFull )
 {
 	// Arrange
-	alpha::concurrent::internal::hazard_ptr_group                        sut;
-	char                                                                 dummy = 1;
-	int                                                                  dummy_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
-	alpha::concurrent::internal::hazard_ptr_group::hzrd_slot_ownership_t righofownership_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
+	alpha::concurrent::internal::hazard_ptr_group      sut;
+	char                                               dummy = 1;
+	int                                                dummy_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
+	alpha::concurrent::internal::hzrd_slot_ownership_t righofownership_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
 	for ( size_t i = 0; i < alpha::concurrent::internal::hazard_ptr_group::kArraySize; i++ ) {
 		righofownership_array[i] = sut.try_assign( &dummy_array[i] );
 		EXPECT_NE( righofownership_array[i], nullptr );
@@ -124,10 +124,10 @@ TEST_F( TestGlobalScopeHazardPtrChain, CallDestroyAll )
 		alpha::concurrent::internal::bind_hazard_ptr_list sut1;
 		alpha::concurrent::internal::bind_hazard_ptr_list sut2;
 
-		char                                                                 dummy1 = 1;
-		char                                                                 dummy2 = 2;
-		int                                                                  dummy_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
-		alpha::concurrent::internal::hazard_ptr_group::hzrd_slot_ownership_t righofownership_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
+		char                                               dummy1 = 1;
+		char                                               dummy2 = 2;
+		int                                                dummy_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
+		alpha::concurrent::internal::hzrd_slot_ownership_t righofownership_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
 		for ( size_t i = 0; i < alpha::concurrent::internal::hazard_ptr_group::kArraySize; i++ ) {
 			righofownership_array[i] = sut1.slot_assign( &dummy_array[i] );
 			EXPECT_NE( righofownership_array[i], nullptr );
@@ -176,7 +176,7 @@ TEST_F( TestGlobalScopeHazardPtrChain, CallCheckPtrIsHazardPtr2 )
 	EXPECT_NE( righofownership1, nullptr );
 	bool ret1 = alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 );
 	EXPECT_TRUE( ret1 );
-	righofownership1 = alpha::concurrent::internal::bind_hazard_ptr_list::hzrd_slot_ownership_t {};
+	righofownership1 = alpha::concurrent::internal::hzrd_slot_ownership_t {};
 
 	// Act
 	bool ret2 = alpha::concurrent::internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( &dummy1 );
@@ -191,11 +191,11 @@ TEST_F( TestGlobalScopeHazardPtrChain, CallCheckPtrIsHazardPtr3 )
 	alpha::concurrent::internal::bind_hazard_ptr_list sut1;
 	alpha::concurrent::internal::bind_hazard_ptr_list sut2;
 
-	char                                                                 dummy1 = 1;
-	char                                                                 dummy2 = 2;
-	char                                                                 dummy3 = 3;
-	int                                                                  dummy_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
-	alpha::concurrent::internal::hazard_ptr_group::hzrd_slot_ownership_t righofownership_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
+	char                                               dummy1 = 1;
+	char                                               dummy2 = 2;
+	char                                               dummy3 = 3;
+	int                                                dummy_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
+	alpha::concurrent::internal::hzrd_slot_ownership_t righofownership_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
 	for ( size_t i = 0; i < alpha::concurrent::internal::hazard_ptr_group::kArraySize; i++ ) {
 		righofownership_array[i] = sut1.slot_assign( &dummy_array[i] );
 		EXPECT_NE( righofownership_array[i], nullptr );
@@ -277,10 +277,10 @@ TEST_F( TestBindHazardPtrList, CallAssingForNullptr )
 TEST_F( TestBindHazardPtrList, CallAssingWithFull )
 {
 	// Arrange
-	alpha::concurrent::internal::bind_hazard_ptr_list                        sut;
-	char                                                                     dummy = 1;
-	int                                                                      dummy_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
-	alpha::concurrent::internal::bind_hazard_ptr_list::hzrd_slot_ownership_t righofownership_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
+	alpha::concurrent::internal::bind_hazard_ptr_list  sut;
+	char                                               dummy = 1;
+	int                                                dummy_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
+	alpha::concurrent::internal::hzrd_slot_ownership_t righofownership_array[alpha::concurrent::internal::hazard_ptr_group::kArraySize];
 	for ( size_t i = 0; i < alpha::concurrent::internal::hazard_ptr_group::kArraySize; i++ ) {
 		righofownership_array[i] = sut.slot_assign( &dummy_array[i] );
 		EXPECT_NE( righofownership_array[i], nullptr );

@@ -54,13 +54,13 @@ hazard_ptr_group::~hazard_ptr_group()
 	}
 }
 
-hazard_ptr_group::hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
+hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 	call_count_try_assign_++;
 #endif
 
-	hazard_ptr_group::hzrd_slot_ownership_t ans( nullptr );   // expect RVO
+	hzrd_slot_ownership_t ans( nullptr );   // expect RVO
 
 	if ( p == nullptr ) {
 		return ans;
@@ -284,7 +284,7 @@ bind_hazard_ptr_list::~bind_hazard_ptr_list()
 	}
 }
 
-bind_hazard_ptr_list::hzrd_slot_ownership_t bind_hazard_ptr_list::slot_assign( void* p )
+hzrd_slot_ownership_t bind_hazard_ptr_list::slot_assign( void* p )
 {
 	if ( p == nullptr ) {
 		return nullptr;
