@@ -210,15 +210,15 @@ public:
 	  : mtx_()
 	  , cv()
 	  , retire_list_()
-	  , ap_lockfree_head_( nullptr )
+	//   , ap_lockfree_head_( nullptr )
 	{
 	}
 
 	~global_retire_mgr()
 	{
 		// delete all without any check
-		retire_node_list { ap_lockfree_head_.load( std::memory_order_acquire ) };
-		ap_lockfree_head_.store( nullptr, std::memory_order_release );
+		// retire_node_list { ap_lockfree_head_.load( std::memory_order_acquire ) };
+		// ap_lockfree_head_.store( nullptr, std::memory_order_release );
 	}
 
 	locker try_lock( void )
@@ -231,17 +231,17 @@ public:
 		return locker( *this, retire_list_ );
 	}
 
-	void push_lockfree( retire_node_abst* p_list_head )
-	{
-		if ( p_list_head == nullptr ) return;
+	// void push_lockfree( retire_node_abst* p_list_head )
+	// {
+	// 	if ( p_list_head == nullptr ) return;
 
-		retire_node_abst* p_expect = ap_lockfree_head_.load( std::memory_order_acquire );
-		p_list_head->p_next_       = p_expect;
-		while ( !ap_lockfree_head_.compare_exchange_weak( p_expect, p_list_head, std::memory_order_release, std::memory_order_relaxed ) ) {
-			p_list_head->p_next_ = p_expect;
-		}
-		cv.notify_all();
-	}
+	// 	retire_node_abst* p_expect = ap_lockfree_head_.load( std::memory_order_acquire );
+	// 	p_list_head->p_next_       = p_expect;
+	// 	while ( !ap_lockfree_head_.compare_exchange_weak( p_expect, p_list_head, std::memory_order_release, std::memory_order_relaxed ) ) {
+	// 		p_list_head->p_next_ = p_expect;
+	// 	}
+	// 	cv.notify_all();
+	// }
 
 	/**
 	 * @brief ロックフリーリストの先頭へ、１つのノードの追加を試みる
@@ -249,30 +249,30 @@ public:
 	 * @param p_list_head retire_node_abstのリストの先頭ノードへのポインタ
 	 * @return retire_node_abst* 追加が成功した場合、p_list_headの次のノードのポインタを返す。追加に失敗した場合、p_list_headを返す
 	 */
-	retire_node_abst* push_lockfree_one_try( retire_node_abst* const p_list_head )
-	{
-		if ( p_list_head == nullptr ) return nullptr;
+	// retire_node_abst* push_lockfree_one_try( retire_node_abst* const p_list_head )
+	// {
+	// 	if ( p_list_head == nullptr ) return nullptr;
 
-		retire_node_abst* const p_next_of_head = p_list_head->p_next_;
+	// 	retire_node_abst* const p_next_of_head = p_list_head->p_next_;
 
-		retire_node_abst* p_expect = ap_lockfree_head_.load( std::memory_order_acquire );
-		p_list_head->p_next_       = p_expect;
-		if ( ap_lockfree_head_.compare_exchange_weak( p_expect, p_list_head, std::memory_order_release, std::memory_order_relaxed ) ) {
-			cv.notify_all();
-			return p_next_of_head;
-		}
+	// 	retire_node_abst* p_expect = ap_lockfree_head_.load( std::memory_order_acquire );
+	// 	p_list_head->p_next_       = p_expect;
+	// 	if ( ap_lockfree_head_.compare_exchange_weak( p_expect, p_list_head, std::memory_order_release, std::memory_order_relaxed ) ) {
+	// 		cv.notify_all();
+	// 		return p_next_of_head;
+	// 	}
 
-		p_list_head->p_next_ = p_next_of_head;
-		return p_list_head;
-	}
+	// 	p_list_head->p_next_ = p_next_of_head;
+	// 	return p_list_head;
+	// }
 
-	retire_node_abst* parge_lockfree( void )
-	{
-		retire_node_abst* p_expect = ap_lockfree_head_.load( std::memory_order_acquire );
-		while ( !ap_lockfree_head_.compare_exchange_weak( p_expect, nullptr, std::memory_order_release, std::memory_order_relaxed ) ) {
-		}
-		return p_expect;
-	}
+	// retire_node_abst* parge_lockfree( void )
+	// {
+	// 	retire_node_abst* p_expect = ap_lockfree_head_.load( std::memory_order_acquire );
+	// 	while ( !ap_lockfree_head_.compare_exchange_weak( p_expect, nullptr, std::memory_order_release, std::memory_order_relaxed ) ) {
+	// 	}
+	// 	return p_expect;
+	// }
 
 	static void prune_thread( void );
 	static void notify_prune_thread( void );
@@ -282,7 +282,7 @@ private:
 	std::condition_variable cv;
 	retire_node_list        retire_list_;
 
-	alignas( internal::atomic_variable_align ) std::atomic<retire_node_abst*> ap_lockfree_head_;
+	// alignas( internal::atomic_variable_align ) std::atomic<retire_node_abst*> ap_lockfree_head_;
 };
 
 /**
@@ -363,9 +363,10 @@ public:
 			return true;
 		}
 
-		retire_node_abst* p_orig_head = p_head_;
-		p_head_                       = transfer_distination_.push_lockfree_one_try( p_head_ );
-		return ( p_head_ == p_orig_head ) ? false : true;
+		return false;   // TODO: retire_node_abstのリストに対し、lock freeを使う場合、ハザードポインタが使えないから、ロックフリーは使用しない方が良い。。。気がする。
+		                // retire_node_abst* p_orig_head = p_head_;
+		                // p_head_                       = transfer_distination_.push_lockfree_one_try( p_head_ );
+		                // return ( p_head_ == p_orig_head ) ? false : true;
 #else
 		// pruneスレッドに任せるのではなく、個々のスレッドと共同でリサイクルを行う場合のアルゴリズム。
 		if ( p_head_ == nullptr ) {
@@ -499,7 +500,7 @@ void global_retire_mgr::prune_thread( void )
 		recycle_list.merge_push_back( std::move( lk.ref() ) );
 	}
 
-	recycle_list.merge_push_back( g_retire_mgr_inst.parge_lockfree() );
+	// recycle_list.merge_push_back( g_retire_mgr_inst.parge_lockfree() );
 
 	while ( recycle_list.recycle_head_one() ) {}
 
