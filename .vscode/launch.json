@@ -205,6 +205,66 @@
             "preLaunchTask": "build with a sanitizer"
         },
         {
+            "name": "(gdb) test_lf_stack起動",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/test/test_lf_stack/test_lf_stack",
+            "args": [
+                "--gtest_catch_exceptions=0",
+                // "--gtest_repeat=100",
+                // "--gtest_filter=lffifoTest.TC1_SimplePushPop"
+                // "--gtest_filter=lffifoTest.TC1_MultThreadPushPop"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "gdb の再フォーマットを有効にする",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "逆アセンブリ フレーバーを Intel に設定",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "make build-test with -g"
+        },
+        {
+            "name": "(gdb) test_lf_stack with sanitizer起動",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/test/test_lf_stack/test_lf_stack",
+            "args": [
+                "--gtest_catch_exceptions=0",
+                // "--gtest_repeat=100",
+                // "--gtest_filter=lffifoTest.TC1_SimplePushPop"
+                // "--gtest_filter=lffifoTest.TC1_MultThreadPushPop"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "gdb の再フォーマットを有効にする",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "逆アセンブリ フレーバーを Intel に設定",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build with a sanitizer"
+        },
+        {
             "name": "(gdb) test_dynamic_tls起動",
             "type": "cppdbg",
             "request": "launch",

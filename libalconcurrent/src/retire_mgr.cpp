@@ -376,7 +376,7 @@ public:
 			return false;
 		}
 
-		if ( internal::global_scope_hazard_ptr_chain::CheckPtrIsHazardPtr( p_head_->get_retire_pointer() ) ) {
+		if ( internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_head_->get_retire_pointer() ) ) {
 			auto locker_handle = transfer_distination_.try_lock();
 			if ( locker_handle.owns_lock() ) {
 				retire_node_abst* p_transfer = p_head_;
