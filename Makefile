@@ -125,7 +125,7 @@ configure-cmake:
 	cmake ${CMAKE_CONFIGURE_OPTS} -G "Unix Makefiles" ${MAKEFILE_DIR}
 
 build-profile:
-	make BUILDTARGET=gprof BUILDTYPE=Release build-test
+	make BUILDTARGET=gprof BUILDTYPE=${BUILDTYPE} build-test
 
 exec-profile: build-profile
 	set -e; \
@@ -158,6 +158,9 @@ profile.%: build-profile
 
 else
 ## $(TEST_EXECS)になんらかの値が入っている場合=buildが実行されている状況
+# 第1引数: テスト実行ファイルのファイル名
+# 第2引数: テスト実行ファイルのあるディレクトリ名
+# 第3引数: テスト実行ファイルのフルパス名
 define TEST_EXEC_TEMPLATE
 test.$(1): build-test
 	$(3) $(TEST_OPTS)
