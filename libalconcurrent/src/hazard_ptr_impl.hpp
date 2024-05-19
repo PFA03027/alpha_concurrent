@@ -18,7 +18,7 @@ namespace internal {
 
 class alignas( atomic_variable_align ) hazard_ptr_group {
 public:
-	static constexpr size_t kArraySize = 16;
+	static constexpr size_t kArraySize = 8;
 	using hzrd_p_array_t               = std::array<std::atomic<void*>, kArraySize>;
 	using reference                    = hzrd_p_array_t::reference;
 	using const_reference              = hzrd_p_array_t::const_reference;
