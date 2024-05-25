@@ -463,6 +463,133 @@ TEST( od_node_list_class, CanMergePushFrontToList )
 	EXPECT_EQ( p, nullptr );
 }
 
+TEST( od_node_list_class, CanMergePushBackToEmptyList1 )
+{
+	// Arrange
+	alpha::concurrent::internal::od_node_list<int> src;
+	src.push_front( new alpha::concurrent::internal::od_node<int>( nullptr, 1 ) );
+	src.push_front( new alpha::concurrent::internal::od_node<int>( nullptr, 2 ) );
+	alpha::concurrent::internal::od_node_list<int> sut;
+
+	// Act
+	sut.merge_push_back( std::move( src ) );
+
+	// Assert
+	auto p = sut.pop_front();
+	ASSERT_NE( p, nullptr );
+	EXPECT_EQ( p->get(), 2 );
+	delete p;
+	p = sut.pop_front();
+	ASSERT_NE( p, nullptr );
+	EXPECT_EQ( p->get(), 1 );
+	delete p;
+	p = sut.pop_front();
+	EXPECT_EQ( p, nullptr );
+
+	p = src.pop_front();
+	EXPECT_EQ( p, nullptr );
+}
+
+TEST( od_node_list_class, CanMergePushBackToEmptyList2 )
+{
+	// Arrange
+	alpha::concurrent::internal::od_node_list<int> src;
+	src.push_front( new alpha::concurrent::internal::od_node<int>( nullptr, 1 ) );
+	src.push_front( new alpha::concurrent::internal::od_node<int>( nullptr, 2 ) );
+	alpha::concurrent::internal::od_node_list<int> sut;
+	sut.push_front( new alpha::concurrent::internal::od_node<int>( nullptr, 3 ) );
+	sut.push_front( new alpha::concurrent::internal::od_node<int>( nullptr, 4 ) );
+	auto p = sut.pop_front();
+	ASSERT_NE( p, nullptr );
+	EXPECT_EQ( p->get(), 4 );
+	delete p;
+	p = sut.pop_front();
+	ASSERT_NE( p, nullptr );
+	EXPECT_EQ( p->get(), 3 );
+	delete p;
+	p = sut.pop_front();
+	EXPECT_EQ( p, nullptr );
+
+	// Act
+	sut.merge_push_back( std::move( src ) );
+
+	// Assert
+	p = sut.pop_front();
+	ASSERT_NE( p, nullptr );
+	EXPECT_EQ( p->get(), 2 );
+	delete p;
+	p = sut.pop_front();
+	ASSERT_NE( p, nullptr );
+	EXPECT_EQ( p->get(), 1 );
+	delete p;
+	p = sut.pop_front();
+	EXPECT_EQ( p, nullptr );
+
+	p = src.pop_front();
+	EXPECT_EQ( p, nullptr );
+}
+
+TEST( od_node_list_class, CanPushBackToEmptyList )
+{
+	// Arrange
+	alpha::concurrent::internal::od_node_list<int> sut;
+	sut.push_front( new alpha::concurrent::internal::od_node<int>( nullptr, 1 ) );
+	sut.push_front( new alpha::concurrent::internal::od_node<int>( nullptr, 2 ) );
+	auto p = sut.pop_front();
+	ASSERT_NE( p, nullptr );
+	EXPECT_EQ( p->get(), 2 );
+	delete p;
+	p = sut.pop_front();
+	ASSERT_NE( p, nullptr );
+	EXPECT_EQ( p->get(), 1 );
+	delete p;
+	p = sut.pop_front();
+	EXPECT_EQ( p, nullptr );
+
+	// Act
+	sut.push_back( new alpha::concurrent::internal::od_node<int>( nullptr, 3 ) );
+
+	// Assert
+	p = sut.pop_front();
+	ASSERT_NE( p, nullptr );
+	EXPECT_EQ( p->get(), 3 );
+	delete p;
+	p = sut.pop_front();
+	EXPECT_EQ( p, nullptr );
+}
+
+TEST( od_node_list_class, CanMergePushBackToList )
+{
+	// Arrange
+	alpha::concurrent::internal::od_node_list<int> src;
+	src.push_front( new alpha::concurrent::internal::od_node<int>( nullptr, 1 ) );
+	src.push_front( new alpha::concurrent::internal::od_node<int>( nullptr, 2 ) );
+	alpha::concurrent::internal::od_node_list<int> sut;
+	sut.push_front( new alpha::concurrent::internal::od_node<int>( nullptr, 3 ) );
+
+	// Act
+	sut.merge_push_back( std::move( src ) );
+
+	// Assert
+	auto p = sut.pop_front();
+	ASSERT_NE( p, nullptr );
+	EXPECT_EQ( p->get(), 3 );
+	delete p;
+	p = sut.pop_front();
+	ASSERT_NE( p, nullptr );
+	EXPECT_EQ( p->get(), 2 );
+	delete p;
+	p = sut.pop_front();
+	ASSERT_NE( p, nullptr );
+	EXPECT_EQ( p->get(), 1 );
+	delete p;
+	p = sut.pop_front();
+	EXPECT_EQ( p, nullptr );
+
+	p = src.pop_front();
+	EXPECT_EQ( p, nullptr );
+}
+
 ///////////////////////////////////////////////////////////////////////////////////
 
 TEST( od_node_list_lockfree_class, CanDefaultConstruct )

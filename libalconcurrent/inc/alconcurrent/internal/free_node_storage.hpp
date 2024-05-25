@@ -476,88 +476,6 @@ private:
 	}
 
 	/**
-	 * @brief グローバル変数専用クラス
-	 *
-	 */
-	class global_od_node_list : private od_node_list<T> {
-	public:
-		class locker {
-		public:
-			locker( const locker& ) = delete;
-			locker( locker&& src )
-			  : reftarget_( src.reftarget_ )
-			  , lg_( std::move( src.lg_ ) )
-			{
-			}
-			locker& operator=( const locker& ) = delete;
-			locker& operator=( locker&& src )
-			{
-				reftarget_ = src.reftarget_;
-				lg_        = std::move( src.lg_ );
-			}
-			~locker() = default;
-
-			bool owns_lock( void ) const noexcept
-			{
-				return lg_.owns_lock();
-			}
-
-			od_node_list<T>& ref( void )
-			{
-				if ( !lg_.owns_lock() ) {
-					throw std::logic_error( "no lock access is logic error" );
-				}
-				return reftarget_;
-			}
-
-		private:
-			locker( od_node_list<T>& reftarget_arg, std::mutex& mtx_arg )
-			  : reftarget_( reftarget_arg )
-			  , lg_( mtx_arg )
-			{
-			}
-			locker( od_node_list<T>& reftarget_arg, std::mutex& mtx_arg, std::try_to_lock_t )
-			  : reftarget_( reftarget_arg )
-			  , lg_( mtx_arg, std::try_to_lock )
-			{
-			}
-
-			od_node_list<T>&             reftarget_;
-			std::unique_lock<std::mutex> lg_;
-
-			friend class x_free_od_node_storage::global_od_node_list;
-		};
-
-		constexpr global_od_node_list( void ) noexcept    = default;
-		global_od_node_list( const global_od_node_list& ) = delete;
-		constexpr global_od_node_list( global_od_node_list&& src ) noexcept
-		  : od_node_list<T>( std::move( src.lock().ref() ) )
-		  , mtx_()
-		{
-		}
-		global_od_node_list&           operator=( const global_od_node_list& ) = delete;
-		constexpr global_od_node_list& operator=( global_od_node_list&& src ) noexcept
-		{
-			// need the dead-lock
-			od_node_list<T> tmp( std::move( src.lock().ref() ) );
-			lock().ref().swap( tmp );
-		}
-		~global_od_node_list() = default;
-
-		locker lock( void )
-		{
-			return locker( *this, mtx_ );
-		}
-		locker try_lock( void )
-		{
-			return locker( *this, mtx_, std::try_to_lock );
-		}
-
-	private:
-		std::mutex mtx_;
-	};
-
-	/**
 	 * @brief スレッドローカルストレージ専用クラス
 	 *
 	 * @note
@@ -566,7 +484,7 @@ private:
 	 */
 	class thread_local_od_node_list {
 	public:
-		constexpr thread_local_od_node_list( global_od_node_list& center_list_arg )
+		constexpr thread_local_od_node_list( od_node_list_lockable<T>& center_list_arg )
 		  : center_list_( center_list_arg )
 		{
 		}
@@ -579,12 +497,12 @@ private:
 		od_node_list<T> node_list_;
 
 	private:
-		global_od_node_list& center_list_;
+		od_node_list_lockable<T>& center_list_;
 	};
 
 	static od_node_list_lockfree<T>               g_fn_list_lockfree_;
 	static std::atomic<bool>                      g_fn_list_lockfree_help_flag_;
-	static global_od_node_list                    g_fn_list_;
+	static od_node_list_lockable<T>               g_fn_list_;
 	static std::atomic<bool>                      g_fn_list_help_flag_;
 	static thread_local thread_local_od_node_list tl_fn_list_;
 
@@ -658,7 +576,7 @@ template <typename T>
 ALCC_INTERNAL_CONSTINIT std::atomic<bool> x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_( false );
 
 template <typename T>
-ALCC_INTERNAL_CONSTINIT typename x_free_od_node_storage<T>::global_od_node_list x_free_od_node_storage<T>::g_fn_list_;
+ALCC_INTERNAL_CONSTINIT od_node_list_lockable<T> x_free_od_node_storage<T>::g_fn_list_;
 
 template <typename T>
 ALCC_INTERNAL_CONSTINIT std::atomic<bool> x_free_od_node_storage<T>::g_fn_list_help_flag_( false );

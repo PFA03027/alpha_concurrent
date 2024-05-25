@@ -320,6 +320,24 @@ public:
 		p_head_ = p_nd;
 	}
 
+	void push_back( node_pointer p_nd ) noexcept
+	{
+		if ( p_nd == nullptr ) return;
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
+		if ( p_nd->hph_next_.load() != nullptr ) {
+			LogOutput( log_type::WARN, "od_node_list::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
+			p_nd->hph_next_.store( nullptr );
+		}
+#endif
+		if ( p_head_ == nullptr ) {
+			p_head_ = p_nd;
+			p_tail_ = p_nd;
+		} else {
+			p_tail_->hph_next_.store( p_nd );
+			p_tail_ = p_nd;
+		}
+	}
+
 	void merge_push_front( od_node_list&& src ) noexcept
 	{
 		if ( src.p_head_ == nullptr ) return;
@@ -346,6 +364,32 @@ public:
 		merge_push_front( p_nd, p_cur );
 	}
 
+	void merge_push_back( od_node_list&& src ) noexcept
+	{
+		if ( src.p_head_ == nullptr ) return;
+
+		node_pointer p_src_head = src.p_head_;
+		node_pointer p_src_tail = src.p_tail_;
+		src.p_head_             = nullptr;
+		src.p_tail_             = nullptr;
+
+		merge_push_back( p_src_head, p_src_tail );
+	}
+
+	void merge_push_back( node_pointer p_nd ) noexcept
+	{
+		if ( p_nd == nullptr ) return;
+
+		node_pointer p_cur = p_nd;
+		node_pointer p_nxt = p_cur->hph_next_.load();
+		while ( p_nxt != nullptr ) {
+			p_cur = p_nxt;
+			p_nxt = p_cur->hph_next_.load();
+		}
+
+		merge_push_back( p_nd, p_cur );
+	}
+
 	node_pointer pop_front( void ) noexcept
 	{
 		node_pointer p_ans = p_head_;
@@ -361,15 +405,110 @@ private:
 	void merge_push_front( node_pointer p_nd_head, node_pointer p_nd_tail ) noexcept
 	{
 		if ( p_head_ == nullptr ) {
+			p_head_ = p_nd_head;
 			p_tail_ = p_nd_tail;
 		} else {
 			p_nd_tail->hph_next_.store( p_head_ );
+			p_head_ = p_nd_head;
 		}
-		p_head_ = p_nd_head;
+	}
+
+	void merge_push_back( node_pointer p_nd_head, node_pointer p_nd_tail ) noexcept
+	{
+		if ( p_head_ == nullptr ) {
+			p_head_ = p_nd_head;
+			p_tail_ = p_nd_tail;
+		} else {
+			p_tail_->hph_next_.store( p_nd_head );
+			p_tail_ = p_nd_tail;
+		}
 	}
 
 	node_pointer p_head_ = nullptr;
 	node_pointer p_tail_ = nullptr;
+};
+
+/**
+ * @brief
+ *
+ */
+template <typename T>
+class od_node_list_lockable : private od_node_list<T> {
+public:
+	class locker {
+	public:
+		locker( const locker& ) = delete;
+		locker( locker&& src )
+		  : reftarget_( src.reftarget_ )
+		  , lg_( std::move( src.lg_ ) )
+		{
+		}
+		locker& operator=( const locker& ) = delete;
+		locker& operator=( locker&& src )
+		{
+			reftarget_ = src.reftarget_;
+			lg_        = std::move( src.lg_ );
+		}
+		~locker() = default;
+
+		bool owns_lock( void ) const noexcept
+		{
+			return lg_.owns_lock();
+		}
+
+		od_node_list<T>& ref( void )
+		{
+			if ( !lg_.owns_lock() ) {
+				throw std::logic_error( "no lock access is logic error" );
+			}
+			return reftarget_;
+		}
+
+	private:
+		locker( od_node_list<T>& reftarget_arg, std::mutex& mtx_arg )
+		  : reftarget_( reftarget_arg )
+		  , lg_( mtx_arg )
+		{
+		}
+		locker( od_node_list<T>& reftarget_arg, std::mutex& mtx_arg, std::try_to_lock_t )
+		  : reftarget_( reftarget_arg )
+		  , lg_( mtx_arg, std::try_to_lock )
+		{
+		}
+
+		od_node_list<T>&             reftarget_;
+		std::unique_lock<std::mutex> lg_;
+
+		friend class od_node_list_lockable;
+	};
+
+	constexpr od_node_list_lockable( void ) noexcept      = default;
+	od_node_list_lockable( const od_node_list_lockable& ) = delete;
+	constexpr od_node_list_lockable( od_node_list_lockable&& src ) noexcept
+	  : od_node_list<T>( std::move( src.lock().ref() ) )
+	  , mtx_()
+	{
+	}
+	od_node_list_lockable&           operator=( const od_node_list_lockable& ) = delete;
+	constexpr od_node_list_lockable& operator=( od_node_list_lockable&& src ) noexcept
+	{
+		// need the dead-lock
+		od_node_list<T> tmp( std::move( src.lock().ref() ) );
+		lock().ref().swap( tmp );
+	}
+	~od_node_list_lockable() = default;
+
+	locker lock( void )
+	{
+		return locker( *this, mtx_ );
+	}
+	locker try_lock( void )
+	{
+		return locker( *this, mtx_, std::try_to_lock );
+	}
+
+private:
+	std::mutex mtx_;
 };
 
 /**
