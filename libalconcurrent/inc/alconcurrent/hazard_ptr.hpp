@@ -682,6 +682,7 @@ public:
 	hazard_ptr_handler( hazard_ptr_handler&& src ) noexcept
 	  : ap_target_p_()
 	{
+		// TODO: should do CAS ?
 		ap_target_p_.store( src.ap_target_p_.load( std::memory_order_acquire ), std::memory_order_release );
 		src.ap_target_p_.store( nullptr, std::memory_order_release );
 	}

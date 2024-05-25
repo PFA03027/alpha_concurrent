@@ -573,7 +573,7 @@ private:
 
 		~thread_local_od_node_list()
 		{
-			center_list_.lock().ref().merge_push_front( node_list_ );
+			center_list_.lock().ref().merge_push_front( std::move( node_list_ ) );
 		}
 
 		od_node_list<T> node_list_;

@@ -31,6 +31,7 @@ template <typename T>
 class alignas( atomic_variable_align ) od_node {
 public:
 	using value_type           = T;
+	using reference_type       = T&;
 	using hazard_ptr_handler_t = hazard_ptr_handler<od_node>;
 
 private:
@@ -38,6 +39,13 @@ private:
 
 public:
 	hazard_ptr_handler<od_node> hph_next_;
+
+	template <bool IsDefaultConstructible = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructible>::type* = nullptr>
+	od_node( od_node* p_next_arg ) noexcept( std::is_nothrow_default_constructible<value_type>::value )
+	  : v_ {}
+	  , hph_next_( p_next_arg )
+	{
+	}
 
 	template <bool IsCopyable = std::is_copy_constructible<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
 	od_node( od_node* p_next_arg, const value_type& v_arg ) noexcept( std::is_nothrow_copy_constructible<value_type>::value )
@@ -49,6 +57,15 @@ public:
 	template <bool IsMovable = std::is_move_constructible<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
 	od_node( od_node* p_next_arg, value_type&& v_arg ) noexcept( std::is_nothrow_move_constructible<value_type>::value )
 	  : v_( std::move( v_arg ) )
+	  , hph_next_( p_next_arg )
+	{
+	}
+
+	template <typename Arg1st, typename... RemainingArgs,
+	          typename RemoveCVArg1st                                                          = typename std::remove_reference<typename std::remove_const<Arg1st>::type>::type,
+	          typename std::enable_if<!std::is_same<RemoveCVArg1st, value_type>::value>::type* = nullptr>
+	od_node( od_node* p_next_arg, Arg1st&& arg1, RemainingArgs&&... args )
+	  : v_( std::forward<Arg1st>( arg1 ), std::forward<RemainingArgs>( args )... )
 	  , hph_next_( p_next_arg )
 	{
 	}
@@ -67,9 +84,22 @@ public:
 		hph_next_.store( p_next_arg );
 	}
 
-	value_type get( void )
+	reference_type get( void ) &
 	{
-		// ALCC_INTERNAL_MAYBE_UNUSED_ATTR auto tmp_p = hph_next_.load();	// TODO: is this mandatory code?
+		return v_;
+	}
+
+	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+	value_type get( void ) &&
+	{
+		return std::move( v_ );
+	}
+
+	template <bool IsCopyable                                          = std::is_copy_assignable<value_type>::value,
+	          bool IsMovable                                           = std::is_move_assignable<value_type>::value,
+	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
+	value_type get( void ) &&
+	{
 		return v_;
 	}
 
@@ -236,25 +266,25 @@ public:
 	using node_pointer = od_node<T>*;
 
 	constexpr od_node_list( void ) noexcept = default;
-	explicit constexpr od_node_list( node_pointer p_head_arg ) noexcept
-	  : p_head_( p_head_arg )
-	{
-	}
-	od_node_list( const od_node_list& ) = delete;
+	od_node_list( const od_node_list& )     = delete;
 	constexpr od_node_list( od_node_list&& src ) noexcept
 	  : p_head_( src.p_head_ )
+	  , p_tail_( src.p_tail_ )
 	{
 		src.p_head_ = nullptr;
+		src.p_tail_ = nullptr;
 	}
 	od_node_list&           operator=( const od_node_list& ) = delete;
 	constexpr od_node_list& operator=( od_node_list&& src ) noexcept
 	{
 		od_node_list( std::move( src ) ).swap( *this );
+		return *this;
 	}
 	~od_node_list()
 	{
 		node_pointer p_cur = p_head_;
 		p_head_            = nullptr;
+		p_tail_            = nullptr;
 		while ( p_cur != nullptr ) {
 			node_pointer p_nxt = p_cur->hph_next_.load();
 			delete p_cur;
@@ -264,9 +294,15 @@ public:
 
 	void swap( od_node_list& src ) noexcept
 	{
-		node_pointer p_tmp = p_head_;
-		p_head_            = src.p_head_;
-		src.p_head_        = p_tmp;
+		node_pointer p_tmp;
+
+		p_tmp       = p_head_;
+		p_head_     = src.p_head_;
+		src.p_head_ = p_tmp;
+
+		p_tmp       = p_tail_;
+		p_tail_     = src.p_tail_;
+		src.p_tail_ = p_tmp;
 	}
 
 	void push_front( node_pointer p_nd ) noexcept
@@ -277,24 +313,23 @@ public:
 			LogOutput( log_type::WARN, "od_node_list::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
 		}
 #endif
+		if ( p_head_ == nullptr ) {
+			p_tail_ = p_nd;
+		}
 		p_nd->hph_next_.store( p_head_ );
 		p_head_ = p_nd;
 	}
 
-	void merge_push_front( od_node_list& src ) noexcept
-	{
-		node_pointer p_src_head = src.p_head_;
-		src.p_head_             = nullptr;
-
-		merge_push_front( p_src_head );
-	}
-
 	void merge_push_front( od_node_list&& src ) noexcept
 	{
-		node_pointer p_src_head = src.p_head_;
-		src.p_head_             = nullptr;
+		if ( src.p_head_ == nullptr ) return;
 
-		merge_push_front( p_src_head );
+		node_pointer p_src_head = src.p_head_;
+		node_pointer p_src_tail = src.p_tail_;
+		src.p_head_             = nullptr;
+		src.p_tail_             = nullptr;
+
+		merge_push_front( p_src_head, p_src_tail );
 	}
 
 	void merge_push_front( node_pointer p_nd ) noexcept
@@ -308,8 +343,7 @@ public:
 			p_nxt = p_cur->hph_next_.load();
 		}
 
-		p_cur->hph_next_.store( p_head_ );
-		p_head_ = p_nd;
+		merge_push_front( p_nd, p_cur );
 	}
 
 	node_pointer pop_front( void ) noexcept
@@ -324,7 +358,18 @@ public:
 	}
 
 private:
+	void merge_push_front( node_pointer p_nd_head, node_pointer p_nd_tail ) noexcept
+	{
+		if ( p_head_ == nullptr ) {
+			p_tail_ = p_nd_tail;
+		} else {
+			p_nd_tail->hph_next_.store( p_head_ );
+		}
+		p_head_ = p_nd_head;
+	}
+
 	node_pointer p_head_ = nullptr;
+	node_pointer p_tail_ = nullptr;
 };
 
 /**
@@ -341,11 +386,7 @@ public:
 	using value_type   = typename od_node<T>::value_type;
 	using node_pointer = od_node<T>*;
 
-	constexpr od_node_list_lockfree( void ) noexcept = default;
-	explicit constexpr od_node_list_lockfree( node_pointer p_head_arg ) noexcept
-	  : hph_head_( p_head_arg )
-	{
-	}
+	constexpr od_node_list_lockfree( void ) noexcept      = default;
 	od_node_list_lockfree( const od_node_list_lockfree& ) = delete;
 	constexpr od_node_list_lockfree( od_node_list_lockfree&& src ) noexcept
 	  : hph_head_( std::move( src.hph_head_ ) )
@@ -385,29 +426,6 @@ public:
 		p_nd->hph_next_.store( p_expected );
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_nd, std::memory_order_release, std::memory_order_relaxed ) ) {
 			p_nd->hph_next_.store( p_expected );
-		}
-	}
-
-	/**
-	 * @brief p_ndからつながるノードリストを自インスタンスのノードリストの先頭に追加する。
-	 *
-	 * @param p_nd
-	 */
-	void merge_push_front( node_pointer p_nd ) noexcept
-	{
-		if ( p_nd == nullptr ) return;
-
-		node_pointer p_last = p_nd;
-		node_pointer p_next = p_last->hph_next_.load();
-		while ( p_next != nullptr ) {
-			p_last = p_next;
-			p_next = p_last->hph_next_.load();
-		}
-
-		node_pointer p_expected = hph_head_.load();
-		p_last->hph_next_.store( p_expected );
-		while ( !hph_head_.compare_exchange_weak( p_expected, p_nd, std::memory_order_release, std::memory_order_relaxed ) ) {
-			p_last->hph_next_.store( p_expected );
 		}
 	}
 
