@@ -11,7 +11,7 @@
                 "$gcc"
             ],
             "group": {
-                "kind": "build",
+                "kind": "build"
             }
         },
         {
@@ -22,7 +22,7 @@
                 "$gcc"
             ],
             "group": {
-                "kind": "build",
+                "kind": "build"
             }
         },
         {
@@ -33,13 +33,24 @@
                 "$gcc"
             ],
             "group": {
-                "kind": "build",
+                "kind": "build"
             }
         },
         {
             "label": "make build-test with -g",
             "type": "shell",
             "command": "make BUILDTYPE=Debug build-test",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+            }
+        },
+        {
+            "label": "make test with -g",
+            "type": "shell",
+            "command": "make BUILDTYPE=Debug test",
             "problemMatcher": [
                 "$gcc"
             ],
@@ -56,7 +67,7 @@
                 "$gcc"
             ],
             "group": {
-                "kind": "build",
+                "kind": "build"
             }
         },
         {
@@ -67,7 +78,7 @@
                 "$gcc"
             ],
             "group": {
-                "kind": "build",
+                "kind": "build"
             }
         },
         {
@@ -78,7 +89,7 @@
                 "$gcc"
             ],
             "group": {
-                "kind": "build",
+                "kind": "build"
             }
         },
         {
@@ -89,7 +100,7 @@
                 "$gcc"
             ],
             "group": {
-                "kind": "build",
+                "kind": "build"
             }
         },
         {
