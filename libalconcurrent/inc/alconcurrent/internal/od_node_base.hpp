@@ -411,6 +411,14 @@ public:
 			return reftarget_;
 		}
 
+		const LIST_T& ref( void ) const
+		{
+			if ( !lg_.owns_lock() ) {
+				throw std::logic_error( "no lock access is logic error" );
+			}
+			return reftarget_;
+		}
+
 	private:
 		locker( LIST_T& reftarget_arg, std::mutex& mtx_arg )
 		  : reftarget_( reftarget_arg )
@@ -432,7 +440,7 @@ public:
 	constexpr od_node_list_lockable_base( void ) noexcept           = default;
 	od_node_list_lockable_base( const od_node_list_lockable_base& ) = delete;
 	constexpr od_node_list_lockable_base( od_node_list_lockable_base&& src ) noexcept
-	  : LIST_T( std::move( src.lock().ref() ) )
+	  : list_data_( std::move( src.lock().ref() ) )
 	  , mtx_()
 	{
 	}
@@ -457,6 +465,129 @@ public:
 protected:
 	std::mutex mtx_;
 	LIST_T     list_data_;
+};
+
+template <typename LIST_T>
+class od_node_list_conditional_lockable_base {
+public:
+	using list_type = LIST_T;
+
+	class locker {
+	public:
+		locker( const locker& ) = delete;
+		locker( locker&& src )
+		  : reftarget_( src.reftarget_ )
+		  , lg_( std::move( src.lg_ ) )
+		  , refcv_( src.refcv_ )
+		{
+		}
+		locker& operator=( const locker& ) = delete;
+		locker& operator=( locker&& src )
+		{
+			reftarget_ = src.reftarget_;
+			lg_        = std::move( src.lg_ );
+			refcv_     = src.refcv_;
+		}
+		~locker() = default;
+
+		bool owns_lock( void ) const noexcept
+		{
+			return lg_.owns_lock();
+		}
+
+		LIST_T& ref( void )
+		{
+			if ( !lg_.owns_lock() ) {
+				throw std::logic_error( "no lock access is logic error" );
+			}
+			return reftarget_;
+		}
+
+		const LIST_T& ref( void ) const
+		{
+			if ( !lg_.owns_lock() ) {
+				throw std::logic_error( "no lock access is logic error" );
+			}
+			return reftarget_;
+		}
+
+		void wait( void )
+		{
+			if ( !lg_.owns_lock() ) {
+				throw std::logic_error( "no lock access is logic error" );
+				// condition_variable requires this pre-condtion requirement also.
+			}
+			cv_.wait( lg_ );
+		}
+
+		template <class Predicate>
+		void wait( Predicate pred )
+		{
+			if ( !lg_.owns_lock() ) {
+				throw std::logic_error( "no lock access is logic error" );
+				// condition_variable requires this pre-condtion requirement also.
+			}
+			while ( !pred() ) {
+				refcv_.wait( lg_ );
+			}
+		}
+
+		void notify_all( void )
+		{
+			refcv_.notify_all();
+		}
+
+	private:
+		locker( LIST_T& reftarget_arg, std::mutex& mtx_arg, std::condition_variable& cv_arg )
+		  : reftarget_( reftarget_arg )
+		  , lg_( mtx_arg )
+		  , refcv_( cv_arg )
+		{
+		}
+		locker( LIST_T& reftarget_arg, std::mutex& mtx_arg, std::condition_variable& cv_arg, std::try_to_lock_t )
+		  : reftarget_( reftarget_arg )
+		  , lg_( mtx_arg, std::try_to_lock )
+		  , refcv_( cv_arg )
+		{
+		}
+
+		LIST_T&                      reftarget_;
+		std::unique_lock<std::mutex> lg_;
+		std::condition_variable&     refcv_;
+
+		friend class od_node_list_conditional_lockable_base;
+	};
+
+	od_node_list_conditional_lockable_base( void ) noexcept                                 = default;
+	od_node_list_conditional_lockable_base( const od_node_list_conditional_lockable_base& ) = delete;
+	od_node_list_conditional_lockable_base( od_node_list_conditional_lockable_base&& src ) noexcept
+	  : mtx_()
+	  , cv_()
+	  , list_data_( std::move( src.lock().ref() ) )
+	{
+	}
+	od_node_list_conditional_lockable_base& operator=( const od_node_list_conditional_lockable_base& ) = delete;
+	od_node_list_conditional_lockable_base& operator=( od_node_list_conditional_lockable_base&& src ) noexcept
+	{
+		// need to avoid the dead-lock
+		LIST_T tmp( std::move( src.lock().ref() ) );
+		lock().ref().swap( tmp );
+	}
+	~od_node_list_conditional_lockable_base() = default;
+
+	locker lock( void )
+	{
+		return locker( list_data_, mtx_, cv_ );
+	}
+	locker try_lock( void )
+	{
+		return locker( list_data_, mtx_, cv_, std::try_to_lock );
+	}
+
+protected:
+	std::mutex              mtx_;
+	std::condition_variable cv_;
+	LIST_T                  list_data_;
 };
 
 /**

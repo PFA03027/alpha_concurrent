@@ -106,6 +106,8 @@ public:
 private:
 	static void retire_impl( retire_node_abst* p_new_retire );
 
+	static void prune_one_work( void );
+
 	static std::atomic<bool> loop_flag_prune_thread_;
 };
 
