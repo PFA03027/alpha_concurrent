@@ -18,7 +18,7 @@
 #include "../hazard_ptr.hpp"
 #include "../lf_mem_alloc.hpp"
 
-#include "od_node.hpp"
+#include "od_node_base.hpp"
 #include "retire_mgr.hpp"
 
 namespace alpha {

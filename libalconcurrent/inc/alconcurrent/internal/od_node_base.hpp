@@ -14,6 +14,7 @@
 
 #include <atomic>
 #include <memory>
+#include <type_traits>
 
 #include "../hazard_ptr.hpp"
 #include "../lf_mem_alloc.hpp"
@@ -192,6 +193,8 @@ public:
  */
 template <typename NODE_T>
 class alignas( atomic_variable_align ) od_node_list_base {
+	static_assert( std::is_base_of<od_node_base<NODE_T>, NODE_T>::value, "NODE_T should be derived from od_node_base<>" );
+
 public:
 	using node_type    = NODE_T;
 	using node_pointer = NODE_T*;
@@ -463,6 +466,8 @@ private:
  */
 template <typename NODE_T>
 class alignas( atomic_variable_align ) od_node_list_lockfree_base {
+	static_assert( std::is_base_of<od_node_base<NODE_T>, NODE_T>::value, "NODE_T should be derived from od_node_base<>" );
+
 public:
 	using node_type    = NODE_T;
 	using node_pointer = NODE_T*;

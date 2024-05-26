@@ -13,7 +13,7 @@
 
 #include "gtest/gtest.h"
 
-#include "alconcurrent/internal/od_node.hpp"
+#include "alconcurrent/internal/od_node_base.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////////
 class test_od_node_base : public alpha::concurrent::internal::od_node_base<test_od_node_base> {

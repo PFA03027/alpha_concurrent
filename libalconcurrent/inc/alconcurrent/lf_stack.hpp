@@ -19,7 +19,7 @@
 #include "internal/free_node_storage.hpp"
 #include "internal/one_way_list_node.hpp"
 
-#include "internal/od_node.hpp"
+#include "internal/od_node_base.hpp"
 
 namespace alpha {
 namespace concurrent {
