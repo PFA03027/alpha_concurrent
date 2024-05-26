@@ -13,7 +13,7 @@
 
 #include "gtest/gtest.h"
 
-#include "alconcurrent/internal/od_node.hpp"
+#include "alconcurrent/internal/free_node_storage.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////////
 

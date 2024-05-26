@@ -28,121 +28,31 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
-class retire_node_list {
+class retire_node_list : public od_node_list_base<retire_node_abst> {
 public:
-	constexpr retire_node_list( void ) noexcept
-	  : p_head_()
-	  , p_tail_()
-	{
-		p_head_.store( nullptr, std::memory_order_release );
-		p_tail_.store( nullptr, std::memory_order_release );
-	}
-	explicit constexpr retire_node_list( retire_node_abst* p_node ) noexcept
-	  : p_head_()
-	  , p_tail_()
-	{
-		p_head_.store( p_node, std::memory_order_release );
-		p_tail_.store( find_tail_pointer( p_node ), std::memory_order_release );
-	}
-	retire_node_list( retire_node_list&& src ) noexcept
-	  : p_head_()
-	  , p_tail_()
-	{
-		p_head_.store( src.p_head_.load( std::memory_order_acquire ), std::memory_order_release );
-		p_tail_.store( src.p_tail_.load( std::memory_order_acquire ), std::memory_order_release );
-		src.p_head_.store( nullptr, std::memory_order_release );
-		src.p_tail_.store( nullptr, std::memory_order_release );
-	}
-
-	~retire_node_list()
-	{
-		clear();
-	}
-
-	void merge_push_back( retire_node_abst* p_node )
-	{
-		if ( p_node == nullptr ) return;
-
-		// add new node to last
-		if ( p_head_.load( std::memory_order_acquire ) == nullptr ) {
-			p_head_.store( p_node, std::memory_order_release );
-		} else {
-			p_tail_.load( std::memory_order_acquire )->p_next_.store( p_node, std::memory_order_release );
-		}
-		p_tail_.store( find_tail_pointer( p_node ), std::memory_order_release );
-	}
-	void merge_push_back( retire_node_list&& src )
-	{
-		if ( src.p_head_.load( std::memory_order_acquire ) == nullptr ) return;
-
-		if ( p_head_.load( std::memory_order_acquire ) == nullptr ) {
-			p_head_.store( src.p_head_.load( std::memory_order_acquire ), std::memory_order_release );
-		} else {
-			p_tail_.load( std::memory_order_acquire )->p_next_.store( src.p_head_.load( std::memory_order_acquire ), std::memory_order_release );
-		}
-		p_tail_.store( src.p_tail_.load( std::memory_order_acquire ), std::memory_order_release );
-
-		src.p_head_.store( nullptr, std::memory_order_release );
-		src.p_tail_.store( nullptr, std::memory_order_release );
-	}
-	void clear( void ) noexcept
-	{
-		retire_node_abst* p_cur = p_head_.load( std::memory_order_acquire );
-		p_head_.store( nullptr, std::memory_order_release );
-		p_tail_.store( nullptr, std::memory_order_release );
-		while ( p_cur != nullptr ) {
-			retire_node_abst* p_nxt = p_cur->p_next_.load( std::memory_order_acquire );
-			delete p_cur;
-			p_cur = p_nxt;
-		}
-	}
+	retire_node_list( void )                               = default;
+	retire_node_list( const retire_node_list& )            = delete;
+	retire_node_list( retire_node_list&& )                 = default;
+	retire_node_list& operator=( const retire_node_list& ) = delete;
+	retire_node_list& operator=( retire_node_list&& )      = default;
 
 	bool recycle_head_one( void ) noexcept
 	{
-		retire_node_abst* p_cur_head = p_head_.load( std::memory_order_acquire );
+		retire_node_abst* p_cur_head = pop_front();
 		if ( p_cur_head == nullptr ) {
 			return false;
 		}
 
 		if ( internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_cur_head->get_retire_pointer() ) ) {
 			// because pointer is in hazard pointer list, therefore recycle is impossible for head
+			push_front( p_cur_head );
 			return false;
 		}
 
-		retire_node_abst* p_parge    = p_cur_head;
-		retire_node_abst* p_new_head = p_parge->p_next_.load( std::memory_order_acquire );
-
-		p_head_.store( p_new_head, std::memory_order_release );
-		if ( p_new_head == nullptr ) {
-			p_tail_.store( nullptr, std::memory_order_release );
-		}
-
-		delete p_parge;
+		delete p_cur_head;
 
 		return true;
 	}
-
-	bool is_empty( void ) const noexcept
-	{
-		return p_head_.load( std::memory_order_acquire ) == nullptr;
-	}
-
-private:
-	static constexpr retire_node_abst* find_tail_pointer( retire_node_abst* p_head_arg ) noexcept
-	{
-		if ( p_head_arg == nullptr ) return nullptr;
-
-		retire_node_abst* p_cur = p_head_arg;
-		retire_node_abst* p_nxt = p_cur->p_next_.load( std::memory_order_acquire );
-		while ( p_nxt != nullptr ) {
-			p_cur = p_nxt;
-			p_nxt = p_cur->p_next_.load( std::memory_order_acquire );
-		}
-		return p_cur;
-	}
-
-	std::atomic<retire_node_abst*> p_head_;
-	std::atomic<retire_node_abst*> p_tail_;
 };
 
 /**
@@ -298,7 +208,7 @@ class alignas( internal::atomic_variable_align ) thread_local_retire_mgr {
 public:
 	explicit constexpr thread_local_retire_mgr( global_retire_mgr& transfer_distination_arg ) noexcept
 	  : transfer_distination_( transfer_distination_arg )
-	  , p_head_( nullptr )
+	  , rnd_list_()
 	{
 	}
 
@@ -306,26 +216,16 @@ public:
 	{
 		// スレッドローカルストレージを参照しているようなdeleterの場合、スレッドが終了時にはdeleterが正常に動作しなくなるため、
 		// 単純にグローバルストレージに移管することだけを行う。
-		if ( p_head_ == nullptr ) return;
+		if ( rnd_list_.is_empty() ) return;
 
-		transfer_distination_.lock().ref().merge_push_back( p_head_ );
-		p_head_ = nullptr;
+		transfer_distination_.lock().ref().merge_push_back( std::move( rnd_list_ ) );
 	}
 
 	void retire( retire_node_abst* p_new_retire )
 	{
 		recycle_one();
 
-		if ( p_head_ == nullptr ) {
-			p_head_ = p_new_retire;
-		} else {
-			// add new node to last
-			retire_node_abst* p_cur = p_head_;
-			while ( p_cur->p_next_ != nullptr ) {
-				p_cur = p_cur->p_next_;
-			}
-			p_cur->p_next_ = p_new_retire;
-		}
+		rnd_list_.push_back( p_new_retire );
 
 #ifdef ALCONCURRENT_CONF_ENABLE_PRUNE_THREAD
 #else
@@ -352,14 +252,13 @@ public:
 	bool recycle_one( void )
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_PRUNE_THREAD
-		if ( p_head_ == nullptr ) {
+		if ( rnd_list_.is_empty() ) {
 			return false;
 		}
 
 		auto locker_handle = transfer_distination_.try_lock();
 		if ( locker_handle.owns_lock() ) {
-			locker_handle.ref().merge_push_back( p_head_ );
-			p_head_ = nullptr;
+			locker_handle.ref().merge_push_back( std::move( rnd_list_ ) );
 			return true;
 		}
 
@@ -369,7 +268,7 @@ public:
 		                // return ( p_head_ == p_orig_head ) ? false : true;
 #else
 		// pruneスレッドに任せるのではなく、個々のスレッドと共同でリサイクルを行う場合のアルゴリズム。
-		if ( p_head_ == nullptr ) {
+		if ( rnd_list_.is_empty() ) {
 			auto locker_handle = transfer_distination_.try_lock();
 			if ( locker_handle.owns_lock() ) {
 				locker_handle.ref().recycle_head_one();
@@ -377,22 +276,19 @@ public:
 			return false;
 		}
 
-		if ( internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_head_->get_retire_pointer() ) ) {
+		retire_node_abst* p_transfer = rnd_list_.pop_front();
+		if ( internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_transfer->get_retire_pointer() ) ) {
 			auto locker_handle = transfer_distination_.try_lock();
 			if ( locker_handle.owns_lock() ) {
-				retire_node_abst* p_transfer = p_head_;
-				p_head_                      = p_transfer->p_next_;
-				p_transfer->p_next_          = nullptr;   // important!!
-				locker_handle.ref().merge_push_back( p_transfer );
+				locker_handle.ref().push_back( p_transfer );
+			} else {
+				rnd_list_.push_back( p_transfer );
 			}
 			// because pointer is in hazard pointer list, therefore recycle is impossible for head
 			return false;
 		}
 
-		retire_node_abst* p_parge = p_head_;
-		p_head_                   = p_parge->p_next_;
-
-		delete p_parge;
+		delete p_transfer;
 
 		return true;
 #endif
@@ -400,7 +296,7 @@ public:
 
 private:
 	global_retire_mgr& transfer_distination_;
-	retire_node_abst*  p_head_;
+	retire_node_list   rnd_list_;
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////

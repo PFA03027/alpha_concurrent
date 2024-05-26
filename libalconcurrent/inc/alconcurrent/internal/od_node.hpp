@@ -22,85 +22,17 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
-/**
- * @brief node of one direction list
- *
- * @tparam T value type kept in this class
- */
-template <typename T>
-class alignas( atomic_variable_align ) od_node {
+template <typename NODE_T>
+class alignas( atomic_variable_align ) od_node_base {
 public:
-	using value_type           = T;
-	using reference_type       = T&;
-	using hazard_ptr_handler_t = hazard_ptr_handler<od_node>;
+	using node_pointer         = NODE_T*;
+	using hazard_ptr_handler_t = hazard_ptr_handler<NODE_T>;
 
-private:
-	value_type v_;
+	hazard_ptr_handler_t hph_next_;
 
-public:
-	hazard_ptr_handler<od_node> hph_next_;
-
-	template <bool IsDefaultConstructible = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructible>::type* = nullptr>
-	od_node( od_node* p_next_arg ) noexcept( std::is_nothrow_default_constructible<value_type>::value )
-	  : v_ {}
-	  , hph_next_( p_next_arg )
+	od_node_base( node_pointer p_next_arg = nullptr ) noexcept
+	  : hph_next_( p_next_arg )
 	{
-	}
-
-	template <bool IsCopyable = std::is_copy_constructible<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
-	od_node( od_node* p_next_arg, const value_type& v_arg ) noexcept( std::is_nothrow_copy_constructible<value_type>::value )
-	  : v_( v_arg )
-	  , hph_next_( p_next_arg )
-	{
-	}
-
-	template <bool IsMovable = std::is_move_constructible<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
-	od_node( od_node* p_next_arg, value_type&& v_arg ) noexcept( std::is_nothrow_move_constructible<value_type>::value )
-	  : v_( std::move( v_arg ) )
-	  , hph_next_( p_next_arg )
-	{
-	}
-
-	template <typename Arg1st, typename... RemainingArgs,
-	          typename RemoveCVArg1st                                                          = typename std::remove_reference<typename std::remove_const<Arg1st>::type>::type,
-	          typename std::enable_if<!std::is_same<RemoveCVArg1st, value_type>::value>::type* = nullptr>
-	od_node( od_node* p_next_arg, Arg1st&& arg1, RemainingArgs&&... args )
-	  : v_( std::forward<Arg1st>( arg1 ), std::forward<RemainingArgs>( args )... )
-	  , hph_next_( p_next_arg )
-	{
-	}
-
-	template <bool IsCopyable = std::is_copy_assignable<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
-	void set( const value_type& v_arg, od_node* p_next_arg ) noexcept( std::is_nothrow_copy_assignable<value_type>::value )
-	{
-		v_ = v_arg;
-		hph_next_.store( p_next_arg );
-	}
-
-	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
-	void set( value_type&& v_arg, od_node* p_next_arg ) noexcept( std::is_nothrow_move_assignable<value_type>::value )
-	{
-		v_ = std::move( v_arg );
-		hph_next_.store( p_next_arg );
-	}
-
-	reference_type get( void ) &
-	{
-		return v_;
-	}
-
-	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
-	value_type get( void ) &&
-	{
-		return std::move( v_ );
-	}
-
-	template <bool IsCopyable                                          = std::is_copy_assignable<value_type>::value,
-	          bool IsMovable                                           = std::is_move_assignable<value_type>::value,
-	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
-	value_type get( void ) &&
-	{
-		return v_;
 	}
 
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
@@ -258,41 +190,33 @@ public:
  *
  * @tparam T value type kept in od_node class
  */
-template <typename T>
-class od_node_list {
+template <typename NODE_T>
+class alignas( atomic_variable_align ) od_node_list_base {
 public:
-	using node_type    = od_node<T>;
-	using value_type   = typename od_node<T>::value_type;
-	using node_pointer = od_node<T>*;
+	using node_type    = NODE_T;
+	using node_pointer = NODE_T*;
 
-	constexpr od_node_list( void ) noexcept = default;
-	od_node_list( const od_node_list& )     = delete;
-	constexpr od_node_list( od_node_list&& src ) noexcept
+	constexpr od_node_list_base( void ) noexcept  = default;
+	od_node_list_base( const od_node_list_base& ) = delete;
+	constexpr od_node_list_base( od_node_list_base&& src ) noexcept
 	  : p_head_( src.p_head_ )
 	  , p_tail_( src.p_tail_ )
 	{
 		src.p_head_ = nullptr;
 		src.p_tail_ = nullptr;
 	}
-	od_node_list&           operator=( const od_node_list& ) = delete;
-	constexpr od_node_list& operator=( od_node_list&& src ) noexcept
+	od_node_list_base&           operator=( const od_node_list_base& ) = delete;
+	constexpr od_node_list_base& operator=( od_node_list_base&& src ) noexcept
 	{
-		od_node_list( std::move( src ) ).swap( *this );
+		od_node_list_base( std::move( src ) ).swap( *this );
 		return *this;
 	}
-	~od_node_list()
+	~od_node_list_base()
 	{
-		node_pointer p_cur = p_head_;
-		p_head_            = nullptr;
-		p_tail_            = nullptr;
-		while ( p_cur != nullptr ) {
-			node_pointer p_nxt = p_cur->hph_next_.load();
-			delete p_cur;
-			p_cur = p_nxt;
-		}
+		clear();
 	}
 
-	void swap( od_node_list& src ) noexcept
+	void swap( od_node_list_base& src ) noexcept
 	{
 		node_pointer p_tmp;
 
@@ -310,7 +234,7 @@ public:
 		if ( p_nd == nullptr ) return;
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
 		if ( p_nd->hph_next_.load() != nullptr ) {
-			LogOutput( log_type::WARN, "od_node_list::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
+			LogOutput( log_type::WARN, "od_node_list_base::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
 		}
 #endif
 		if ( p_head_ == nullptr ) {
@@ -325,7 +249,7 @@ public:
 		if ( p_nd == nullptr ) return;
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
 		if ( p_nd->hph_next_.load() != nullptr ) {
-			LogOutput( log_type::WARN, "od_node_list::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
+			LogOutput( log_type::WARN, "od_node_list_base::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
 			p_nd->hph_next_.store( nullptr );
 		}
 #endif
@@ -338,7 +262,7 @@ public:
 		}
 	}
 
-	void merge_push_front( od_node_list&& src ) noexcept
+	void merge_push_front( od_node_list_base&& src ) noexcept
 	{
 		if ( src.p_head_ == nullptr ) return;
 
@@ -355,7 +279,7 @@ public:
 		if ( p_nd == nullptr ) return;
 
 		node_pointer p_cur = p_nd;
-		node_pointer p_nxt = p_cur->hph_next_.load();
+		node_pointer p_nxt = reinterpret_cast<node_pointer>( p_cur->hph_next_.load() );
 		while ( p_nxt != nullptr ) {
 			p_cur = p_nxt;
 			p_nxt = p_cur->hph_next_.load();
@@ -364,7 +288,7 @@ public:
 		merge_push_front( p_nd, p_cur );
 	}
 
-	void merge_push_back( od_node_list&& src ) noexcept
+	void merge_push_back( od_node_list_base&& src ) noexcept
 	{
 		if ( src.p_head_ == nullptr ) return;
 
@@ -381,7 +305,7 @@ public:
 		if ( p_nd == nullptr ) return;
 
 		node_pointer p_cur = p_nd;
-		node_pointer p_nxt = p_cur->hph_next_.load();
+		node_pointer p_nxt = reinterpret_cast<node_pointer>( p_cur->hph_next_.load() );
 		while ( p_nxt != nullptr ) {
 			p_cur = p_nxt;
 			p_nxt = p_cur->hph_next_.load();
@@ -395,10 +319,27 @@ public:
 		node_pointer p_ans = p_head_;
 		if ( p_ans == nullptr ) return p_ans;
 
-		p_head_ = p_ans->hph_next_.load();
+		p_head_ = reinterpret_cast<node_pointer>( p_ans->hph_next_.load() );
 		p_ans->hph_next_.store( nullptr );
 
 		return p_ans;
+	}
+
+	void clear( void )
+	{
+		node_pointer p_cur = p_head_;
+		p_head_            = nullptr;
+		p_tail_            = nullptr;
+		while ( p_cur != nullptr ) {
+			node_pointer p_nxt = reinterpret_cast<node_pointer>( p_cur->hph_next_.load() );
+			delete p_cur;
+			p_cur = p_nxt;
+		}
+	}
+
+	bool is_empty( void ) const
+	{
+		return p_head_ == nullptr;
 	}
 
 private:
@@ -432,9 +373,11 @@ private:
  * @brief
  *
  */
-template <typename T>
-class od_node_list_lockable : private od_node_list<T> {
+template <typename LIST_T>
+class od_node_list_lockable_base : private LIST_T {
 public:
+	using list_type = LIST_T;
+
 	class locker {
 	public:
 		locker( const locker& ) = delete;
@@ -456,7 +399,7 @@ public:
 			return lg_.owns_lock();
 		}
 
-		od_node_list<T>& ref( void )
+		LIST_T& ref( void )
 		{
 			if ( !lg_.owns_lock() ) {
 				throw std::logic_error( "no lock access is logic error" );
@@ -465,38 +408,38 @@ public:
 		}
 
 	private:
-		locker( od_node_list<T>& reftarget_arg, std::mutex& mtx_arg )
+		locker( LIST_T& reftarget_arg, std::mutex& mtx_arg )
 		  : reftarget_( reftarget_arg )
 		  , lg_( mtx_arg )
 		{
 		}
-		locker( od_node_list<T>& reftarget_arg, std::mutex& mtx_arg, std::try_to_lock_t )
+		locker( LIST_T& reftarget_arg, std::mutex& mtx_arg, std::try_to_lock_t )
 		  : reftarget_( reftarget_arg )
 		  , lg_( mtx_arg, std::try_to_lock )
 		{
 		}
 
-		od_node_list<T>&             reftarget_;
+		LIST_T&                      reftarget_;
 		std::unique_lock<std::mutex> lg_;
 
-		friend class od_node_list_lockable;
+		friend class od_node_list_lockable_base;
 	};
 
-	constexpr od_node_list_lockable( void ) noexcept      = default;
-	od_node_list_lockable( const od_node_list_lockable& ) = delete;
-	constexpr od_node_list_lockable( od_node_list_lockable&& src ) noexcept
-	  : od_node_list<T>( std::move( src.lock().ref() ) )
+	constexpr od_node_list_lockable_base( void ) noexcept           = default;
+	od_node_list_lockable_base( const od_node_list_lockable_base& ) = delete;
+	constexpr od_node_list_lockable_base( od_node_list_lockable_base&& src ) noexcept
+	  : LIST_T( std::move( src.lock().ref() ) )
 	  , mtx_()
 	{
 	}
-	od_node_list_lockable&           operator=( const od_node_list_lockable& ) = delete;
-	constexpr od_node_list_lockable& operator=( od_node_list_lockable&& src ) noexcept
+	od_node_list_lockable_base&           operator=( const od_node_list_lockable_base& ) = delete;
+	constexpr od_node_list_lockable_base& operator=( od_node_list_lockable_base&& src ) noexcept
 	{
-		// need the dead-lock
-		od_node_list<T> tmp( std::move( src.lock().ref() ) );
+		// need to avoid the dead-lock
+		LIST_T tmp( std::move( src.lock().ref() ) );
 		lock().ref().swap( tmp );
 	}
-	~od_node_list_lockable() = default;
+	~od_node_list_lockable_base() = default;
 
 	locker lock( void )
 	{
@@ -518,22 +461,21 @@ private:
  *
  * @tparam T value type kept in od_node class
  */
-template <typename T>
-class od_node_list_lockfree {
+template <typename NODE_T>
+class alignas( atomic_variable_align ) od_node_list_lockfree_base {
 public:
-	using node_type    = od_node<T>;
-	using value_type   = typename od_node<T>::value_type;
-	using node_pointer = od_node<T>*;
+	using node_type    = NODE_T;
+	using node_pointer = NODE_T*;
 
-	constexpr od_node_list_lockfree( void ) noexcept      = default;
-	od_node_list_lockfree( const od_node_list_lockfree& ) = delete;
-	constexpr od_node_list_lockfree( od_node_list_lockfree&& src ) noexcept
+	constexpr od_node_list_lockfree_base( void ) noexcept           = default;
+	od_node_list_lockfree_base( const od_node_list_lockfree_base& ) = delete;
+	constexpr od_node_list_lockfree_base( od_node_list_lockfree_base&& src ) noexcept
 	  : hph_head_( std::move( src.hph_head_ ) )
 	{
 	}
-	od_node_list_lockfree& operator=( const od_node_list_lockfree& ) = delete;
-	od_node_list_lockfree& operator=( od_node_list_lockfree&& src )  = delete;
-	~od_node_list_lockfree()
+	od_node_list_lockfree_base& operator=( const od_node_list_lockfree_base& ) = delete;
+	od_node_list_lockfree_base& operator=( od_node_list_lockfree_base&& src )  = delete;
+	~od_node_list_lockfree_base()
 	{
 		node_pointer p_cur = hph_head_.load();
 		hph_head_.store( nullptr );
@@ -593,7 +535,7 @@ public:
 	}
 
 private:
-	using hazard_ptr_handler_t = typename od_node<T>::hazard_ptr_handler_t;
+	using hazard_ptr_handler_t = typename NODE_T::hazard_ptr_handler_t;
 
 	hazard_ptr_handler_t hph_head_;
 };
