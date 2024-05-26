@@ -99,16 +99,20 @@ public:
 		retire_impl( p_new_retire );
 	}
 
-	static void prune_thread( void );
 	static void stop_prune_thread( void );
-	static void request_stop_prune_thread( void );
 
 private:
+	class prune_thread_inst_t;
+	class prune_thread_mgr;
+
 	static void retire_impl( retire_node_abst* p_new_retire );
 
 	static void prune_one_work( void );
+	static void prune_thread( void );
+	static void request_stop_prune_thread( void );
 
-	static std::atomic<bool> loop_flag_prune_thread_;
+	static std::atomic<bool>   loop_flag_prune_thread_;
+	static prune_thread_inst_t g_prune_thread_obj;
 };
 
 }   // namespace internal

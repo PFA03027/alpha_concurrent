@@ -124,7 +124,8 @@ ALCC_INTERNAL_CONSTINIT thread_local unorder_retire_node_buffer::tl_retire_node_
 ALCC_INTERNAL_CONSTINIT alignas( internal::atomic_variable_align ) std::atomic<size_t> g_call_count_retire( 0 );
 #endif
 
-class prune_thread_inst_t {
+///////////////////////////////////////////////////////////////////////////////////////
+class retire_mgr::prune_thread_inst_t {
 public:
 	prune_thread_inst_t( void )
 	  : prune_thread_obj_()
@@ -151,20 +152,14 @@ public:
 		stop();
 	}
 
-	void increment_call_count( void )
-	{
-#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-		g_call_count_retire++;
-#endif
-	}
-
 private:
 	std::thread prune_thread_obj_;
 };
 
-static prune_thread_inst_t g_prune_thread_obj;
+retire_mgr::prune_thread_inst_t retire_mgr::g_prune_thread_obj;
 
-class prune_thread_mgr {
+///////////////////////////////////////////////////////////////////////////////////////
+class retire_mgr::prune_thread_mgr {
 public:
 	prune_thread_mgr( void )
 	{
