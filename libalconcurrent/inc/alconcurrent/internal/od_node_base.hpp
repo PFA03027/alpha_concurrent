@@ -13,6 +13,7 @@
 #define ALCONCURRENT_INC_INTERNAL_OD_NODE_HPP_
 
 #include <atomic>
+#include <condition_variable>
 #include <memory>
 #include <type_traits>
 
@@ -373,11 +374,11 @@ private:
 };
 
 /**
- * @brief
+ * @brief od_node list that supports exclusive control
  *
  */
 template <typename LIST_T>
-class od_node_list_lockable_base : private LIST_T {
+class od_node_list_lockable_base {
 public:
 	using list_type = LIST_T;
 
@@ -446,15 +447,16 @@ public:
 
 	locker lock( void )
 	{
-		return locker( *this, mtx_ );
+		return locker( list_data_, mtx_ );
 	}
 	locker try_lock( void )
 	{
-		return locker( *this, mtx_, std::try_to_lock );
+		return locker( list_data_, mtx_, std::try_to_lock );
 	}
 
-private:
+protected:
 	std::mutex mtx_;
+	LIST_T     list_data_;
 };
 
 /**

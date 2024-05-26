@@ -55,6 +55,35 @@ public:
 	}
 };
 
+using retire_node_list_lockable = od_node_list_lockable_base<retire_node_list>;
+
+/**
+ * @brief スレッドローカルストレージを一時バッファとして、グローバル共有バッファにod_node<T>をプールする
+ */
+class unorder_retire_node_buffer {
+public:
+	using node_type    = retire_node_abst;
+	using node_pointer = retire_node_abst*;
+
+	static void push( node_pointer p_nd )
+	{
+		tl_retire_node_list_.push_back( p_nd );
+		auto lk = g_retire_node_list_.try_lock();
+		if ( lk.owns_lock() ) {
+			lk.ref().merge_push_back( std::move( tl_retire_node_list_ ) );
+		}
+	}
+
+	static retire_node_list pop_all( void )
+	{
+		return retire_node_list( std::move( g_retire_node_list_.lock().ref() ) );
+	}
+
+private:
+	static thread_local retire_node_list tl_retire_node_list_;
+	static retire_node_list_lockable     g_retire_node_list_;
+};
+
 /**
  * @brief グローバル変数専用のretire pointer管理クラス
  *

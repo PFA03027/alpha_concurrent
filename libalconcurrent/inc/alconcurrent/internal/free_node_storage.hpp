@@ -456,41 +456,6 @@ template <typename T>
 using od_node_list_lockfree = od_node_list_lockfree_base<od_node<T>>;
 
 template <typename T>
-class unorder_od_node_buffer {
-public:
-	using node_type    = od_node<T>;
-	using value_type   = typename od_node<T>::value_type;
-	using node_pointer = od_node<T>*;
-
-	static void push( node_pointer p_nd )
-	{
-		tl_od_node_list_.push_back( p_nd );
-		auto lk = g_od_node_list_.try_lock();
-		if ( lk.owns_lock() ) {
-			lk.ref().merge_push_back( std::move( tl_od_node_list_ ) );
-		}
-	}
-
-	static node_pointer pop( void )
-	{
-		node_pointer p_ans = tl_od_node_list_.pop_front();
-		if ( p_ans != nullptr ) return p_ans;
-
-		auto lk = g_od_node_list_.try_lock();
-		if ( lk.owns_lock() ) {
-			tl_od_node_list_.merge_push_back( std::move( lk.ref() ) );
-			p_ans = tl_od_node_list_.pop_front();
-		}
-
-		return p_ans;
-	}
-
-private:
-	static thread_local od_node_list<T> tl_od_node_list_;
-	static od_node_list_lockable<T>     g_od_node_list_;
-};
-
-template <typename T>
 class x_free_od_node_storage {
 public:
 	using node_type            = od_node<T>;
