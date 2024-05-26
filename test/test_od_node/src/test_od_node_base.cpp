@@ -440,6 +440,249 @@ TEST( od_node_list_base_class, CanMergePushBackToList )
 	EXPECT_EQ( p, nullptr );
 }
 
+TEST( od_node_list_base_class, CanClearWithEmpty )
+{
+	// Arrange
+	test_od_node_list_base sut;
+	EXPECT_TRUE( sut.is_empty() );
+
+	// Act
+	sut.clear();
+
+	// Assert
+	EXPECT_TRUE( sut.is_empty() );
+}
+
+TEST( od_node_list_base_class, CanClear )
+{
+	// Arrange
+	test_od_node_list_base sut;
+	sut.push_front( new test_od_node_base( nullptr ) );
+	EXPECT_FALSE( sut.is_empty() );
+
+	// Act
+	sut.clear();
+
+	// Assert
+	EXPECT_TRUE( sut.is_empty() );
+}
+
+TEST( od_node_list_base_class, CanSplitWithEmpty1 )
+{
+	// Arrange
+	test_od_node_list_base sut;
+
+	// Act
+	auto ret = sut.split_if( []( auto& ) -> bool { return true; } );
+
+	// Assert
+	EXPECT_TRUE( sut.is_empty() );
+	EXPECT_TRUE( ret.is_empty() );
+}
+
+TEST( od_node_list_base_class, CanSplitWithEmpty2 )
+{
+	// Arrange
+	test_od_node_list_base sut;
+
+	// Act
+	auto ret = sut.split_if( []( auto& ) -> bool { return false; } );
+
+	// Assert
+	EXPECT_TRUE( sut.is_empty() );
+	EXPECT_TRUE( ret.is_empty() );
+}
+
+TEST( od_node_list_base_class, CanSplitWithAllTrue1 )
+{
+	// Arrange
+	test_od_node_list_base sut;
+	sut.push_front( new test_od_node_base( nullptr ) );
+
+	// Act
+	auto ret = sut.split_if( []( auto& ) -> bool { return true; } );
+
+	// Assert
+	EXPECT_TRUE( sut.is_empty() );
+	EXPECT_FALSE( ret.is_empty() );
+}
+
+TEST( od_node_list_base_class, CanSplitWithAllTrue2 )
+{
+	// Arrange
+	test_od_node_list_base sut;
+	sut.push_front( new test_od_node_base( nullptr ) );
+	sut.push_front( new test_od_node_base( nullptr ) );
+
+	// Act
+	auto ret = sut.split_if( []( auto& ) -> bool { return true; } );
+
+	// Assert
+	EXPECT_TRUE( sut.is_empty() );
+	EXPECT_FALSE( ret.is_empty() );
+}
+
+TEST( od_node_list_base_class, CanSplitWithAllTrue3 )
+{
+	// Arrange
+	test_od_node_list_base sut;
+	sut.push_front( new test_od_node_base( nullptr ) );
+	sut.push_front( new test_od_node_base( nullptr ) );
+	sut.push_front( new test_od_node_base( nullptr ) );
+
+	// Act
+	auto ret = sut.split_if( []( auto& ) -> bool { return true; } );
+
+	// Assert
+	EXPECT_TRUE( sut.is_empty() );
+	EXPECT_FALSE( ret.is_empty() );
+}
+
+TEST( od_node_list_base_class, CanSplitWithAllFalse1 )
+{
+	// Arrange
+	test_od_node_list_base sut;
+	sut.push_front( new test_od_node_base( nullptr ) );
+
+	// Act
+	auto ret = sut.split_if( []( auto& ) -> bool { return false; } );
+
+	// Assert
+	EXPECT_FALSE( sut.is_empty() );
+	EXPECT_TRUE( ret.is_empty() );
+}
+
+TEST( od_node_list_base_class, CanSplitWithAllFalse2 )
+{
+	// Arrange
+	test_od_node_list_base sut;
+	sut.push_front( new test_od_node_base( nullptr ) );
+	sut.push_front( new test_od_node_base( nullptr ) );
+
+	// Act
+	auto ret = sut.split_if( []( auto& ) -> bool { return false; } );
+
+	// Assert
+	EXPECT_FALSE( sut.is_empty() );
+	EXPECT_TRUE( ret.is_empty() );
+}
+
+TEST( od_node_list_base_class, CanSplitWithAllFalse3 )
+{
+	// Arrange
+	test_od_node_list_base sut;
+	sut.push_front( new test_od_node_base( nullptr ) );
+	sut.push_front( new test_od_node_base( nullptr ) );
+	sut.push_front( new test_od_node_base( nullptr ) );
+
+	// Act
+	auto ret = sut.split_if( []( auto& ) -> bool { return false; } );
+
+	// Assert
+	EXPECT_FALSE( sut.is_empty() );
+	EXPECT_TRUE( ret.is_empty() );
+}
+
+TEST( od_node_list_base_class, CanSplitWithOddTrue1 )
+{
+	// Arrange
+	test_od_node_list_base sut;
+	sut.push_front( new test_od_node_base( nullptr ) );
+	int x = 0;
+
+	// Act
+	auto ret = sut.split_if( [&x]( auto& ) -> bool { x++; return ((x%2) == 1); } );
+
+	// Assert
+	EXPECT_TRUE( sut.is_empty() );
+	EXPECT_FALSE( ret.is_empty() );
+}
+
+TEST( od_node_list_base_class, CanSplitWithOddTrue2 )
+{
+	// Arrange
+	test_od_node_list_base sut;
+	sut.push_front( new test_od_node_base( nullptr ) );
+	sut.push_front( new test_od_node_base( nullptr ) );
+	int x = 0;
+
+	// Act
+	auto ret = sut.split_if( [&x]( auto& ) -> bool { x++; return ((x%2) == 1); } );
+
+	// Assert
+	EXPECT_FALSE( sut.is_empty() );
+	EXPECT_FALSE( ret.is_empty() );
+}
+
+TEST( od_node_list_base_class, CanSplitWithOddTrue3 )
+{
+	// Arrange
+	test_od_node_list_base sut;
+	sut.push_front( new test_od_node_base( nullptr ) );
+	sut.push_front( new test_od_node_base( nullptr ) );
+	sut.push_front( new test_od_node_base( nullptr ) );
+	int x = 0;
+
+	// Act
+	auto ret = sut.split_if( [&x]( auto& ) -> bool { x++; return ((x%2) == 1); } );
+
+	// Assert
+	EXPECT_FALSE( sut.is_empty() );
+	EXPECT_FALSE( ret.is_empty() );
+	delete sut.pop_front();
+	EXPECT_TRUE( sut.is_empty() );
+}
+
+TEST( od_node_list_base_class, CanSplitWithEvenTrue1 )
+{
+	// Arrange
+	test_od_node_list_base sut;
+	sut.push_front( new test_od_node_base( nullptr ) );
+	int x = 1;
+
+	// Act
+	auto ret = sut.split_if( [&x]( auto& ) -> bool { x++; return ((x%2) == 1); } );
+
+	// Assert
+	EXPECT_FALSE( sut.is_empty() );
+	EXPECT_TRUE( ret.is_empty() );
+}
+
+TEST( od_node_list_base_class, CanSplitWithEvenTrue2 )
+{
+	// Arrange
+	test_od_node_list_base sut;
+	sut.push_front( new test_od_node_base( nullptr ) );
+	sut.push_front( new test_od_node_base( nullptr ) );
+	int x = 1;
+
+	// Act
+	auto ret = sut.split_if( [&x]( auto& ) -> bool { x++; return ((x%2) == 1); } );
+
+	// Assert
+	EXPECT_FALSE( sut.is_empty() );
+	EXPECT_FALSE( ret.is_empty() );
+}
+
+TEST( od_node_list_base_class, CanSplitWithEvenTrue3 )
+{
+	// Arrange
+	test_od_node_list_base sut;
+	sut.push_front( new test_od_node_base( nullptr ) );
+	sut.push_front( new test_od_node_base( nullptr ) );
+	sut.push_front( new test_od_node_base( nullptr ) );
+	int x = 1;
+
+	// Act
+	auto ret = sut.split_if( [&x]( auto& ) -> bool { x++; return ((x%2) == 1); } );
+
+	// Assert
+	EXPECT_FALSE( sut.is_empty() );
+	EXPECT_FALSE( ret.is_empty() );
+	delete ret.pop_front();
+	EXPECT_TRUE( ret.is_empty() );
+}
+
 ///////////////////////////////////////////////////////////////////////////////////
 class test_od_node_list_lockfree_base : public alpha::concurrent::internal::od_node_list_lockfree_base<test_od_node_base> {
 };

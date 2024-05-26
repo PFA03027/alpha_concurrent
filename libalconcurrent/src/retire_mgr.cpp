@@ -36,22 +36,24 @@ public:
 	retire_node_list& operator=( const retire_node_list& ) = delete;
 	retire_node_list& operator=( retire_node_list&& )      = default;
 
-	bool recycle_head_one( void ) noexcept
+	void recycle_all( void )
 	{
-		retire_node_abst* p_cur_head = pop_front();
-		if ( p_cur_head == nullptr ) {
-			return false;
+		if ( is_empty() ) {
+			return;
 		}
 
-		if ( internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_cur_head->get_retire_pointer() ) ) {
-			// because pointer is in hazard pointer list, therefore recycle is impossible for head
-			push_front( p_cur_head );
-			return false;
-		}
+		retire_node_list nodes_still_in_hazard;
 
-		delete p_cur_head;
+		internal::hazard_ptr_mgr::ScanHazardPtrs(
+			[this, &nodes_still_in_hazard]( void* p_hzd ) {
+				od_node_list_base<retire_node_abst> ret = split_if( [p_hzd]( const retire_node_abst& rnd ) {
+					return rnd.get_retire_pointer() == p_hzd;
+				} );
+				nodes_still_in_hazard.merge_push_back( std::move( ret ) );
+			} );
 
-		return true;
+		clear();
+		merge_push_back( std::move( nodes_still_in_hazard ) );
 	}
 };
 
@@ -187,7 +189,7 @@ void retire_mgr::prune_one_work( void )
 	retire_node_list recycle_list;
 	recycle_list = unorder_retire_node_buffer::wait_pop_all();
 
-	while ( recycle_list.recycle_head_one() ) {}
+	recycle_list.recycle_all();
 
 	if ( recycle_list.is_empty() ) return;
 

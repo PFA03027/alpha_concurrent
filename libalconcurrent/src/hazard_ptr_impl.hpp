@@ -81,6 +81,7 @@ public:
 	void force_clear( void ) noexcept;
 
 	bool check_pointer_is_hazard_pointer( void* p ) noexcept;
+	void scan_hazard_pointers( std::function<void( void* )>& pred );
 
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else
@@ -210,6 +211,15 @@ public:
 	 * @return false p is not hazard pointer
 	 */
 	bool check_pointer_is_hazard_pointer( void* p ) noexcept;
+
+	/**
+	 * @brief Check if p is still in hazard pointer list or not
+	 *
+	 * @param p
+	 * @return true p is still listed in hazard pointer list
+	 * @return false p is not hazard pointer
+	 */
+	void scan_hazard_pointers( std::function<void( void* )>& pred );
 
 	/**
 	 * @brief remove all hazard_ptr_group

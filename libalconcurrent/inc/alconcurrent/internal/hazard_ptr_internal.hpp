@@ -14,6 +14,7 @@
 
 #include <array>
 #include <atomic>
+#include <functional>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -68,6 +69,15 @@ public:
 	 * @return false p is not hazard pointer
 	 */
 	static bool CheckPtrIsHazardPtr( void* p ) noexcept;
+
+	/**
+	 * @brief Check if p is still in hazard pointer list or not
+	 *
+	 * @param p
+	 * @return true p is still listed in hazard pointer list
+	 * @return false p is not hazard pointer
+	 */
+	static void ScanHazardPtrs( std::function<void( void* )> pred );
 
 	/**
 	 * @brief remove all hazard_ptr_group from internal global variable

@@ -147,6 +147,17 @@ bool hazard_ptr_group::check_pointer_is_hazard_pointer( void* p ) noexcept
 	return false;
 }
 
+void hazard_ptr_group::scan_hazard_pointers( std::function<void( void* )>& pred )
+{
+	for ( auto& e : *this ) {
+		// if hazard_ptr_group has a pointer that is same to p, p is hazard pointer
+		void* p = e.load( std::memory_order_acquire );
+		if ( p != nullptr ) {
+			pred( p );
+		}
+	}
+}
+
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else
 #if __cpp_aligned_new
@@ -411,6 +422,25 @@ bool global_scope_hazard_ptr_chain::check_pointer_is_hazard_pointer( void* p ) n
 	return false;
 }
 
+void global_scope_hazard_ptr_chain::scan_hazard_pointers( std::function<void( void* )>& pred )
+{
+	hazard_ptr_group* p_cur_chain = ap_top_hzrd_ptr_chain_.load( std::memory_order_acquire );
+
+	while ( p_cur_chain != nullptr ) {
+		hazard_ptr_group* p_next_chain = p_cur_chain->ap_chain_next_.load( std::memory_order_acquire );
+		if ( p_cur_chain->is_used() ) {
+			hazard_ptr_group* p_cur_list = p_cur_chain;
+			while ( p_cur_list != nullptr ) {
+				p_cur_list->scan_hazard_pointers( pred );
+
+				hazard_ptr_group* p_next_list = p_cur_list->ap_list_next_.load( std::memory_order_acquire );
+				p_cur_list                    = p_next_list;
+			}
+		}
+		p_cur_chain = p_next_chain;
+	}
+}
+
 void global_scope_hazard_ptr_chain::remove_all( void )
 {
 	tl_bhpl = bind_hazard_ptr_list();
@@ -449,54 +479,26 @@ void global_scope_hazard_ptr_chain::remove_all( void )
 
 //////////////////////////////////////////////////////////////////////////////
 
-/**
- * @brief assign a slot of hazard pointer and set the pointer
- *
- * @param p pointer to a object. should not be nullptr
- * @return hzrd_slot_ownership_t pointer to hazard pointer slot
- * @retval nullptr fail to assign or p is nullptr
- * @retval non-nullptr success to assign
- */
 hzrd_slot_ownership_t hazard_ptr_mgr::AssignHazardPtrSlot( void* p )
 {
 	return internal::tl_bhpl.slot_assign( p );
 }
 
-/**
- * @brief Check if p is still in hazard pointer list or not
- *
- * @param p
- * @return true p is still listed in hazard pointer list
- * @return false p is not hazard pointer
- */
 bool hazard_ptr_mgr::CheckPtrIsHazardPtr( void* p ) noexcept
 {
 	return g_scope_hzrd_chain_.check_pointer_is_hazard_pointer( p );
 }
 
-/**
- * @brief remove all hazard_ptr_group from internal global variable
- *
- * This API is for debug and test purpose.
- *
- * @pre this API should be called from main thread. And, all other threads should be exited before call this API.
- *      at least, caller side shold call alpha::concurrent::internal::retire_mgr::stop_prune_thread() before calling this API
- */
+void hazard_ptr_mgr::ScanHazardPtrs( std::function<void( void* )> pred )
+{
+	g_scope_hzrd_chain_.scan_hazard_pointers( pred );
+}
+
 void hazard_ptr_mgr::DestoryAll( void )
 {
 	return g_scope_hzrd_chain_.remove_all();
 }
 
-/**
- * @brief check empty or not
- *
- * @warning this API has race condition. Therefore, this API is test purpose only.
- *
- * @return true hazard pointer related resouce is Empty
- * @return false hazard pointer related resouce is Not Empty
- *
- * @todo introduce exclusive control by mutex b/w DestroyAll() and IsDestoryed()
- */
 bool hazard_ptr_mgr::IsDestoryed( void )
 {
 	return g_scope_hzrd_chain_.is_empty();

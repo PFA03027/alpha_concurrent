@@ -85,15 +85,5 @@
                 ]
             }
         },
-        {
-            "name": "${filename}",
-            "pattern": "{build,Build,BUILD,out,Out,OUT}/**/*{test,Test,TEST}_*",
-            "cwd": "${absDirpath}",
-            "runTask": {
-                "before": [
-                    "make build-test"
-                ]
-            }
-        }
     ]
 }

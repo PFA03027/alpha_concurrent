@@ -283,7 +283,7 @@ public:
 		if ( p_nd == nullptr ) return;
 
 		node_pointer p_cur = p_nd;
-		node_pointer p_nxt = reinterpret_cast<node_pointer>( p_cur->hph_next_.load() );
+		node_pointer p_nxt = p_cur->hph_next_.load();
 		while ( p_nxt != nullptr ) {
 			p_cur = p_nxt;
 			p_nxt = p_cur->hph_next_.load();
@@ -309,7 +309,7 @@ public:
 		if ( p_nd == nullptr ) return;
 
 		node_pointer p_cur = p_nd;
-		node_pointer p_nxt = reinterpret_cast<node_pointer>( p_cur->hph_next_.load() );
+		node_pointer p_nxt = p_cur->hph_next_.load();
 		while ( p_nxt != nullptr ) {
 			p_cur = p_nxt;
 			p_nxt = p_cur->hph_next_.load();
@@ -323,10 +323,57 @@ public:
 		node_pointer p_ans = p_head_;
 		if ( p_ans == nullptr ) return p_ans;
 
-		p_head_ = reinterpret_cast<node_pointer>( p_ans->hph_next_.load() );
+		p_head_ = p_ans->hph_next_.load();
 		p_ans->hph_next_.store( nullptr );
 
 		return p_ans;
+	}
+
+	/**
+	 * @brief if pred return true, that node is purged and push it into return value
+	 *
+	 * @tparam Predicate callable pred(const node_type&) and return bool
+	 * @param pred callable pred(const node_type&) and return bool
+	 * @return od_node_list_base purged nodes
+	 */
+	template <class Predicate>
+	od_node_list_base split_if( Predicate pred )
+	{
+		od_node_list_base ans;
+
+		node_pointer p_pre = nullptr;
+		node_pointer p_cur = p_head_;
+		while ( p_cur != nullptr ) {
+			node_pointer p_next = p_cur->hph_next_.load();
+			if ( pred( *( reinterpret_cast<const node_pointer>( p_cur ) ) ) ) {
+				if ( p_pre == nullptr ) {
+					p_head_ = p_next;
+					if ( p_head_ == nullptr ) {
+						p_tail_ = nullptr;
+					}
+
+					p_cur->hph_next_.store( nullptr );
+					ans.push_back( p_cur );
+
+					p_cur = p_head_;
+				} else {
+					p_pre->hph_next_.store( p_next );
+					if ( p_next == nullptr ) {
+						p_tail_ = p_pre;
+					}
+
+					p_cur->hph_next_.store( nullptr );
+					ans.push_back( p_cur );
+
+					p_cur = p_next;
+				}
+			} else {
+				p_pre = p_cur;
+				p_cur = p_next;
+			}
+		}
+
+		return ans;
 	}
 
 	void clear( void )
@@ -335,7 +382,7 @@ public:
 		p_head_            = nullptr;
 		p_tail_            = nullptr;
 		while ( p_cur != nullptr ) {
-			node_pointer p_nxt = reinterpret_cast<node_pointer>( p_cur->hph_next_.load() );
+			node_pointer p_nxt = p_cur->hph_next_.load();
 			delete p_cur;
 			p_cur = p_nxt;
 		}
