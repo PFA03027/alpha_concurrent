@@ -553,7 +553,7 @@ private:
 			if ( p_ans != nullptr ) {
 				return p_ans;
 			}
-			x_free_od_node_storage<T>::g_fn_list_help_flag_.store( true );
+			x_free_od_node_storage<T>::g_fn_list_help_flag_.store( true, std::memory_order_release );
 		}
 
 		// グローバルストレージのロックフリーリストからノードをリサイクルする。
@@ -565,7 +565,7 @@ private:
 			internal::retire_mgr::retire_always_store( p_ans, recycler( &( x_free_od_node_storage<T>::tl_fn_list_ ) ) );
 			p_ans = x_free_od_node_storage<T>::g_fn_list_lockfree_.pop_front();
 		}
-		x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_.store( true );
+		x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_.store( true, std::memory_order_release );
 
 		return p_ans;
 	}
@@ -622,39 +622,48 @@ private:
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
 			p_nd->hph_next_.store( nullptr );   // this line make slower the performance about 3%. therefore this line only enable in case of debug option
 #endif
-
-			// グローバルストレージのロックフリーリストでヘルプフラグが立っているので、そこにノードを回す。
-			if ( x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_.load() ) {
-				g_fn_list_lockfree_.push_front( p_nd );
-				x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_.store( false );
-				return;
-			}
-
-			// グローバルストレージのロック付きリストでヘルプフラグが立っているので、そこにノードを回す。
-			if ( x_free_od_node_storage<T>::g_fn_list_help_flag_.load() ) {
-				auto lk = x_free_od_node_storage<T>::g_fn_list_.try_lock();
-				if ( lk.owns_lock() ) {
-					lk.ref().push_front( p_nd );
-					x_free_od_node_storage<T>::g_fn_list_help_flag_.store( false );
+			thread_local_od_node_list* p_this_thread_instance = &( x_free_od_node_storage<T>::tl_fn_list_ );
+			if ( p_this_thread_instance == p_recycle_tl_target_ ) {
+				if ( p_recycle_tl_target_->node_list_.is_empty() ) {
+					// recyclerが呼ばれたスレッドと、戻し先スレッドが同じで、かつローカルストレージが空ならノードを回す。
+					p_recycle_tl_target_->node_list_.push_front( p_nd );
 					return;
 				}
 			}
 
-			thread_local_od_node_list* p_this_thread_instance = &( x_free_od_node_storage<T>::tl_fn_list_ );
+			// グローバルストレージのロックフリーリストでヘルプフラグが立っているので、そこにノードを回す。
+			if ( x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_.load( std::memory_order_acquire ) ) {
+				g_fn_list_lockfree_.push_front( p_nd );
+				x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_.store( false, std::memory_order_release );
+				return;
+			}
+
+			// グローバルストレージのロック付きリストでヘルプフラグが立っているので、そこにノードを回す。
+			if ( x_free_od_node_storage<T>::g_fn_list_help_flag_.load( std::memory_order_acquire ) ) {
+				auto lk = x_free_od_node_storage<T>::g_fn_list_.try_lock();
+				if ( lk.owns_lock() ) {
+					lk.ref().push_front( p_nd );
+					x_free_od_node_storage<T>::g_fn_list_help_flag_.store( false, std::memory_order_release );
+					return;
+				}
+			}
+
 			if ( p_this_thread_instance == p_recycle_tl_target_ ) {
+				// recyclerが呼ばれたスレッドと、戻し先スレッドが同じなので、そのままローカルストレージにノードを回す。
 				p_recycle_tl_target_->node_list_.push_front( p_nd );
 				return;
 			} else {
 				// 通常はこちらには来ない。
 				// こちらに来るのは、retire_mgrのスレッドローカルストレージに残っていたまま、スレッドが終了した場合に
 				// グローバルストレージに移管された後、別スレッドでrecycleが呼ばれた場合にここにくる。
+				// あるいは、p_recycle_tl_target_ が nullptrの場合。
 				auto lk = x_free_od_node_storage<T>::g_fn_list_.try_lock();
 				if ( lk.owns_lock() ) {
 					lk.ref().push_front( p_nd );
 				} else {
 					// ロックが取得できない場合、ロックフリーリストに、ノードをpushする。
 					g_fn_list_lockfree_.push_front( p_nd );
-					x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_.store( false );
+					x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_.store( false, std::memory_order_release );
 				}
 			}
 		}

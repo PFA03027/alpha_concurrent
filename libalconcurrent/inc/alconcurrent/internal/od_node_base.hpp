@@ -39,7 +39,7 @@ public:
 
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else
-#if 0   // too slow...
+#if 0   // too slow... if enabled, prune thread termination has failed...
 #if __cpp_aligned_new
 	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
 	{

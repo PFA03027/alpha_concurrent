@@ -79,14 +79,37 @@ public:
 		}
 	}
 
-	static void merge_push( retire_node_list&& src_rnd_list )
+	static void merge_push_with_lock( retire_node_list&& src_rnd_list )
 	{
+		if ( src_rnd_list.is_empty() ) return;
 		g_rnd_list_.lock().ref().merge_push_front( std::move( src_rnd_list ) );
+	}
+
+	static void merge_push_without_lock( retire_node_list&& src_rnd_list )
+	{
+		if ( src_rnd_list.is_empty() ) return;
+
+		tl_rnd_list_.merge_push_back( std::move( src_rnd_list ) );
+		auto lk = g_rnd_list_.try_lock();
+		if ( lk.owns_lock() ) {
+			lk.ref().merge_push_back( std::move( tl_rnd_list_ ) );
+			lk.notify_all();
+		}
 	}
 
 	static retire_node_list pop_all( void )
 	{
 		return retire_node_list( std::move( g_rnd_list_.lock().ref() ) );
+	}
+
+	static retire_node_list try_pop_all( void )
+	{
+		retire_node_list ans = std::move( tl_rnd_list_ );
+		auto             lk  = g_rnd_list_.lock();
+		if ( lk.owns_lock() ) {
+			ans.merge_push_back( std::move( lk.ref() ) );
+		}
+		return ans;
 	}
 
 	static retire_node_list wait_pop_all( void )
@@ -193,13 +216,13 @@ void retire_mgr::prune_one_work( void )
 
 	if ( recycle_list.is_empty() ) return;
 
-	unorder_retire_node_buffer::merge_push( std::move( recycle_list ) );
+	unorder_retire_node_buffer::merge_push_with_lock( std::move( recycle_list ) );
 }
 
 void retire_mgr::prune_thread( void )
 {
-	loop_flag_prune_thread_.store( true );
-	while ( loop_flag_prune_thread_.load() ) {
+	loop_flag_prune_thread_.store( true, std::memory_order_release );
+	while ( loop_flag_prune_thread_.load( std::memory_order_acquire ) ) {
 		prune_one_work();
 	}
 }
@@ -226,6 +249,20 @@ void retire_mgr::retire_impl( retire_node_abst* p_new_retire )
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 	g_call_count_retire++;
 #endif
+	{
+		static thread_local int recycle_skip = 0;
+		recycle_skip++;
+		if ( recycle_skip > 4 ) {
+			recycle_skip                  = 0;
+			retire_node_list recycle_list = unorder_retire_node_buffer::try_pop_all();
+
+			recycle_list.recycle_all();
+
+			if ( !recycle_list.is_empty() ) {
+				unorder_retire_node_buffer::merge_push_without_lock( std::move( recycle_list ) );
+			}
+		}
+	}
 #endif
 
 	unorder_retire_node_buffer::push( p_new_retire );
