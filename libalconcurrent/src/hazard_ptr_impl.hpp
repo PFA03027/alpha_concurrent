@@ -44,8 +44,8 @@ public:
 
 	ALCC_INTERNAL_CPPSTD17_CONSTEXPR hazard_ptr_group( void )
 	  : ap_chain_next_( nullptr )
-	  , aaddr_valid_chain_next_( 0 )
 	  , ap_list_next_( nullptr )
+	  , aaddr_valid_chain_next_( 0 )
 	  , is_used_( false )
 	  , used_slot_cnt_( 0 )
 	  , hzrd_ptr_array_ {}                                // zero-initialization as nullptr
@@ -140,8 +140,8 @@ public:
 #endif
 
 	std::atomic<hazard_ptr_group*> ap_chain_next_;
-	std::atomic<std::uintptr_t>    aaddr_valid_chain_next_;
 	std::atomic<hazard_ptr_group*> ap_list_next_;
+	alignas( internal::atomic_variable_align ) std::atomic<std::uintptr_t> aaddr_valid_chain_next_;
 
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 	static std::atomic<size_t> call_count_try_assign_;
@@ -186,8 +186,8 @@ private:
 		return reinterpret_cast<std::uintptr_t>( p_hpg_arg );
 	}
 
-	std::atomic<bool> is_used_;
-	std::atomic<int>  used_slot_cnt_;
+	alignas( internal::atomic_variable_align ) std::atomic<bool> is_used_;
+	alignas( internal::atomic_variable_align ) std::atomic<int> used_slot_cnt_;
 	alignas( internal::atomic_variable_align ) hzrd_p_array_t hzrd_ptr_array_;
 	alignas( internal::atomic_variable_align ) iterator next_assign_hint_it_;
 };

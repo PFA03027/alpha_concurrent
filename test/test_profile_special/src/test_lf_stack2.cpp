@@ -46,7 +46,7 @@ protected:
 };
 
 constexpr unsigned int   num_thread = 10;   // Tested until 128.
-constexpr std::uintptr_t loop_num   = 2000000;
+constexpr std::uintptr_t loop_num   = 20000000 / num_thread;
 
 pthread_barrier_t barrier2;
 
