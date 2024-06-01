@@ -173,6 +173,199 @@ TEST_F( TestHazardPtrGroup, CallChkHazardPtr4 )
 	EXPECT_FALSE( ret );
 }
 
+TEST_F( TestHazardPtrGroup, CallPushFrontToValidChain )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut;
+
+	// Act
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut ) );
+}
+
+TEST_F( TestHazardPtrGroup, CallSearchWithNullChain )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut;
+
+	// Act
+	std::atomic<std::uintptr_t>* p_ret = alpha::concurrent::internal::hazard_ptr_group::srch_pre_hazard_ptr_group_on_valid_chain( &sut, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_EQ( p_ret, nullptr );
+}
+
+TEST_F( TestHazardPtrGroup, CallSearchTop )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut, &aaddr_valid_chain_next_ );
+
+	// Act
+	std::atomic<std::uintptr_t>* p_ret = alpha::concurrent::internal::hazard_ptr_group::srch_pre_hazard_ptr_group_on_valid_chain( &sut, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_EQ( p_ret, &aaddr_valid_chain_next_ );
+}
+
+TEST_F( TestHazardPtrGroup, CallSearchSecond )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut1;
+	alpha::concurrent::internal::hazard_ptr_group sut2;
+	alpha::concurrent::internal::hazard_ptr_group sut3;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+
+	// Act
+	std::atomic<std::uintptr_t>* p_ret = alpha::concurrent::internal::hazard_ptr_group::srch_pre_hazard_ptr_group_on_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_EQ( p_ret, &( sut1.aaddr_valid_chain_next_ ) );
+}
+
+TEST_F( TestHazardPtrGroup, CallSearchThird )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut1;
+	alpha::concurrent::internal::hazard_ptr_group sut2;
+	alpha::concurrent::internal::hazard_ptr_group sut3;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+
+	// Act
+	std::atomic<std::uintptr_t>* p_ret = alpha::concurrent::internal::hazard_ptr_group::srch_pre_hazard_ptr_group_on_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_EQ( p_ret, &( sut2.aaddr_valid_chain_next_ ) );
+}
+
+TEST_F( TestHazardPtrGroup, CallSearchNotExist )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut1;
+	alpha::concurrent::internal::hazard_ptr_group sut2;
+	alpha::concurrent::internal::hazard_ptr_group sut3;
+	alpha::concurrent::internal::hazard_ptr_group sut4;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+
+	// Act
+	std::atomic<std::uintptr_t>* p_ret = alpha::concurrent::internal::hazard_ptr_group::srch_pre_hazard_ptr_group_on_valid_chain( &sut4, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_EQ( p_ret, nullptr );
+}
+
+TEST_F( TestHazardPtrGroup, CallSearchNullptr )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut1;
+	alpha::concurrent::internal::hazard_ptr_group sut2;
+	alpha::concurrent::internal::hazard_ptr_group sut3;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+
+	// Act
+	std::atomic<std::uintptr_t>* p_ret = alpha::concurrent::internal::hazard_ptr_group::srch_pre_hazard_ptr_group_on_valid_chain( nullptr, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_EQ( p_ret, nullptr );
+}
+
+TEST_F( TestHazardPtrGroup, CallRemoveTopFromOneValidChain )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut, &aaddr_valid_chain_next_ );
+
+	// Act
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), 0 );
+}
+
+TEST_F( TestHazardPtrGroup, CallRemoveTopFromValidChain )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut1;
+	alpha::concurrent::internal::hazard_ptr_group sut2;
+	alpha::concurrent::internal::hazard_ptr_group sut3;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+
+	// Act
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut2 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut3 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), 0 );
+}
+
+TEST_F( TestHazardPtrGroup, CallRemoveMidFromValidChain )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut1;
+	alpha::concurrent::internal::hazard_ptr_group sut2;
+	alpha::concurrent::internal::hazard_ptr_group sut3;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+
+	// Act
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut1 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut3 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), 0 );
+}
+
+TEST_F( TestHazardPtrGroup, CallRemoveLastFromValidChain )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut1;
+	alpha::concurrent::internal::hazard_ptr_group sut2;
+	alpha::concurrent::internal::hazard_ptr_group sut3;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+
+	// Act
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut1 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut2 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), 0 );
+}
+
 /////////////////////////////////////////////////////////////////////////////////
 class TestGlobalScopeHazardPtrChain : public ::testing::Test {
 public:

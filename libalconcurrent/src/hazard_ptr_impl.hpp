@@ -44,8 +44,10 @@ public:
 
 	ALCC_INTERNAL_CPPSTD17_CONSTEXPR hazard_ptr_group( void )
 	  : ap_chain_next_( nullptr )
+	  , aaddr_valid_chain_next_( 0 )
 	  , ap_list_next_( nullptr )
 	  , is_used_( false )
+	  , used_slot_cnt_( 0 )
 	  , hzrd_ptr_array_ {}                                // zero-initialization as nullptr
 	  , next_assign_hint_it_( hzrd_ptr_array_.begin() )   // C++17 and after, array::begin is constexpr
 	{
@@ -82,6 +84,15 @@ public:
 
 	bool check_pointer_is_hazard_pointer( void* p ) noexcept;
 	void scan_hazard_pointers( std::function<void( void* )>& pred );
+
+	static void                         push_front_hazard_ptr_group_to_valid_chain( hazard_ptr_group* const p_hpg_arg, std::atomic<std::uintptr_t>* const p_addr_top_valid_hpg_chain );
+	static void                         remove_hazard_ptr_group_from_valid_chain( hazard_ptr_group* const p_hpg_arg, std::atomic<std::uintptr_t>* const p_addr_top_valid_hpg_chain );
+	static std::atomic<std::uintptr_t>* srch_pre_hazard_ptr_group_on_valid_chain( hazard_ptr_group* const p_hpg_arg, std::atomic<std::uintptr_t>* const p_addr_top_valid_hpg_chain );
+
+	static inline hazard_ptr_group* get_pointer_of_hazard_ptr_group_from_addr_clr_marker( std::uintptr_t addr_hpg_arg )
+	{
+		return reinterpret_cast<hazard_ptr_group*>( clr_del_mark_from_addr( addr_hpg_arg ) );
+	}
 
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else
@@ -129,6 +140,7 @@ public:
 #endif
 
 	std::atomic<hazard_ptr_group*> ap_chain_next_;
+	std::atomic<std::uintptr_t>    aaddr_valid_chain_next_;
 	std::atomic<hazard_ptr_group*> ap_list_next_;
 
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
@@ -154,7 +166,28 @@ private:
 		return hzrd_ptr_array_.end();
 	}
 
+	static inline std::uintptr_t set_del_mark_to_addr( std::uintptr_t addr_hpg_arg )
+	{
+		return addr_hpg_arg | static_cast<std::uintptr_t>( 1U );
+	}
+
+	static inline std::uintptr_t clr_del_mark_from_addr( std::uintptr_t addr_hpg_arg )
+	{
+		return addr_hpg_arg & ( ~( static_cast<std::uintptr_t>( 1U ) ) );
+	}
+
+	static inline bool is_del_marked( std::uintptr_t addr_hpg_arg )
+	{
+		return ( ( addr_hpg_arg & ( static_cast<std::uintptr_t>( 1U ) ) ) != 0 );
+	}
+
+	static inline std::uintptr_t get_addr_from_pointer_of_hazard_ptr_group( hazard_ptr_group* const p_hpg_arg )
+	{
+		return reinterpret_cast<std::uintptr_t>( p_hpg_arg );
+	}
+
 	std::atomic<bool> is_used_;
+	std::atomic<int>  used_slot_cnt_;
 	alignas( internal::atomic_variable_align ) hzrd_p_array_t hzrd_ptr_array_;
 	alignas( internal::atomic_variable_align ) iterator next_assign_hint_it_;
 };
@@ -193,6 +226,7 @@ class alignas( internal::atomic_variable_align ) global_scope_hazard_ptr_chain {
 public:
 	constexpr global_scope_hazard_ptr_chain( void )
 	  : ap_top_hzrd_ptr_chain_( nullptr )
+	  , aaddr_top_hzrd_ptr_valid_chain_( 0 )
 	{
 	}
 
@@ -201,7 +235,14 @@ public:
 	 *
 	 * @return hazard_ptr_group::ownership_t ownership data. this api does not return nullptr
 	 */
-	static inline hazard_ptr_group::ownership_t GetOwnership( void );
+	static hazard_ptr_group::ownership_t GetOwnership( void );
+
+	/**
+	 * @brief Release ownership of hazard_ptr_group and return it to hazard_ptr_group list
+	 *
+	 * @return hazard_ptr_group::ownership_t ownership data. this api does not return nullptr
+	 */
+	static void ReleaseOwnership( hazard_ptr_group::ownership_t os );
 
 	/**
 	 * @brief Check if p is still in hazard pointer list or not
@@ -240,11 +281,27 @@ private:
 	hazard_ptr_group::ownership_t try_get_ownership( void );
 
 	/**
+	 * @brief release ownership that is gottne by try_get_ownership()
+	 *
+	 * @param up_o ownership
+	 */
+	void release_ownership( hazard_ptr_group::ownership_t up_o );
+
+	/**
 	 * @brief register new hazard_ptr_group list
 	 *
 	 * @param p_hpg_arg
 	 */
 	void register_new_hazard_ptr_group( hazard_ptr_group* p_hpg_arg );
+
+	/**
+	 * @brief register hazard_ptr_group to valid list
+	 *
+	 * @pre p_hpg_arg that has registered by register_new_hazard_ptr_group()
+	 *
+	 * @param p_hpg_arg pointer to hazard_ptr_group that has registered by  register_new_hazard_ptr_group()
+	 */
+	void register_hazard_ptr_group_to_valid_list( hazard_ptr_group* p_hpg_arg );
 
 	/**
 	 * @brief get ownership from unused hazard_ptr_group list
@@ -254,6 +311,7 @@ private:
 	hazard_ptr_group::ownership_t get_ownership( void );
 
 	std::atomic<hazard_ptr_group*> ap_top_hzrd_ptr_chain_;
+	std::atomic<std::uintptr_t>    aaddr_top_hzrd_ptr_valid_chain_;
 };
 
 }   // namespace internal

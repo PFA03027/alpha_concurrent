@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <tuple>
 
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/internal/alloc_only_allocator.hpp"
@@ -156,6 +157,126 @@ void hazard_ptr_group::scan_hazard_pointers( std::function<void( void* )>& pred 
 			pred( p );
 		}
 	}
+}
+
+void hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( hazard_ptr_group* const p_hpg_arg, std::atomic<std::uintptr_t>* const p_addr_top_valid_hpg_chain )
+{
+	if ( p_hpg_arg == nullptr ) {
+		throw std::logic_error( "p_hpg_arg should not be nullptr. this is logic error" );
+	}
+	if ( p_addr_top_valid_hpg_chain == nullptr ) {
+		throw std::logic_error( "p_addr_top_valid_hpg_chain should not be nullptr. this is logic error" );
+	}
+
+	std::uintptr_t addr_new_top = get_addr_from_pointer_of_hazard_ptr_group( p_hpg_arg );
+	std::uintptr_t addr_nxt     = p_addr_top_valid_hpg_chain->load( std::memory_order_acquire );
+	p_hpg_arg->aaddr_valid_chain_next_.store( addr_nxt, std::memory_order_release );
+	while ( !( p_addr_top_valid_hpg_chain->compare_exchange_strong( addr_nxt, addr_new_top, std::memory_order_release, std::memory_order_relaxed ) ) ) {
+		// p_addr_top_valid_hpg_chainの中の値には削除マークはつかないので、clr処理は不要
+		p_hpg_arg->aaddr_valid_chain_next_.store( addr_nxt, std::memory_order_release );
+	}
+}
+void hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( hazard_ptr_group* const p_hpg_arg, std::atomic<std::uintptr_t>* const p_addr_top_valid_hpg_chain )
+{
+	if ( p_hpg_arg == nullptr ) {
+		throw std::logic_error( "p_hpg_arg should not be nullptr. this is logic error" );
+	}
+	if ( p_addr_top_valid_hpg_chain == nullptr ) {
+		throw std::logic_error( "p_addr_top_valid_hpg_chain should not be nullptr. this is logic error" );
+	}
+
+	std::atomic<std::uintptr_t>* p_addr_pre = srch_pre_hazard_ptr_group_on_valid_chain( p_hpg_arg, p_addr_top_valid_hpg_chain );
+	if ( p_addr_pre == nullptr ) {
+		// すでに削除されている
+		return;
+	}
+
+	// 削除マークの付与を試みる
+	std::uintptr_t expect_addr     = p_hpg_arg->aaddr_valid_chain_next_.load( std::memory_order_acquire );
+	std::uintptr_t addr_w_del_mark = set_del_mark_to_addr( expect_addr );
+	while ( !p_hpg_arg->aaddr_valid_chain_next_.compare_exchange_strong( expect_addr, addr_w_del_mark, std::memory_order_release, std::memory_order_relaxed ) ) {
+		if ( is_del_marked( expect_addr ) ) {
+			// 既に削除マークがついていたら、ループ終了
+			break;
+		}
+		addr_w_del_mark = set_del_mark_to_addr( expect_addr );
+	}
+
+	// 削除を試みる
+	// Note: Lock-freeリストの削除処理の過程おいては、削除マーク付きのアドレス情報は削除が完了するまで書き換えてはならないという制約を満たす必要がある。
+	// Note: ABA問題に関して、これらのAPI群は下記の制約を前提としているため、このAPIによる削除完了後、hazard_ptr_group::is_used_フラグがfalseになるまで再使用対象とならない。
+	// Note: ・削除権は、hazard_ptr_groupのスレッドオーナーだけが持っている。
+	// Note: ・削除処理自体は、srch_pre_hazard_ptr_group_on_valid_chain()を呼び出すスレッドも行うが、このAPIを呼び出すhazard_ptr_groupのスレッドオーナーによって、削除完了まで監視される。
+	std::uintptr_t addr_target = get_addr_from_pointer_of_hazard_ptr_group( p_hpg_arg );
+	expect_addr                = clr_del_mark_from_addr( expect_addr );
+	while ( !( p_addr_pre->compare_exchange_strong( addr_target, expect_addr, std::memory_order_release, std::memory_order_relaxed ) ) ) {
+		p_addr_pre = srch_pre_hazard_ptr_group_on_valid_chain( p_hpg_arg, p_addr_top_valid_hpg_chain );
+		if ( p_addr_pre == nullptr ) {
+			// すでに削除されている
+			return;
+		}
+		addr_target = get_addr_from_pointer_of_hazard_ptr_group( p_hpg_arg );
+	}
+	// ここに来た時点で、削除に成功
+
+	return;
+}
+std::atomic<std::uintptr_t>* hazard_ptr_group::srch_pre_hazard_ptr_group_on_valid_chain( hazard_ptr_group* const p_hpg_arg, std::atomic<std::uintptr_t>* const p_addr_top_valid_hpg_chain )
+{
+	// Note: Lock-freeリストの削除処理の過程おいては、削除マーク付きのアドレス情報は削除が完了するまで書き換えてはならないという制約を満たす必要がある。
+	// Note: さらに、このhazard_ptr_groupのvalid_chainのリストについては、削除完了後も削除マーク付きのアドレス情報を書き換えてはならない追加の制約がある。
+	// Note: これは、hazard_ptr_groupのハザードポインタチェック処理をリストの最後まで走り切らせる必要があるため、
+	// Note: 削除後であってもリンクのつながりを切ってはならないという制約条件があるため。
+
+	std::atomic<std::uintptr_t>* p_ans = nullptr;
+	if ( p_hpg_arg == nullptr ) {
+		return p_ans;
+	}
+	if ( p_addr_top_valid_hpg_chain == nullptr ) {
+		return p_ans;
+	}
+
+	while ( true ) {
+		// 最初から検索をやり直す。
+		std::atomic<std::uintptr_t>* p_addr_cur = p_addr_top_valid_hpg_chain;
+
+		std::uintptr_t    addr_nxt = p_addr_cur->load( std::memory_order_acquire );
+		hazard_ptr_group* p_nxt    = get_pointer_of_hazard_ptr_group_from_addr_clr_marker( addr_nxt );
+		while ( p_nxt != p_hpg_arg ) {
+			if ( p_nxt == nullptr ) {
+				// valid chainの最後まで検索しても、検索対象が見つからなかった場合。
+				return nullptr;
+			}
+
+			std::atomic<std::uintptr_t>* p_addr_next  = &( p_nxt->aaddr_valid_chain_next_ );
+			std::uintptr_t               addr_nxt_nxt = p_addr_next->load( std::memory_order_acquire );
+			if ( is_del_marked( addr_nxt_nxt ) ) {
+				// 削除マークがついているので、削除を試みる
+				std::uintptr_t add_new_nxt = clr_del_mark_from_addr( addr_nxt_nxt );
+				if ( p_addr_cur->compare_exchange_weak( addr_nxt, add_new_nxt, std::memory_order_release, std::memory_order_relaxed ) ) {
+					// 削除に成功
+					addr_nxt = add_new_nxt;
+					p_nxt    = get_pointer_of_hazard_ptr_group_from_addr_clr_marker( addr_nxt );
+				} else {
+					// 削除に失敗(＝誰かが削除した or p_addr_curに削除マークがついた or 削除後さらに別の場所に挿入された)
+					// よって、ループの先頭からやり直す
+					break;
+				}
+			} else {
+				// 削除マークがついていないので、次に進める
+				p_addr_cur = p_addr_next;
+				addr_nxt   = addr_nxt_nxt;
+				p_nxt      = get_pointer_of_hazard_ptr_group_from_addr_clr_marker( addr_nxt );
+			}
+		}
+		if ( p_nxt == p_hpg_arg ) {
+			// 見つかったのでループを終了する。
+			p_ans = p_addr_cur;
+			break;
+		}
+	}
+
+	return p_ans;
 }
 
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
@@ -306,12 +427,16 @@ bind_hazard_ptr_list::~bind_hazard_ptr_list()
 	if ( hazard_ptr_mgr::IsDestoryed() ) return;
 
 	hazard_ptr_group* p_cur_list = ownership_ticket_.get();
-	while ( p_cur_list != nullptr ) {
+	if ( p_cur_list == nullptr ) return;
+
+	do {
 		p_cur_list->force_clear();
 
 		hazard_ptr_group* p_next_list = p_cur_list->ap_list_next_.load( std::memory_order_acquire );
 		p_cur_list                    = p_next_list;
-	}
+	} while ( p_cur_list != nullptr );
+
+	global_scope_hazard_ptr_chain::ReleaseOwnership( std::move( ownership_ticket_ ) );
 }
 
 hzrd_slot_ownership_t bind_hazard_ptr_list::slot_assign( void* p )
@@ -358,6 +483,15 @@ hazard_ptr_group::ownership_t global_scope_hazard_ptr_chain::GetOwnership( void 
 	return g_scope_hzrd_chain_.get_ownership();
 }
 
+void global_scope_hazard_ptr_chain::ReleaseOwnership( hazard_ptr_group::ownership_t os )
+{
+	if ( os == nullptr ) {
+		throw std::logic_error( "ownership is nullptr. and required to release it. this is logic error" );
+	}
+
+	g_scope_hzrd_chain_.release_ownership( std::move( os ) );
+}
+
 hazard_ptr_group::ownership_t global_scope_hazard_ptr_chain::try_get_ownership( void )
 {
 	hazard_ptr_group* p_cur_hpg = ap_top_hzrd_ptr_chain_.load( std::memory_order_acquire );
@@ -372,6 +506,11 @@ hazard_ptr_group::ownership_t global_scope_hazard_ptr_chain::try_get_ownership( 
 	return nullptr;
 }
 
+void global_scope_hazard_ptr_chain::release_ownership( hazard_ptr_group::ownership_t up_o )
+{
+	hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( up_o.get(), &aaddr_top_hzrd_ptr_valid_chain_ );
+}
+
 void global_scope_hazard_ptr_chain::register_new_hazard_ptr_group( hazard_ptr_group* p_hpg_arg )
 {
 	// push p_phg_arg to top of chain like stack(LILO, even if not allow out)
@@ -380,6 +519,15 @@ void global_scope_hazard_ptr_chain::register_new_hazard_ptr_group( hazard_ptr_gr
 	while ( !ap_top_hzrd_ptr_chain_.compare_exchange_weak( p_cur_top_hpg, p_hpg_arg, std::memory_order_release, std::memory_order_release ) ) {
 		p_hpg_arg->ap_chain_next_.store( p_cur_top_hpg, std::memory_order_release );
 	}
+}
+
+void global_scope_hazard_ptr_chain::register_hazard_ptr_group_to_valid_list( hazard_ptr_group* p_hpg_arg )
+{
+	if ( p_hpg_arg == nullptr ) {
+		throw std::logic_error( "p_hpg_arg is nullptr. this is logic error" );
+	}
+
+	hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( p_hpg_arg, &aaddr_top_hzrd_ptr_valid_chain_ );
 }
 
 hazard_ptr_group::ownership_t global_scope_hazard_ptr_chain::get_ownership( void )
@@ -395,6 +543,9 @@ hazard_ptr_group::ownership_t global_scope_hazard_ptr_chain::get_ownership( void
 		register_new_hazard_ptr_group( p_new_hpg );
 	}
 
+	// valid chainに追加する
+	register_hazard_ptr_group_to_valid_list( ans.get() );
+
 	return ans;
 }
 
@@ -402,10 +553,9 @@ bool global_scope_hazard_ptr_chain::check_pointer_is_hazard_pointer( void* p ) n
 {
 	if ( p == nullptr ) return false;
 
-	hazard_ptr_group* p_cur_chain = ap_top_hzrd_ptr_chain_.load( std::memory_order_acquire );
+	hazard_ptr_group* p_cur_chain = hazard_ptr_group::get_pointer_of_hazard_ptr_group_from_addr_clr_marker( aaddr_top_hzrd_ptr_valid_chain_.load( std::memory_order_acquire ) );
 
 	while ( p_cur_chain != nullptr ) {
-		hazard_ptr_group* p_next_chain = p_cur_chain->ap_chain_next_.load( std::memory_order_acquire );
 		if ( p_cur_chain->is_used() ) {
 			hazard_ptr_group* p_cur_list = p_cur_chain;
 			while ( p_cur_list != nullptr ) {
@@ -416,7 +566,8 @@ bool global_scope_hazard_ptr_chain::check_pointer_is_hazard_pointer( void* p ) n
 				p_cur_list                    = p_next_list;
 			}
 		}
-		p_cur_chain = p_next_chain;
+		hazard_ptr_group* p_next_chain = hazard_ptr_group::get_pointer_of_hazard_ptr_group_from_addr_clr_marker( p_cur_chain->aaddr_valid_chain_next_.load( std::memory_order_acquire ) );
+		p_cur_chain                    = p_next_chain;
 	}
 
 	return false;
@@ -424,10 +575,9 @@ bool global_scope_hazard_ptr_chain::check_pointer_is_hazard_pointer( void* p ) n
 
 void global_scope_hazard_ptr_chain::scan_hazard_pointers( std::function<void( void* )>& pred )
 {
-	hazard_ptr_group* p_cur_chain = ap_top_hzrd_ptr_chain_.load( std::memory_order_acquire );
+	hazard_ptr_group* p_cur_chain = hazard_ptr_group::get_pointer_of_hazard_ptr_group_from_addr_clr_marker( aaddr_top_hzrd_ptr_valid_chain_.load( std::memory_order_acquire ) );
 
 	while ( p_cur_chain != nullptr ) {
-		hazard_ptr_group* p_next_chain = p_cur_chain->ap_chain_next_.load( std::memory_order_acquire );
 		if ( p_cur_chain->is_used() ) {
 			hazard_ptr_group* p_cur_list = p_cur_chain;
 			while ( p_cur_list != nullptr ) {
@@ -437,7 +587,8 @@ void global_scope_hazard_ptr_chain::scan_hazard_pointers( std::function<void( vo
 				p_cur_list                    = p_next_list;
 			}
 		}
-		p_cur_chain = p_next_chain;
+		hazard_ptr_group* p_next_chain = hazard_ptr_group::get_pointer_of_hazard_ptr_group_from_addr_clr_marker( p_cur_chain->aaddr_valid_chain_next_.load( std::memory_order_acquire ) );
+		p_cur_chain                    = p_next_chain;
 	}
 }
 
