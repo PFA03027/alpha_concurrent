@@ -69,8 +69,8 @@ int nwoker_perf_test_stack_NtoN_sub( unsigned int nworker )
 
 int nwoker_perf_test_stack_NtoN_main( unsigned int nworker )
 {
-	nwoker_perf_test_stack_NtoN_sub<10>( nworker );
 	nwoker_perf_test_stack_NtoN_sub<100>( nworker );
+	nwoker_perf_test_stack_NtoN_sub<10>( nworker );
 
 	return 0;
 }
