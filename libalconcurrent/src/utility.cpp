@@ -17,11 +17,6 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
-[[noreturn]] void terminate( void )
-{
-	std::terminate();
-}
-
 }   // namespace internal
 }   // namespace concurrent
 }   // namespace alpha

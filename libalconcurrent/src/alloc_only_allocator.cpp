@@ -160,7 +160,7 @@ inline uintptr_t room_boader::calc_addr_of_allocated_memory_based_on_room_boader
 	if ( !is_power_of_2( req_align ) ) {
 		internal::LogOutput( log_type::ERR, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-		terminate();
+		std::terminate();
 #endif
 	}
 #endif
@@ -185,7 +185,7 @@ inline alloc_in_room* room_boader::calc_pointer_of_alloc_in_room_from_allocated_
 	if ( addr_allocated_mem != reinterpret_cast<uintptr_t>( p_ans->mem ) ) {
 		internal::LogOutput( log_type::ERR, "calculated address is different to actual address 0x%zu, 0x%zu", addr_allocated_mem, reinterpret_cast<uintptr_t>( p_ans->mem ) );
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-		terminate();
+		std::terminate();
 #endif
 	}
 #endif
@@ -228,7 +228,7 @@ room_boader::room_boader( const alloc_chamber* p_parent, size_t chopped_size_arg
 	if ( addr_end_of_room_boader > addr_top_of_alloc_in_room ) {
 		internal::LogOutput( log_type::ERR, "room_boader and alloc_in_room is overlapped, addr_end_of_room_boader = 0x%zu, addr_top_of_alloc_in_room = 0x%zu", addr_end_of_room_boader, addr_top_of_alloc_in_room );
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-		terminate();
+		std::terminate();
 #endif
 	}
 #endif

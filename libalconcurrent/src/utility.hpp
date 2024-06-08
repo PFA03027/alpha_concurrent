@@ -38,7 +38,6 @@ private:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-[[noreturn]] void terminate( void );
 
 }   // namespace internal
 }   // namespace concurrent

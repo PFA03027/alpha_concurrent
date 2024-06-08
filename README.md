@@ -176,7 +176,7 @@ If compile with ALCONCURRENT_CONF_ENABLE_CHECK_OVERRUN_WRITING, write over run i
 If compile with ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR, it will detect logical error and output error log. This is only for internal debugging or porting activity.
 
 #### ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-If compile with ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION, call std::terminate() via alpha::concurrent::internal::terminate() when detect logical error. This is only for internal debugging or porting activity.
+If compile with ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION, call std::std::terminate() when detect logical error. This is only for internal debugging or porting activity.
 
 #### ALCONCURRENT_CONF_ENABLE_MALLOC_INSTEAD_OF_MMAP
 When doing memory sanitizer test for internal lf_mem_alloc, this option is needed. In case of defined this option, lf_mem_alloc will call malloc/free instead of mmap/munmap. This is only for internal debugging or porting activity.

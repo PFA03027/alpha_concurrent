@@ -138,7 +138,7 @@ void* slot_array_mgr::allocate( size_t n, size_t req_alignsize )
 	if ( !chk_ret_free_slot_idx.is_ok_ ) {
 		internal::LogOutput( log_type::ERR, "recieved free slot is not belong to this slot_array_mgr" );
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-		terminate();
+		std::terminate();
 #else
 		return nullptr;
 #endif

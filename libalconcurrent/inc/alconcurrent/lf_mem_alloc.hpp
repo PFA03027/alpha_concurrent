@@ -130,7 +130,7 @@ public:
 		if ( !internal::is_power_of_2( req_align ) ) {
 			internal::LogOutput( log_type::ERR, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-			terminate();
+			std::terminate();
 #else
 			static_assert( internal::is_power_of_2( default_slot_alignsize ), "default_slot_alignsize should be power of 2." );
 			req_align = default_slot_alignsize;

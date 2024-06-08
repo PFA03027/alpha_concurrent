@@ -793,7 +793,7 @@ void general_mem_allocator_impl_deallocate(
 		if ( chk_ret.p_chms_ == nullptr ) {
 			internal::LogOutput( log_type::ERR, "return value of get_chunk() is unexpected" );
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-			terminate();
+			std::terminate();
 #else
 			return;
 #endif

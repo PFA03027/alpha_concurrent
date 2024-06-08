@@ -775,7 +775,7 @@ private:
 			if ( status != 0 ) {
 				error_log_output( status, "pthread_key_create()" );
 				internal::LogOutput( log_type::ERR, "PTHREAD_KEYS_MAX: %d", PTHREAD_KEYS_MAX );
-				terminate();   // because of the critical error, let's exit. TODO: should throw std::runtime_error ?
+				std::terminate();   // because of the critical error, let's exit. TODO: should throw std::runtime_error ?
 			}
 			return;
 		}

@@ -130,7 +130,7 @@ bool_unified_slot_header_p slot_container::get_slot_header_from_assignment_p( vo
 	if ( p_mem != reinterpret_cast<void*>( p_slot_container->mem ) ) {
 		internal::LogOutput( log_type::ERR, "does not match p_mem and slot_container::mem[0]. This is logical error." );
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-		terminate();
+		std::terminate();
 #else
 		return { false, nullptr };
 #endif
@@ -155,7 +155,7 @@ void* slot_container::construct_slot_container_in_container_buffer( slot_mheader
 	if ( !is_power_of_2( req_align ) ) {
 		internal::LogOutput( log_type::ERR, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-		terminate();
+		std::terminate();
 #endif
 	}
 #endif
@@ -181,7 +181,7 @@ void* slot_container::construct_slot_container_in_container_buffer( slot_mheader
 	if ( reinterpret_cast<void*>( ans_addr ) != reinterpret_cast<void*>( p_slot_container->mem ) ) {
 		internal::LogOutput( log_type::ERR, "does not match assignment address and slot_container::mem[0]" );
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-		terminate();
+		std::terminate();
 #endif
 	}
 #endif
