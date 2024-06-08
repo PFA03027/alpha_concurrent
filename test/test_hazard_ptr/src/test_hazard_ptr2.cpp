@@ -193,13 +193,13 @@ TEST_F( TestHazardPtrGroup, CallSearchWithNullChain )
 	alpha::concurrent::internal::hazard_ptr_group sut;
 
 	// Act
-	std::atomic<std::uintptr_t>* p_ret = alpha::concurrent::internal::hazard_ptr_group::srch_pre_hazard_ptr_group_on_valid_chain( &sut, &aaddr_valid_chain_next_ );
+	bool ret = alpha::concurrent::internal::hazard_ptr_group::is_hazard_ptr_group_in_valid_chain( &sut, &aaddr_valid_chain_next_ );
 
 	// Assert
-	EXPECT_EQ( p_ret, nullptr );
+	EXPECT_FALSE( ret );
 }
 
-TEST_F( TestHazardPtrGroup, CallSearchTop )
+TEST_F( TestHazardPtrGroup, CallSearchTop1 )
 {
 	// Arrange
 	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
@@ -207,10 +207,28 @@ TEST_F( TestHazardPtrGroup, CallSearchTop )
 	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut, &aaddr_valid_chain_next_ );
 
 	// Act
-	std::atomic<std::uintptr_t>* p_ret = alpha::concurrent::internal::hazard_ptr_group::srch_pre_hazard_ptr_group_on_valid_chain( &sut, &aaddr_valid_chain_next_ );
+	bool ret = alpha::concurrent::internal::hazard_ptr_group::is_hazard_ptr_group_in_valid_chain( &sut, &aaddr_valid_chain_next_ );
 
 	// Assert
-	EXPECT_EQ( p_ret, &aaddr_valid_chain_next_ );
+	EXPECT_TRUE( ret );
+}
+
+TEST_F( TestHazardPtrGroup, CallSearchTop2 )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut1;
+	alpha::concurrent::internal::hazard_ptr_group sut2;
+	alpha::concurrent::internal::hazard_ptr_group sut3;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+
+	// Act
+	bool ret = alpha::concurrent::internal::hazard_ptr_group::is_hazard_ptr_group_in_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_TRUE( ret );
 }
 
 TEST_F( TestHazardPtrGroup, CallSearchSecond )
@@ -225,10 +243,10 @@ TEST_F( TestHazardPtrGroup, CallSearchSecond )
 	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
 
 	// Act
-	std::atomic<std::uintptr_t>* p_ret = alpha::concurrent::internal::hazard_ptr_group::srch_pre_hazard_ptr_group_on_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	bool ret = alpha::concurrent::internal::hazard_ptr_group::is_hazard_ptr_group_in_valid_chain( &sut2, &aaddr_valid_chain_next_ );
 
 	// Assert
-	EXPECT_EQ( p_ret, &( sut1.aaddr_valid_chain_next_ ) );
+	EXPECT_TRUE( ret );
 }
 
 TEST_F( TestHazardPtrGroup, CallSearchThird )
@@ -243,10 +261,10 @@ TEST_F( TestHazardPtrGroup, CallSearchThird )
 	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
 
 	// Act
-	std::atomic<std::uintptr_t>* p_ret = alpha::concurrent::internal::hazard_ptr_group::srch_pre_hazard_ptr_group_on_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	bool ret = alpha::concurrent::internal::hazard_ptr_group::is_hazard_ptr_group_in_valid_chain( &sut3, &aaddr_valid_chain_next_ );
 
 	// Assert
-	EXPECT_EQ( p_ret, &( sut2.aaddr_valid_chain_next_ ) );
+	EXPECT_TRUE( ret );
 }
 
 TEST_F( TestHazardPtrGroup, CallSearchNotExist )
@@ -262,10 +280,10 @@ TEST_F( TestHazardPtrGroup, CallSearchNotExist )
 	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
 
 	// Act
-	std::atomic<std::uintptr_t>* p_ret = alpha::concurrent::internal::hazard_ptr_group::srch_pre_hazard_ptr_group_on_valid_chain( &sut4, &aaddr_valid_chain_next_ );
+	bool ret = alpha::concurrent::internal::hazard_ptr_group::is_hazard_ptr_group_in_valid_chain( &sut4, &aaddr_valid_chain_next_ );
 
 	// Assert
-	EXPECT_EQ( p_ret, nullptr );
+	EXPECT_FALSE( ret );
 }
 
 TEST_F( TestHazardPtrGroup, CallSearchNullptr )
@@ -280,10 +298,10 @@ TEST_F( TestHazardPtrGroup, CallSearchNullptr )
 	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
 
 	// Act
-	std::atomic<std::uintptr_t>* p_ret = alpha::concurrent::internal::hazard_ptr_group::srch_pre_hazard_ptr_group_on_valid_chain( nullptr, &aaddr_valid_chain_next_ );
+	bool ret = alpha::concurrent::internal::hazard_ptr_group::is_hazard_ptr_group_in_valid_chain( nullptr, &aaddr_valid_chain_next_ );
 
 	// Assert
-	EXPECT_EQ( p_ret, nullptr );
+	EXPECT_FALSE( ret );
 }
 
 TEST_F( TestHazardPtrGroup, CallRemoveTopFromOneValidChain )
@@ -298,6 +316,8 @@ TEST_F( TestHazardPtrGroup, CallRemoveTopFromOneValidChain )
 
 	// Assert
 	EXPECT_EQ( aaddr_valid_chain_next_.load(), 0 );
+	bool ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
 }
 
 TEST_F( TestHazardPtrGroup, CallRemoveTopFromValidChain )
@@ -320,6 +340,12 @@ TEST_F( TestHazardPtrGroup, CallRemoveTopFromValidChain )
 	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut3 ) );
 	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut3, &aaddr_valid_chain_next_ );
 	EXPECT_EQ( aaddr_valid_chain_next_.load(), 0 );
+	bool ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut1.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut2.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut3.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
 }
 
 TEST_F( TestHazardPtrGroup, CallRemoveMidFromValidChain )
@@ -342,6 +368,12 @@ TEST_F( TestHazardPtrGroup, CallRemoveMidFromValidChain )
 	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut3 ) );
 	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut3, &aaddr_valid_chain_next_ );
 	EXPECT_EQ( aaddr_valid_chain_next_.load(), 0 );
+	bool ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut1.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut2.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut3.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
 }
 
 TEST_F( TestHazardPtrGroup, CallRemoveLastFromValidChain )
@@ -364,7 +396,299 @@ TEST_F( TestHazardPtrGroup, CallRemoveLastFromValidChain )
 	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut2 ) );
 	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut2, &aaddr_valid_chain_next_ );
 	EXPECT_EQ( aaddr_valid_chain_next_.load(), 0 );
+	bool ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut1.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut2.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut3.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
 }
+
+TEST_F( TestHazardPtrGroup, CallSearchWithDelMarkAt1st )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut1;
+	alpha::concurrent::internal::hazard_ptr_group sut2;
+	alpha::concurrent::internal::hazard_ptr_group sut3;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+	sut1.get_valid_chain_next_writer_accesser().set_del_mark();
+
+	// Act
+	bool ret = alpha::concurrent::internal::hazard_ptr_group::is_hazard_ptr_group_in_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_FALSE( ret );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut2 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut3 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), 0 );
+	bool ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut1.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut2.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut3.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+}
+
+TEST_F( TestHazardPtrGroup, CallSearchWithDelMarkAt2nd )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut1;
+	alpha::concurrent::internal::hazard_ptr_group sut2;
+	alpha::concurrent::internal::hazard_ptr_group sut3;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+	sut2.get_valid_chain_next_writer_accesser().set_del_mark();
+
+	// Act
+	bool ret = alpha::concurrent::internal::hazard_ptr_group::is_hazard_ptr_group_in_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_FALSE( ret );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut1 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut3 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), 0 );
+	bool ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut1.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut2.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut3.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+}
+
+TEST_F( TestHazardPtrGroup, CallSearchWithDelMarkAt3rd )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut1;
+	alpha::concurrent::internal::hazard_ptr_group sut2;
+	alpha::concurrent::internal::hazard_ptr_group sut3;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+	sut3.get_valid_chain_next_writer_accesser().set_del_mark();
+
+	// Act
+	bool ret = alpha::concurrent::internal::hazard_ptr_group::is_hazard_ptr_group_in_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_FALSE( ret );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut1 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut2 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), 0 );
+	bool ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut1.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut2.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut3.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+}
+
+TEST_F( TestHazardPtrGroup, CallSearchWithDelMarkAt1st3rd )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut1;
+	alpha::concurrent::internal::hazard_ptr_group sut2;
+	alpha::concurrent::internal::hazard_ptr_group sut3;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+	sut1.get_valid_chain_next_writer_accesser().set_del_mark();
+	sut3.get_valid_chain_next_writer_accesser().set_del_mark();
+
+	// Act
+	bool ret = alpha::concurrent::internal::hazard_ptr_group::is_hazard_ptr_group_in_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_FALSE( ret );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut2 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), 0 );
+	bool ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut1.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut2.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut3.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+}
+
+TEST_F( TestHazardPtrGroup, CallSearchWithDelMarkAt1st2nd3rd )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut1;
+	alpha::concurrent::internal::hazard_ptr_group sut2;
+	alpha::concurrent::internal::hazard_ptr_group sut3;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+	sut1.get_valid_chain_next_writer_accesser().set_del_mark();
+	sut2.get_valid_chain_next_writer_accesser().set_del_mark();
+	sut3.get_valid_chain_next_writer_accesser().set_del_mark();
+
+	// Act
+	bool ret = alpha::concurrent::internal::hazard_ptr_group::is_hazard_ptr_group_in_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_FALSE( ret );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), 0 );
+	bool ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut1.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut2.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut3.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+}
+
+TEST_F( TestHazardPtrGroup, CallPush1stWithDelMarkAt2nd3rd )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut1;
+	alpha::concurrent::internal::hazard_ptr_group sut2;
+	alpha::concurrent::internal::hazard_ptr_group sut3;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	sut2.get_valid_chain_next_writer_accesser().set_del_mark();
+	sut3.get_valid_chain_next_writer_accesser().set_del_mark();
+
+	// Act
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut1 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+	bool ret = alpha::concurrent::internal::hazard_ptr_group::is_hazard_ptr_group_in_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+	EXPECT_FALSE( ret );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), 0 );
+	bool ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut1.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut2.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut3.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+}
+
+TEST_F( TestHazardPtrGroup, CallSearchWithDelMarkAt2nd3rd )
+{
+	// Arrange
+	std::atomic<std::uintptr_t>                   aaddr_valid_chain_next_( 0 );
+	alpha::concurrent::internal::hazard_ptr_group sut1;
+	alpha::concurrent::internal::hazard_ptr_group sut2;
+	alpha::concurrent::internal::hazard_ptr_group sut3;
+	alpha::concurrent::internal::hazard_ptr_group sut4;
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut4, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut3, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+	alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+	sut2.get_valid_chain_next_writer_accesser().set_del_mark();
+	sut3.get_valid_chain_next_writer_accesser().set_del_mark();
+
+	// Act
+	bool ret = alpha::concurrent::internal::hazard_ptr_group::is_hazard_ptr_group_in_valid_chain( &sut2, &aaddr_valid_chain_next_ );
+
+	// Assert
+	EXPECT_FALSE( ret );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut1 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut1, &aaddr_valid_chain_next_ );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), reinterpret_cast<std::uintptr_t>( &sut4 ) );
+	alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( &sut4, &aaddr_valid_chain_next_ );
+	EXPECT_EQ( aaddr_valid_chain_next_.load(), 0 );
+	bool ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut1.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut2.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut3.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+	ret_is_del_marked = alpha::concurrent::internal::is_del_marked( sut4.get_valid_chain_next_reader_accesser().load_address() );
+	EXPECT_TRUE( ret_is_del_marked );
+}
+
+#if 1
+TEST_F( TestHazardPtrGroup, HighLoadValidChain )
+{
+	// Arrange
+	constexpr int                                 array_size = 10;
+	constexpr int                                 th_num     = 8;
+	std::atomic<std::uintptr_t>                   sut( 0 );
+	alpha::concurrent::internal::hazard_ptr_group hpg[array_size * th_num];
+	std::thread                                   test_load_th_obj[th_num];
+	pthread_barrier_t                             barrier2;
+	pthread_barrier_init( &barrier2, NULL, th_num + 1 );
+
+	struct load_object {
+		void operator()(
+			int                                                  my_tid,
+			pthread_barrier_t* const                             p_barrier,
+			std::atomic<std::uintptr_t>* const                   p_addr_top,
+			alpha::concurrent::internal::hazard_ptr_group* const p_begin,
+			alpha::concurrent::internal::hazard_ptr_group* const p_end )
+		{
+			constexpr int loop_num = 100000;
+
+			pthread_barrier_wait( p_barrier );
+			for ( int i = 0; i < loop_num; i++ ) {
+				int                                            j = 0;
+				alpha::concurrent::internal::hazard_ptr_group* p_cur;
+				for ( p_cur = p_begin; p_cur != p_end; p_cur++ ) {
+					alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( p_cur, p_addr_top );
+					if ( alpha::concurrent::internal::is_del_marked( p_cur->get_valid_chain_next_reader_accesser().load_address() ) ) {
+						std::cout << std::string( "should not be del marked1" ) << std::endl;
+						throw std::logic_error( "should not be del marked" );
+					}
+				}
+				j = 0;
+				for ( p_cur = p_begin; p_cur != p_end; p_cur++ ) {
+					std::uintptr_t tmp_addr1 = p_cur->get_valid_chain_next_reader_accesser().load_address();
+					if ( alpha::concurrent::internal::is_del_marked( tmp_addr1 ) ) {
+						std::cout << std::string( "should not be del marked2" ) << std::endl;
+						throw std::logic_error( "should not be del marked" );
+					}
+					alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( p_cur, p_addr_top );
+					std::uintptr_t tmp_addr2 = p_cur->get_valid_chain_next_reader_accesser().load_address();
+					if ( !alpha::concurrent::internal::is_del_marked( tmp_addr2 ) ) {
+						// if ( my_tid == 0 ) {
+						std::cout << std::string( "should be del marked  " ) + std::to_string( j ) + std::string( "  " ) +
+										 std::to_string( tmp_addr1 ) + std::string( "  " ) + std::to_string( tmp_addr2 )
+								  << std::endl;
+						throw std::logic_error( std::string( "should be del marked  " ) + std::to_string( tmp_addr1 ) + std::string( "  " ) + std::to_string( tmp_addr2 ) );
+						// }
+					}
+					j++;
+				}
+				if ( alpha::concurrent::internal::is_del_marked( p_addr_top->load( std::memory_order_acquire ) ) ) {
+					throw std::logic_error( "p_addr_top should not have del marked" );
+				}
+			}
+		}
+	};
+	for ( int i = 0; i < th_num; i++ ) {
+		test_load_th_obj[i] = std::thread( load_object {}, i, &barrier2, &sut, &( hpg[i * array_size] ), &( hpg[( i + 1 ) * array_size] ) );
+	}
+
+	// Act
+	pthread_barrier_wait( &barrier2 );
+	for ( int i = 0; i < th_num; i++ ) {
+		if ( test_load_th_obj[i].joinable() ) {
+			test_load_th_obj[i].join();
+		}
+	}
+
+	// Assert
+	EXPECT_EQ( sut.load(), 0 );
+}
+#endif
 
 /////////////////////////////////////////////////////////////////////////////////
 class TestGlobalScopeHazardPtrChain : public ::testing::Test {
