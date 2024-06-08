@@ -615,8 +615,7 @@ TEST_F( TestHazardPtrGroup, CallSearchWithDelMarkAt2nd3rd )
 	EXPECT_TRUE( ret_is_del_marked );
 }
 
-#if 1
-TEST_F( TestHazardPtrGroup, HighLoadValidChain )
+TEST_F( TestHazardPtrGroup, HighLoadValidChainWithWriterOnly )
 {
 	// Arrange
 	constexpr int                                 array_size = 10;
@@ -682,6 +681,109 @@ TEST_F( TestHazardPtrGroup, HighLoadValidChain )
 	for ( int i = 0; i < th_num; i++ ) {
 		if ( test_load_th_obj[i].joinable() ) {
 			test_load_th_obj[i].join();
+		}
+	}
+
+	// Assert
+	EXPECT_EQ( sut.load(), 0 );
+}
+
+#if 1
+TEST_F( TestHazardPtrGroup, HighLoadValidChainWithReaderAndWriter )
+{
+	// Arrange
+	constexpr int array_size = 10;
+	constexpr int th_num     = 4;
+	constexpr int loop_num   = 100000;
+
+	std::atomic<std::uintptr_t>                   sut( 0 );
+	alpha::concurrent::internal::hazard_ptr_group hpg[array_size * th_num];
+	std::thread                                   test_load_th_writer_obj[th_num];
+	std::thread                                   test_load_th_reader_obj[th_num];
+	pthread_barrier_t                             barrier2;
+	pthread_barrier_init( &barrier2, NULL, ( th_num * 2 ) + 1 );
+
+	struct load_writer_object {
+		void operator()(
+			int                                                  loop_num,
+			pthread_barrier_t* const                             p_barrier,
+			std::atomic<std::uintptr_t>* const                   p_addr_top,
+			alpha::concurrent::internal::hazard_ptr_group* const p_begin,
+			alpha::concurrent::internal::hazard_ptr_group* const p_end )
+		{
+			pthread_barrier_wait( p_barrier );
+			for ( int i = 0; i < loop_num; i++ ) {
+				int                                            j = 0;
+				alpha::concurrent::internal::hazard_ptr_group* p_cur;
+				for ( p_cur = p_begin; p_cur != p_end; p_cur++ ) {
+					alpha::concurrent::internal::hazard_ptr_group::push_front_hazard_ptr_group_to_valid_chain( p_cur, p_addr_top );
+					if ( alpha::concurrent::internal::is_del_marked( p_cur->get_valid_chain_next_reader_accesser().load_address() ) ) {
+						std::cout << std::string( "should not be del marked1" ) << std::endl;
+						throw std::logic_error( "should not be del marked" );
+					}
+				}
+				j = 0;
+				for ( p_cur = p_begin; p_cur != p_end; p_cur++ ) {
+					std::uintptr_t tmp_addr1 = p_cur->get_valid_chain_next_reader_accesser().load_address();
+					if ( alpha::concurrent::internal::is_del_marked( tmp_addr1 ) ) {
+						std::cout << std::string( "should not be del marked2" ) << std::endl;
+						throw std::logic_error( "should not be del marked" );
+					}
+					alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( p_cur, p_addr_top );
+					std::uintptr_t tmp_addr2 = p_cur->get_valid_chain_next_reader_accesser().load_address();
+					if ( !alpha::concurrent::internal::is_del_marked( tmp_addr2 ) ) {
+						std::cout << std::string( "should be del marked  " ) + std::to_string( j ) + std::string( "  " ) +
+										 std::to_string( tmp_addr1 ) + std::string( "  " ) + std::to_string( tmp_addr2 )
+								  << std::endl;
+						throw std::logic_error( std::string( "should be del marked  " ) + std::to_string( tmp_addr1 ) + std::string( "  " ) + std::to_string( tmp_addr2 ) );
+					}
+					j++;
+				}
+				if ( alpha::concurrent::internal::is_del_marked( p_addr_top->load( std::memory_order_acquire ) ) ) {
+					throw std::logic_error( "p_addr_top should not have del marked" );
+				}
+			}
+		}
+	};
+	struct load_reader_object {
+		void operator()(
+			int                                                  loop_num,
+			pthread_barrier_t* const                             p_barrier,
+			std::atomic<std::uintptr_t>* const                   p_addr_top,
+			alpha::concurrent::internal::hazard_ptr_group* const p_begin,
+			alpha::concurrent::internal::hazard_ptr_group* const p_end )
+		{
+			int loop_num2 = loop_num * 2;
+
+			pthread_barrier_wait( p_barrier );
+			for ( int i = 0; i < loop_num2; i++ ) {
+				int                                            j = 0;
+				alpha::concurrent::internal::hazard_ptr_group* p_cur;
+				for ( p_cur = p_begin; p_cur != p_end; p_cur++ ) {
+					alpha::concurrent::internal::hazard_ptr_group::is_hazard_ptr_group_in_valid_chain( p_cur, p_addr_top );
+					j++;
+				}
+			}
+		}
+	};
+
+	for ( int i = 0; i < th_num; i++ ) {
+		test_load_th_writer_obj[i] = std::thread( load_writer_object {}, loop_num, &barrier2, &sut, &( hpg[i * array_size] ), &( hpg[( i + 1 ) * array_size] ) );
+	}
+	for ( int i = 0; i < th_num; i++ ) {
+		test_load_th_reader_obj[i] = std::thread( load_reader_object {}, loop_num, &barrier2, &sut, &( hpg[i * array_size] ), &( hpg[( i + 1 ) * array_size] ) );
+	}
+
+	// Act
+	pthread_barrier_wait( &barrier2 );
+	for ( int i = 0; i < th_num; i++ ) {
+		if ( test_load_th_writer_obj[i].joinable() ) {
+			test_load_th_writer_obj[i].join();
+		}
+	}
+	for ( int i = 0; i < th_num; i++ ) {
+		if ( test_load_th_reader_obj[i].joinable() ) {
+			test_load_th_reader_obj[i].join();
 		}
 	}
 
