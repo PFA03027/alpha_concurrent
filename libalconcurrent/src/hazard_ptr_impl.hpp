@@ -349,7 +349,7 @@ private:
 class alignas( atomic_variable_align ) hazard_ptr_group {
 public:
 	static constexpr size_t kArraySize = 8;
-	using hzrd_p_array_t               = std::array<std::atomic<void*>, kArraySize>;
+	using hzrd_p_array_t               = std::array<std::atomic<void*>, kArraySize>;   // std::atomic<void*>をクラスでラップしてアライメントを調整した場合でも、処理負荷は変わらなかった。
 	using reference                    = hzrd_p_array_t::reference;
 	using const_reference              = hzrd_p_array_t::const_reference;
 	using iterator                     = hzrd_p_array_t::iterator;
