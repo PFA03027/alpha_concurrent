@@ -376,32 +376,36 @@ public:
 
 	template <bool IsDefaultConstructible = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructible>::type* = nullptr>
 	od_node( od_node* p_next_arg ) noexcept( std::is_nothrow_default_constructible<value_type>::value )
-	  : od_node_base<od_node>( p_next_arg )
+	  : od_node_base<od_node>()
 	  , v_ {}
 	{
+		od_node_base<od_node<T>>::hph_next_.store( p_next_arg );
 	}
 
 	template <bool IsCopyable = std::is_copy_constructible<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
 	od_node( od_node* p_next_arg, const value_type& v_arg ) noexcept( std::is_nothrow_copy_constructible<value_type>::value )
-	  : od_node_base<od_node>( p_next_arg )
+	  : od_node_base<od_node>()
 	  , v_( v_arg )
 	{
+		od_node_base<od_node<T>>::hph_next_.store( p_next_arg );
 	}
 
 	template <bool IsMovable = std::is_move_constructible<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
 	od_node( od_node* p_next_arg, value_type&& v_arg ) noexcept( std::is_nothrow_move_constructible<value_type>::value )
-	  : od_node_base<od_node>( p_next_arg )
+	  : od_node_base<od_node>()
 	  , v_( std::move( v_arg ) )
 	{
+		od_node_base<od_node<T>>::hph_next_.store( p_next_arg );
 	}
 
 	template <typename Arg1st, typename... RemainingArgs,
 	          typename RemoveCVArg1st                                                          = typename std::remove_reference<typename std::remove_const<Arg1st>::type>::type,
 	          typename std::enable_if<!std::is_same<RemoveCVArg1st, value_type>::value>::type* = nullptr>
 	od_node( od_node* p_next_arg, Arg1st&& arg1, RemainingArgs&&... args )
-	  : od_node_base<od_node>( p_next_arg )
+	  : od_node_base<od_node>()
 	  , v_( std::forward<Arg1st>( arg1 ), std::forward<RemainingArgs>( args )... )
 	{
+		od_node_base<od_node<T>>::hph_next_.store( p_next_arg );
 	}
 
 	template <bool IsCopyable = std::is_copy_assignable<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
