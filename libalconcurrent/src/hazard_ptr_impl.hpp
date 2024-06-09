@@ -367,7 +367,7 @@ public:
 		void operator()( hazard_ptr_group* ptr ) const
 		{
 			if ( ptr == nullptr ) return;
-			ptr->is_used_.store( false, std::memory_order_release );
+			ptr->is_using_.store( false, std::memory_order_release );
 		}
 	};
 	using ownership_t = std::unique_ptr<hazard_ptr_group, ownership_releaser>;
@@ -376,7 +376,7 @@ public:
 	  : ap_chain_next_( nullptr )
 	  , ap_list_next_( nullptr )
 	  , delmarkable_valid_chain_next_( 1 )
-	  , is_used_( false )
+	  , is_using_( false )
 	  , hzrd_ptr_array_ {}                                // zero-initialization as nullptr
 	  , next_assign_hint_it_( hzrd_ptr_array_.begin() )   // C++17 and after, array::begin is constexpr
 	{
@@ -406,7 +406,7 @@ public:
 
 	bool is_used( void ) const noexcept
 	{
-		return is_used_.load( std::memory_order_acquire );
+		return is_using_.load( std::memory_order_acquire );
 	}
 
 	void force_clear( void ) noexcept;
@@ -503,7 +503,7 @@ private:
 	}
 
 	del_markable_pointer delmarkable_valid_chain_next_;
-	alignas( atomic_variable_align ) std::atomic<bool> is_used_;
+	alignas( atomic_variable_align ) std::atomic<bool> is_using_;
 	alignas( atomic_variable_align ) hzrd_p_array_t hzrd_ptr_array_;
 	alignas( atomic_variable_align ) iterator next_assign_hint_it_;
 };

@@ -119,7 +119,7 @@ hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 hazard_ptr_group::ownership_t hazard_ptr_group::try_ocupy( void )
 {
 	bool expected_b = false;
-	if ( is_used_.compare_exchange_strong( expected_b, true, std::memory_order_release, std::memory_order_relaxed ) ) {
+	if ( is_using_.compare_exchange_strong( expected_b, true, std::memory_order_release, std::memory_order_relaxed ) ) {
 		return ownership_t( this );
 	}
 
