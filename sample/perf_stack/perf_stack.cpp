@@ -23,7 +23,6 @@
 
 #include "alconcurrent/lf_stack.hpp"
 
-#include "perf_stack_1toN.hpp"
 #include "perf_stack_NtoN.hpp"
 #include "perf_stack_comparison.hpp"
 
@@ -42,7 +41,6 @@ int main( void )
 	}
 
 	nwoker_perf_test_stack_NtoN_main( nworker );
-	nwoker_perf_test_stack_1toN_main( nworker );
 
 	return EXIT_SUCCESS;
 }

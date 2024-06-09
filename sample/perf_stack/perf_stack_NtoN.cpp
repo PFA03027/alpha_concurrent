@@ -33,15 +33,19 @@ using TestType = std::size_t;
 template <size_t SUT_N>
 int nwoker_perf_test_stack_NtoN_sub( unsigned int nworker )
 {
-	std::cout << "--- x_stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 1 );
-
 	std::cout << "--- alpha::concurrent::stack_list<> " << std::to_string( SUT_N ) << " ---" << std::endl;
 	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( nworker * 2 );
 	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( nworker );
 	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( nworker / 2 );
 	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( 4 );
 	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( 1 );
+
+	std::cout << "--- x_stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( nworker * 2 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( nworker );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( nworker / 2 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 4 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 1 );
 
 	std::cout << "--- vec_mutex_stack " << std::to_string( SUT_N ) << " ---" << std::endl;
 	nwoker_perf_test_stack_NtoN<vec_mutex_stack<TestType>, SUT_N>( nworker * 2 );
@@ -57,13 +61,6 @@ int nwoker_perf_test_stack_NtoN_sub( unsigned int nworker )
 	nwoker_perf_test_stack_NtoN<list_mutex_stack<TestType>, SUT_N>( 4 );
 	nwoker_perf_test_stack_NtoN<list_mutex_stack<TestType>, SUT_N>( 1 );
 
-	std::cout << "--- x_stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( nworker * 2 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( nworker );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( nworker / 2 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 4 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 1 );
-
 	return 0;
 }
 
@@ -71,6 +68,7 @@ int nwoker_perf_test_stack_NtoN_main( unsigned int nworker )
 {
 	nwoker_perf_test_stack_NtoN_sub<100>( nworker );
 	nwoker_perf_test_stack_NtoN_sub<10>( nworker );
+	nwoker_perf_test_stack_NtoN_sub<1>( nworker );
 
 	return 0;
 }
