@@ -467,37 +467,43 @@ public:
 	using node_pointer         = od_node<T>*;
 	using hazard_ptr_handler_t = typename od_node<T>::hazard_ptr_handler_t;
 
-	void pre_allocate( size_t reserve_size ) noexcept
+	// set minimum capacity
+	void reserve_minimum( size_t reserve_size ) noexcept
 	{
+		if ( x_free_od_node_storage<T>::g_fn_list_capacity_.load( std::memory_order_acquire ) >= reserve_size ) {
+			return;
+		}
 		if ( reserve_size < 2 ) {
 			reserve_size = 2;
 		}
 
 		{
 			node_pointer p_pre_head = nullptr;
+			size_t       i          = 0;
 			try {
-				for ( size_t i = 0; i < reserve_size / 2; i++ ) {
-					node_pointer p_new_head = new node_type { hazard_ptr_handler_t { p_pre_head }, value_type {} };
+				for ( i = 0; i < reserve_size / 2; i++ ) {
+					node_pointer p_new_head = new node_type { p_pre_head, value_type {} };
 					p_pre_head              = p_new_head;
 				}
 			} catch ( ... ) {
-				LogOutput( log_type::ERR, "pre_allocate finished partly" );
+				LogOutput( log_type::ERR, "reserve_minimum finished partly" );
 			}
 			x_free_od_node_storage<T>::g_fn_list_.lock().ref().merge_push_front( p_pre_head );
 			x_free_od_node_storage<T>::g_fn_list_help_flag_.store( false );
+			x_free_od_node_storage<T>::g_fn_list_capacity_.fetch_add( i );
 		}
 		{
-			node_pointer p_pre_head = nullptr;
+			size_t i = 0;
 			try {
-				for ( size_t i = 0; i < reserve_size / 2; i++ ) {
-					node_pointer p_new_head = new node_type { hazard_ptr_handler_t { p_pre_head }, value_type {} };
-					p_pre_head              = p_new_head;
+				for ( i = 0; i < reserve_size / 2; i++ ) {
+					node_pointer p_new_head = new node_type { nullptr, value_type {} };
+					x_free_od_node_storage<T>::g_fn_list_lockfree_.push_front( p_new_head );
 				}
 			} catch ( ... ) {
-				LogOutput( log_type::ERR, "pre_allocate finished partly" );
+				LogOutput( log_type::ERR, "reserve_minimum finished partly" );
 			}
-			x_free_od_node_storage<T>::g_fn_list_lockfree_.merge_push_front( p_pre_head );
 			x_free_od_node_storage<T>::g_fn_list_lockfree_help_flag_.store( false );
+			x_free_od_node_storage<T>::g_fn_list_capacity_.fetch_add( i );
 		}
 	}
 
@@ -518,6 +524,7 @@ public:
 		}
 
 		// ノードをリサイクルできなかったので、ノードをアロケートする
+		x_free_od_node_storage<T>::g_fn_list_capacity_.fetch_add( 1 );
 		return new node_type { p_next_node_arg, init_v_arg };
 	}
 
@@ -532,6 +539,7 @@ public:
 		}
 
 		// ノードをリサイクルできなかったので、ノードをアロケートする
+		x_free_od_node_storage<T>::g_fn_list_capacity_.fetch_add( 1 );
 		return new node_type { p_next_node_arg, std::move( init_v_arg ) };
 	}
 
@@ -544,7 +552,7 @@ private:
 	 */
 	node_pointer allocate_from_recycle_storage() noexcept
 	{
-		// ローカルストレージからノードをリサイクルする。
+		// スレッドローカルストレージからノードをリサイクルする。
 		node_pointer p_ans = x_free_od_node_storage<T>::tl_fn_list_.node_list_.pop_front();
 		if ( p_ans != nullptr ) {
 			return p_ans;
@@ -603,6 +611,7 @@ private:
 	static std::atomic<bool>                      g_fn_list_lockfree_help_flag_;
 	static od_node_list_lockable<T>               g_fn_list_;
 	static std::atomic<bool>                      g_fn_list_help_flag_;
+	static std::atomic<size_t>                    g_fn_list_capacity_;   // number of allocated nodes
 	static thread_local thread_local_od_node_list tl_fn_list_;
 
 	class recycler {
@@ -688,6 +697,9 @@ ALCC_INTERNAL_CONSTINIT od_node_list_lockable<T> x_free_od_node_storage<T>::g_fn
 
 template <typename T>
 ALCC_INTERNAL_CONSTINIT std::atomic<bool> x_free_od_node_storage<T>::g_fn_list_help_flag_( false );
+
+template <typename T>
+ALCC_INTERNAL_CONSTINIT std::atomic<size_t> x_free_od_node_storage<T>::g_fn_list_capacity_( 0 );
 
 template <typename T>
 thread_local ALCC_INTERNAL_CONSTINIT typename x_free_od_node_storage<T>::thread_local_od_node_list x_free_od_node_storage<T>::tl_fn_list_( x_free_od_node_storage<T>::g_fn_list_ );
