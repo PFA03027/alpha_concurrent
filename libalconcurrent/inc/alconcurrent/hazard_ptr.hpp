@@ -723,6 +723,8 @@ public:
 #endif
 			if ( p_expect != nullptr ) {
 				hso->store( p_expect, std::memory_order_release );
+			} else {
+				hso->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
 			}
 		}
 

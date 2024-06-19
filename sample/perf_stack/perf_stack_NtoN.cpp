@@ -66,9 +66,12 @@ int nwoker_perf_test_stack_NtoN_sub( unsigned int nworker )
 
 int nwoker_perf_test_stack_NtoN_main( unsigned int nworker )
 {
-	nwoker_perf_test_stack_NtoN_sub<100>( nworker );
-	nwoker_perf_test_stack_NtoN_sub<10>( nworker );
 	nwoker_perf_test_stack_NtoN_sub<1>( nworker );
+	std::cout << "*** number of od_node: " << std::to_string( alpha::concurrent::internal::x_free_od_node_storage<TestType>::allocated_size() ) << " ***" << std::endl;
+	nwoker_perf_test_stack_NtoN_sub<10>( nworker );
+	std::cout << "*** number of od_node: " << std::to_string( alpha::concurrent::internal::x_free_od_node_storage<TestType>::allocated_size() ) << " ***" << std::endl;
+	nwoker_perf_test_stack_NtoN_sub<100>( nworker );
+	std::cout << "*** number of od_node: " << std::to_string( alpha::concurrent::internal::x_free_od_node_storage<TestType>::allocated_size() ) << " ***" << std::endl;
 
 	return 0;
 }

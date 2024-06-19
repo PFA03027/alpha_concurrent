@@ -543,6 +543,11 @@ public:
 		return new node_type { p_next_node_arg, std::move( init_v_arg ) };
 	}
 
+	static size_t allocated_size( void )
+	{
+		return x_free_od_node_storage<T>::g_fn_list_capacity_.load( std::memory_order_acquire );
+	}
+
 private:
 	/**
 	 * @brief リサイクル用のストレージからノードのリサイクルを試みる
