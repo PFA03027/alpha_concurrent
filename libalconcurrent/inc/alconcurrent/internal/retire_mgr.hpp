@@ -84,12 +84,16 @@ public:
 	template <typename T, typename Deleter = std::default_delete<T>>
 	static void retire( T* p_retire_obj, Deleter&& deleter_arg = std::default_delete<T> {} )
 	{
+#ifdef ALCONCURRENT_CONF_ENABLE_ALL_NODE_RECYCLE_BY_PRUNE_THREAD
+		retire_always_store( p_retire_obj, std::forward<Deleter>( deleter_arg ) );
+#else
 		if ( internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( p_retire_obj ) ) {
 			retire_node_abst* p_new_retire = new retire_node<T, Deleter>( p_retire_obj, std::forward<Deleter>( deleter_arg ) );
 			retire_impl( p_new_retire );
 		} else {
 			deleter_arg( p_retire_obj );
 		}
+#endif
 	}
 
 	template <typename T, typename Deleter = std::default_delete<T>>
