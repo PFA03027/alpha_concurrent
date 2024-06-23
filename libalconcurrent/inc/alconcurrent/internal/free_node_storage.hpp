@@ -613,13 +613,6 @@ private:
 		od_node_list_lockable<T>& center_list_;
 	};
 
-	static od_node_list_lockfree<T>               g_fn_list_lockfree_;
-	static std::atomic<bool>                      g_fn_list_lockfree_help_flag_;
-	static od_node_list_lockable<T>               g_fn_list_;
-	static std::atomic<bool>                      g_fn_list_help_flag_;
-	static std::atomic<size_t>                    g_fn_list_capacity_;   // number of allocated nodes
-	static thread_local thread_local_od_node_list tl_fn_list_;
-
 	class recycler {
 	public:
 		constexpr recycler( void ) noexcept
@@ -690,6 +683,13 @@ private:
 	private:
 		thread_local_od_node_list* p_recycle_tl_target_;
 	};
+
+	static od_node_list_lockfree<T>               g_fn_list_lockfree_;
+	static std::atomic<bool>                      g_fn_list_lockfree_help_flag_;
+	static od_node_list_lockable<T>               g_fn_list_;
+	static std::atomic<bool>                      g_fn_list_help_flag_;
+	static std::atomic<size_t>                    g_fn_list_capacity_;   // number of allocated nodes
+	static thread_local thread_local_od_node_list tl_fn_list_;
 };
 
 template <typename T>

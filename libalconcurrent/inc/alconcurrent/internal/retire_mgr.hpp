@@ -53,7 +53,7 @@ struct retire_node : public retire_node_abst {
 	static_assert( std::is_nothrow_default_constructible<Deleter>::value &&
 	                   std::is_nothrow_copy_constructible<Deleter>::value &&
 	                   std::is_nothrow_move_constructible<Deleter>::value,
-	               "Deleter should be nothrow of constructors" );
+	               "Deleter should have nothrow of constructors" );
 
 	Deleter deleter_;
 
