@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <array>
+#include <latch>
 #include <random>
 #include <thread>
 #include <tuple>
@@ -67,7 +68,7 @@ std::tuple<std::size_t, typename FIFOType::value_type> worker_task_stack_NtoN(
 }
 
 template <typename FIFOType, size_t N>
-int nwoker_perf_test_stack_NtoN( unsigned int nworker )
+int nwoker_perf_test_stack_NtoN( unsigned int nworker, unsigned int exec_sec )
 {
 	std::array<FIFOType, N> sut;
 
@@ -75,7 +76,7 @@ int nwoker_perf_test_stack_NtoN( unsigned int nworker )
 
 	std::latch       start_sync_latch( nworker + 1 );
 	std::atomic_bool loop_flag( true );
-	using result_type = decltype( worker_task_stack_NtoN<FIFOType>( start_sync_latch, loop_flag, sut ) );
+	using result_type = decltype( worker_task_stack_NtoN<FIFOType, N>( start_sync_latch, loop_flag, sut ) );
 
 	std::vector<std::future<result_type>> rets;
 	rets.reserve( nworker );
@@ -90,7 +91,7 @@ int nwoker_perf_test_stack_NtoN( unsigned int nworker )
 	}
 
 	start_sync_latch.arrive_and_wait();
-	sleep( 1 );
+	sleep( exec_sec );
 	loop_flag.store( false, std::memory_order_release );
 
 	for ( auto& t : task_threads ) {

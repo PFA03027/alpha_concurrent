@@ -510,6 +510,7 @@ public:
 	bool recycle( node_pointer p_retire_node )
 	{
 		internal::retire_mgr::retire( p_retire_node, recycler( &( x_free_od_node_storage<T>::tl_fn_list_ ) ) );
+		// internal::retire_mgr::retire_always_store( p_retire_node, recycler( &( x_free_od_node_storage<T>::tl_fn_list_ ) ) );
 
 		return false;
 	}

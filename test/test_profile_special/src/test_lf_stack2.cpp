@@ -24,6 +24,8 @@
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 #include "alconcurrent/lf_stack.hpp"
 
+#include "../../../sample/perf_stack/perf_stack_NtoN.hpp"
+
 ///////////////////////////////////////////////////////////////////////////////
 class TestLFSTACK_2_HighLoad : public ::testing::Test {
 protected:
@@ -79,6 +81,7 @@ long func_test_stack_list( alpha::concurrent::x_stack_list<long>* p_test_obj )
 	return v;
 }
 
+#if 1
 TEST_F( TestLFSTACK_2_HighLoad, TC_Profile )
 {
 	// Arrange
@@ -109,3 +112,19 @@ TEST_F( TestLFSTACK_2_HighLoad, TC_Profile )
 	// に等しくなるはず。
 	EXPECT_EQ( num_thread * loop_num, sum );
 }
+#else
+TEST_F( TestLFSTACK_2_HighLoad, TC_Profile2 )
+{
+	using TestType = std::size_t;
+	// using TestType = int;
+
+	constexpr size_t SUT_N = 10;
+
+	std::cout << "--- x_stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	// nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 20 * 2, 10 );
+	// nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 20, 10 );
+	// nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 20 / 2, 10 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 4, 10 );
+	// nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 1, 10 );
+}
+#endif

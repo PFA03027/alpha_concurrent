@@ -15,7 +15,6 @@
 #include <atomic>
 #include <future>
 #include <iostream>
-#include <latch>
 #include <list>
 #include <mutex>
 #include <new>
@@ -34,32 +33,32 @@ template <size_t SUT_N>
 int nwoker_perf_test_stack_NtoN_sub( unsigned int nworker )
 {
 	std::cout << "--- alpha::concurrent::stack_list<> " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( nworker * 2 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( nworker );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( nworker / 2 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( 4 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( 1 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( nworker * 2, 1 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( nworker, 1 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( nworker / 2, 1 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( 4, 1 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( 1, 1 );
 
 	std::cout << "--- x_stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( nworker * 2 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( nworker );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( nworker / 2 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 4 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 1 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( nworker * 2, 1 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( nworker, 1 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( nworker / 2, 1 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 4, 1 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 1, 1 );
 
 	std::cout << "--- vec_mutex_stack " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_stack_NtoN<vec_mutex_stack<TestType>, SUT_N>( nworker * 2 );
-	nwoker_perf_test_stack_NtoN<vec_mutex_stack<TestType>, SUT_N>( nworker );
-	nwoker_perf_test_stack_NtoN<vec_mutex_stack<TestType>, SUT_N>( nworker / 2 );
-	nwoker_perf_test_stack_NtoN<vec_mutex_stack<TestType>, SUT_N>( 4 );
-	nwoker_perf_test_stack_NtoN<vec_mutex_stack<TestType>, SUT_N>( 1 );
+	nwoker_perf_test_stack_NtoN<vec_mutex_stack<TestType>, SUT_N>( nworker * 2, 1 );
+	nwoker_perf_test_stack_NtoN<vec_mutex_stack<TestType>, SUT_N>( nworker, 1 );
+	nwoker_perf_test_stack_NtoN<vec_mutex_stack<TestType>, SUT_N>( nworker / 2, 1 );
+	nwoker_perf_test_stack_NtoN<vec_mutex_stack<TestType>, SUT_N>( 4, 1 );
+	nwoker_perf_test_stack_NtoN<vec_mutex_stack<TestType>, SUT_N>( 1, 1 );
 
 	std::cout << "--- list_mutex_stack " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_stack_NtoN<list_mutex_stack<TestType>, SUT_N>( nworker * 2 );
-	nwoker_perf_test_stack_NtoN<list_mutex_stack<TestType>, SUT_N>( nworker );
-	nwoker_perf_test_stack_NtoN<list_mutex_stack<TestType>, SUT_N>( nworker / 2 );
-	nwoker_perf_test_stack_NtoN<list_mutex_stack<TestType>, SUT_N>( 4 );
-	nwoker_perf_test_stack_NtoN<list_mutex_stack<TestType>, SUT_N>( 1 );
+	nwoker_perf_test_stack_NtoN<list_mutex_stack<TestType>, SUT_N>( nworker * 2, 1 );
+	nwoker_perf_test_stack_NtoN<list_mutex_stack<TestType>, SUT_N>( nworker, 1 );
+	nwoker_perf_test_stack_NtoN<list_mutex_stack<TestType>, SUT_N>( nworker / 2, 1 );
+	nwoker_perf_test_stack_NtoN<list_mutex_stack<TestType>, SUT_N>( 4, 1 );
+	nwoker_perf_test_stack_NtoN<list_mutex_stack<TestType>, SUT_N>( 1, 1 );
 
 	return 0;
 }

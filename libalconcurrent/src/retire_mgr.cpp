@@ -223,6 +223,7 @@ void retire_mgr::prune_thread( void )
 {
 	loop_flag_prune_thread_.store( true, std::memory_order_release );
 	while ( loop_flag_prune_thread_.load( std::memory_order_acquire ) ) {
+		// std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 		prune_one_work();
 	}
 }
