@@ -99,7 +99,9 @@ public:
 
 	static retire_node_list pop_all( void )
 	{
-		return retire_node_list( std::move( g_rnd_list_.lock().ref() ) );
+		retire_node_list ans = std::move( tl_rnd_list_ );
+		ans.merge_push_back( std::move( g_rnd_list_.lock().ref() ) );
+		return ans;
 	}
 
 	static retire_node_list try_pop_all( void )
@@ -141,8 +143,8 @@ private:
 	static thread_local tl_retire_node_list tl_rnd_list_;
 };
 
-ALCC_INTERNAL_CONSTINIT unorder_retire_node_buffer::g_retire_node_list               unorder_retire_node_buffer::g_rnd_list_;
-ALCC_INTERNAL_CONSTINIT thread_local unorder_retire_node_buffer::tl_retire_node_list unorder_retire_node_buffer::tl_rnd_list_( unorder_retire_node_buffer::g_rnd_list_ );
+unorder_retire_node_buffer::g_retire_node_list               unorder_retire_node_buffer::g_rnd_list_;
+thread_local unorder_retire_node_buffer::tl_retire_node_list unorder_retire_node_buffer::tl_rnd_list_( unorder_retire_node_buffer::g_rnd_list_ );
 
 ///////////////////////////////////////////////////////////////////////////////////////
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
@@ -223,7 +225,9 @@ void retire_mgr::prune_thread( void )
 {
 	loop_flag_prune_thread_.store( true, std::memory_order_release );
 	while ( loop_flag_prune_thread_.load( std::memory_order_acquire ) ) {
-		// std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_PRUNE_THREAD_SLEEP_SEC
+		std::this_thread::sleep_for( std::chrono::seconds( ALCONCURRENT_CONF_ENABLE_PRUNE_THREAD_SLEEP_SEC ) );
+#endif
 		prune_one_work();
 	}
 }
