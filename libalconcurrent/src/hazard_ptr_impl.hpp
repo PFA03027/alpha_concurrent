@@ -535,8 +535,6 @@ private:
 	hazard_ptr_group::ownership_t ownership_ticket_;
 };
 
-extern thread_local bind_hazard_ptr_list tl_bhpl;
-
 /////////////////////////////////////////////////////////////////
 class alignas( atomic_variable_align ) global_scope_hazard_ptr_chain {
 public:

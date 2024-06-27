@@ -457,7 +457,7 @@ template <typename T>
 using od_node_list_lockable = od_node_list_lockable_base<od_node_list<T>>;
 
 template <typename T>
-using od_node_list_lockfree = od_node_list_lockfree_base<od_node<T>>;
+using od_node_list_lockfree = od_node_stack_lockfree_base<od_node<T>>;
 
 template <typename T>
 class x_free_od_node_storage {

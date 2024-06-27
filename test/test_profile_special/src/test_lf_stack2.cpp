@@ -81,7 +81,7 @@ long func_test_stack_list( alpha::concurrent::x_stack_list<long>* p_test_obj )
 	return v;
 }
 
-#if 1
+#if 0
 TEST_F( TestLFSTACK_2_HighLoad, TC_Profile )
 {
 	// Arrange

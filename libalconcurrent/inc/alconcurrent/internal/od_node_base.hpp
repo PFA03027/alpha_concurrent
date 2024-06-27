@@ -645,22 +645,22 @@ protected:
  * @tparam T value type kept in od_node class
  */
 template <typename NODE_T>
-class alignas( atomic_variable_align ) od_node_list_lockfree_base {
+class alignas( atomic_variable_align ) od_node_stack_lockfree_base {
 	static_assert( std::is_base_of<od_node_base<NODE_T>, NODE_T>::value, "NODE_T should be derived from od_node_base<>" );
 
 public:
 	using node_type    = NODE_T;
 	using node_pointer = NODE_T*;
 
-	constexpr od_node_list_lockfree_base( void ) noexcept           = default;
-	od_node_list_lockfree_base( const od_node_list_lockfree_base& ) = delete;
-	constexpr od_node_list_lockfree_base( od_node_list_lockfree_base&& src ) noexcept
+	constexpr od_node_stack_lockfree_base( void ) noexcept            = default;
+	od_node_stack_lockfree_base( const od_node_stack_lockfree_base& ) = delete;
+	constexpr od_node_stack_lockfree_base( od_node_stack_lockfree_base&& src ) noexcept
 	  : hph_head_( std::move( src.hph_head_ ) )
 	{
 	}
-	od_node_list_lockfree_base& operator=( const od_node_list_lockfree_base& ) = delete;
-	od_node_list_lockfree_base& operator=( od_node_list_lockfree_base&& src )  = delete;
-	~od_node_list_lockfree_base()
+	od_node_stack_lockfree_base& operator=( const od_node_stack_lockfree_base& ) = delete;
+	od_node_stack_lockfree_base& operator=( od_node_stack_lockfree_base&& src )  = delete;
+	~od_node_stack_lockfree_base()
 	{
 		node_pointer p_cur = hph_head_.load();
 		hph_head_.store( nullptr );

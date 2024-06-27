@@ -684,7 +684,7 @@ TEST( od_node_list_base_class, CanSplitWithEvenTrue3 )
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
-class test_od_node_list_lockfree_base : public alpha::concurrent::internal::od_node_list_lockfree_base<test_od_node_base> {
+class test_od_node_list_lockfree_base : public alpha::concurrent::internal::od_node_stack_lockfree_base<test_od_node_base> {
 };
 
 TEST( od_node_list_lockfree_base_class, CanDefaultConstruct )
