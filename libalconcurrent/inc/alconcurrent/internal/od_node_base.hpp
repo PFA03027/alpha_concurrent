@@ -39,6 +39,29 @@ public:
 	{
 	}
 
+	class raw_next_rw {
+	public:
+		static inline node_pointer read( const node_pointer onb )
+		{
+			return onb->p_raw_next_;
+		}
+		static inline void write( node_pointer onb, node_pointer p )
+		{
+			onb->p_raw_next_ = p;
+		}
+	};
+	class hph_next_rw {
+	public:
+		static inline node_pointer read( const node_pointer onb )
+		{
+			return onb->hph_next_.load();
+		}
+		static inline void write( node_pointer onb, node_pointer p )
+		{
+			onb->hph_next_.store( p );
+		}
+	};
+
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else
 #if 0   // too slow... if enabled, prune thread termination has failed...
@@ -188,41 +211,46 @@ public:
 };
 
 /**
- * @brief list that has od_node<T> pointer has header pointer
+ * @brief list implementation class that has od_node<T> pointer has header pointer
  *
  * @warning this class is not thread safe
  *
- * @tparam T value type kept in od_node class
+ * @tparam NODE_T this type should be the derived class from od_node_base<NODE_T>
+ * @tparam NEXT_RW_T this type should be od_node_base<NODE_T>::raw_next_rw or od_node_base<NODE_T>::hph_next_rw
  */
-template <typename NODE_T>
-class alignas( atomic_variable_align ) od_node_list_base {
-	static_assert( std::is_base_of<od_node_base<NODE_T>, NODE_T>::value, "NODE_T should be derived from od_node_base<>" );
+template <typename NODE_T, typename NEXT_RW_T>
+class alignas( atomic_variable_align ) od_node_list_base_impl {
+	static_assert( std::is_base_of<od_node_base<NODE_T>, NODE_T>::value, "NODE_T should be derived from od_node_base<NODE_T>" );
+	static_assert( std::is_same<NEXT_RW_T, typename od_node_base<NODE_T>::raw_next_rw>::value ||
+	                   std::is_same<NEXT_RW_T, typename od_node_base<NODE_T>::hph_next_rw>::value,
+	               "NEXT_RW_T should be accesser class of od_node_base<NODE_T>" );
 
 public:
-	using node_type    = NODE_T;
-	using node_pointer = NODE_T*;
+	using node_type      = NODE_T;
+	using node_pointer   = NODE_T*;
+	using node_next_rw_t = NEXT_RW_T;
 
-	constexpr od_node_list_base( void ) noexcept  = default;
-	od_node_list_base( const od_node_list_base& ) = delete;
-	constexpr od_node_list_base( od_node_list_base&& src ) noexcept
+	constexpr od_node_list_base_impl( void ) noexcept       = default;
+	od_node_list_base_impl( const od_node_list_base_impl& ) = delete;
+	constexpr od_node_list_base_impl( od_node_list_base_impl&& src ) noexcept
 	  : p_head_( src.p_head_ )
 	  , p_tail_( src.p_tail_ )
 	{
 		src.p_head_ = nullptr;
 		src.p_tail_ = nullptr;
 	}
-	od_node_list_base&           operator=( const od_node_list_base& ) = delete;
-	constexpr od_node_list_base& operator=( od_node_list_base&& src ) noexcept
+	od_node_list_base_impl&           operator=( const od_node_list_base_impl& ) = delete;
+	constexpr od_node_list_base_impl& operator=( od_node_list_base_impl&& src ) noexcept
 	{
-		od_node_list_base( std::move( src ) ).swap( *this );
+		od_node_list_base_impl( std::move( src ) ).swap( *this );
 		return *this;
 	}
-	~od_node_list_base()
+	~od_node_list_base_impl()
 	{
 		clear();
 	}
 
-	void swap( od_node_list_base& src ) noexcept
+	void swap( od_node_list_base_impl& src ) noexcept
 	{
 		node_pointer p_tmp;
 
@@ -239,14 +267,14 @@ public:
 	{
 		if ( p_nd == nullptr ) return;
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
-		if ( p_nd->hph_next_.load() != nullptr ) {
+		if ( node_next_rw_t::read( p_nd ) != nullptr ) {
 			LogOutput( log_type::WARN, "od_node_list_base::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
 		}
 #endif
 		if ( p_head_ == nullptr ) {
 			p_tail_ = p_nd;
 		}
-		p_nd->hph_next_.store( p_head_ );
+		node_next_rw_t::write( p_nd, p_head_ );
 		p_head_ = p_nd;
 	}
 
@@ -254,21 +282,21 @@ public:
 	{
 		if ( p_nd == nullptr ) return;
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
-		if ( p_nd->hph_next_.load() != nullptr ) {
+		if ( node_next_rw_t::read( p_nd ) != nullptr ) {
 			LogOutput( log_type::WARN, "od_node_list_base::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
-			p_nd->hph_next_.store( nullptr );
+			node_next_rw_t::write( p_nd, nullptr );
 		}
 #endif
 		if ( p_head_ == nullptr ) {
 			p_head_ = p_nd;
 			p_tail_ = p_nd;
 		} else {
-			p_tail_->hph_next_.store( p_nd );
+			node_next_rw_t::write( p_tail_, p_nd );
 			p_tail_ = p_nd;
 		}
 	}
 
-	void merge_push_front( od_node_list_base&& src ) noexcept
+	void merge_push_front( od_node_list_base_impl&& src ) noexcept
 	{
 		if ( src.p_head_ == nullptr ) return;
 
@@ -285,16 +313,16 @@ public:
 		if ( p_nd == nullptr ) return;
 
 		node_pointer p_cur = p_nd;
-		node_pointer p_nxt = p_cur->hph_next_.load();
+		node_pointer p_nxt = node_next_rw_t::read( p_cur );
 		while ( p_nxt != nullptr ) {
 			p_cur = p_nxt;
-			p_nxt = p_cur->hph_next_.load();
+			p_nxt = node_next_rw_t::read( p_cur );
 		}
 
 		merge_push_front( p_nd, p_cur );
 	}
 
-	void merge_push_back( od_node_list_base&& src ) noexcept
+	void merge_push_back( od_node_list_base_impl&& src ) noexcept
 	{
 		if ( src.p_head_ == nullptr ) return;
 
@@ -311,10 +339,10 @@ public:
 		if ( p_nd == nullptr ) return;
 
 		node_pointer p_cur = p_nd;
-		node_pointer p_nxt = p_cur->hph_next_.load();
+		node_pointer p_nxt = node_next_rw_t::read( p_cur );
 		while ( p_nxt != nullptr ) {
 			p_cur = p_nxt;
-			p_nxt = p_cur->hph_next_.load();
+			p_nxt = node_next_rw_t::read( p_cur );
 		}
 
 		merge_push_back( p_nd, p_cur );
@@ -325,8 +353,8 @@ public:
 		node_pointer p_ans = p_head_;
 		if ( p_ans == nullptr ) return p_ans;
 
-		p_head_ = p_ans->hph_next_.load();
-		p_ans->hph_next_.store( nullptr );
+		p_head_ = node_next_rw_t::read( p_ans );
+		node_next_rw_t::write( p_ans, nullptr );
 
 		return p_ans;
 	}
@@ -339,14 +367,14 @@ public:
 	 * @return od_node_list_base purged nodes
 	 */
 	template <class Predicate>
-	od_node_list_base split_if( Predicate pred )
+	od_node_list_base_impl split_if( Predicate pred )
 	{
-		od_node_list_base ans;
+		od_node_list_base_impl ans;
 
 		node_pointer p_pre = nullptr;
 		node_pointer p_cur = p_head_;
 		while ( p_cur != nullptr ) {
-			node_pointer p_next = p_cur->hph_next_.load();
+			node_pointer p_next = node_next_rw_t::read( p_cur );
 			if ( pred( *( reinterpret_cast<const node_pointer>( p_cur ) ) ) ) {
 				if ( p_pre == nullptr ) {
 					p_head_ = p_next;
@@ -354,17 +382,17 @@ public:
 						p_tail_ = nullptr;
 					}
 
-					p_cur->hph_next_.store( nullptr );
+					node_next_rw_t::write( p_cur, nullptr );
 					ans.push_back( p_cur );
 
 					p_cur = p_head_;
 				} else {
-					p_pre->hph_next_.store( p_next );
+					node_next_rw_t::write( p_pre, p_next );
 					if ( p_next == nullptr ) {
 						p_tail_ = p_pre;
 					}
 
-					p_cur->hph_next_.store( nullptr );
+					node_next_rw_t::write( p_cur, nullptr );
 					ans.push_back( p_cur );
 
 					p_cur = p_next;
@@ -384,7 +412,7 @@ public:
 		p_head_            = nullptr;
 		p_tail_            = nullptr;
 		while ( p_cur != nullptr ) {
-			node_pointer p_nxt = p_cur->hph_next_.load();
+			node_pointer p_nxt = node_next_rw_t::read( p_cur );
 			delete p_cur;
 			p_cur = p_nxt;
 		}
@@ -402,7 +430,7 @@ private:
 			p_head_ = p_nd_head;
 			p_tail_ = p_nd_tail;
 		} else {
-			p_nd_tail->hph_next_.store( p_head_ );
+			node_next_rw_t::write( p_nd_tail, p_head_ );
 			p_head_ = p_nd_head;
 		}
 	}
@@ -413,7 +441,7 @@ private:
 			p_head_ = p_nd_head;
 			p_tail_ = p_nd_tail;
 		} else {
-			p_tail_->hph_next_.store( p_nd_head );
+			node_next_rw_t::write( p_tail_, p_nd_head );
 			p_tail_ = p_nd_tail;
 		}
 	}
@@ -423,239 +451,24 @@ private:
 };
 
 /**
- * @brief list that has od_node<T> pointer has header pointer
+ * @brief list that is linked by hph_next_
  *
  * @warning this class is not thread safe
  *
- * @tparam T value type kept in od_node class
+ * @tparam NODE_T this type should be the derived class from od_node_base<NODE_T>
  */
 template <typename NODE_T>
-class alignas( atomic_variable_align ) od_node_raw_list_base {
-	static_assert( std::is_base_of<od_node_base<NODE_T>, NODE_T>::value, "NODE_T should be derived from od_node_base<>" );
+using od_node_list_base = od_node_list_base_impl<NODE_T, typename NODE_T::hph_next_rw>;
 
-public:
-	using node_type    = NODE_T;
-	using node_pointer = NODE_T*;
-
-	constexpr od_node_raw_list_base( void ) noexcept      = default;
-	od_node_raw_list_base( const od_node_raw_list_base& ) = delete;
-	constexpr od_node_raw_list_base( od_node_raw_list_base&& src ) noexcept
-	  : p_head_( src.p_head_ )
-	  , p_tail_( src.p_tail_ )
-	{
-		src.p_head_ = nullptr;
-		src.p_tail_ = nullptr;
-	}
-	od_node_raw_list_base&           operator=( const od_node_raw_list_base& ) = delete;
-	constexpr od_node_raw_list_base& operator=( od_node_raw_list_base&& src ) noexcept
-	{
-		od_node_raw_list_base( std::move( src ) ).swap( *this );
-		return *this;
-	}
-	~od_node_raw_list_base()
-	{
-		clear();
-	}
-
-	void swap( od_node_raw_list_base& src ) noexcept
-	{
-		node_pointer p_tmp;
-
-		p_tmp       = p_head_;
-		p_head_     = src.p_head_;
-		src.p_head_ = p_tmp;
-
-		p_tmp       = p_tail_;
-		p_tail_     = src.p_tail_;
-		src.p_tail_ = p_tmp;
-	}
-
-	void push_front( node_pointer p_nd ) noexcept
-	{
-		if ( p_nd == nullptr ) return;
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
-		if ( p_nd->p_raw_next_ != nullptr ) {
-			LogOutput( log_type::WARN, "od_node_raw_list_base::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
-		}
-#endif
-		if ( p_head_ == nullptr ) {
-			p_tail_ = p_nd;
-		}
-		p_nd->p_raw_next_ = p_head_;
-		p_head_         = p_nd;
-	}
-
-	void push_back( node_pointer p_nd ) noexcept
-	{
-		if ( p_nd == nullptr ) return;
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
-		if ( p_nd->p_raw_next_ != nullptr ) {
-			LogOutput( log_type::WARN, "od_node_list_base::push_back() receives a od_node<T> that has non nullptr in hph_next_" );
-			p_nd->p_raw_next_ = nullptr;
-		}
-#endif
-		if ( p_head_ == nullptr ) {
-			p_head_ = p_nd;
-			p_tail_ = p_nd;
-		} else {
-			p_tail_->p_raw_next_ = p_nd;
-			p_tail_            = p_nd;
-		}
-	}
-
-	void merge_push_front( od_node_raw_list_base&& src ) noexcept
-	{
-		if ( src.p_head_ == nullptr ) return;
-
-		node_pointer p_src_head = src.p_head_;
-		node_pointer p_src_tail = src.p_tail_;
-		src.p_head_             = nullptr;
-		src.p_tail_             = nullptr;
-
-		merge_push_front( p_src_head, p_src_tail );
-	}
-
-	void merge_push_front( node_pointer p_nd ) noexcept
-	{
-		if ( p_nd == nullptr ) return;
-
-		node_pointer p_cur = p_nd;
-		node_pointer p_nxt = p_cur->p_raw_next_;
-		while ( p_nxt != nullptr ) {
-			p_cur = p_nxt;
-			p_nxt = p_cur->p_raw_next_;
-		}
-
-		merge_push_front( p_nd, p_cur );
-	}
-
-	void merge_push_back( od_node_raw_list_base&& src ) noexcept
-	{
-		if ( src.p_head_ == nullptr ) return;
-
-		node_pointer p_src_head = src.p_head_;
-		node_pointer p_src_tail = src.p_tail_;
-		src.p_head_             = nullptr;
-		src.p_tail_             = nullptr;
-
-		merge_push_back( p_src_head, p_src_tail );
-	}
-
-	void merge_push_back( node_pointer p_nd ) noexcept
-	{
-		if ( p_nd == nullptr ) return;
-
-		node_pointer p_cur = p_nd;
-		node_pointer p_nxt = p_cur->p_raw_next_;
-		while ( p_nxt != nullptr ) {
-			p_cur = p_nxt;
-			p_nxt = p_cur->p_raw_next_;
-		}
-
-		merge_push_back( p_nd, p_cur );
-	}
-
-	node_pointer pop_front( void ) noexcept
-	{
-		node_pointer p_ans = p_head_;
-		if ( p_ans == nullptr ) return p_ans;
-
-		p_head_          = p_ans->p_raw_next_;
-		p_ans->p_raw_next_ = nullptr;
-
-		return p_ans;
-	}
-
-	/**
-	 * @brief if pred return true, that node is purged and push it into return value
-	 *
-	 * @tparam Predicate callable pred(const node_type&) and return bool
-	 * @param pred callable pred(const node_type&) and return bool
-	 * @return od_node_list_base purged nodes
-	 */
-	template <class Predicate>
-	od_node_raw_list_base split_if( Predicate pred )
-	{
-		od_node_raw_list_base ans;
-
-		node_pointer p_pre = nullptr;
-		node_pointer p_cur = p_head_;
-		while ( p_cur != nullptr ) {
-			node_pointer p_next = p_cur->p_raw_next_;
-			if ( pred( *( reinterpret_cast<const node_pointer>( p_cur ) ) ) ) {
-				if ( p_pre == nullptr ) {
-					p_head_ = p_next;
-					if ( p_head_ == nullptr ) {
-						p_tail_ = nullptr;
-					}
-
-					p_cur->p_raw_next_ = nullptr;
-					ans.push_back( p_cur );
-
-					p_cur = p_head_;
-				} else {
-					p_pre->p_raw_next_ = p_next;
-					if ( p_next == nullptr ) {
-						p_tail_ = p_pre;
-					}
-
-					p_cur->p_raw_next_ = nullptr;
-					ans.push_back( p_cur );
-
-					p_cur = p_next;
-				}
-			} else {
-				p_pre = p_cur;
-				p_cur = p_next;
-			}
-		}
-
-		return ans;
-	}
-
-	void clear( void )
-	{
-		node_pointer p_cur = p_head_;
-		p_head_            = nullptr;
-		p_tail_            = nullptr;
-		while ( p_cur != nullptr ) {
-			node_pointer p_nxt = p_cur->p_raw_next_;
-			delete p_cur;
-			p_cur = p_nxt;
-		}
-	}
-
-	bool is_empty( void ) const
-	{
-		return p_head_ == nullptr;
-	}
-
-private:
-	void merge_push_front( node_pointer p_nd_head, node_pointer p_nd_tail ) noexcept
-	{
-		if ( p_head_ == nullptr ) {
-			p_head_ = p_nd_head;
-			p_tail_ = p_nd_tail;
-		} else {
-			p_nd_tail->p_raw_next_ = p_head_;
-			p_head_              = p_nd_head;
-		}
-	}
-
-	void merge_push_back( node_pointer p_nd_head, node_pointer p_nd_tail ) noexcept
-	{
-		if ( p_head_ == nullptr ) {
-			p_head_ = p_nd_head;
-			p_tail_ = p_nd_tail;
-		} else {
-			p_tail_->p_raw_next_ = p_nd_head;
-			p_tail_            = p_nd_tail;
-		}
-	}
-
-	node_pointer p_head_ = nullptr;
-	node_pointer p_tail_ = nullptr;
-};
+/**
+ * @brief list that is linked by p_raw_next_
+ *
+ * @warning this class is not thread safe
+ *
+ * @tparam NODE_T this type should be the derived class from od_node_base<NODE_T>
+ */
+template <typename NODE_T>
+using od_node_raw_list_base = od_node_list_base_impl<NODE_T, typename NODE_T::raw_next_rw>;
 
 /**
  * @brief od_node list that supports exclusive control
