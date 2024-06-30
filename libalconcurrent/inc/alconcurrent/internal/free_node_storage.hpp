@@ -631,6 +631,8 @@ private:
 
 		void operator()( node_pointer p_nd )
 		{
+			if ( p_nd == nullptr ) return;
+
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
 			p_nd->hph_next_.store( nullptr );   // this line make slower the performance about 3%. therefore this line only enable in case of debug option
 #endif

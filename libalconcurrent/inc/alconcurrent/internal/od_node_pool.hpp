@@ -34,10 +34,10 @@ struct countermeasure_gcc_bug_deletable_obj_abst {
 };
 #endif
 
-template <typename NODE_T, typename OD_NODE_LIST_T = od_node_list_base<NODE_T>, typename OD_NODE_LOCKFREE_STACK_T = od_node_stack_lockfree_base<NODE_T>>
+template <typename NODE_T, typename OD_NODE_LIST_T = od_node_raw_list_base<NODE_T>, typename OD_NODE_LOCKFREE_STACK_T = od_node_stack_lockfree_base<NODE_T>>
 class od_node_pool {
 	static_assert( std::is_base_of<typename NODE_T::next_node_type, NODE_T>::value, "NODE_T::next_node_type should be a base class of NODE_T." );
-	static_assert( std::is_base_of<od_node_list_base<NODE_T>, OD_NODE_LIST_T>::value, "od_node_list_base<NODE_T> should be a base class of OD_NODE_LIST_T." );
+	static_assert( std::is_base_of<od_node_raw_list_base<NODE_T>, OD_NODE_LIST_T>::value, "od_node_list_base<NODE_T> should be a base class of OD_NODE_LIST_T." );
 	static_assert( std::is_base_of<od_node_stack_lockfree_base<NODE_T>, OD_NODE_LOCKFREE_STACK_T>::value, "od_node_stack_lockfree_base<NODE_T> should be a base class of OD_NODE_LOCKFREE_STACK_T." );
 
 public:
@@ -46,6 +46,17 @@ public:
 
 	static void push( node_pointer p_nd )
 	{
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
+		if ( p_nd->p_raw_next_ != nullptr ) {
+			LogOutput( log_type::WARN, "od_node_pool::push() receives a od_node<T> that has non nullptr in raw next" );
+			p_nd->p_raw_next_ = nullptr;
+		}
+		if ( p_nd->hph_next_.load() != nullptr ) {
+			LogOutput( log_type::WARN, "od_node_pool::push() receives a od_node<T> that has non nullptr in hph next" );
+			p_nd->hph_next_.store( nullptr );
+		}
+#endif
+
 		tl_od_node_list& tl_odn_list_ = get_tl_od_node_list();
 
 		if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p_nd ) ) {
@@ -73,14 +84,19 @@ public:
 		tl_od_node_list& tl_odn_list_ = get_tl_od_node_list();
 
 		node_pointer p_ans = tl_odn_list_.pop_front();
-		if ( !hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
-			return p_ans;
+		if ( p_ans != nullptr ) {
+			if ( !hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
+				p_ans->clear_next();
+				return p_ans;
+			}
+			tl_odn_list_.push_back( p_ans );   // まだハザードポインタに登録されていたので、スレッドローカルな変数に差し戻す。
 		}
-		tl_odn_list_.push_back( p_ans );   // まだハザードポインタに登録されていたので、スレッドローカルな変数に差し戻す。
 
 		p_ans = g_lockfree_odn_list_.pop_front();
 		while ( p_ans != nullptr ) {
 			if ( !hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
+				// popped node is not in hazard pointer list. therefore clear hph_next_
+				p_ans->clear_next();
 				return p_ans;
 			}
 			tl_odn_list_.push_back( p_ans );   // ハザードポインタに登録されていたので、スレッドローカルな変数に差し戻す。
@@ -89,7 +105,11 @@ public:
 
 		auto lk = g_odn_list_.try_lock();
 		if ( lk.owns_lock() ) {
-			return lk.ref().pop_front();
+			p_ans = lk.ref().pop_front();
+			if ( p_ans != nullptr ) {
+				p_ans->clear_next();
+				return p_ans;
+			}
 		}
 
 		return nullptr;   // 使えるノードがなかった

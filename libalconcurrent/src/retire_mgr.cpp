@@ -121,10 +121,12 @@ public:
 
 	static retire_node_list wait_pop_all( void )
 	{
-		retire_node_list ans;
-		auto             locker = g_rnd_list_.lock();
+		auto locker = g_rnd_list_.lock();
 		locker.wait( [&locker]() -> bool { return !( locker.ref().is_empty() ); } );
-		return retire_node_list( std::move( locker.ref() ) );
+
+		retire_node_list ans = std::move( tl_rnd_list_ );
+		ans.merge_push_back( std::move( locker.ref() ) );
+		return ans;
 	}
 
 private:

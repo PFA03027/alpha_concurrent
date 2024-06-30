@@ -248,11 +248,30 @@ public:
 	{
 		src.p_head_ = nullptr;
 		src.p_tail_ = nullptr;
+
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_TAIL_NODE_NEXT_NULLPTR
+		if ( p_tail_ != nullptr ) {
+			if ( node_next_rw_t::read( p_tail_ ) != nullptr ) {
+				LogOutput( log_type::ERR, "tail node has non-nullptr in next" );
+				std::terminate();
+			}
+		}
+#endif
 	}
 	od_node_list_base_impl&           operator=( const od_node_list_base_impl& ) = delete;
 	constexpr od_node_list_base_impl& operator=( od_node_list_base_impl&& src ) noexcept
 	{
 		od_node_list_base_impl( std::move( src ) ).swap( *this );
+
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_TAIL_NODE_NEXT_NULLPTR
+		if ( p_tail_ != nullptr ) {
+			if ( node_next_rw_t::read( p_tail_ ) != nullptr ) {
+				LogOutput( log_type::ERR, "tail node has non-nullptr in next" );
+				std::terminate();
+			}
+		}
+#endif
+
 		return *this;
 	}
 	~od_node_list_base_impl()
@@ -271,6 +290,15 @@ public:
 		p_tmp       = p_tail_;
 		p_tail_     = src.p_tail_;
 		src.p_tail_ = p_tmp;
+
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_TAIL_NODE_NEXT_NULLPTR
+		if ( p_tail_ != nullptr ) {
+			if ( node_next_rw_t::read( p_tail_ ) != nullptr ) {
+				LogOutput( log_type::ERR, "tail node has non-nullptr in next" );
+				std::terminate();
+			}
+		}
+#endif
 	}
 
 	void push_front( node_pointer p_nd ) noexcept
@@ -278,7 +306,8 @@ public:
 		if ( p_nd == nullptr ) return;
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
 		if ( node_next_rw_t::read( p_nd ) != nullptr ) {
-			LogOutput( log_type::WARN, "od_node_list_base::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
+			LogOutput( log_type::WARN, "od_node_list_base::push_front() receives a od_node<T> that has non nullptr in next" );
+			node_next_rw_t::write( p_nd, nullptr );
 		}
 #endif
 		if ( p_head_ == nullptr ) {
@@ -293,7 +322,7 @@ public:
 		if ( p_nd == nullptr ) return;
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
 		if ( node_next_rw_t::read( p_nd ) != nullptr ) {
-			LogOutput( log_type::WARN, "od_node_list_base::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
+			LogOutput( log_type::WARN, "od_node_list_base::push_back() receives a od_node<T> that has non nullptr in next" );
 			node_next_rw_t::write( p_nd, nullptr );
 		}
 #endif
@@ -389,6 +418,15 @@ public:
 	od_node_list_base_impl split_if( Predicate pred )
 	{
 		od_node_list_base_impl ans;
+
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_TAIL_NODE_NEXT_NULLPTR
+		if ( p_tail_ != nullptr ) {
+			if ( node_next_rw_t::read( p_tail_ ) != nullptr ) {
+				LogOutput( log_type::ERR, "tail node has non-nullptr in next" );
+				std::terminate();
+			}
+		}
+#endif
 
 		next_node_pointer p_pre = nullptr;
 		next_node_pointer p_cur = p_head_;
@@ -489,10 +527,28 @@ private:
 			node_next_rw_t::write( p_nd_tail, p_head_ );
 			p_head_ = p_nd_head;
 		}
+
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_TAIL_NODE_NEXT_NULLPTR
+		if ( p_tail_ != nullptr ) {
+			if ( node_next_rw_t::read( p_tail_ ) != nullptr ) {
+				LogOutput( log_type::ERR, "tail node has non-nullptr in next" );
+				std::terminate();
+			}
+		}
+#endif
 	}
 
 	void merge_push_back( next_node_pointer p_nd_head, next_node_pointer p_nd_tail ) noexcept
 	{
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_TAIL_NODE_NEXT_NULLPTR
+		if ( p_nd_tail != nullptr ) {
+			if ( node_next_rw_t::read( p_nd_tail ) != nullptr ) {
+				LogOutput( log_type::ERR, "tail node has non-nullptr in next" );
+				std::terminate();
+			}
+		}
+#endif
+
 		if ( p_head_ == nullptr ) {
 			p_head_ = p_nd_head;
 			p_tail_ = p_nd_tail;
@@ -794,6 +850,9 @@ public:
 		if ( p_nd->hph_next_.load() != nullptr ) {
 			LogOutput( log_type::WARN, "od_node_list_lockfree::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
 		}
+		if ( p_nd->p_raw_next_ != nullptr ) {
+			LogOutput( log_type::WARN, "od_node_list_lockfree::push_front() receives a od_node<T> that has non nullptr in p_raw_next_" );
+		}
 #endif
 		next_node_pointer p_typematch_node = p_nd;
 		next_node_pointer p_expected       = hph_head_.load();
@@ -803,6 +862,13 @@ public:
 		}
 	}
 
+	/**
+	 * @brief pop from front
+	 *
+	 * @warning because there is a possibility that a returned node is in hazard pointer, hazard_ptr_handler_t hph_next_ in returned node is not set nullptr.
+	 *
+	 * @return popped node_pointer. please see warning also.
+	 */
 	node_pointer pop_front( void ) noexcept
 	{
 		hazard_pointer    hp_cur_head = hph_head_.get();
