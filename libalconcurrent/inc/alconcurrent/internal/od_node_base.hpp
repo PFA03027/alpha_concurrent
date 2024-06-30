@@ -9,28 +9,32 @@
  *
  */
 
-#ifndef ALCONCURRENT_INC_INTERNAL_OD_NODE_HPP_
-#define ALCONCURRENT_INC_INTERNAL_OD_NODE_HPP_
+#ifndef ALCONCURRENT_INC_INTERNAL_OD_NODE_BASE_HPP_
+#define ALCONCURRENT_INC_INTERNAL_OD_NODE_BASE_HPP_
 
 #include <atomic>
 #include <condition_variable>
 #include <memory>
 #include <type_traits>
 
-#include "../hazard_ptr.hpp"
-#include "../lf_mem_alloc.hpp"
+#include "alconcurrent/hazard_ptr.hpp"
+#include "alconcurrent/lf_mem_alloc.hpp"
 
 namespace alpha {
 namespace concurrent {
 namespace internal {
 
-template <typename NODE_T>
+template <typename NODE_T, typename NEXT_NODE_T = NODE_T>
 class alignas( atomic_variable_align ) od_node_base {
 public:
+	using node_type            = NODE_T;
 	using node_pointer         = NODE_T*;
-	using hazard_ptr_handler_t = hazard_ptr_handler<NODE_T>;
+	using next_node_type       = NEXT_NODE_T;
+	using next_node_pointer    = NEXT_NODE_T*;
+	using hazard_ptr_handler_t = hazard_ptr_handler<next_node_type>;
+	using hazard_pointer       = typename hazard_ptr_handler<next_node_type>::hazard_pointer;
 
-	node_pointer         p_raw_next_;
+	next_node_pointer    p_raw_next_;
 	hazard_ptr_handler_t hph_next_;
 
 	od_node_base( node_pointer p_next_arg = nullptr ) noexcept
@@ -39,24 +43,30 @@ public:
 	{
 	}
 
+	void clear_next( void )
+	{
+		p_raw_next_ = nullptr;
+		hph_next_.store( nullptr );
+	}
+
 	class raw_next_rw {
 	public:
-		static inline node_pointer read( const node_pointer onb )
+		static inline next_node_pointer read( const node_pointer onb )
 		{
 			return onb->p_raw_next_;
 		}
-		static inline void write( node_pointer onb, node_pointer p )
+		static inline void write( node_pointer onb, next_node_pointer p )
 		{
 			onb->p_raw_next_ = p;
 		}
 	};
 	class hph_next_rw {
 	public:
-		static inline node_pointer read( const node_pointer onb )
+		static inline next_node_pointer read( const node_pointer onb )
 		{
 			return onb->hph_next_.load();
 		}
-		static inline void write( node_pointer onb, node_pointer p )
+		static inline void write( node_pointer onb, next_node_pointer p )
 		{
 			onb->hph_next_.store( p );
 		}
@@ -220,9 +230,9 @@ public:
  */
 template <typename NODE_T, typename NEXT_RW_T>
 class alignas( atomic_variable_align ) od_node_list_base_impl {
-	static_assert( std::is_base_of<od_node_base<NODE_T>, NODE_T>::value, "NODE_T should be derived from od_node_base<NODE_T>" );
-	static_assert( std::is_same<NEXT_RW_T, typename od_node_base<NODE_T>::raw_next_rw>::value ||
-	                   std::is_same<NEXT_RW_T, typename od_node_base<NODE_T>::hph_next_rw>::value,
+	static_assert( std::is_base_of<typename NODE_T::next_node_type, NODE_T>::value, "NODE_T::next_node_type should be a base class of NODE_T." );
+	static_assert( std::is_same<NEXT_RW_T, typename NODE_T::raw_next_rw>::value ||
+	                   std::is_same<NEXT_RW_T, typename NODE_T::hph_next_rw>::value,
 	               "NEXT_RW_T should be accesser class of od_node_base<NODE_T>" );
 
 public:
@@ -300,10 +310,10 @@ public:
 	{
 		if ( src.p_head_ == nullptr ) return;
 
-		node_pointer p_src_head = src.p_head_;
-		node_pointer p_src_tail = src.p_tail_;
-		src.p_head_             = nullptr;
-		src.p_tail_             = nullptr;
+		next_node_pointer p_src_head = src.p_head_;
+		next_node_pointer p_src_tail = src.p_tail_;
+		src.p_head_                  = nullptr;
+		src.p_tail_                  = nullptr;
 
 		merge_push_front( p_src_head, p_src_tail );
 	}
@@ -312,8 +322,8 @@ public:
 	{
 		if ( p_nd == nullptr ) return;
 
-		node_pointer p_cur = p_nd;
-		node_pointer p_nxt = node_next_rw_t::read( p_cur );
+		next_node_pointer p_cur = p_nd;
+		next_node_pointer p_nxt = node_next_rw_t::read( p_cur );
 		while ( p_nxt != nullptr ) {
 			p_cur = p_nxt;
 			p_nxt = node_next_rw_t::read( p_cur );
@@ -326,10 +336,10 @@ public:
 	{
 		if ( src.p_head_ == nullptr ) return;
 
-		node_pointer p_src_head = src.p_head_;
-		node_pointer p_src_tail = src.p_tail_;
-		src.p_head_             = nullptr;
-		src.p_tail_             = nullptr;
+		next_node_pointer p_src_head = src.p_head_;
+		next_node_pointer p_src_tail = src.p_tail_;
+		src.p_head_                  = nullptr;
+		src.p_tail_                  = nullptr;
 
 		merge_push_back( p_src_head, p_src_tail );
 	}
@@ -338,8 +348,8 @@ public:
 	{
 		if ( p_nd == nullptr ) return;
 
-		node_pointer p_cur = p_nd;
-		node_pointer p_nxt = node_next_rw_t::read( p_cur );
+		next_node_pointer p_cur = p_nd;
+		next_node_pointer p_nxt = node_next_rw_t::read( p_cur );
 		while ( p_nxt != nullptr ) {
 			p_cur = p_nxt;
 			p_nxt = node_next_rw_t::read( p_cur );
@@ -350,13 +360,22 @@ public:
 
 	node_pointer pop_front( void ) noexcept
 	{
-		node_pointer p_ans = p_head_;
-		if ( p_ans == nullptr ) return p_ans;
+		next_node_pointer p_ans = p_head_;
+		if ( p_ans == nullptr ) return nullptr;
 
 		p_head_ = node_next_rw_t::read( p_ans );
-		node_next_rw_t::write( p_ans, nullptr );
 
-		return p_ans;
+		node_next_rw_t::write( p_ans, nullptr );
+		node_pointer p_tmp = dynamic_cast<node_pointer>( p_ans );
+		if ( p_tmp == nullptr ) {
+			LogOutput( log_type::ERR, "fail to dynamic_cast from next_node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
+			delete p_ans;
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+			throw std::logic_error( "fail to dynamic_cast from next_node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
+#endif
+		}
+
+		return p_tmp;
 	}
 
 	/**
@@ -371,43 +390,77 @@ public:
 	{
 		od_node_list_base_impl ans;
 
-		node_pointer p_pre = nullptr;
-		node_pointer p_cur = p_head_;
+		next_node_pointer p_pre = nullptr;
+		next_node_pointer p_cur = p_head_;
 		while ( p_cur != nullptr ) {
-			node_pointer p_next = node_next_rw_t::read( p_cur );
-			if ( pred( *( reinterpret_cast<const node_pointer>( p_cur ) ) ) ) {
-				if ( p_pre == nullptr ) {
-					p_head_ = p_next;
-					if ( p_head_ == nullptr ) {
-						p_tail_ = nullptr;
-					}
-
-					node_next_rw_t::write( p_cur, nullptr );
-					ans.push_back( p_cur );
-
-					p_cur = p_head_;
-				} else {
-					node_next_rw_t::write( p_pre, p_next );
-					if ( p_next == nullptr ) {
-						p_tail_ = p_pre;
-					}
-
-					node_next_rw_t::write( p_cur, nullptr );
-					ans.push_back( p_cur );
-
-					p_cur = p_next;
-				}
-			} else {
+			next_node_pointer  p_next = node_next_rw_t::read( p_cur );
+			const node_pointer p_tmp  = dynamic_cast<const node_pointer>( p_cur );
+			if ( p_tmp == nullptr ) {
+				LogOutput( log_type::ERR, "fail to dynamic_cast from next_node_pointer to const node_pointer. this error caused by type mismatch implementation logic error" );
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+				throw std::logic_error( "fail to dynamic_cast from next_node_pointer to const node_pointer. this error caused by type mismatch implementation logic error" );
+#endif
 				p_pre = p_cur;
 				p_cur = p_next;
+			} else {
+				if ( pred( *p_tmp ) ) {
+					if ( p_pre == nullptr ) {
+						p_head_ = p_next;
+						if ( p_head_ == nullptr ) {
+							p_tail_ = nullptr;
+						}
+
+						node_next_rw_t::write( p_cur, nullptr );
+						ans.push_back( p_cur );
+
+						p_cur = p_head_;
+					} else {
+						node_next_rw_t::write( p_pre, p_next );
+						if ( p_next == nullptr ) {
+							p_tail_ = p_pre;
+						}
+
+						node_next_rw_t::write( p_cur, nullptr );
+						ans.push_back( p_cur );
+
+						p_cur = p_next;
+					}
+				} else {
+					p_pre = p_cur;
+					p_cur = p_next;
+				}
 			}
 		}
 
 		return ans;
 	}
 
+	template <typename Pred>
+	void clear( Pred pred )
+	{
+		next_node_pointer p_cur = p_head_;
+		p_head_                 = nullptr;
+		p_tail_                 = nullptr;
+		while ( p_cur != nullptr ) {
+			auto p_nxt = node_next_rw_t::read( p_cur );
+			p_cur->clear_next();
+			node_pointer p_tmp = dynamic_cast<node_pointer>( p_cur );
+			if ( p_tmp != nullptr ) {
+				pred( p_tmp );
+			} else {
+				LogOutput( log_type::ERR, "fail to dynamic_cast from next_node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+				throw std::logic_error( "fail to dynamic_cast from next_node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
+#endif
+			}
+			p_cur = p_nxt;
+		}
+	}
+
 	void clear( void )
 	{
+		clear( std::default_delete<node_type>() );
+#if 0
 		node_pointer p_cur = p_head_;
 		p_head_            = nullptr;
 		p_tail_            = nullptr;
@@ -416,6 +469,7 @@ public:
 			delete p_cur;
 			p_cur = p_nxt;
 		}
+#endif
 	}
 
 	bool is_empty( void ) const
@@ -424,7 +478,9 @@ public:
 	}
 
 private:
-	void merge_push_front( node_pointer p_nd_head, node_pointer p_nd_tail ) noexcept
+	using next_node_pointer = typename NODE_T::next_node_pointer;
+
+	void merge_push_front( next_node_pointer p_nd_head, next_node_pointer p_nd_tail ) noexcept
 	{
 		if ( p_head_ == nullptr ) {
 			p_head_ = p_nd_head;
@@ -435,7 +491,7 @@ private:
 		}
 	}
 
-	void merge_push_back( node_pointer p_nd_head, node_pointer p_nd_tail ) noexcept
+	void merge_push_back( next_node_pointer p_nd_head, next_node_pointer p_nd_tail ) noexcept
 	{
 		if ( p_head_ == nullptr ) {
 			p_head_ = p_nd_head;
@@ -446,8 +502,8 @@ private:
 		}
 	}
 
-	node_pointer p_head_ = nullptr;
-	node_pointer p_tail_ = nullptr;
+	next_node_pointer p_head_ = nullptr;
+	next_node_pointer p_tail_ = nullptr;
 };
 
 /**
@@ -692,11 +748,12 @@ protected:
  *
  * this class support lock-free behavior
  *
- * @tparam T value type kept in od_node class
+ * @tparam NODE_T node type
+ * @tparam NODE_T node type
  */
 template <typename NODE_T>
 class alignas( atomic_variable_align ) od_node_stack_lockfree_base {
-	static_assert( std::is_base_of<od_node_base<NODE_T>, NODE_T>::value, "NODE_T should be derived from od_node_base<>" );
+	static_assert( std::is_base_of<typename NODE_T::next_node_type, NODE_T>::value, "NODE_T::next_node_type should be a base class of NODE_T." );
 
 public:
 	using node_type    = NODE_T;
@@ -712,10 +769,10 @@ public:
 	od_node_stack_lockfree_base& operator=( od_node_stack_lockfree_base&& src )  = delete;
 	~od_node_stack_lockfree_base()
 	{
-		node_pointer p_cur = hph_head_.load();
+		next_node_pointer p_cur = hph_head_.load();
 		hph_head_.store( nullptr );
 		while ( p_cur != nullptr ) {
-			node_pointer p_nxt = p_cur->hph_next_.load();
+			next_node_pointer p_nxt = p_cur->hph_next_.load();
 			delete p_cur;
 			p_cur = p_nxt;
 		}
@@ -738,20 +795,21 @@ public:
 			LogOutput( log_type::WARN, "od_node_list_lockfree::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
 		}
 #endif
-		node_pointer p_expected = hph_head_.load();
+		next_node_pointer p_typematch_node = p_nd;
+		next_node_pointer p_expected       = hph_head_.load();
 		p_nd->hph_next_.store( p_expected );
-		while ( !hph_head_.compare_exchange_weak( p_expected, p_nd, std::memory_order_release, std::memory_order_relaxed ) ) {
+		while ( !hph_head_.compare_exchange_weak( p_expected, p_typematch_node, std::memory_order_release, std::memory_order_relaxed ) ) {
 			p_nd->hph_next_.store( p_expected );
 		}
 	}
 
 	node_pointer pop_front( void ) noexcept
 	{
-		hazard_ptr<node_type> hp_cur_head = hph_head_.get();
-		node_pointer          p_expected  = hp_cur_head.get();
+		hazard_pointer    hp_cur_head = hph_head_.get();
+		next_node_pointer p_expected  = hp_cur_head.get();
 		if ( p_expected == nullptr ) return nullptr;
 
-		node_pointer p_new_head = hp_cur_head->hph_next_.load( std::memory_order_acquire );
+		next_node_pointer p_new_head = hp_cur_head->hph_next_.load( std::memory_order_acquire );
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_head, std::memory_order_release, std::memory_order_relaxed ) ) {
 			hp_cur_head = hph_head_.get();
 			p_expected  = hp_cur_head.get();
@@ -766,11 +824,23 @@ public:
 		//    メンバ変数 v_ を参照しないアルゴリズムになっているので、以降は参照してよい。
 		//    hph_next_ は他スレッドで読みだされているため、書き換えてはならない。
 		//    なお、hp_cur_headは、他スレッドでもハザードポインタとして登録中であるため、ハザードポインタとしての登録がなくなるまで破棄してはならない。
-		return hp_cur_head.get();
+		next_node_pointer p_tmp = hp_cur_head.get();
+		node_pointer      p_ans = dynamic_cast<node_pointer>( p_tmp );
+		if ( p_ans == nullptr ) {
+			LogOutput( log_type::ERR, "fail to dynamic_cast from next_node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+			throw std::logic_error( "fail to dynamic_cast from next_node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
+#endif
+		}
+
+		return p_ans;
 	}
 
 private:
 	using hazard_ptr_handler_t = typename NODE_T::hazard_ptr_handler_t;
+	using hazard_pointer       = typename NODE_T::hazard_pointer;
+	using next_node_type       = typename NODE_T::next_node_type;
+	using next_node_pointer    = typename NODE_T::next_node_pointer;
 
 	hazard_ptr_handler_t hph_head_;
 };
@@ -779,4 +849,4 @@ private:
 }   // namespace concurrent
 }   // namespace alpha
 
-#endif /* SRC_LF_FIFO_HPP_ */
+#endif /* ALCONCURRENT_INC_INTERNAL_OD_NODE_BASE_HPP_ */

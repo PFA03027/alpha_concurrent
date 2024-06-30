@@ -661,8 +661,9 @@ constexpr bool operator>=( const T1* a, const hazard_ptr<T2>& b ) noexcept
 template <typename T>
 class hazard_ptr_handler {
 public:
-	using element_type = T;
-	using pointer      = T*;
+	using element_type   = T;
+	using pointer        = T*;
+	using hazard_pointer = hazard_ptr<T>;
 
 	hazard_ptr_handler( void ) noexcept
 	  : ap_target_p_()
@@ -704,7 +705,7 @@ public:
 		return *this;
 	}
 
-	hazard_ptr<T> get( void )
+	hazard_pointer get( void )
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 		internal::call_count_hazard_ptr_get_++;
@@ -712,7 +713,7 @@ public:
 
 		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
 		if ( p_expect == nullptr ) {
-			return hazard_ptr<T>( p_expect, nullptr );
+			return hazard_pointer( p_expect, nullptr );
 		}
 
 		internal::hzrd_slot_ownership_t hso = internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_expect );
@@ -729,9 +730,9 @@ public:
 		}
 
 		if ( p_expect == nullptr ) {
-			return hazard_ptr<T>( p_expect, nullptr );
+			return hazard_pointer( p_expect, nullptr );
 		}
-		return hazard_ptr<T>( p_expect, std::move( hso ) );
+		return hazard_pointer( p_expect, std::move( hso ) );
 	}
 
 	// TODO: このI/Fを本当に用意していいのか？ get()に限定しなくてよいのか？

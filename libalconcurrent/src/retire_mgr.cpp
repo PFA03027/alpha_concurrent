@@ -28,6 +28,8 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
+std::atomic<size_t> retire_node_abst::count_allocate_;
+
 class retire_node_list : public od_node_list_base<retire_node_abst> {
 public:
 	retire_node_list( void )                               = default;
@@ -42,22 +44,25 @@ public:
 			return;
 		}
 
+		retire_node_list nodes_not_in_hazard( std::move( *this ) );   // いったん自分自身のノードを移す。処理が終わったときに残っているノードがハザードポインタに登録されていないノードのリストとなっている。
 		retire_node_list nodes_still_in_hazard;
 
 		internal::hazard_ptr_mgr::ScanHazardPtrs(
-			[this, &nodes_still_in_hazard]( void* p_hzd ) {
-				od_node_list_base<retire_node_abst> ret = split_if( [p_hzd]( const retire_node_abst& rnd ) {
+			[&nodes_not_in_hazard, &nodes_still_in_hazard]( void* p_hzd ) {
+				od_node_list_base<retire_node_abst> ret = nodes_not_in_hazard.split_if( [p_hzd]( const retire_node_abst& rnd ) {
 					return rnd.get_retire_pointer() == p_hzd;
 				} );
 				nodes_still_in_hazard.merge_push_back( std::move( ret ) );
 			} );
+		swap( nodes_still_in_hazard );   // ハザードポインタに登録されているノードを自分自身に戻す。
 
-		clear();
-		merge_push_back( std::move( nodes_still_in_hazard ) );
+		nodes_not_in_hazard.clear(
+			[]( retire_node_abst* p_target ) {
+				p_target->call_deleter();
+				retire_node_abst::recycle( p_target );
+			} );
 	}
 };
-
-using retire_node_list_lockable = od_node_list_lockable_base<retire_node_list>;
 
 /**
  * @brief スレッドローカルストレージを一時バッファとして、グローバル共有バッファにod_node<T>をプールする
