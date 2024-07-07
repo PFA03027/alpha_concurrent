@@ -699,8 +699,9 @@ public:
 	{
 		if ( this == &src ) return *this;
 
-		ap_target_p_.store( src.ap_target_p_.load( std::memory_order_acquire ), std::memory_order_release );
+		auto p_tmp = src.ap_target_p_.load( std::memory_order_acquire );
 		src.ap_target_p_.store( nullptr, std::memory_order_release );
+		ap_target_p_.store( p_tmp, std::memory_order_release );
 
 		return *this;
 	}
@@ -736,7 +737,7 @@ public:
 	}
 
 	// TODO: このI/Fを本当に用意していいのか？ get()に限定しなくてよいのか？
-	pointer load( std::memory_order order = std::memory_order_acquire ) noexcept
+	pointer load( std::memory_order order = std::memory_order_acquire ) const noexcept
 	{
 		return ap_target_p_.load( order );
 	}

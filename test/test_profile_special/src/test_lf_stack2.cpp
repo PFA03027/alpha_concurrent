@@ -124,7 +124,7 @@ TEST_F( TestLFSTACK_2_HighLoad, TC_Profile2 )
 	// nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 20 * 2, 10 );
 	// nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 20, 10 );
 	// nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 20 / 2, 10 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 4, 10 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 20, 10 );
 	// nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 1, 10 );
 }
 #endif

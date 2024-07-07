@@ -59,13 +59,19 @@ public:
 
 		tl_od_node_list& tl_odn_list_ = get_tl_od_node_list();
 
-		if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p_nd ) ) {
-			tl_odn_list_.push_back( p_nd );   // まだハザードポインタに登録されていたので、スレッドローカルな変数に保存する。
+		if ( tl_odn_list_.is_empty() ) {
+			tl_odn_list_.push_back( p_nd );   // スレッドローカルな変数が空だったので、やっぱりスレッドローカルな変数に保存する。
 			return;
 		}
 
-		if ( tl_odn_list_.is_empty() ) {
-			tl_odn_list_.push_back( p_nd );   // スレッドローカルな変数が空だったので、やっぱりスレッドローカルな変数に保存する。
+		auto lk = g_odn_list_.try_lock();
+		if ( lk.owns_lock() ) {
+			lk.ref().push_back( p_nd );
+			return;
+		}
+
+		if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p_nd ) ) {
+			tl_odn_list_.push_back( p_nd );   // まだハザードポインタに登録されていたので、スレッドローカルな変数に保存する。
 			return;
 		}
 
@@ -82,14 +88,33 @@ public:
 	static node_pointer pop( void )
 	{
 		tl_od_node_list& tl_odn_list_ = get_tl_od_node_list();
+		node_pointer     p_ans        = nullptr;
 
-		node_pointer p_ans = tl_odn_list_.pop_front();
+		p_ans = tl_odn_list_.pop_front();
 		if ( p_ans != nullptr ) {
 			if ( !hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
 				p_ans->clear_next();
 				return p_ans;
 			}
 			tl_odn_list_.push_back( p_ans );   // まだハザードポインタに登録されていたので、スレッドローカルな変数に差し戻す。
+		}
+
+		auto lk = g_odn_list_.try_lock();
+		if ( lk.owns_lock() ) {
+			p_ans = lk.ref().pop_front();
+			if ( p_ans != nullptr ) {
+				if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
+					// まだハザードポインタに登録されていたので、差し戻す。
+					if ( tl_odn_list_.is_empty() ) {
+						tl_odn_list_.push_back( p_ans );
+					} else {
+						lk.ref().push_back( p_ans );
+					}
+				} else {
+					p_ans->clear_next();
+					return p_ans;
+				}
+			}
 		}
 
 		p_ans = g_lockfree_odn_list_.pop_front();
@@ -101,15 +126,6 @@ public:
 			}
 			tl_odn_list_.push_back( p_ans );   // ハザードポインタに登録されていたので、スレッドローカルな変数に差し戻す。
 			p_ans = g_lockfree_odn_list_.pop_front();
-		}
-
-		auto lk = g_odn_list_.try_lock();
-		if ( lk.owns_lock() ) {
-			p_ans = lk.ref().pop_front();
-			if ( p_ans != nullptr ) {
-				p_ans->clear_next();
-				return p_ans;
-			}
 		}
 
 		return nullptr;   // 使えるノードがなかった

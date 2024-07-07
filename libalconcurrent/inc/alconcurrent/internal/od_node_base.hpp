@@ -24,53 +24,23 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
-template <typename NODE_T, typename NEXT_NODE_T = NODE_T>
-class alignas( atomic_variable_align ) od_node_base {
+template <typename NODE_T, typename NEXT_NODE_T>
+class alignas( atomic_variable_align ) od_node_base_common {
 public:
-	using node_type            = NODE_T;
-	using node_pointer         = NODE_T*;
-	using next_node_type       = NEXT_NODE_T;
-	using next_node_pointer    = NEXT_NODE_T*;
-	using hazard_ptr_handler_t = hazard_ptr_handler<next_node_type>;
-	using hazard_pointer       = typename hazard_ptr_handler<next_node_type>::hazard_pointer;
+	using node_type         = NODE_T;
+	using node_pointer      = NODE_T*;
+	using next_node_type    = NEXT_NODE_T;
+	using next_node_pointer = NEXT_NODE_T*;
 
-	next_node_pointer    p_raw_next_;
-	hazard_ptr_handler_t hph_next_;
-
-	od_node_base( node_pointer p_next_arg = nullptr ) noexcept
-	  : p_raw_next_( nullptr )
-	  , hph_next_( p_next_arg )
+	next_node_pointer next( void ) const noexcept
 	{
+		return this->NODE_T::next();
 	}
 
-	void clear_next( void )
+	void set_next( next_node_pointer p_n ) noexcept
 	{
-		p_raw_next_ = nullptr;
-		hph_next_.store( nullptr );
+		this->NODE_T::set_next( p_n );
 	}
-
-	class raw_next_rw {
-	public:
-		static inline next_node_pointer read( const node_pointer onb )
-		{
-			return onb->p_raw_next_;
-		}
-		static inline void write( node_pointer onb, next_node_pointer p )
-		{
-			onb->p_raw_next_ = p;
-		}
-	};
-	class hph_next_rw {
-	public:
-		static inline next_node_pointer read( const node_pointer onb )
-		{
-			return onb->hph_next_.load();
-		}
-		static inline void write( node_pointer onb, next_node_pointer p )
-		{
-			onb->hph_next_.store( p );
-		}
-	};
 
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else
@@ -218,6 +188,151 @@ public:
 	}
 #endif
 #endif
+};
+
+template <typename NODE_T, typename NEXT_NODE_T = NODE_T>
+class alignas( atomic_variable_align ) od_node_base_raw_next : public od_node_base_common<NODE_T, NEXT_NODE_T> {
+public:
+	using node_type         = NODE_T;
+	using node_pointer      = NODE_T*;
+	using next_node_type    = NEXT_NODE_T;
+	using next_node_pointer = NEXT_NODE_T*;
+
+	explicit od_node_base_raw_next( node_pointer p_next_arg = nullptr ) noexcept
+	  : p_raw_next_( p_next_arg )
+	{
+	}
+	od_node_base_raw_next( const od_node_base_raw_next& src ) noexcept
+	  : p_raw_next_( src.p_raw_next_ )
+	{
+	}
+	od_node_base_raw_next( od_node_base_raw_next&& src ) noexcept
+	  : p_raw_next_( src.p_raw_next_ )
+	{
+		src.p_raw_next_ = nullptr;
+	}
+	od_node_base_raw_next& operator=( const od_node_base_raw_next& src ) noexcept
+	{
+		if ( this == &src ) return *this;
+		p_raw_next_ = src.p_raw_next_;
+		return *this;
+	}
+	od_node_base_raw_next& operator=( od_node_base_raw_next&& src ) noexcept
+	{
+		if ( this == &src ) return *this;
+		p_raw_next_     = src.p_raw_next_;
+		src.p_raw_next_ = nullptr;
+		return *this;
+	}
+
+	next_node_pointer next( void ) const noexcept
+	{
+		return p_raw_next_;
+	}
+
+	void set_next( next_node_pointer p_n ) noexcept
+	{
+		p_raw_next_ = p_n;
+	}
+
+private:
+	next_node_pointer p_raw_next_;
+};
+
+template <typename NODE_T, typename NEXT_NODE_T = NODE_T>
+class alignas( atomic_variable_align ) od_node_base_hazard_handler_next : public od_node_base_common<NODE_T, NEXT_NODE_T> {
+public:
+	using node_type            = NODE_T;
+	using node_pointer         = NODE_T*;
+	using next_node_type       = NEXT_NODE_T;
+	using next_node_pointer    = NEXT_NODE_T*;
+	using hazard_ptr_handler_t = hazard_ptr_handler<next_node_type>;
+	using hazard_pointer       = typename hazard_ptr_handler<next_node_type>::hazard_pointer;
+
+	explicit od_node_base_hazard_handler_next( node_pointer p_next_arg = nullptr ) noexcept
+	  : hph_next_( p_next_arg )
+	{
+	}
+	od_node_base_hazard_handler_next( const od_node_base_hazard_handler_next& )            = default;
+	od_node_base_hazard_handler_next( od_node_base_hazard_handler_next&& )                 = default;
+	od_node_base_hazard_handler_next& operator=( const od_node_base_hazard_handler_next& ) = default;
+	od_node_base_hazard_handler_next& operator=( od_node_base_hazard_handler_next&& )      = default;
+
+	next_node_pointer next( void ) const noexcept
+	{
+		return hph_next_.load();
+	}
+
+	void set_next( next_node_pointer p_n ) noexcept
+	{
+		hph_next_.store( p_n );
+	}
+
+	hazard_pointer get_hazard_ptr_of_next( void )
+	{
+		return hph_next_.get();
+	}
+
+	hazard_ptr_handler_t& hazard_handler( void ) noexcept
+	{
+		return hph_next_;
+	}
+
+	const hazard_ptr_handler_t& hazard_handler( void ) const noexcept
+	{
+		return hph_next_;
+	}
+
+private:
+	hazard_ptr_handler_t hph_next_;
+};
+
+template <typename NODE_T, typename NEXT_NODE_T = NODE_T>
+class alignas( atomic_variable_align ) od_node_base : public od_node_base_raw_next<NODE_T, NEXT_NODE_T>, public od_node_base_hazard_handler_next<NODE_T, NEXT_NODE_T> {
+public:
+	using node_type               = NODE_T;
+	using node_pointer            = NODE_T*;
+	using next_node_type          = NEXT_NODE_T;
+	using next_node_pointer       = NEXT_NODE_T*;
+	using hazard_ptr_handler_t    = typename od_node_base_hazard_handler_next<NODE_T, NEXT_NODE_T>::hazard_ptr_handler_t;
+	using hazard_pointer          = typename od_node_base_hazard_handler_next<NODE_T, NEXT_NODE_T>::hazard_pointer;
+	using base_t_w_raw_pointer    = od_node_base_raw_next<NODE_T, NEXT_NODE_T>;
+	using base_t_w_hazard_handler = od_node_base_hazard_handler_next<NODE_T, NEXT_NODE_T>;
+
+	od_node_base( node_pointer p_next_arg = nullptr ) noexcept
+	  : od_node_base_raw_next<NODE_T, NEXT_NODE_T>( nullptr )
+	  , od_node_base_hazard_handler_next<NODE_T, NEXT_NODE_T>( p_next_arg )
+	{
+	}
+
+	void clear_next( void )
+	{
+		od_node_base_raw_next<NODE_T, NEXT_NODE_T>::set_next( nullptr );
+		od_node_base_hazard_handler_next<NODE_T, NEXT_NODE_T>::set_next( nullptr );
+	}
+
+	class raw_next_rw {
+	public:
+		static inline next_node_pointer read( const node_pointer onb )
+		{
+			return onb->base_t_w_raw_pointer::next();
+		}
+		static inline void write( node_pointer onb, next_node_pointer p )
+		{
+			onb->base_t_w_raw_pointer::set_next( p );
+		}
+	};
+	class hph_next_rw {
+	public:
+		static inline next_node_pointer read( const node_pointer onb )
+		{
+			return onb->base_t_w_hazard_handler::next();
+		}
+		static inline void write( node_pointer onb, next_node_pointer p )
+		{
+			onb->base_t_w_hazard_handler::set_next( p );
+		}
+	};
 };
 
 /**
@@ -805,11 +920,9 @@ protected:
  * this class support lock-free behavior
  *
  * @tparam NODE_T node type
- * @tparam NODE_T node type
  */
 template <typename NODE_T>
 class alignas( atomic_variable_align ) od_node_stack_lockfree_base {
-	static_assert( std::is_base_of<typename NODE_T::next_node_type, NODE_T>::value, "NODE_T::next_node_type should be a base class of NODE_T." );
 
 public:
 	using node_type    = NODE_T;
@@ -828,7 +941,7 @@ public:
 		next_node_pointer p_cur = hph_head_.load();
 		hph_head_.store( nullptr );
 		while ( p_cur != nullptr ) {
-			next_node_pointer p_nxt = p_cur->hph_next_.load();
+			next_node_pointer p_nxt = p_cur->base_t_w_hazard_handler::next();
 			delete p_cur;
 			p_cur = p_nxt;
 		}
@@ -847,7 +960,7 @@ public:
 	{
 		if ( p_nd == nullptr ) return;
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
-		if ( p_nd->hph_next_.load() != nullptr ) {
+		if ( p_nd->base_t_w_hazard_handler::next() != nullptr ) {
 			LogOutput( log_type::WARN, "od_node_list_lockfree::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
 		}
 		if ( p_nd->p_raw_next_ != nullptr ) {
@@ -856,9 +969,9 @@ public:
 #endif
 		next_node_pointer p_typematch_node = p_nd;
 		next_node_pointer p_expected       = hph_head_.load();
-		p_nd->hph_next_.store( p_expected );
+		p_nd->base_t_w_hazard_handler::set_next( p_expected );
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_typematch_node, std::memory_order_release, std::memory_order_relaxed ) ) {
-			p_nd->hph_next_.store( p_expected );
+			p_nd->base_t_w_hazard_handler::set_next( p_expected );
 		}
 	}
 
@@ -875,14 +988,14 @@ public:
 		next_node_pointer p_expected  = hp_cur_head.get();
 		if ( p_expected == nullptr ) return nullptr;
 
-		next_node_pointer p_new_head = hp_cur_head->hph_next_.load( std::memory_order_acquire );
+		next_node_pointer p_new_head = hp_cur_head->base_t_w_hazard_handler::next();
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_head, std::memory_order_release, std::memory_order_relaxed ) ) {
 			hp_cur_head = hph_head_.get();
 			p_expected  = hp_cur_head.get();
 			if ( p_expected == nullptr ) {
 				return nullptr;
 			}
-			p_new_head = hp_cur_head->hph_next_.load( std::memory_order_acquire );
+			p_new_head = hp_cur_head->base_t_w_hazard_handler::next();
 		}
 
 		// ここに来た時点で、hp_cur_head で保持されているノードの所有権を確保できた。
@@ -891,13 +1004,17 @@ public:
 		//    hph_next_ は他スレッドで読みだされているため、書き換えてはならない。
 		//    なお、hp_cur_headは、他スレッドでもハザードポインタとして登録中であるため、ハザードポインタとしての登録がなくなるまで破棄してはならない。
 		next_node_pointer p_tmp = hp_cur_head.get();
-		node_pointer      p_ans = dynamic_cast<node_pointer>( p_tmp );
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+		node_pointer p_ans = dynamic_cast<node_pointer>( p_tmp );
 		if ( p_ans == nullptr ) {
 			LogOutput( log_type::ERR, "fail to dynamic_cast from next_node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
 			throw std::logic_error( "fail to dynamic_cast from next_node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
-#endif
 		}
+#else
+		// push_front()で入ってくるノードはnode_typeなので、
+		// popしたノードは、必ずnext_node_pointerからnode_pointerにcastできる。
+		node_pointer p_ans = static_cast<node_pointer>( p_tmp );
+#endif
 
 		return p_ans;
 	}
@@ -907,6 +1024,11 @@ private:
 	using hazard_pointer       = typename NODE_T::hazard_pointer;
 	using next_node_type       = typename NODE_T::next_node_type;
 	using next_node_pointer    = typename NODE_T::next_node_pointer;
+
+	// static_assert( std::is_base_of<next_node_pointer, node_type>::value, "NODE_T should be a derived class of next_node_pointer" );
+
+	using base_t_w_hazard_handler = od_node_base_hazard_handler_next<typename NODE_T::node_type, typename NODE_T::next_node_type>;
+	static_assert( std::is_base_of<base_t_w_hazard_handler, NODE_T>::value, "NODE_T should be a derived class of od_node_base_hazard_handler_next<>" );
 
 	hazard_ptr_handler_t hph_head_;
 };

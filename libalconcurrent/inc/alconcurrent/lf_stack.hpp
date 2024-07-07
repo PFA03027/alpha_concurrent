@@ -20,6 +20,7 @@
 #include "internal/one_way_list_node.hpp"
 
 #include "internal/od_node_base.hpp"
+#include "internal/od_node_pool.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -377,49 +378,50 @@ private:
 template <typename T>
 class x_stack_list {
 public:
-	static_assert( std::is_default_constructible<T>::value && std::is_move_constructible<T>::value && std::is_move_assignable<T>::value, "T should be default/move constructible and move assignable at least" );
+	static_assert( std::is_default_constructible<T>::value && std::is_move_constructible<T>::value && std::is_move_assignable<T>::value,
+	               "T should be default constructible, move constructible and move assignable at least" );
 
 	using value_type = T;
 
-	constexpr x_stack_list( void ) noexcept
-	  : hph_head_( nullptr )
-	{
-	}
+	constexpr x_stack_list( void ) noexcept = default;
 
 	x_stack_list( size_t reserve_size ) noexcept
-	  : hph_head_( nullptr )
+	  : x_stack_list()
 	{
-		free_node_storage_.reserve_minimum( reserve_size );
 	}
 
-	template <bool IsCopyConstructivle = std::is_copy_constructible<T>::value, typename std::enable_if<IsCopyConstructivle>::type* = nullptr>
-	void push( T& v_arg )
+	template <bool IsCopyConstructivle = std::is_copy_constructible<T>::value, bool IsCopyAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsCopyConstructivle && IsCopyAssignable>::type* = nullptr>
+	void push( const T& v_arg )
 	{
-		node_pointer p_expected = hph_head_.load();
-		node_pointer p_new_node = free_node_storage_.allocate( v_arg, p_expected );
-		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_node, std::memory_order_release, std::memory_order_relaxed ) ) {
-			p_new_node->hph_next_.store( p_expected );
+		node_pointer p_new_nd = unused_node_pool_.pop();
+		if ( p_new_nd != nullptr ) {
+			p_new_nd->get() = v_arg;
+		} else {
+			p_new_nd = new node_type( nullptr, v_arg );
 		}
+		lf_stack_impl_.push_front( p_new_nd );
 	}
-	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, typename std::enable_if<IsMoveConstructivle>::type* = nullptr>
+	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, bool IsMoveAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsMoveConstructivle && IsMoveAssignable>::type* = nullptr>
 	void push( T&& v_arg )
 	{
-		node_pointer p_expected = hph_head_.load();
-		node_pointer p_new_node = free_node_storage_.allocate( std::move( v_arg ), p_expected );
-		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_node, std::memory_order_release, std::memory_order_relaxed ) ) {
-			p_new_node->hph_next_.store( p_expected );
+		node_pointer p_new_nd = unused_node_pool_.pop();
+		if ( p_new_nd != nullptr ) {
+			p_new_nd->get() = std::move( v_arg );
+		} else {
+			p_new_nd = new node_type( nullptr, std::move( v_arg ) );
 		}
+		lf_stack_impl_.push_front( p_new_nd );
 	}
 
 	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, typename std::enable_if<IsMoveConstructivle>::type* = nullptr>
 	std::tuple<bool, value_type> pop( void )
 	{
 		// TがMove可能である場合に選択されるAPI実装
-		node_pointer p_poped_node = pop_impl();
+		node_pointer p_poped_node = lf_stack_impl_.pop_front();
 		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
 		std::tuple<bool, value_type> ans { true, std::move( p_poped_node->get() ) };
-		free_node_storage_.recycle( p_poped_node );
+		unused_node_pool_.push( p_poped_node );
 		return ans;
 	}
 	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, bool IsCopyConstructivle = std::is_copy_constructible<T>::value,
@@ -427,47 +429,21 @@ public:
 	std::tuple<bool, value_type> pop( void )
 	{
 		// TがMove不可能であるが、Copy可能である場合に選択されるAPI実装
-		node_pointer p_poped_node = pop_impl();
+		node_pointer p_poped_node = lf_stack_impl_.pop_front();
 		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
 		std::tuple<bool, value_type> ans { true, p_poped_node->get() };
-		free_node_storage_.recycle( p_poped_node );
+		unused_node_pool_.push( p_poped_node );
 		return ans;
 	}
 
 private:
-	using node_type    = typename internal::x_free_od_node_storage<T>::node_type;
-	using node_pointer = typename internal::x_free_od_node_storage<T>::node_pointer;
+	using node_type    = internal::od_node<T>;
+	using node_pointer = node_type*;
 
-	node_type* pop_impl( void )
-	{
-		hazard_ptr<node_type> hp_cur_head = hph_head_.get();
-		node_pointer          p_expected  = hp_cur_head.get();
-		if ( p_expected == nullptr ) return nullptr;
-
-		node_pointer p_new_head = hp_cur_head->hph_next_.load( std::memory_order_acquire );
-		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_head, std::memory_order_release, std::memory_order_relaxed ) ) {
-			hp_cur_head = hph_head_.get();
-			p_expected  = hp_cur_head.get();
-			if ( p_expected == nullptr ) return nullptr;
-			p_new_head = hp_cur_head->hph_next_.load( std::memory_order_acquire );
-		}
-
-		// ここに来た時点で、hp_cur_head で保持されているノードの所有権を確保できた。
-		// ※ 確保しているノードへのポインタを他スレッドでも持っているかもしれないが、
-		//    メンバ変数 v_ を参照しないアルゴリズムになっているので、以降は参照してよい。
-		//    hph_next_ は他スレッドで読みだされているため、書き換えてはならない。
-		//    なお、hp_cur_headは、他スレッドでもハザードポインタとして登録中であるため、ハザードポインタとしての登録がなくなるまで破棄してはならない。
-		return hp_cur_head.get();
-	}
-
-	hazard_ptr_handler<node_type> hph_head_;
-
-	static internal::x_free_od_node_storage<T> free_node_storage_;
+	internal::od_node_stack_lockfree_base<node_type> lf_stack_impl_;
+	internal::od_node_pool<node_type>                unused_node_pool_;
 };
-
-template <typename T>
-internal::x_free_od_node_storage<T> x_stack_list<T>::free_node_storage_;
 
 }   // namespace concurrent
 }   // namespace alpha

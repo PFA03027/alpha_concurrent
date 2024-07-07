@@ -30,7 +30,7 @@ TEST( od_node_base_class, CanConstructWithNullptr )
 	test_od_node_base sut( nullptr );
 
 	// Assert
-	EXPECT_EQ( sut.hph_next_.load(), nullptr );
+	EXPECT_EQ( sut.base_t_w_hazard_handler::next(), nullptr );
 }
 
 TEST( od_node_base_class, CanConstruct )
@@ -42,7 +42,7 @@ TEST( od_node_base_class, CanConstruct )
 	test_od_node_base sut( &yy );
 
 	// Assert
-	auto p_x = sut.hph_next_.load();
+	auto p_x = sut.base_t_w_hazard_handler::next();
 	EXPECT_EQ( p_x, &yy );
 }
 
@@ -108,7 +108,7 @@ TEST( od_node_list_base_class, CanPop1 )
 
 	// Assert
 	EXPECT_NE( p, nullptr );
-	EXPECT_EQ( p->hph_next_.load(), nullptr );
+	EXPECT_EQ( p->base_t_w_hazard_handler::next(), nullptr );
 	delete p;
 	p = sut.pop_front();
 	EXPECT_EQ( p, nullptr );
@@ -126,7 +126,7 @@ TEST( od_node_list_base_class, CanPop2 )
 
 	// Assert
 	EXPECT_NE( p, nullptr );
-	EXPECT_EQ( p->hph_next_.load(), nullptr );
+	EXPECT_EQ( p->base_t_w_hazard_handler::next(), nullptr );
 	delete p;
 }
 
@@ -745,7 +745,7 @@ TEST( od_node_raw_list_base_class, CanPop1 )
 
 	// Assert
 	EXPECT_NE( p, nullptr );
-	EXPECT_EQ( p->hph_next_.load(), nullptr );
+	EXPECT_EQ( p->base_t_w_hazard_handler::next(), nullptr );
 	delete p;
 	p = sut.pop_front();
 	EXPECT_EQ( p, nullptr );
@@ -763,7 +763,7 @@ TEST( od_node_raw_list_base_class, CanPop2 )
 
 	// Assert
 	EXPECT_NE( p, nullptr );
-	EXPECT_EQ( p->hph_next_.load(), nullptr );
+	EXPECT_EQ( p->base_t_w_hazard_handler::next(), nullptr );
 	delete p;
 }
 
