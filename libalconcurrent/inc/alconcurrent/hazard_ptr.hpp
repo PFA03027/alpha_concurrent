@@ -712,12 +712,13 @@ public:
 		internal::call_count_hazard_ptr_get_++;
 #endif
 
+		internal::hzrd_slot_ownership_t hso = internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) );
+
 		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
 		if ( p_expect == nullptr ) {
 			return hazard_pointer( p_expect, nullptr );
 		}
-
-		internal::hzrd_slot_ownership_t hso = internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_expect );
+		hso->store( p_expect, std::memory_order_release );
 
 		while ( !ap_target_p_.compare_exchange_weak( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
