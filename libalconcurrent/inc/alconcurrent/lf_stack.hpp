@@ -383,12 +383,22 @@ public:
 
 	using value_type = T;
 
-	constexpr x_stack_list( void ) noexcept = default;
+	constexpr x_stack_list( void ) noexcept
+	  : lf_stack_impl_()
+	  , unused_node_pool_()
+	{
+	}
 
 	x_stack_list( size_t reserve_size ) noexcept
 	  : x_stack_list()
 	{
 	}
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_NODE_COUNT
+	~x_stack_list()
+	{
+		internal::LogOutput( log_type::TEST, "Number of free nodes: %zu", internal::od_node_pool<node_type>::size() );
+	}
+#endif
 
 	template <bool IsCopyConstructivle = std::is_copy_constructible<T>::value, bool IsCopyAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsCopyConstructivle && IsCopyAssignable>::type* = nullptr>
 	void push( const T& v_arg )

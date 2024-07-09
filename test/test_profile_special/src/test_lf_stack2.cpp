@@ -118,7 +118,7 @@ TEST_F( TestLFSTACK_2_HighLoad, TC_Profile2 )
 	using TestType = std::size_t;
 	// using TestType = int;
 
-	constexpr size_t SUT_N = 10;
+	constexpr size_t SUT_N = 100;
 
 	std::cout << "--- x_stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
 	// nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 20 * 2, 10 );

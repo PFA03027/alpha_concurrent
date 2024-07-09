@@ -46,6 +46,8 @@ public:
 
 	static void push( node_pointer p_nd )
 	{
+		if ( p_nd == nullptr ) return;
+
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
 		if ( p_nd->p_raw_next_ != nullptr ) {
 			LogOutput( log_type::WARN, "od_node_pool::push() receives a od_node<T> that has non nullptr in raw next" );
@@ -55,6 +57,9 @@ public:
 			LogOutput( log_type::WARN, "od_node_pool::push() receives a od_node<T> that has non nullptr in hph next" );
 			p_nd->hph_next_.store( nullptr );
 		}
+#endif
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_NODE_COUNT
+		++node_count_;
 #endif
 
 		tl_od_node_list& tl_odn_list_ = get_tl_od_node_list();
@@ -78,15 +83,25 @@ public:
 		g_lockfree_odn_list_.push_front( p_nd );
 	}
 
-	static void merge_push( node_pointer p_nd )
-	{
-		tl_od_node_list& tl_odn_list_ = get_tl_od_node_list();
-
-		tl_odn_list_.merge_push_back( p_nd );   // とりあえず、全部スレッドローカルな変数に保存する。
-	}
-
 	static node_pointer pop( void )
 	{
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_NODE_COUNT
+		struct counter_handler {
+			bool is_decrement_;
+
+			counter_handler( void )
+			  : is_decrement_( true )
+			{
+			}
+			~counter_handler()
+			{
+				if ( is_decrement_ ) {
+					--node_count_;
+				}
+			}
+		};
+		counter_handler ch_chip;
+#endif
 		tl_od_node_list& tl_odn_list_ = get_tl_od_node_list();
 		node_pointer     p_ans        = nullptr;
 
@@ -128,7 +143,19 @@ public:
 			p_ans = g_lockfree_odn_list_.pop_front();
 		}
 
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_NODE_COUNT
+		ch_chip.is_decrement_ = false;
+#endif
 		return nullptr;   // 使えるノードがなかった
+	}
+
+	static size_t size( void ) noexcept
+	{
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_NODE_COUNT
+		return node_count_.load( std::memory_order_acquire );
+#else
+		return 0;
+#endif
 	}
 
 protected:
@@ -162,6 +189,9 @@ protected:
 #else
 	static thread_local tl_od_node_list tl_odn_list_;   //!< ハザードポインタに登録されている場合に、一時保管するためのリスト。GCCの不具合でコンパイルエラーとなるため、スレッドローカル変数が使えない。。。
 #endif
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_NODE_COUNT
+	static std::atomic<size_t> node_count_;
+#endif
 };
 
 template <typename NODE_T, typename OD_NODE_LIST_T, typename OD_NODE_LOCKFREE_STACK_T>
@@ -177,6 +207,11 @@ thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T, OD_NODE_LOCKFREE_STAC
 #else
 template <typename NODE_T, typename OD_NODE_LIST_T, typename OD_NODE_LOCKFREE_STACK_T>
 thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T, OD_NODE_LOCKFREE_STACK_T>::tl_od_node_list od_node_pool<NODE_T, OD_NODE_LIST_T, OD_NODE_LOCKFREE_STACK_T>::tl_odn_list_( od_node_pool<NODE_T, OD_NODE_LIST_T, OD_NODE_LOCKFREE_STACK_T>::g_odn_list_ );
+#endif
+
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_NODE_COUNT
+template <typename NODE_T, typename OD_NODE_LIST_T, typename OD_NODE_LOCKFREE_STACK_T>
+std::atomic<size_t> od_node_pool<NODE_T, OD_NODE_LIST_T, OD_NODE_LOCKFREE_STACK_T>::node_count_( 0 );
 #endif
 
 template <typename NODE_T, typename OD_NODE_LIST_T, typename OD_NODE_LOCKFREE_STACK_T>
