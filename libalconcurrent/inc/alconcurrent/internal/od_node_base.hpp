@@ -25,7 +25,7 @@ namespace concurrent {
 namespace internal {
 
 template <typename NODE_T>
-class alignas( atomic_variable_align ) od_node_base_common {
+class alignas( atomic_variable_align ) od_node_base_if {
 public:
 	using node_type    = NODE_T;
 	using node_pointer = NODE_T*;
@@ -189,7 +189,7 @@ public:
 };
 
 template <typename NODE_T>
-class alignas( atomic_variable_align ) od_node_base_raw_next : public od_node_base_common<NODE_T> {
+class alignas( atomic_variable_align ) od_node_base_raw_next : public od_node_base_if<od_node_base_raw_next<NODE_T>> {
 public:
 	using node_type    = NODE_T;
 	using node_pointer = NODE_T*;
@@ -236,7 +236,7 @@ private:
 };
 
 template <typename NODE_T>
-class alignas( atomic_variable_align ) od_node_base_hazard_handler_next : public od_node_base_common<NODE_T> {
+class alignas( atomic_variable_align ) od_node_base_hazard_handler_next : public od_node_base_if<od_node_base_hazard_handler_next<NODE_T>> {
 public:
 	using node_type            = NODE_T;
 	using node_pointer         = NODE_T*;
@@ -284,12 +284,12 @@ private:
 template <typename NODE_T>
 class alignas( atomic_variable_align ) od_node_base : public od_node_base_raw_next<NODE_T>, public od_node_base_hazard_handler_next<NODE_T> {
 public:
-	using node_type               = NODE_T;
-	using node_pointer            = NODE_T*;
-	using hazard_ptr_handler_t    = typename od_node_base_hazard_handler_next<NODE_T>::hazard_ptr_handler_t;
-	using hazard_pointer          = typename od_node_base_hazard_handler_next<NODE_T>::hazard_pointer;
-	using base_t_w_raw_pointer    = od_node_base_raw_next<NODE_T>;
-	using base_t_w_hazard_handler = od_node_base_hazard_handler_next<NODE_T>;
+	using node_type                          = NODE_T;
+	using node_pointer                       = NODE_T*;
+	using hazard_ptr_handler_t               = typename od_node_base_hazard_handler_next<NODE_T>::hazard_ptr_handler_t;
+	using hazard_pointer                     = typename od_node_base_hazard_handler_next<NODE_T>::hazard_pointer;
+	using od_node_base_raw_next_t            = od_node_base_raw_next<NODE_T>;
+	using od_node_base_hazard_handler_next_t = od_node_base_hazard_handler_next<NODE_T>;
 
 	od_node_base( node_pointer p_next_arg = nullptr ) noexcept
 	  : od_node_base_raw_next<NODE_T>( nullptr )
@@ -307,22 +307,22 @@ public:
 	public:
 		static inline node_pointer read( const node_pointer onb )
 		{
-			return onb->base_t_w_raw_pointer::next();
+			return onb->od_node_base_raw_next_t::next();
 		}
 		static inline void write( node_pointer onb, node_pointer p )
 		{
-			onb->base_t_w_raw_pointer::set_next( p );
+			onb->od_node_base_raw_next_t::set_next( p );
 		}
 	};
 	class hph_next_rw {
 	public:
 		static inline node_pointer read( const node_pointer onb )
 		{
-			return onb->base_t_w_hazard_handler::next();
+			return onb->od_node_base_hazard_handler_next_t::next();
 		}
 		static inline void write( node_pointer onb, node_pointer p )
 		{
-			onb->base_t_w_hazard_handler::set_next( p );
+			onb->od_node_base_hazard_handler_next_t::set_next( p );
 		}
 	};
 };

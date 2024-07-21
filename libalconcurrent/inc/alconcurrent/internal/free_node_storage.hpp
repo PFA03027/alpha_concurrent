@@ -373,8 +373,8 @@ public:
 	using value_type              = T;
 	using reference_type          = T&;
 	using const_reference_type    = const T&;
-	using base_t_w_raw_pointer    = typename od_node_base<od_node<T>>::base_t_w_raw_pointer;
-	using base_t_w_hazard_handler = typename od_node_base<od_node<T>>::base_t_w_hazard_handler;
+	using base_t_w_raw_pointer    = typename od_node_base<od_node<T>>::od_node_base_raw_next_t;
+	using base_t_w_hazard_handler = typename od_node_base<od_node<T>>::od_node_base_hazard_handler_next_t;
 
 	template <bool IsDefaultConstructible = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructible>::type* = nullptr>
 	od_node( od_node* p_next_arg ) noexcept( std::is_nothrow_default_constructible<value_type>::value )
