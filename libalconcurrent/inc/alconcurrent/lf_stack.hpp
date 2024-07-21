@@ -393,10 +393,11 @@ public:
 	  : x_stack_list()
 	{
 	}
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_NODE_COUNT
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
 	~x_stack_list()
 	{
-		internal::LogOutput( log_type::TEST, "Number of free nodes: %zu", internal::od_node_pool<node_type>::size() );
+		internal::LogOutput( log_type::TEST, "%s", internal::od_node_pool<node_type>::profile_info_string().c_str() );
+		// internal::od_node_pool<node_type>::clear_as_possible_as();
 	}
 #endif
 

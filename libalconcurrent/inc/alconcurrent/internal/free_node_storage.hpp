@@ -461,6 +461,7 @@ using od_node_list_lockable = od_node_list_lockable_base<od_node_list<T>>;
 template <typename T>
 using od_node_list_lockfree = od_node_stack_lockfree_base<od_node<T>>;
 
+#if 0
 template <typename T>
 class x_free_od_node_storage {
 public:
@@ -713,7 +714,7 @@ ALCC_INTERNAL_CONSTINIT std::atomic<size_t> x_free_od_node_storage<T>::g_fn_list
 
 template <typename T>
 thread_local ALCC_INTERNAL_CONSTINIT typename x_free_od_node_storage<T>::thread_local_od_node_list x_free_od_node_storage<T>::tl_fn_list_( x_free_od_node_storage<T>::g_fn_list_ );
-
+#endif
 }   // namespace internal
 
 /*!
