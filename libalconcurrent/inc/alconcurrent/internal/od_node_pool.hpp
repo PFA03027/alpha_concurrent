@@ -36,7 +36,6 @@ struct countermeasure_gcc_bug_deletable_obj_abst {
 
 template <typename NODE_T, typename OD_NODE_LIST_T = od_node_raw_list_base<NODE_T>, typename OD_NODE_LOCKFREE_STACK_T = od_node_stack_lockfree_base<NODE_T>>
 class od_node_pool {
-	static_assert( std::is_base_of<typename NODE_T::next_node_type, NODE_T>::value, "NODE_T::next_node_type should be a base class of NODE_T." );
 	static_assert( std::is_base_of<od_node_raw_list_base<NODE_T>, OD_NODE_LIST_T>::value, "od_node_list_base<NODE_T> should be a base class of OD_NODE_LIST_T." );
 	static_assert( std::is_base_of<od_node_stack_lockfree_base<NODE_T>, OD_NODE_LOCKFREE_STACK_T>::value, "od_node_stack_lockfree_base<NODE_T> should be a base class of OD_NODE_LOCKFREE_STACK_T." );
 

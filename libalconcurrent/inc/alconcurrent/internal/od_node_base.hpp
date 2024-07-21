@@ -24,20 +24,18 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
-template <typename NODE_T, typename NEXT_NODE_T>
+template <typename NODE_T>
 class alignas( atomic_variable_align ) od_node_base_common {
 public:
-	using node_type         = NODE_T;
-	using node_pointer      = NODE_T*;
-	using next_node_type    = NEXT_NODE_T;
-	using next_node_pointer = NEXT_NODE_T*;
+	using node_type    = NODE_T;
+	using node_pointer = NODE_T*;
 
-	next_node_pointer next( void ) const noexcept
+	node_pointer next( void ) const noexcept
 	{
 		return this->NODE_T::next();
 	}
 
-	void set_next( next_node_pointer p_n ) noexcept
+	void set_next( node_pointer p_n ) noexcept
 	{
 		this->NODE_T::set_next( p_n );
 	}
@@ -190,13 +188,11 @@ public:
 #endif
 };
 
-template <typename NODE_T, typename NEXT_NODE_T = NODE_T>
-class alignas( atomic_variable_align ) od_node_base_raw_next : public od_node_base_common<NODE_T, NEXT_NODE_T> {
+template <typename NODE_T>
+class alignas( atomic_variable_align ) od_node_base_raw_next : public od_node_base_common<NODE_T> {
 public:
-	using node_type         = NODE_T;
-	using node_pointer      = NODE_T*;
-	using next_node_type    = NEXT_NODE_T;
-	using next_node_pointer = NEXT_NODE_T*;
+	using node_type    = NODE_T;
+	using node_pointer = NODE_T*;
 
 	explicit od_node_base_raw_next( node_pointer p_next_arg = nullptr ) noexcept
 	  : p_raw_next_( p_next_arg )
@@ -225,29 +221,27 @@ public:
 		return *this;
 	}
 
-	next_node_pointer next( void ) const noexcept
+	node_pointer next( void ) const noexcept
 	{
 		return p_raw_next_;
 	}
 
-	void set_next( next_node_pointer p_n ) noexcept
+	void set_next( node_pointer p_n ) noexcept
 	{
 		p_raw_next_ = p_n;
 	}
 
 private:
-	next_node_pointer p_raw_next_;
+	node_pointer p_raw_next_;
 };
 
-template <typename NODE_T, typename NEXT_NODE_T = NODE_T>
-class alignas( atomic_variable_align ) od_node_base_hazard_handler_next : public od_node_base_common<NODE_T, NEXT_NODE_T> {
+template <typename NODE_T>
+class alignas( atomic_variable_align ) od_node_base_hazard_handler_next : public od_node_base_common<NODE_T> {
 public:
 	using node_type            = NODE_T;
 	using node_pointer         = NODE_T*;
-	using next_node_type       = NEXT_NODE_T;
-	using next_node_pointer    = NEXT_NODE_T*;
-	using hazard_ptr_handler_t = hazard_ptr_handler<next_node_type>;
-	using hazard_pointer       = typename hazard_ptr_handler<next_node_type>::hazard_pointer;
+	using hazard_ptr_handler_t = hazard_ptr_handler<node_type>;
+	using hazard_pointer       = typename hazard_ptr_handler<node_type>::hazard_pointer;
 
 	explicit od_node_base_hazard_handler_next( node_pointer p_next_arg = nullptr ) noexcept
 	  : hph_next_( p_next_arg )
@@ -258,12 +252,12 @@ public:
 	od_node_base_hazard_handler_next& operator=( const od_node_base_hazard_handler_next& ) = default;
 	od_node_base_hazard_handler_next& operator=( od_node_base_hazard_handler_next&& )      = default;
 
-	next_node_pointer next( void ) const noexcept
+	node_pointer next( void ) const noexcept
 	{
 		return hph_next_.load();
 	}
 
-	void set_next( next_node_pointer p_n ) noexcept
+	void set_next( node_pointer p_n ) noexcept
 	{
 		hph_next_.store( p_n );
 	}
@@ -287,48 +281,46 @@ private:
 	hazard_ptr_handler_t hph_next_;
 };
 
-template <typename NODE_T, typename NEXT_NODE_T = NODE_T>
-class alignas( atomic_variable_align ) od_node_base : public od_node_base_raw_next<NODE_T, NEXT_NODE_T>, public od_node_base_hazard_handler_next<NODE_T, NEXT_NODE_T> {
+template <typename NODE_T>
+class alignas( atomic_variable_align ) od_node_base : public od_node_base_raw_next<NODE_T>, public od_node_base_hazard_handler_next<NODE_T> {
 public:
 	using node_type               = NODE_T;
 	using node_pointer            = NODE_T*;
-	using next_node_type          = NEXT_NODE_T;
-	using next_node_pointer       = NEXT_NODE_T*;
-	using hazard_ptr_handler_t    = typename od_node_base_hazard_handler_next<NODE_T, NEXT_NODE_T>::hazard_ptr_handler_t;
-	using hazard_pointer          = typename od_node_base_hazard_handler_next<NODE_T, NEXT_NODE_T>::hazard_pointer;
-	using base_t_w_raw_pointer    = od_node_base_raw_next<NODE_T, NEXT_NODE_T>;
-	using base_t_w_hazard_handler = od_node_base_hazard_handler_next<NODE_T, NEXT_NODE_T>;
+	using hazard_ptr_handler_t    = typename od_node_base_hazard_handler_next<NODE_T>::hazard_ptr_handler_t;
+	using hazard_pointer          = typename od_node_base_hazard_handler_next<NODE_T>::hazard_pointer;
+	using base_t_w_raw_pointer    = od_node_base_raw_next<NODE_T>;
+	using base_t_w_hazard_handler = od_node_base_hazard_handler_next<NODE_T>;
 
 	od_node_base( node_pointer p_next_arg = nullptr ) noexcept
-	  : od_node_base_raw_next<NODE_T, NEXT_NODE_T>( nullptr )
-	  , od_node_base_hazard_handler_next<NODE_T, NEXT_NODE_T>( p_next_arg )
+	  : od_node_base_raw_next<NODE_T>( nullptr )
+	  , od_node_base_hazard_handler_next<NODE_T>( p_next_arg )
 	{
 	}
 
 	void clear_next( void )
 	{
-		od_node_base_raw_next<NODE_T, NEXT_NODE_T>::set_next( nullptr );
-		od_node_base_hazard_handler_next<NODE_T, NEXT_NODE_T>::set_next( nullptr );
+		od_node_base_raw_next<NODE_T>::set_next( nullptr );
+		od_node_base_hazard_handler_next<NODE_T>::set_next( nullptr );
 	}
 
 	class raw_next_rw {
 	public:
-		static inline next_node_pointer read( const node_pointer onb )
+		static inline node_pointer read( const node_pointer onb )
 		{
 			return onb->base_t_w_raw_pointer::next();
 		}
-		static inline void write( node_pointer onb, next_node_pointer p )
+		static inline void write( node_pointer onb, node_pointer p )
 		{
 			onb->base_t_w_raw_pointer::set_next( p );
 		}
 	};
 	class hph_next_rw {
 	public:
-		static inline next_node_pointer read( const node_pointer onb )
+		static inline node_pointer read( const node_pointer onb )
 		{
 			return onb->base_t_w_hazard_handler::next();
 		}
-		static inline void write( node_pointer onb, next_node_pointer p )
+		static inline void write( node_pointer onb, node_pointer p )
 		{
 			onb->base_t_w_hazard_handler::set_next( p );
 		}
@@ -345,7 +337,6 @@ public:
  */
 template <typename NODE_T, typename NEXT_RW_T>
 class alignas( atomic_variable_align ) od_node_list_base_impl {
-	static_assert( std::is_base_of<typename NODE_T::next_node_type, NODE_T>::value, "NODE_T::next_node_type should be a base class of NODE_T." );
 	static_assert( std::is_same<NEXT_RW_T, typename NODE_T::raw_next_rw>::value ||
 	                   std::is_same<NEXT_RW_T, typename NODE_T::hph_next_rw>::value,
 	               "NEXT_RW_T should be accesser class of od_node_base<NODE_T>" );
@@ -454,8 +445,8 @@ public:
 	{
 		if ( src.p_head_ == nullptr ) return;
 
-		next_node_pointer p_src_head = src.p_head_;
-		next_node_pointer p_src_tail = src.p_tail_;
+		link_node_pointer p_src_head = src.p_head_;
+		link_node_pointer p_src_tail = src.p_tail_;
 		src.p_head_                  = nullptr;
 		src.p_tail_                  = nullptr;
 
@@ -466,8 +457,8 @@ public:
 	{
 		if ( p_nd == nullptr ) return;
 
-		next_node_pointer p_cur = p_nd;
-		next_node_pointer p_nxt = node_next_rw_t::read( p_cur );
+		link_node_pointer p_cur = p_nd;
+		link_node_pointer p_nxt = node_next_rw_t::read( p_cur );
 		while ( p_nxt != nullptr ) {
 			p_cur = p_nxt;
 			p_nxt = node_next_rw_t::read( p_cur );
@@ -480,8 +471,8 @@ public:
 	{
 		if ( src.p_head_ == nullptr ) return;
 
-		next_node_pointer p_src_head = src.p_head_;
-		next_node_pointer p_src_tail = src.p_tail_;
+		link_node_pointer p_src_head = src.p_head_;
+		link_node_pointer p_src_tail = src.p_tail_;
 		src.p_head_                  = nullptr;
 		src.p_tail_                  = nullptr;
 
@@ -492,8 +483,8 @@ public:
 	{
 		if ( p_nd == nullptr ) return;
 
-		next_node_pointer p_cur = p_nd;
-		next_node_pointer p_nxt = node_next_rw_t::read( p_cur );
+		link_node_pointer p_cur = p_nd;
+		link_node_pointer p_nxt = node_next_rw_t::read( p_cur );
 		while ( p_nxt != nullptr ) {
 			p_cur = p_nxt;
 			p_nxt = node_next_rw_t::read( p_cur );
@@ -504,7 +495,7 @@ public:
 
 	node_pointer pop_front( void ) noexcept
 	{
-		next_node_pointer p_ans = p_head_;
+		link_node_pointer p_ans = p_head_;
 		if ( p_ans == nullptr ) return nullptr;
 
 		p_head_ = node_next_rw_t::read( p_ans );
@@ -512,10 +503,10 @@ public:
 		node_next_rw_t::write( p_ans, nullptr );
 		node_pointer p_tmp = dynamic_cast<node_pointer>( p_ans );
 		if ( p_tmp == nullptr ) {
-			LogOutput( log_type::ERR, "fail to dynamic_cast from next_node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
+			LogOutput( log_type::ERR, "fail to dynamic_cast from node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
 			delete p_ans;
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
-			throw std::logic_error( "fail to dynamic_cast from next_node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
+			throw std::logic_error( "fail to dynamic_cast from node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
 #endif
 		}
 
@@ -543,15 +534,15 @@ public:
 		}
 #endif
 
-		next_node_pointer p_pre = nullptr;
-		next_node_pointer p_cur = p_head_;
+		link_node_pointer p_pre = nullptr;
+		link_node_pointer p_cur = p_head_;
 		while ( p_cur != nullptr ) {
-			next_node_pointer  p_next = node_next_rw_t::read( p_cur );
+			link_node_pointer  p_next = node_next_rw_t::read( p_cur );
 			const node_pointer p_tmp  = dynamic_cast<const node_pointer>( p_cur );
 			if ( p_tmp == nullptr ) {
-				LogOutput( log_type::ERR, "fail to dynamic_cast from next_node_pointer to const node_pointer. this error caused by type mismatch implementation logic error" );
+				LogOutput( log_type::ERR, "fail to dynamic_cast from node_pointer to const node_pointer. this error caused by type mismatch implementation logic error" );
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
-				throw std::logic_error( "fail to dynamic_cast from next_node_pointer to const node_pointer. this error caused by type mismatch implementation logic error" );
+				throw std::logic_error( "fail to dynamic_cast from node_pointer to const node_pointer. this error caused by type mismatch implementation logic error" );
 #endif
 				p_pre = p_cur;
 				p_cur = p_next;
@@ -591,19 +582,19 @@ public:
 	template <typename Pred>
 	void clear( Pred pred )
 	{
-		next_node_pointer p_cur = p_head_;
+		link_node_pointer p_cur = p_head_;
 		p_head_                 = nullptr;
 		p_tail_                 = nullptr;
 		while ( p_cur != nullptr ) {
-			auto p_nxt = node_next_rw_t::read( p_cur );
+			link_node_pointer p_nxt = node_next_rw_t::read( p_cur );
 			p_cur->clear_next();
 			node_pointer p_tmp = dynamic_cast<node_pointer>( p_cur );
 			if ( p_tmp != nullptr ) {
 				pred( p_tmp );
 			} else {
-				LogOutput( log_type::ERR, "fail to dynamic_cast from next_node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
+				LogOutput( log_type::ERR, "fail to dynamic_cast from node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
-				throw std::logic_error( "fail to dynamic_cast from next_node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
+				throw std::logic_error( "fail to dynamic_cast from node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
 #endif
 			}
 			p_cur = p_nxt;
@@ -631,9 +622,9 @@ public:
 	}
 
 private:
-	using next_node_pointer = typename NODE_T::next_node_pointer;
+	using link_node_pointer = typename NODE_T::node_pointer;
 
-	void merge_push_front( next_node_pointer p_nd_head, next_node_pointer p_nd_tail ) noexcept
+	void merge_push_front( link_node_pointer p_nd_head, link_node_pointer p_nd_tail ) noexcept
 	{
 		if ( p_head_ == nullptr ) {
 			p_head_ = p_nd_head;
@@ -653,7 +644,7 @@ private:
 #endif
 	}
 
-	void merge_push_back( next_node_pointer p_nd_head, next_node_pointer p_nd_tail ) noexcept
+	void merge_push_back( link_node_pointer p_nd_head, link_node_pointer p_nd_tail ) noexcept
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_TAIL_NODE_NEXT_NULLPTR
 		if ( p_nd_tail != nullptr ) {
@@ -673,8 +664,8 @@ private:
 		}
 	}
 
-	next_node_pointer p_head_ = nullptr;
-	next_node_pointer p_tail_ = nullptr;
+	link_node_pointer p_head_ = nullptr;
+	link_node_pointer p_tail_ = nullptr;
 };
 
 /**
@@ -938,10 +929,10 @@ public:
 	od_node_stack_lockfree_base& operator=( od_node_stack_lockfree_base&& src )  = delete;
 	~od_node_stack_lockfree_base()
 	{
-		next_node_pointer p_cur = hph_head_.load();
+		link_node_pointer p_cur = hph_head_.load();
 		hph_head_.store( nullptr );
 		while ( p_cur != nullptr ) {
-			next_node_pointer p_nxt = p_cur->base_t_w_hazard_handler::next();
+			link_node_pointer p_nxt = p_cur->base_t_w_hazard_handler::next();
 			delete p_cur;
 			p_cur = p_nxt;
 		}
@@ -967,8 +958,8 @@ public:
 			LogOutput( log_type::WARN, "od_node_list_lockfree::push_front() receives a od_node<T> that has non nullptr in p_raw_next_" );
 		}
 #endif
-		next_node_pointer p_typematch_node = p_nd;
-		next_node_pointer p_expected       = hph_head_.load();
+		link_node_pointer p_typematch_node = p_nd;
+		link_node_pointer p_expected       = hph_head_.load();
 		p_nd->base_t_w_hazard_handler::set_next( p_expected );
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_typematch_node, std::memory_order_release, std::memory_order_relaxed ) ) {
 			p_nd->base_t_w_hazard_handler::set_next( p_expected );
@@ -985,10 +976,10 @@ public:
 	node_pointer pop_front( void ) noexcept
 	{
 		hazard_pointer    hp_cur_head = hph_head_.get();
-		next_node_pointer p_expected  = hp_cur_head.get();
+		link_node_pointer p_expected  = hp_cur_head.get();
 		if ( p_expected == nullptr ) return nullptr;
 
-		next_node_pointer p_new_head = hp_cur_head->base_t_w_hazard_handler::next();
+		link_node_pointer p_new_head = hp_cur_head->base_t_w_hazard_handler::next();
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_head, std::memory_order_release, std::memory_order_relaxed ) ) {
 			hp_cur_head = hph_head_.get();
 			p_expected  = hp_cur_head.get();
@@ -1003,16 +994,16 @@ public:
 		//    メンバ変数 v_ を参照しないアルゴリズムになっているので、以降は参照してよい。
 		//    hph_next_ は他スレッドで読みだされているため、書き換えてはならない。
 		//    なお、hp_cur_headは、他スレッドでもハザードポインタとして登録中であるため、ハザードポインタとしての登録がなくなるまで破棄してはならない。
-		next_node_pointer p_tmp = hp_cur_head.get();
+		link_node_pointer p_tmp = hp_cur_head.get();
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
 		node_pointer p_ans = dynamic_cast<node_pointer>( p_tmp );
 		if ( p_ans == nullptr ) {
-			LogOutput( log_type::ERR, "fail to dynamic_cast from next_node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
-			throw std::logic_error( "fail to dynamic_cast from next_node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
+			LogOutput( log_type::ERR, "fail to dynamic_cast from node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
+			throw std::logic_error( "fail to dynamic_cast from node_pointer to node_pointer. this error caused by type mismatch implementation logic error" );
 		}
 #else
 		// push_front()で入ってくるノードはnode_typeなので、
-		// popしたノードは、必ずnext_node_pointerからnode_pointerにcastできる。
+		// popしたノードは、必ずnode_pointerからnode_pointerにcastできる。
 		node_pointer p_ans = static_cast<node_pointer>( p_tmp );
 #endif
 
@@ -1020,14 +1011,13 @@ public:
 	}
 
 private:
+	using link_node_pointer    = typename NODE_T::node_pointer;
 	using hazard_ptr_handler_t = typename NODE_T::hazard_ptr_handler_t;
 	using hazard_pointer       = typename NODE_T::hazard_pointer;
-	using next_node_type       = typename NODE_T::next_node_type;
-	using next_node_pointer    = typename NODE_T::next_node_pointer;
 
-	// static_assert( std::is_base_of<next_node_pointer, node_type>::value, "NODE_T should be a derived class of next_node_pointer" );
+	// static_assert( std::is_base_of<node_pointer, node_type>::value, "NODE_T should be a derived class of node_pointer" );
 
-	using base_t_w_hazard_handler = od_node_base_hazard_handler_next<typename NODE_T::node_type, typename NODE_T::next_node_type>;
+	using base_t_w_hazard_handler = od_node_base_hazard_handler_next<typename NODE_T::node_type>;
 	static_assert( std::is_base_of<base_t_w_hazard_handler, NODE_T>::value, "NODE_T should be a derived class of od_node_base_hazard_handler_next<>" );
 
 	hazard_ptr_handler_t hph_head_;
