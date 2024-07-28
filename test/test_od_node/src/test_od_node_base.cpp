@@ -60,7 +60,7 @@ TEST( od_node_list_base_class, CanConstruct )
 
 	// Assert
 	EXPECT_EQ( sut.pop_front(), nullptr );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 }
@@ -74,7 +74,7 @@ TEST( od_node_list_base_class, CanPushFront1 )
 	sut.push_front( new test_od_node_base( nullptr ) );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 	auto p = sut.pop_front();
@@ -94,7 +94,7 @@ TEST( od_node_list_base_class, CanPushFront2 )
 	sut.push_front( new test_od_node_base( nullptr ) );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 2 );
 #endif
 	auto p = sut.pop_front();
@@ -112,7 +112,7 @@ TEST( od_node_list_base_class, CanPop1 )
 	// Arrange
 	test_od_node_list_base sut;
 	sut.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 
@@ -120,7 +120,7 @@ TEST( od_node_list_base_class, CanPop1 )
 	auto p = sut.pop_front();
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 	EXPECT_NE( p, nullptr );
@@ -136,7 +136,7 @@ TEST( od_node_list_base_class, CanPop2 )
 	test_od_node_list_base sut;
 	sut.push_front( new test_od_node_base( nullptr ) );
 	sut.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 2 );
 #endif
 
@@ -144,7 +144,7 @@ TEST( od_node_list_base_class, CanPop2 )
 	auto p = sut.pop_front();
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 	EXPECT_NE( p, nullptr );
@@ -161,7 +161,7 @@ TEST( od_node_list_base_class, CanMoveConstruct0 )
 {
 	// Arrange
 	test_od_node_list_base src;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 0 );
 #endif
 
@@ -169,7 +169,7 @@ TEST( od_node_list_base_class, CanMoveConstruct0 )
 	test_od_node_list_base sut( std::move( src ) );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 	auto p = sut.pop_front();
@@ -184,7 +184,7 @@ TEST( od_node_list_base_class, CanMoveConstruct1 )
 	// Arrange
 	test_od_node_list_base src;
 	src.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 1 );
 #endif
 
@@ -192,7 +192,7 @@ TEST( od_node_list_base_class, CanMoveConstruct1 )
 	test_od_node_list_base sut( std::move( src ) );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 	auto p = sut.pop_front();
@@ -210,11 +210,11 @@ TEST( od_node_list_base_class, CanSwap )
 	// Arrange
 	test_od_node_list_base src;
 	src.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 1 );
 #endif
 	test_od_node_list_base sut;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 
@@ -222,7 +222,7 @@ TEST( od_node_list_base_class, CanSwap )
 	sut.swap( src );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 0 );
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
@@ -238,11 +238,11 @@ TEST( od_node_list_base_class, CanMoveAssignment )
 	// Arrange
 	test_od_node_list_base src;
 	src.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 1 );
 #endif
 	test_od_node_list_base sut;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 
@@ -250,7 +250,7 @@ TEST( od_node_list_base_class, CanMoveAssignment )
 	sut = std::move( src );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 0 );
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
@@ -270,11 +270,11 @@ TEST( od_node_list_base_class, CanMergePushFrontToEmptyList1 )
 	test_od_node_list_base src;
 	src.push_front( new test_od_node_base( nullptr ) );
 	src.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 2 );
 #endif
 	test_od_node_list_base sut;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 
@@ -282,7 +282,7 @@ TEST( od_node_list_base_class, CanMergePushFrontToEmptyList1 )
 	sut.merge_push_front( std::move( src ) );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 0 );
 	EXPECT_EQ( sut.profile_info_count(), 2 );
 #endif
@@ -305,7 +305,7 @@ TEST( od_node_list_base_class, CanMergePushFrontToEmptyList2 )
 	test_od_node_list_base src;
 	src.push_front( new test_od_node_base( nullptr ) );
 	src.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 2 );
 #endif
 	test_od_node_list_base sut;
@@ -319,7 +319,7 @@ TEST( od_node_list_base_class, CanMergePushFrontToEmptyList2 )
 	delete p;
 	p = sut.pop_front();
 	EXPECT_EQ( p, nullptr );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 
@@ -327,7 +327,7 @@ TEST( od_node_list_base_class, CanMergePushFrontToEmptyList2 )
 	sut.merge_push_front( std::move( src ) );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 2 );
 #endif
 	p = sut.pop_front();
@@ -357,7 +357,7 @@ TEST( od_node_list_base_class, CanPushFrontToEmptyList )
 	delete p;
 	p = sut.pop_front();
 	EXPECT_EQ( p, nullptr );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 
@@ -365,7 +365,7 @@ TEST( od_node_list_base_class, CanPushFrontToEmptyList )
 	sut.push_front( new test_od_node_base( nullptr ) );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 	p = sut.pop_front();
@@ -381,12 +381,12 @@ TEST( od_node_list_base_class, CanMergePushFrontToList )
 	test_od_node_list_base src;
 	src.push_front( new test_od_node_base( nullptr ) );
 	src.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 2 );
 #endif
 	test_od_node_list_base sut;
 	sut.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 
@@ -394,7 +394,7 @@ TEST( od_node_list_base_class, CanMergePushFrontToList )
 	sut.merge_push_front( std::move( src ) );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 0 );
 	EXPECT_EQ( sut.profile_info_count(), 3 );
 #endif
@@ -420,11 +420,11 @@ TEST( od_node_list_base_class, CanMergePushBackToEmptyList1 )
 	test_od_node_list_base src;
 	src.push_front( new test_od_node_base( nullptr ) );
 	src.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 2 );
 #endif
 	test_od_node_list_base sut;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 
@@ -432,7 +432,7 @@ TEST( od_node_list_base_class, CanMergePushBackToEmptyList1 )
 	sut.merge_push_back( std::move( src ) );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 0 );
 	EXPECT_EQ( sut.profile_info_count(), 2 );
 #endif
@@ -455,7 +455,7 @@ TEST( od_node_list_base_class, CanMergePushBackToEmptyList2 )
 	test_od_node_list_base src;
 	src.push_front( new test_od_node_base( nullptr ) );
 	src.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 2 );
 #endif
 	test_od_node_list_base sut;
@@ -469,7 +469,7 @@ TEST( od_node_list_base_class, CanMergePushBackToEmptyList2 )
 	delete p;
 	p = sut.pop_front();
 	EXPECT_EQ( p, nullptr );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 
@@ -477,7 +477,7 @@ TEST( od_node_list_base_class, CanMergePushBackToEmptyList2 )
 	sut.merge_push_back( std::move( src ) );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 0 );
 	EXPECT_EQ( sut.profile_info_count(), 2 );
 #endif
@@ -508,7 +508,7 @@ TEST( od_node_list_base_class, CanPushBackToEmptyList )
 	delete p;
 	p = sut.pop_front();
 	EXPECT_EQ( p, nullptr );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 
@@ -516,7 +516,7 @@ TEST( od_node_list_base_class, CanPushBackToEmptyList )
 	sut.push_back( new test_od_node_base( nullptr ) );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 	p = sut.pop_front();
@@ -532,12 +532,12 @@ TEST( od_node_list_base_class, CanMergePushBackToList )
 	test_od_node_list_base src;
 	src.push_front( new test_od_node_base( nullptr ) );
 	src.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 2 );
 #endif
 	test_od_node_list_base sut;
 	sut.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 
@@ -545,7 +545,7 @@ TEST( od_node_list_base_class, CanMergePushBackToList )
 	sut.merge_push_back( std::move( src ) );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( src.profile_info_count(), 0 );
 	EXPECT_EQ( sut.profile_info_count(), 3 );
 #endif
@@ -570,7 +570,7 @@ TEST( od_node_list_base_class, CanClearWithEmpty )
 	// Arrange
 	test_od_node_list_base sut;
 	EXPECT_TRUE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 
@@ -578,7 +578,7 @@ TEST( od_node_list_base_class, CanClearWithEmpty )
 	sut.clear();
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 	EXPECT_TRUE( sut.is_empty() );
@@ -590,7 +590,7 @@ TEST( od_node_list_base_class, CanClear )
 	test_od_node_list_base sut;
 	sut.push_front( new test_od_node_base( nullptr ) );
 	EXPECT_FALSE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 
@@ -598,7 +598,7 @@ TEST( od_node_list_base_class, CanClear )
 	sut.clear();
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 	EXPECT_TRUE( sut.is_empty() );
@@ -608,7 +608,7 @@ TEST( od_node_list_base_class, CanSplitWithEmpty1 )
 {
 	// Arrange
 	test_od_node_list_base sut;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 
@@ -616,11 +616,11 @@ TEST( od_node_list_base_class, CanSplitWithEmpty1 )
 	auto ret = sut.split_if( []( auto& ) -> bool { return true; } );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 	EXPECT_TRUE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( ret.profile_info_count(), 0 );
 #endif
 	EXPECT_TRUE( ret.is_empty() );
@@ -630,7 +630,7 @@ TEST( od_node_list_base_class, CanSplitWithEmpty2 )
 {
 	// Arrange
 	test_od_node_list_base sut;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 
@@ -638,11 +638,11 @@ TEST( od_node_list_base_class, CanSplitWithEmpty2 )
 	auto ret = sut.split_if( []( auto& ) -> bool { return false; } );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 	EXPECT_TRUE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( ret.profile_info_count(), 0 );
 #endif
 	EXPECT_TRUE( ret.is_empty() );
@@ -653,7 +653,7 @@ TEST( od_node_list_base_class, CanSplitWithAllTrue1 )
 	// Arrange
 	test_od_node_list_base sut;
 	sut.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 
@@ -661,11 +661,11 @@ TEST( od_node_list_base_class, CanSplitWithAllTrue1 )
 	auto ret = sut.split_if( []( auto& ) -> bool { return true; } );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 	EXPECT_TRUE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( ret.profile_info_count(), 1 );
 #endif
 	EXPECT_FALSE( ret.is_empty() );
@@ -677,7 +677,7 @@ TEST( od_node_list_base_class, CanSplitWithAllTrue2 )
 	test_od_node_list_base sut;
 	sut.push_front( new test_od_node_base( nullptr ) );
 	sut.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 2 );
 #endif
 
@@ -685,11 +685,11 @@ TEST( od_node_list_base_class, CanSplitWithAllTrue2 )
 	auto ret = sut.split_if( []( auto& ) -> bool { return true; } );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 	EXPECT_TRUE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( ret.profile_info_count(), 2 );
 #endif
 	EXPECT_FALSE( ret.is_empty() );
@@ -702,7 +702,7 @@ TEST( od_node_list_base_class, CanSplitWithAllTrue3 )
 	sut.push_front( new test_od_node_base( nullptr ) );
 	sut.push_front( new test_od_node_base( nullptr ) );
 	sut.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 3 );
 #endif
 
@@ -710,11 +710,11 @@ TEST( od_node_list_base_class, CanSplitWithAllTrue3 )
 	auto ret = sut.split_if( []( auto& ) -> bool { return true; } );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 	EXPECT_TRUE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( ret.profile_info_count(), 3 );
 #endif
 	EXPECT_FALSE( ret.is_empty() );
@@ -725,7 +725,7 @@ TEST( od_node_list_base_class, CanSplitWithAllFalse1 )
 	// Arrange
 	test_od_node_list_base sut;
 	sut.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 
@@ -733,11 +733,11 @@ TEST( od_node_list_base_class, CanSplitWithAllFalse1 )
 	auto ret = sut.split_if( []( auto& ) -> bool { return false; } );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 	EXPECT_FALSE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( ret.profile_info_count(), 0 );
 #endif
 	EXPECT_TRUE( ret.is_empty() );
@@ -749,7 +749,7 @@ TEST( od_node_list_base_class, CanSplitWithAllFalse2 )
 	test_od_node_list_base sut;
 	sut.push_front( new test_od_node_base( nullptr ) );
 	sut.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 2 );
 #endif
 
@@ -757,11 +757,11 @@ TEST( od_node_list_base_class, CanSplitWithAllFalse2 )
 	auto ret = sut.split_if( []( auto& ) -> bool { return false; } );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 2 );
 #endif
 	EXPECT_FALSE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( ret.profile_info_count(), 0 );
 #endif
 	EXPECT_TRUE( ret.is_empty() );
@@ -774,7 +774,7 @@ TEST( od_node_list_base_class, CanSplitWithAllFalse3 )
 	sut.push_front( new test_od_node_base( nullptr ) );
 	sut.push_front( new test_od_node_base( nullptr ) );
 	sut.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 3 );
 #endif
 
@@ -782,11 +782,11 @@ TEST( od_node_list_base_class, CanSplitWithAllFalse3 )
 	auto ret = sut.split_if( []( auto& ) -> bool { return false; } );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 3 );
 #endif
 	EXPECT_FALSE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( ret.profile_info_count(), 0 );
 #endif
 	EXPECT_TRUE( ret.is_empty() );
@@ -797,7 +797,7 @@ TEST( od_node_list_base_class, CanSplitWithOddTrue1 )
 	// Arrange
 	test_od_node_list_base sut;
 	sut.push_front( new test_od_node_base( nullptr ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 	int x = 0;
@@ -806,11 +806,11 @@ TEST( od_node_list_base_class, CanSplitWithOddTrue1 )
 	auto ret = sut.split_if( [&x]( auto& ) -> bool { x++; return ((x%2) == 1); } );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 0 );
 #endif
 	EXPECT_TRUE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( ret.profile_info_count(), 1 );
 #endif
 	EXPECT_FALSE( ret.is_empty() );
@@ -823,7 +823,7 @@ TEST( od_node_list_base_class, CanSplitWithOddTrue2 )
 	sut.push_front( new test_od_node_base( nullptr ) );
 	sut.push_front( new test_od_node_base( nullptr ) );
 	int x = 0;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 2 );
 #endif
 
@@ -831,11 +831,11 @@ TEST( od_node_list_base_class, CanSplitWithOddTrue2 )
 	auto ret = sut.split_if( [&x]( auto& ) -> bool { x++; return ((x%2) == 1); } );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 	EXPECT_FALSE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( ret.profile_info_count(), 1 );
 #endif
 	EXPECT_FALSE( ret.is_empty() );
@@ -849,7 +849,7 @@ TEST( od_node_list_base_class, CanSplitWithOddTrue3 )
 	sut.push_front( new test_od_node_base( nullptr ) );
 	sut.push_front( new test_od_node_base( nullptr ) );
 	int x = 0;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 3 );
 #endif
 
@@ -857,11 +857,11 @@ TEST( od_node_list_base_class, CanSplitWithOddTrue3 )
 	auto ret = sut.split_if( [&x]( auto& ) -> bool { x++; return ((x%2) == 1); } );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 	EXPECT_FALSE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( ret.profile_info_count(), 2 );
 #endif
 	EXPECT_FALSE( ret.is_empty() );
@@ -875,7 +875,7 @@ TEST( od_node_list_base_class, CanSplitWithEvenTrue1 )
 	test_od_node_list_base sut;
 	sut.push_front( new test_od_node_base( nullptr ) );
 	int x = 1;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 
@@ -883,11 +883,11 @@ TEST( od_node_list_base_class, CanSplitWithEvenTrue1 )
 	auto ret = sut.split_if( [&x]( auto& ) -> bool { x++; return ((x%2) == 1); } );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 	EXPECT_FALSE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( ret.profile_info_count(), 0 );
 #endif
 	EXPECT_TRUE( ret.is_empty() );
@@ -900,7 +900,7 @@ TEST( od_node_list_base_class, CanSplitWithEvenTrue2 )
 	sut.push_front( new test_od_node_base( nullptr ) );
 	sut.push_front( new test_od_node_base( nullptr ) );
 	int x = 1;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 2 );
 #endif
 
@@ -908,11 +908,11 @@ TEST( od_node_list_base_class, CanSplitWithEvenTrue2 )
 	auto ret = sut.split_if( [&x]( auto& ) -> bool { x++; return ((x%2) == 1); } );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 1 );
 #endif
 	EXPECT_FALSE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( ret.profile_info_count(), 1 );
 #endif
 	EXPECT_FALSE( ret.is_empty() );
@@ -926,7 +926,7 @@ TEST( od_node_list_base_class, CanSplitWithEvenTrue3 )
 	sut.push_front( new test_od_node_base( nullptr ) );
 	sut.push_front( new test_od_node_base( nullptr ) );
 	int x = 1;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 3 );
 #endif
 
@@ -934,11 +934,11 @@ TEST( od_node_list_base_class, CanSplitWithEvenTrue3 )
 	auto ret = sut.split_if( [&x]( auto& ) -> bool { x++; return ((x%2) == 1); } );
 
 	// Assert
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( sut.profile_info_count(), 2 );
 #endif
 	EXPECT_FALSE( sut.is_empty() );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	EXPECT_EQ( ret.profile_info_count(), 1 );
 #endif
 	EXPECT_FALSE( ret.is_empty() );

@@ -393,7 +393,7 @@ public:
 	  : x_stack_list()
 	{
 	}
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	~x_stack_list()
 	{
 		if ( node_pool_t::profile_info_count() != 0 ) {

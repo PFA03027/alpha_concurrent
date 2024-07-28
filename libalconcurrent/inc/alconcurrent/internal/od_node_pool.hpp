@@ -58,7 +58,7 @@ public:
 			p_nd->hph_next_.store( nullptr );
 		}
 #endif
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		++node_count_total_;
 #endif
 
@@ -92,7 +92,7 @@ public:
 		if ( p_ans != nullptr ) {
 			if ( !hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
 				p_ans->clear_next();
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 				node_count_total_--;
 #endif
 				return p_ans;
@@ -106,7 +106,7 @@ public:
 			while ( p_ans != nullptr ) {
 				if ( !hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
 					p_ans->clear_next();
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 					node_count_total_--;
 #endif
 					// tl_odn_list_.merge_push_back( std::move( lk.ref() ) );
@@ -123,7 +123,7 @@ public:
 				// popped node is not in hazard pointer list. therefore clear hph_next_
 				p_ans->clear_next();
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 				node_count_total_--;
 #endif
 				return p_ans;
@@ -148,7 +148,7 @@ public:
 				tl_odn_list_.push_back( p_working_node );   // まだハザードポインタに登録されていたので、スレッドローカルな変数に差し戻す。
 			} else {
 				p_working_node->clear_next();
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 				node_count_total_--;
 #endif
 				delete p_working_node;
@@ -165,7 +165,7 @@ public:
 					tl_odn_list_.push_back( p_working_node );
 				} else {
 					p_working_node->clear_next();
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 					node_count_total_--;
 #endif
 					delete p_working_node;
@@ -181,7 +181,7 @@ public:
 			} else {
 				// popped node is not in hazard pointer list. therefore clear hph_next_
 				p_working_node->clear_next();
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 				node_count_total_--;
 #endif
 				delete p_working_node;
@@ -196,7 +196,7 @@ public:
 
 	static size_t profile_info_count( void ) noexcept
 	{
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		return node_count_total_.load( std::memory_order_acquire );
 #else
 		return 0;
@@ -207,14 +207,14 @@ public:
 	{
 		std::string ans;
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		ans = "Free nodes:";
 		ans += "\ttotal: " + std::to_string( node_count_total_ );
 		ans += "\ttl_odn_list_: " + std::to_string( tl_od_node_list::profile_info_count() );
 		ans += "\tg_odn_list_: " + std::to_string( g_odn_list_.lock().ref().profile_info_count() );
 		ans += "\tg_lockfree_odn_list_: " + std::to_string( g_lockfree_odn_list_.profile_info_count() );
 #else
-		ans = "ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE is not enabled";
+		ans = "ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE is not enabled";
 #endif
 
 		return ans;
@@ -244,7 +244,7 @@ protected:
 		}
 		~tl_od_node_list()
 		{
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			internal::LogOutput( log_type::TEST, "mv thread local node %zu (%zu)", raw_list::profile_info_count(), node_count_in_tl_odn_list_.load() );
 			node_count_in_tl_odn_list_ -= raw_list::profile_info_count();
 #endif
@@ -254,7 +254,7 @@ protected:
 		void push_back( node_pointer p )
 		{
 			raw_list::push_back( p );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			if ( p != nullptr ) {
 				node_count_in_tl_odn_list_++;
 			}
@@ -263,7 +263,7 @@ protected:
 
 		node_pointer pop_front( void )
 		{
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			auto p_ans = raw_list::pop_front();
 			if ( p_ans != nullptr ) {
 				node_count_in_tl_odn_list_--;
@@ -276,7 +276,7 @@ protected:
 
 		void merge_push_back( raw_list&& src ) noexcept
 		{
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			node_count_in_tl_odn_list_ += src.profile_info_count();
 #endif
 			raw_list::merge_push_back( std::move( src ) );
@@ -289,7 +289,7 @@ protected:
 
 		static size_t profile_info_count( void )
 		{
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			return node_count_in_tl_odn_list_.load( std::memory_order_acquire );
 #else
 			return 0;
@@ -298,7 +298,7 @@ protected:
 
 	private:
 		g_node_list_t& ref_g_odn_list_;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		static std::atomic<size_t> node_count_in_tl_odn_list_;
 #endif
 	};
@@ -312,7 +312,7 @@ protected:
 #else
 	static thread_local tl_od_node_list tl_odn_list_;   //!< ハザードポインタに登録されている場合に、一時保管するためのリスト。GCCの不具合でコンパイルエラーとなるため、スレッドローカル変数が使えない。。。
 #endif
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	static std::atomic<size_t> node_count_total_;
 #endif
 };
@@ -332,7 +332,7 @@ template <typename NODE_T, typename OD_NODE_LIST_T, typename OD_NODE_LOCKFREE_ST
 thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T, OD_NODE_LOCKFREE_STACK_T>::tl_od_node_list od_node_pool<NODE_T, OD_NODE_LIST_T, OD_NODE_LOCKFREE_STACK_T>::tl_odn_list_( od_node_pool<NODE_T, OD_NODE_LIST_T, OD_NODE_LOCKFREE_STACK_T>::g_odn_list_ );
 #endif
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 template <typename NODE_T, typename OD_NODE_LIST_T, typename OD_NODE_LOCKFREE_STACK_T>
 std::atomic<size_t> od_node_pool<NODE_T, OD_NODE_LIST_T, OD_NODE_LOCKFREE_STACK_T>::node_count_total_( 0 );
 template <typename NODE_T, typename OD_NODE_LIST_T, typename OD_NODE_LOCKFREE_STACK_T>

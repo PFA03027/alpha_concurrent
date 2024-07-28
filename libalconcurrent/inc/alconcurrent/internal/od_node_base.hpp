@@ -347,13 +347,13 @@ public:
 	constexpr od_node_list_base_impl( od_node_list_base_impl&& src ) noexcept
 	  : p_head_( src.p_head_ )
 	  , p_tail_( src.p_tail_ )
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	  , count_( src.count_ )
 #endif
 	{
 		src.p_head_ = nullptr;
 		src.p_tail_ = nullptr;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		src.count_ = 0;
 #endif
 
@@ -399,7 +399,7 @@ public:
 		p_tail_     = src.p_tail_;
 		src.p_tail_ = p_tmp;
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		size_t tmp_cnt;
 		tmp_cnt    = count_;
 		count_     = src.count_;
@@ -432,7 +432,7 @@ public:
 		p_nd_link_t->set_next( safe_static_pointer_down_cast<node_pointer>( p_head_ ) );
 		p_head_ = p_nd_link_t;
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		count_++;
 #endif
 	}
@@ -454,7 +454,7 @@ public:
 			p_tail_ = p_nd;
 		}
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		count_++;
 #endif
 	}
@@ -465,7 +465,7 @@ public:
 
 		link_node_pointer p_src_head = src.p_head_;
 		link_node_pointer p_src_tail = src.p_tail_;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		size_t tmp_cnt = src.count_;
 		src.count_     = 0;
 #endif
@@ -473,7 +473,7 @@ public:
 		src.p_tail_ = nullptr;
 
 		merge_push_front( p_src_head, p_src_tail );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		count_ += tmp_cnt;
 #endif
 	}
@@ -482,7 +482,7 @@ public:
 	{
 		if ( p_nd == nullptr ) return;
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		size_t tmp_cnt = 0;
 #endif
 		link_node_pointer p_cur = p_nd;
@@ -490,13 +490,13 @@ public:
 		while ( p_nxt != nullptr ) {
 			p_cur = p_nxt;
 			p_nxt = p_cur->next();
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			tmp_cnt++;
 #endif
 		}
 
 		merge_push_front( p_nd, p_cur );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		count_ += tmp_cnt;
 #endif
 	}
@@ -507,7 +507,7 @@ public:
 
 		link_node_pointer p_src_head = src.p_head_;
 		link_node_pointer p_src_tail = src.p_tail_;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		size_t tmp_cnt = src.count_;
 		src.count_     = 0;
 #endif
@@ -515,7 +515,7 @@ public:
 		src.p_tail_ = nullptr;
 
 		merge_push_back( p_src_head, p_src_tail );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		count_ += tmp_cnt;
 #endif
 	}
@@ -524,7 +524,7 @@ public:
 	{
 		if ( p_nd == nullptr ) return;
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		size_t tmp_cnt = 0;
 #endif
 		link_node_pointer p_cur = p_nd;
@@ -532,13 +532,13 @@ public:
 		while ( p_nxt != nullptr ) {
 			p_cur = p_nxt;
 			p_nxt = p_cur->next();
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			tmp_cnt++;
 #endif
 		}
 
 		merge_push_back( p_nd, p_cur );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		count_ += tmp_cnt;
 #endif
 	}
@@ -550,7 +550,7 @@ public:
 
 		p_head_ = p_ans->next();
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		count_--;
 #endif
 
@@ -586,7 +586,7 @@ public:
 			node_pointer      p_next_type_node = safe_static_pointer_down_cast<node_pointer>( p_next );   // this cast is OK, because LINK_T is a base class of NODE_T checked by static_assert in the top of class definition.
 			node_pointer      p_cur_type_node  = safe_static_pointer_down_cast<node_pointer>( p_cur );    // this cast is OK, because LINK_T is a base class of NODE_T checked by static_assert in the top of class definition.
 			if ( pred( *( static_cast<const node_pointer>( p_cur_type_node ) ) ) ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 				count_--;
 #endif
 				if ( p_pre == nullptr ) {
@@ -641,7 +641,7 @@ public:
 			p_cur = p_nxt;
 		}
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		count_ = 0;
 #endif
 	}
@@ -658,7 +658,7 @@ public:
 
 	size_t profile_info_count( void ) const
 	{
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		if ( count_ == 0 ) {
 			if ( p_head_ != nullptr ) {
 				throw std::runtime_error( "internal error: incorrect counting" );
@@ -716,7 +716,7 @@ private:
 
 	link_node_pointer p_head_ = nullptr;
 	link_node_pointer p_tail_ = nullptr;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	size_t count_ = 0;
 #endif
 };
@@ -955,7 +955,7 @@ public:
 
 	constexpr od_node_stack_lockfree_base( void ) noexcept
 	  : hph_head_()
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	  , count_( 0 )
 #endif
 	{
@@ -963,11 +963,11 @@ public:
 	od_node_stack_lockfree_base( const od_node_stack_lockfree_base& ) = delete;
 	constexpr od_node_stack_lockfree_base( od_node_stack_lockfree_base&& src ) noexcept
 	  : hph_head_( std::move( src.hph_head_ ) )
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	  , count_( src.count_.load( std::memory_order_acquire ) )
 #endif
 	{
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		src.count_.store( 0, std::memory_order_release );
 #endif
 	}
@@ -1007,7 +1007,7 @@ public:
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_nd, std::memory_order_release, std::memory_order_relaxed ) ) {
 			p_nd_link_p->set_next( p_expected );
 		}
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		count_++;
 #endif
 	}
@@ -1046,7 +1046,7 @@ public:
 		//    メンバ変数 v_ を参照しないアルゴリズムになっているので、以降は参照してよい。
 		//    hph_next_ は他スレッドで読みだされているため、書き換えてはならない。
 		//    なお、hp_cur_headは、他スレッドでもハザードポインタとして登録中であるため、ハザードポインタとしての登録がなくなるまで破棄してはならない。
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		count_--;
 #endif
 		return hp_cur_head.get();
@@ -1054,7 +1054,7 @@ public:
 
 	size_t profile_info_count( void ) const
 	{
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		return count_.load( std::memory_order_acquire );
 #else
 		return 0;
@@ -1068,7 +1068,7 @@ private:
 	using hazard_pointer       = typename LINK_T::hazard_pointer;
 
 	hazard_ptr_handler_t hph_head_;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	std::atomic<size_t> count_;
 #endif
 };
