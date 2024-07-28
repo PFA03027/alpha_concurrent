@@ -26,7 +26,11 @@ namespace concurrent {
 namespace internal {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
-struct retire_node_abst : public od_node_base<retire_node_abst> {
+class retire_node_abst : public od_node_base<retire_node_abst> {
+public:
+	using raw_next_t            = typename od_node_base<retire_node_abst>::od_node_base_raw_next_t;
+	using hazard_handler_next_t = typename od_node_base<retire_node_abst>::od_node_base_hazard_handler_next_t;
+
 	retire_node_abst( void* p_retire_arg ) noexcept
 	  : od_node_base<retire_node_abst>( nullptr )
 	  , p_retire_( p_retire_arg )
@@ -93,21 +97,26 @@ private:
  * @tparam Deleter please refer to std::deleter<T>. this class instance has ownership of argument pointer when called. this class should not throw execption
  */
 template <typename T, typename Deleter>
-struct retire_node : public retire_node_abst {
+struct retire_node : public retire_node_abst, public od_node_base<retire_node<T, Deleter>> {
 	static_assert( std::is_nothrow_default_constructible<Deleter>::value &&
 	                   std::is_nothrow_copy_constructible<Deleter>::value &&
 	                   std::is_nothrow_move_constructible<Deleter>::value,
 	               "Deleter should have nothrow of constructors" );
 
+	using raw_next_t            = typename od_node_base<retire_node<T, Deleter>>::od_node_base_raw_next_t;
+	using hazard_handler_next_t = typename od_node_base<retire_node<T, Deleter>>::od_node_base_hazard_handler_next_t;
+
 	Deleter deleter_;
 
 	constexpr retire_node( T* p_retire_arg, const Deleter& deleter_arg ) noexcept
 	  : retire_node_abst { p_retire_arg }
+	  , od_node_base<retire_node<T, Deleter>>()
 	  , deleter_( deleter_arg )
 	{
 	}
 	constexpr retire_node( T* p_retire_arg, Deleter&& deleter_arg ) noexcept
 	  : retire_node_abst { p_retire_arg }
+	  , od_node_base<retire_node<T, Deleter>>()
 	  , deleter_( std::move( deleter_arg ) )
 	{
 	}
@@ -160,7 +169,7 @@ protected:
 		}
 
 	private:
-		using retire_node_pool = od_node_pool<retire_node>;
+		using retire_node_pool = od_node_pool<retire_node, typename retire_node::raw_next_t, typename retire_node::hazard_handler_next_t>;
 	};
 
 	recycler_t* get_recycler( void ) noexcept override

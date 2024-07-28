@@ -34,10 +34,11 @@ struct countermeasure_gcc_bug_deletable_obj_abst {
 };
 #endif
 
-template <typename NODE_T, typename OD_NODE_LIST_T = od_node_raw_list_base<NODE_T>, typename OD_NODE_LOCKFREE_STACK_T = od_node_stack_lockfree_base<NODE_T>>
+// template <typename NODE_T, typename OD_NODE_LIST_T = od_node_raw_list_base<NODE_T>, typename OD_NODE_LOCKFREE_STACK_T = od_node_stack_lockfree_base<NODE_T>>
+template <typename NODE_T, typename RAW_LIST_NEXT_T, typename HPH_LIST_NEXT_T>
 class od_node_pool {
-	static_assert( std::is_base_of<od_node_raw_list_base<NODE_T>, OD_NODE_LIST_T>::value, "od_node_list_base<NODE_T> should be a base class of OD_NODE_LIST_T." );
-	static_assert( std::is_base_of<od_node_stack_lockfree_base<NODE_T>, OD_NODE_LOCKFREE_STACK_T>::value, "od_node_stack_lockfree_base<NODE_T> should be a base class of OD_NODE_LOCKFREE_STACK_T." );
+	static_assert( std::is_base_of<RAW_LIST_NEXT_T, NODE_T>::value, "RAW_LIST_NEXT_T should be a base class of NODE_T." );
+	static_assert( std::is_base_of<HPH_LIST_NEXT_T, NODE_T>::value, "HPH_LIST_NEXT_T should be a base class of NODE_T." );
 
 public:
 	using node_t       = NODE_T;
@@ -272,12 +273,13 @@ public:
 	}
 
 protected:
-	using g_node_list_t     = od_node_list_lockable_base<OD_NODE_LIST_T>;
-	using g_node_lf_stack_t = OD_NODE_LOCKFREE_STACK_T;
+	using raw_list          = od_node_list_base_impl<NODE_T, RAW_LIST_NEXT_T>;
+	using g_node_list_t     = od_node_list_lockable_base<raw_list>;
+	using g_node_lf_stack_t = od_node_stack_lockfree_base<NODE_T, HPH_LIST_NEXT_T>;
 #ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
-	class tl_od_node_list : public OD_NODE_LIST_T, public countermeasure_gcc_bug_deletable_obj_abst {
+	class tl_od_node_list : public raw_list, public countermeasure_gcc_bug_deletable_obj_abst {
 #else
-	class tl_od_node_list : public OD_NODE_LIST_T {
+	class tl_od_node_list : public raw_list {
 #endif
 	public:
 		constexpr tl_od_node_list( g_node_list_t& g_odn_list_arg )
@@ -285,7 +287,7 @@ protected:
 		{
 		}
 		tl_od_node_list( tl_od_node_list&& src )
-		  : OD_NODE_LIST_T( std::move( src ) )
+		  : raw_list( std::move( src ) )
 		  , ref_g_odn_list_( src.ref_g_odn_list_ )
 		{
 		}

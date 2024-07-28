@@ -370,18 +370,18 @@ private:
 template <typename T>
 class od_node : public od_node_base<od_node<T>> {
 public:
-	using value_type              = T;
-	using reference_type          = T&;
-	using const_reference_type    = const T&;
-	using base_t_w_raw_pointer    = typename od_node_base<od_node<T>>::od_node_base_raw_next_t;
-	using base_t_w_hazard_handler = typename od_node_base<od_node<T>>::od_node_base_hazard_handler_next_t;
+	using value_type            = T;
+	using reference_type        = T&;
+	using const_reference_type  = const T&;
+	using raw_next_t            = typename od_node_base<od_node<T>>::od_node_base_raw_next_t;
+	using hazard_handler_next_t = typename od_node_base<od_node<T>>::od_node_base_hazard_handler_next_t;
 
 	template <bool IsDefaultConstructible = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructible>::type* = nullptr>
 	od_node( od_node* p_next_arg ) noexcept( std::is_nothrow_default_constructible<value_type>::value )
 	  : od_node_base<od_node>()
 	  , v_ {}
 	{
-		base_t_w_hazard_handler::set_next( p_next_arg );
+		hazard_handler_next_t::set_next( p_next_arg );
 	}
 
 	template <bool IsCopyable = std::is_copy_constructible<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
@@ -389,7 +389,7 @@ public:
 	  : od_node_base<od_node>()
 	  , v_( v_arg )
 	{
-		base_t_w_hazard_handler::set_next( p_next_arg );
+		hazard_handler_next_t::set_next( p_next_arg );
 	}
 
 	template <bool IsMovable = std::is_move_constructible<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
@@ -397,7 +397,7 @@ public:
 	  : od_node_base<od_node>()
 	  , v_( std::move( v_arg ) )
 	{
-		base_t_w_hazard_handler::set_next( p_next_arg );
+		hazard_handler_next_t::set_next( p_next_arg );
 	}
 
 	template <typename Arg1st, typename... RemainingArgs,
@@ -407,21 +407,21 @@ public:
 	  : od_node_base<od_node>()
 	  , v_( std::forward<Arg1st>( arg1 ), std::forward<RemainingArgs>( args )... )
 	{
-		base_t_w_hazard_handler::set_next( p_next_arg );
+		hazard_handler_next_t::set_next( p_next_arg );
 	}
 
 	template <bool IsCopyable = std::is_copy_assignable<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
 	void set( const value_type& v_arg, od_node* p_next_arg ) noexcept( std::is_nothrow_copy_assignable<value_type>::value )
 	{
 		v_ = v_arg;
-		base_t_w_hazard_handler::set_next( p_next_arg );
+		hazard_handler_next_t::set_next( p_next_arg );
 	}
 
 	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
 	void set( value_type&& v_arg, od_node* p_next_arg ) noexcept( std::is_nothrow_move_assignable<value_type>::value )
 	{
 		v_ = std::move( v_arg );
-		base_t_w_hazard_handler::set_next( p_next_arg );
+		hazard_handler_next_t::set_next( p_next_arg );
 	}
 
 	reference_type get( void ) &
@@ -452,16 +452,16 @@ private:
 	value_type v_;
 };
 
+#if 1
 template <typename T>
-using od_node_list = od_node_list_base<od_node<T>>;
+using od_node_list = od_node_list_base_impl<od_node<T>, typename od_node<T>::raw_next_t>;
 
 template <typename T>
 using od_node_list_lockable = od_node_list_lockable_base<od_node_list<T>>;
 
 template <typename T>
-using od_node_list_lockfree = od_node_stack_lockfree_base<od_node<T>>;
+using od_node_list_lockfree = od_node_stack_lockfree_base<od_node<T>, typename od_node<T>::hazard_handler_next_t>;
 
-#if 0
 template <typename T>
 class x_free_od_node_storage {
 public:
@@ -637,7 +637,7 @@ private:
 			if ( p_nd == nullptr ) return;
 
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
-			p_nd->base_t_w_hazard_handler::set_next( nullptr );   // this line make slower the performance about 3%. therefore this line only enable in case of debug option
+			p_nd->hazard_handler_next_t::set_next( nullptr );   // this line make slower the performance about 3%. therefore this line only enable in case of debug option
 #endif
 			thread_local_od_node_list* p_this_thread_instance = &( x_free_od_node_storage<T>::tl_fn_list_ );
 			if ( p_this_thread_instance == p_recycle_tl_target_ ) {

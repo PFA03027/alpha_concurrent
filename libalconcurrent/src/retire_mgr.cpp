@@ -30,7 +30,7 @@ namespace internal {
 
 std::atomic<size_t> retire_node_abst::count_allocate_;
 
-class retire_node_list : public od_node_list_base<retire_node_abst> {
+class retire_node_list : public od_node_list_base_impl<retire_node_abst, typename retire_node_abst::od_node_base_raw_next_t> {
 public:
 	retire_node_list( void )                               = default;
 	retire_node_list( const retire_node_list& )            = delete;
@@ -49,7 +49,7 @@ public:
 
 		internal::hazard_ptr_mgr::ScanHazardPtrs(
 			[&nodes_not_in_hazard, &nodes_still_in_hazard]( void* p_hzd ) {
-				od_node_list_base<retire_node_abst> ret = nodes_not_in_hazard.split_if( [p_hzd]( const retire_node_abst& rnd ) {
+				auto ret = nodes_not_in_hazard.split_if( [p_hzd]( const retire_node_abst& rnd ) {
 					return rnd.get_retire_pointer() == p_hzd;
 				} );
 				nodes_still_in_hazard.merge_push_back( std::move( ret ) );

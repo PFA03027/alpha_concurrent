@@ -452,8 +452,8 @@ private:
 	using node_type    = internal::od_node<T>;
 	using node_pointer = node_type*;
 
-	internal::od_node_stack_lockfree_base<node_type> lf_stack_impl_;
-	internal::od_node_pool<node_type>                unused_node_pool_;
+	internal::od_node_stack_lockfree_base<node_type, typename node_type::hazard_handler_next_t>                  lf_stack_impl_;
+	internal::od_node_pool<node_type, typename node_type::raw_next_t, typename node_type::hazard_handler_next_t> unused_node_pool_;
 };
 
 }   // namespace concurrent

@@ -45,7 +45,7 @@ TEST( od_node_class, CanConstructWithCopyable )
 
 	// Assert
 	EXPECT_EQ( sut.get(), x );
-	auto p_x = sut.base_t_w_hazard_handler::next();
+	auto p_x = sut.hazard_handler_next_t::next();
 	EXPECT_EQ( p_x, &yy );
 }
 
@@ -59,7 +59,7 @@ TEST( od_node_class, CanConstructWithCopyableRref )
 
 	// Assert
 	EXPECT_EQ( sut.get(), x );
-	auto p_x = sut.base_t_w_hazard_handler::next();
+	auto p_x = sut.hazard_handler_next_t::next();
 	EXPECT_EQ( p_x, nullptr );
 }
 
@@ -74,7 +74,7 @@ TEST( od_node_class, CanConstructWithMovableOnly )
 
 	// Assert
 	EXPECT_EQ( sut.get().get(), target_pointer_value );
-	auto p_x = sut.base_t_w_hazard_handler::next();
+	auto p_x = sut.hazard_handler_next_t::next();
 	EXPECT_EQ( p_x, nullptr );
 }
 
@@ -112,7 +112,7 @@ TEST( od_node_class, CanGetWithMovableOnly )
 
 	// Assert
 	EXPECT_EQ( up_ret.get(), target_pointer_value );
-	auto p_x = sut.base_t_w_hazard_handler::next();
+	auto p_x = sut.hazard_handler_next_t::next();
 	EXPECT_EQ( p_x, nullptr );
 }
 
@@ -168,7 +168,7 @@ TEST( od_node_class, CanSetWithCopyable )
 	alpha::concurrent::internal::od_node<int> yy( nullptr, 0 );
 	alpha::concurrent::internal::od_node<int> sut( nullptr, 1 );
 	EXPECT_EQ( sut.get(), 1 );
-	auto p_x = sut.base_t_w_hazard_handler::next();
+	auto p_x = sut.hazard_handler_next_t::next();
 	EXPECT_EQ( p_x, nullptr );
 	int x = 2;
 
@@ -177,7 +177,7 @@ TEST( od_node_class, CanSetWithCopyable )
 
 	// Assert
 	EXPECT_EQ( sut.get(), 2 );
-	p_x = sut.base_t_w_hazard_handler::next();
+	p_x = sut.hazard_handler_next_t::next();
 	EXPECT_EQ( p_x, &yy );
 }
 
@@ -190,7 +190,7 @@ TEST( od_node_class, CanSetWithMovable )
 	std::unique_ptr<int>                                       up_x( target_pointer_value );
 	alpha::concurrent::internal::od_node<std::unique_ptr<int>> sut( nullptr, std::move( up_x ) );
 	EXPECT_EQ( sut.get().get(), target_pointer_value );
-	auto p_x = sut.base_t_w_hazard_handler::next();
+	auto p_x = sut.hazard_handler_next_t::next();
 	EXPECT_EQ( p_x, nullptr );
 
 	int*                 target_pointer_value2 = new int {};
@@ -201,7 +201,7 @@ TEST( od_node_class, CanSetWithMovable )
 
 	// Assert
 	EXPECT_EQ( sut.get().get(), target_pointer_value2 );
-	p_x = sut.base_t_w_hazard_handler::next();
+	p_x = sut.hazard_handler_next_t::next();
 	EXPECT_EQ( p_x, &yy );
 }
 

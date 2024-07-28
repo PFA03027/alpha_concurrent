@@ -47,7 +47,8 @@ TEST( od_node_base_class, CanConstruct )
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
-class test_od_node_list_base : public alpha::concurrent::internal::od_node_list_base<test_od_node_base> {
+
+class test_od_node_list_base : public alpha::concurrent::internal::od_node_list_base_impl<test_od_node_base, typename test_od_node_base::od_node_base_hazard_handler_next_t> {
 };
 
 TEST( od_node_list_base_class, CanConstruct )
@@ -684,7 +685,8 @@ TEST( od_node_list_base_class, CanSplitWithEvenTrue3 )
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
-class test_od_node_raw_list_base : public alpha::concurrent::internal::od_node_raw_list_base<test_od_node_base> {
+
+class test_od_node_raw_list_base : public alpha::concurrent::internal::od_node_list_base_impl<test_od_node_base, typename test_od_node_base::od_node_base_raw_next_t> {
 };
 
 TEST( od_node_raw_list_base_class, CanConstruct )
@@ -1321,7 +1323,7 @@ TEST( od_node_raw_list_base_class, CanSplitWithEvenTrue3 )
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
-class test_od_node_list_lockfree_base : public alpha::concurrent::internal::od_node_stack_lockfree_base<test_od_node_base> {
+class test_od_node_list_lockfree_base : public alpha::concurrent::internal::od_node_stack_lockfree_base<test_od_node_base, typename test_od_node_base::od_node_base_hazard_handler_next_t> {
 };
 
 TEST( od_node_list_lockfree_base_class, CanDefaultConstruct )
