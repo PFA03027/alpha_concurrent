@@ -955,7 +955,9 @@ public:
 
 	constexpr od_node_stack_lockfree_base( void ) noexcept
 	  : hph_head_()
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
 	  , count_( 0 )
+#endif
 	{
 	}
 	od_node_stack_lockfree_base( const od_node_stack_lockfree_base& ) = delete;

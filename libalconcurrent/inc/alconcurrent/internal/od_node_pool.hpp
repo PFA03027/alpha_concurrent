@@ -103,17 +103,17 @@ public:
 		auto lk = g_odn_list_.try_lock();
 		if ( lk.owns_lock() ) {
 			p_ans = lk.ref().pop_front();
-			if ( p_ans != nullptr ) {
-				if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
-					// まだハザードポインタに登録されていたので、差し戻す。
-					tl_odn_list_.push_back( p_ans );
-				} else {
+			while ( p_ans != nullptr ) {
+				if ( !hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
 					p_ans->clear_next();
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
 					node_count_total_--;
 #endif
+					// tl_odn_list_.merge_push_back( std::move( lk.ref() ) );
 					return p_ans;
 				}
+				tl_odn_list_.push_back( p_ans );   // まだハザードポインタに登録されていたので、スレッドローカルな変数に差し戻す。
+				p_ans = lk.ref().pop_front();
 			}
 		}
 
@@ -245,6 +245,7 @@ protected:
 		~tl_od_node_list()
 		{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+			internal::LogOutput( log_type::TEST, "mv thread local node %zu (%zu)", raw_list::profile_info_count(), node_count_in_tl_odn_list_.load() );
 			node_count_in_tl_odn_list_ -= raw_list::profile_info_count();
 #endif
 			ref_g_odn_list_.lock().ref().merge_push_back( std::move( *this ) );
@@ -271,6 +272,14 @@ protected:
 #else
 			return raw_list::pop_front();
 #endif
+		}
+
+		void merge_push_back( raw_list&& src ) noexcept
+		{
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
+			node_count_in_tl_odn_list_ += src.profile_info_count();
+#endif
+			raw_list::merge_push_back( std::move( src ) );
 		}
 
 		bool is_empty( void )

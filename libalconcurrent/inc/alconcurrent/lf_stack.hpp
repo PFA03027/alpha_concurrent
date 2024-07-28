@@ -396,8 +396,10 @@ public:
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
 	~x_stack_list()
 	{
-		internal::LogOutput( log_type::TEST, "%s", node_pool_t::profile_info_string().c_str() );
-		node_pool_t::clear_as_possible_as();
+		if ( node_pool_t::profile_info_count() != 0 ) {
+			internal::LogOutput( log_type::TEST, "%s", node_pool_t::profile_info_string().c_str() );
+			node_pool_t::clear_as_possible_as();
+		}
 	}
 #endif
 
