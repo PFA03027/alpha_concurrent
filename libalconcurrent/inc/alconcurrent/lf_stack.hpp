@@ -396,8 +396,8 @@ public:
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_POOL_PROFILE
 	~x_stack_list()
 	{
-		internal::LogOutput( log_type::TEST, "%s", internal::od_node_pool<node_type>::profile_info_string().c_str() );
-		// internal::od_node_pool<node_type>::clear_as_possible_as();
+		internal::LogOutput( log_type::TEST, "%s", node_pool_t::profile_info_string().c_str() );
+		node_pool_t::clear_as_possible_as();
 	}
 #endif
 
@@ -452,8 +452,11 @@ private:
 	using node_type    = internal::od_node<T>;
 	using node_pointer = node_type*;
 
-	internal::od_node_stack_lockfree_base<node_type, typename node_type::hazard_handler_next_t>                  lf_stack_impl_;
-	internal::od_node_pool<node_type, typename node_type::raw_next_t, typename node_type::hazard_handler_next_t> unused_node_pool_;
+	using node_stack_lockfree_t = internal::od_node_stack_lockfree_base<node_type, typename node_type::hazard_handler_next_t>;
+	using node_pool_t           = internal::od_node_pool<node_type, typename node_type::raw_next_t, typename node_type::hazard_handler_next_t>;
+
+	node_stack_lockfree_t lf_stack_impl_;
+	node_pool_t           unused_node_pool_;
 };
 
 }   // namespace concurrent
