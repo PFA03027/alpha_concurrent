@@ -30,12 +30,12 @@ namespace internal {
 struct is_check_concept_impl {
 	template <typename T>
 	static auto check_atomic_req( T* ) -> typename std::enable_if<
-		std::is_trivially_copyable<T>::value &&
-			std::is_copy_constructible<T>::value &&
-			std::is_move_constructible<T>::value &&
-			std::is_copy_assignable<T>::value &&
-			std::is_move_assignable<T>::value,
-		typename std::true_type>::type;
+										   std::is_trivially_copyable<T>::value &&
+											   std::is_copy_constructible<T>::value &&
+											   std::is_move_constructible<T>::value &&
+											   std::is_copy_assignable<T>::value &&
+											   std::is_move_assignable<T>::value,
+										   typename std::true_type>::type;
 
 	template <typename T>
 	static auto check_atomic_req( ... ) -> std::false_type;
@@ -302,7 +302,7 @@ public:
 	ticket_type get_ticket( void ) const
 	{
 		ticket_type ans = ap_val_.load( std::memory_order_acquire );
-#if 0
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
 		// lf_listのデバッグ用コード。
 		// lf_fifoの場合、アルゴリズム上この様な条件が発生しうるため、lf_listのデバッグ中のみ有効化可能なコード
 		if ( ans == nullptr ) {
@@ -320,9 +320,9 @@ public:
 	{
 		ticket_type p_tmp = tkt;
 		if ( !ap_val_.compare_exchange_strong( p_tmp, nullptr ) ) {
-#if 0
-		// lf_listのデバッグ用コード。
-		// lf_fifoの場合、アルゴリズム上この様な条件が発生しうるため、lf_listのデバッグ中のみ有効化可能なコード
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+			// lf_listのデバッグ用コード。
+			// lf_fifoの場合、アルゴリズム上この様な条件が発生しうるため、lf_listのデバッグ中のみ有効化可能なコード
 
 			// lf_listの場合、所有権がmove相当となるように、nullptrへの置き換えを試みる。既に書き換わっていたら誰かが所有権の移動を実施済み。
 			// 呼び出し側にとっては、所有権獲得済みなのに所有できなかったこと示す。
@@ -612,7 +612,7 @@ public:
 	ticket_type get_ticket( void ) const
 	{
 		ticket_type ans = ap_val_.load( std::memory_order_acquire );
-#if 0
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
 		// lf_listのデバッグ用コード。
 		// lf_fifoの場合、アルゴリズム上この様な条件が発生しうるため、lf_listのデバッグ中のみ有効化可能なコード
 		if ( ans == nullptr ) {
@@ -630,9 +630,9 @@ public:
 	{
 		ticket_type p_tmp = tkt;
 		if ( !ap_val_.compare_exchange_strong( p_tmp, nullptr ) ) {
-#if 0
-		// lf_listのデバッグ用コード。
-		// lf_fifoの場合、アルゴリズム上この様な条件が発生しうるため、lf_listのデバッグ中のみ有効化可能なコード
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+			// lf_listのデバッグ用コード。
+			// lf_fifoの場合、アルゴリズム上この様な条件が発生しうるため、lf_listのデバッグ中のみ有効化可能なコード
 
 			// lf_listの場合、所有権がmove相当となるように、nullptrへの置き換えを試みる。既に書き換わっていたら誰かが所有権の移動を実施済み。
 			// 呼び出し側にとっては、所有権獲得済みなのに所有できなかったこと示す。

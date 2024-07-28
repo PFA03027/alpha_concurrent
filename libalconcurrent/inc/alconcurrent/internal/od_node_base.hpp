@@ -323,31 +323,6 @@ public:
 		od_node_base_raw_next<NODE_T>::set_next( nullptr );
 		od_node_base_hazard_handler_next<NODE_T>::set_next( nullptr );
 	}
-
-#if 0
-	class raw_next_rw {
-	public:
-		static inline node_pointer read( const node_pointer onb )
-		{
-			return onb->od_node_base_raw_next_t::next();
-		}
-		static inline void write( node_pointer onb, node_pointer p )
-		{
-			onb->od_node_base_raw_next_t::set_next( p );
-		}
-	};
-	class hph_next_rw {
-	public:
-		static inline node_pointer read( const node_pointer onb )
-		{
-			return onb->od_node_base_hazard_handler_next_t::next();
-		}
-		static inline void write( node_pointer onb, node_pointer p )
-		{
-			onb->od_node_base_hazard_handler_next_t::set_next( p );
-		}
-	};
-#endif
 };
 
 /**
@@ -609,16 +584,6 @@ public:
 	void clear( void )
 	{
 		clear( std::default_delete<node_type>() );
-#if 0
-		node_pointer p_cur = p_head_;
-		p_head_            = nullptr;
-		p_tail_            = nullptr;
-		while ( p_cur != nullptr ) {
-			node_pointer p_nxt =  p_cur ->next();
-			delete p_cur;
-			p_cur = p_nxt;
-		}
-#endif
 	}
 
 	bool is_empty( void ) const
