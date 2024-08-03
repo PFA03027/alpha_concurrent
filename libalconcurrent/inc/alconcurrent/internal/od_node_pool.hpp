@@ -109,7 +109,9 @@ public:
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 					node_count_total_--;
 #endif
-					// tl_odn_list_.merge_push_back( std::move( lk.ref() ) );
+#ifdef ALCONCURRENT_CONF_OD_NODE_PREFER_TO_MOVE_FROM_GLOBAL_LIST
+					tl_odn_list_.merge_push_back( std::move( lk.ref() ) );
+#endif
 					return p_ans;
 				}
 				tl_odn_list_.push_back( p_ans );   // まだハザードポインタに登録されていたので、スレッドローカルな変数に差し戻す。
