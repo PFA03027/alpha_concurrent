@@ -139,7 +139,6 @@ public:
 
 	static void clear_as_possible_as( void )
 	{
-#if 1
 		tl_od_node_list& tl_odn_list_   = get_tl_od_node_list();
 		tl_od_node_list  tmp_odn_list_  = std::move( tl_odn_list_ );
 		node_pointer     p_working_node = nullptr;
@@ -190,9 +189,7 @@ public:
 			}
 			p_working_node = g_lockfree_odn_list_.pop_front();
 		}
-#else
-		internal::LogOutput( log_type::WARN, "clear_as_possible_as() is not implemented yet" );
-#endif
+
 		return;
 	}
 
