@@ -285,10 +285,10 @@ thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list od_n
 #endif
 
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-template <typename NODE_T, typename OD_NODE_LIST_T, typename OD_NODE_LOCKFREE_STACK_T>
-std::atomic<size_t> od_node_pool<NODE_T, OD_NODE_LIST_T, OD_NODE_LOCKFREE_STACK_T>::node_count_total_( 0 );
-template <typename NODE_T, typename OD_NODE_LIST_T, typename OD_NODE_LOCKFREE_STACK_T>
-std::atomic<size_t> od_node_pool<NODE_T, OD_NODE_LIST_T, OD_NODE_LOCKFREE_STACK_T>::tl_od_node_list::node_count_in_tl_odn_list_( 0 );
+template <typename NODE_T, typename OD_NODE_LIST_T>
+std::atomic<size_t> od_node_pool<NODE_T, OD_NODE_LIST_T>::node_count_total_( 0 );
+template <typename NODE_T, typename OD_NODE_LIST_T>
+std::atomic<size_t> od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list::node_count_in_tl_odn_list_( 0 );
 #endif
 
 template <typename NODE_T, typename OD_NODE_LIST_T>
