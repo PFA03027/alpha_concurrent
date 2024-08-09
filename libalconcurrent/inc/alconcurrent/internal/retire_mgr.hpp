@@ -169,7 +169,7 @@ protected:
 		}
 
 	private:
-		using retire_node_pool = od_node_pool<retire_node, typename retire_node::raw_next_t, typename retire_node::hazard_handler_next_t>;
+		using retire_node_pool = od_node_pool<retire_node, typename retire_node::raw_next_t>;
 	};
 
 	recycler_t* get_recycler( void ) noexcept override

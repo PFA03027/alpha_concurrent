@@ -73,9 +73,7 @@ public:
 	/**
 	 * @brief Check if p is still in hazard pointer list or not
 	 *
-	 * @param p
-	 * @return true p is still listed in hazard pointer list
-	 * @return false p is not hazard pointer
+	 * @param pred
 	 */
 	static void ScanHazardPtrs( std::function<void( void* )> pred );
 

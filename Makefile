@@ -109,6 +109,9 @@ sanitizer.p:
 sanitizer.%.sanitizer: clean
 	make BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$* test
 
+build-test-sanitizer.%.sanitizer: clean
+	make BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$* build-test
+
 tidy-fix: configure-cmake
 	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build --fix
 	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-format -i

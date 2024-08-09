@@ -455,7 +455,7 @@ private:
 	using node_pointer = node_type*;
 
 	using node_stack_lockfree_t = internal::od_node_stack_lockfree_base<node_type, typename node_type::hazard_handler_next_t>;
-	using node_pool_t           = internal::od_node_pool<node_type, typename node_type::raw_next_t, typename node_type::hazard_handler_next_t>;
+	using node_pool_t           = internal::od_node_pool<node_type, typename node_type::raw_next_t>;
 
 	node_stack_lockfree_t lf_stack_impl_;
 	node_pool_t           unused_node_pool_;
