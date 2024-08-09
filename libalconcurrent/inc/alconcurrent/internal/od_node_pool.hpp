@@ -80,12 +80,19 @@ public:
 
 	static node_pointer pop( void )
 	{
-		tl_od_node_list& tl_odn_list_ = get_tl_od_node_list();
-		node_pointer     p_ans        = nullptr;
-		node_pointer     p_reserve    = nullptr;
+		node_pointer p_ans = nullptr;
 
-#if 1
-		p_ans = tl_odn_list_.pop_front();
+		tl_od_node_list& tl_odn_list_no_in_hazard = get_tl_odn_list_no_in_hazard();
+		p_ans                                     = tl_odn_list_no_in_hazard.pop_front();
+		if ( p_ans != nullptr ) {
+			return p_ans;
+		}
+
+		tl_od_node_list& tl_odn_list = get_tl_od_node_list();
+		bool             is_empty_tl = false;
+		bool             is_empty_gl = false;
+
+		p_ans = tl_odn_list.pop_front();
 		if ( p_ans != nullptr ) {
 			if ( !hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
 				p_ans->clear_next();
@@ -94,25 +101,44 @@ public:
 #endif
 				return p_ans;
 			}
-			p_reserve = p_ans;
+			get_tl_odn_list_still_in_hazard().push_back( p_ans );
+		} else {
+			is_empty_tl = true;
 		}
 
-		if ( tl_odn_list_.is_empty() ) {
+		if ( tl_odn_list.is_empty() ) {
 			auto lk = g_odn_list_.try_lock();
 			if ( lk.owns_lock() ) {
 				if ( lk.ref().is_empty() ) {
-					lk.ref().push_back( p_reserve );   // ハザードポインタに登録されていたポインタを、グローバル変数のリストに戻す。
-					return nullptr;
+					is_empty_gl = true;
+					if ( !is_empty_tl ) {
+						return nullptr;
+					}
 				} else {
-					tl_odn_list_.merge_push_back( std::move( lk.ref() ) );
-					lk.ref().push_back( p_reserve );   // ハザードポインタに登録されていたポインタを、グローバル変数のリストに戻す。
-					p_reserve = nullptr;
+					tl_odn_list.merge_push_back( std::move( lk.ref() ) );
 				}
 			}
 		}
 
-		p_ans = tl_odn_list_.pop_front();
-		tl_odn_list_.push_back( p_reserve );   // return前にハザードポインタに登録されていたポインタを、スレッドローカルな変数に差し戻す。
+		if ( is_empty_gl && is_empty_tl ) {
+			// 本当に空っぽなら、試してみる。
+			tl_od_node_list& tl_odn_list_still_in_hazard = get_tl_odn_list_still_in_hazard();
+			raw_list         tmp_odn_list_( std::move( tl_odn_list_still_in_hazard ) );
+
+			hazard_ptr_mgr::ScanHazardPtrs( [&tmp_odn_list_, &tl_odn_list_still_in_hazard]( void* p_in_hazard ) {
+				auto tt_n_list = tmp_odn_list_.split_if( [p_in_hazard]( const auto& cur_node ) -> bool {
+					return p_in_hazard == &cur_node;   // pointerが同じならtrueを返す。
+				} );
+				tl_odn_list_still_in_hazard.merge_push_back( std::move( tt_n_list ) );
+			} );
+			p_ans = tmp_odn_list_.pop_front();
+			tl_odn_list.merge_push_back( std::move( tmp_odn_list_ ) );
+			if ( p_ans != nullptr ) {
+				return p_ans;
+			}
+		}
+
+		p_ans = tl_odn_list.pop_front();
 		if ( p_ans != nullptr ) {
 			if ( !hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
 				p_ans->clear_next();
@@ -121,82 +147,33 @@ public:
 #endif
 				return p_ans;
 			}
-			tl_odn_list_.push_back( p_ans );   // まだハザードポインタに登録されていたので、スレッドローカルな変数に差し戻す。
+			get_tl_odn_list_still_in_hazard().push_back( p_ans );
 		}
 
 		return nullptr;   // 使えるノードがなかった
-#else
-		p_ans = tl_odn_list_.pop_front();
-		if ( p_ans != nullptr ) {
-			if ( !hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
-				p_ans->clear_next();
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-				node_count_total_--;
-#endif
-				return p_ans;
-			}
-			tl_odn_list_.push_back( p_ans );   // まだハザードポインタに登録されていたので、スレッドローカルな変数に差し戻す。
-		}
-
-		auto lk = g_odn_list_.try_lock();
-		if ( lk.owns_lock() ) {
-			p_ans = lk.ref().pop_front();
-			while ( p_ans != nullptr ) {
-				if ( !hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
-					p_ans->clear_next();
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-					node_count_total_--;
-#endif
-#ifdef ALCONCURRENT_CONF_OD_NODE_PREFER_TO_MOVE_FROM_GLOBAL_LIST
-					tl_odn_list_.merge_push_back( std::move( lk.ref() ) );
-#endif
-					return p_ans;
-				}
-				tl_odn_list_.push_back( p_ans );   // まだハザードポインタに登録されていたので、スレッドローカルな変数に差し戻す。
-				p_ans = lk.ref().pop_front();
-			}
-		}
-
-		return nullptr;   // 使えるノードがなかった
-#endif
 	}
 
 	static void clear_as_possible_as( void )
 	{
-		tl_od_node_list& tl_odn_list_   = get_tl_od_node_list();
-		tl_od_node_list  tmp_odn_list_  = std::move( tl_odn_list_ );
-		node_pointer     p_working_node = nullptr;
+		tl_od_node_list& tl_odn_list                 = get_tl_od_node_list();
+		tl_od_node_list& tl_odn_list_still_in_hazard = get_tl_odn_list_still_in_hazard();
 
-		p_working_node = tmp_odn_list_.pop_front();
-		while ( p_working_node != nullptr ) {
-			if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p_working_node ) ) {
-				tl_odn_list_.push_back( p_working_node );   // まだハザードポインタに登録されていたので、スレッドローカルな変数に差し戻す。
-			} else {
-				p_working_node->clear_next();
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-				node_count_total_--;
-#endif
-				delete p_working_node;
+		raw_list tmp_odn_list = std::move( tl_odn_list );
+		tmp_odn_list.merge_push_back( std::move( tl_odn_list_still_in_hazard ) );
+		{
+			auto lk = g_odn_list_.try_lock();
+			if ( lk.owns_lock() ) {
+				tmp_odn_list.merge_push_back( std::move( lk.ref() ) );
 			}
-			p_working_node = tmp_odn_list_.pop_front();
 		}
 
-		auto lk = g_odn_list_.try_lock();
-		if ( lk.owns_lock() ) {
-			p_working_node = lk.ref().pop_front();
-			while ( p_working_node != nullptr ) {
-				if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p_working_node ) ) {
-					// まだハザードポインタに登録されていたので、差し戻す。
-					tl_odn_list_.push_back( p_working_node );
-				} else {
-					p_working_node->clear_next();
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-					node_count_total_--;
-#endif
-					delete p_working_node;
-				}
-				p_working_node = lk.ref().pop_front();
-			}
+		if ( !tmp_odn_list.is_empty() ) {
+			hazard_ptr_mgr::ScanHazardPtrs( [&tmp_odn_list, &tl_odn_list_still_in_hazard]( void* p_in_hazard ) {
+				auto tt_n_list = tmp_odn_list.split_if( [p_in_hazard]( const auto& cur_node ) -> bool {
+					return p_in_hazard == &cur_node;   // pointerが同じならtrueを返す。
+				} );
+				tl_odn_list_still_in_hazard.merge_push_back( std::move( tt_n_list ) );
+			} );
 		}
 
 		return;
@@ -310,12 +287,18 @@ protected:
 	};
 
 	static tl_od_node_list& get_tl_od_node_list( void );
+	static tl_od_node_list& get_tl_odn_list_still_in_hazard( void );
+	static tl_od_node_list& get_tl_odn_list_no_in_hazard( void );
 
 	static g_node_list_t g_odn_list_;   //!< 他スレッド終了時等、共通プールとしてノードを引き受けるためのグローバル変数。
 #ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
-	static thread_local tl_od_node_list* tl_p_odn_list_;   //!< ハザードポインタに登録されている場合に、一時保管するためのリスト。へのポインタ。下の表現方法の代用。
+	static thread_local tl_od_node_list* x_tl_p_odn_list_;                   //!< ハザードポインタに登録されている場合に、一時保管するためのリスト。へのポインタ。下の表現方法の代用。
+	static thread_local tl_od_node_list* x_tl_p_odn_list_still_in_hazard_;   //!< ハザードポインタに登録されている場合に、一時保管するためのリスト。へのポインタ。下の表現方法の代用。
+	static thread_local tl_od_node_list* x_tl_p_odn_list_no_in_hazard_;      //!< ハザードポインタに登録されている場合に、一時保管するためのリスト。へのポインタ。下の表現方法の代用。
 #else
-	static thread_local tl_od_node_list tl_odn_list_;   //!< ハザードポインタに登録されている場合に、一時保管するためのリスト。GCCの不具合でコンパイルエラーとなるため、スレッドローカル変数が使えない。。。
+	static thread_local tl_od_node_list x_tl_odn_list_;                   //!< ハザードポインタに登録されている場合に、一時保管するためのリスト。GCCの不具合でコンパイルエラーとなるため、スレッドローカル変数が使えない。。。
+	static thread_local tl_od_node_list x_tl_odn_list_still_in_hazard_;   //!< ハザードポインタに登録されている場合に、一時保管するためのリスト。GCCの不具合でコンパイルエラーとなるため、スレッドローカル変数が使えない。。。
+	static thread_local tl_od_node_list x_tl_odn_list_no_in_hazard_;      //!< ハザードポインタに登録されている場合に、一時保管するためのリスト。GCCの不具合でコンパイルエラーとなるため、スレッドローカル変数が使えない。。。
 #endif
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	static std::atomic<size_t> node_count_total_;
@@ -328,10 +311,18 @@ typename od_node_pool<NODE_T, OD_NODE_LIST_T>::g_node_list_t od_node_pool<NODE_T
 #ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
 extern thread_local std::list<std::unique_ptr<countermeasure_gcc_bug_deletable_obj_abst>> tl_list_list;
 template <typename NODE_T, typename OD_NODE_LIST_T>
-thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list* od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_p_odn_list_ = nullptr;
+thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list* od_node_pool<NODE_T, OD_NODE_LIST_T>::x_tl_p_odn_list_ = nullptr;
+template <typename NODE_T, typename OD_NODE_LIST_T>
+thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list* od_node_pool<NODE_T, OD_NODE_LIST_T>::x_tl_p_odn_list_still_in_hazard_ = nullptr;
+template <typename NODE_T, typename OD_NODE_LIST_T>
+thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list* od_node_pool<NODE_T, OD_NODE_LIST_T>::x_tl_p_odn_list_no_in_hazard_ = nullptr;
 #else
 template <typename NODE_T, typename OD_NODE_LIST_T>
-thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_odn_list_( od_node_pool<NODE_T, OD_NODE_LIST_T>::g_odn_list_ );
+thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list od_node_pool<NODE_T, OD_NODE_LIST_T>::x_tl_odn_list_( od_node_pool<NODE_T, OD_NODE_LIST_T>::g_odn_list_ );
+template <typename NODE_T, typename OD_NODE_LIST_T>
+thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list od_node_pool<NODE_T, OD_NODE_LIST_T>::x_tl_odn_list_still_in_hazard_( od_node_pool<NODE_T, OD_NODE_LIST_T>::g_odn_list_ );
+template <typename NODE_T, typename OD_NODE_LIST_T>
+thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list od_node_pool<NODE_T, OD_NODE_LIST_T>::x_tl_odn_list_no_in_hazard_( od_node_pool<NODE_T, OD_NODE_LIST_T>::g_odn_list_ );
 #endif
 
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
@@ -345,13 +336,41 @@ template <typename NODE_T, typename OD_NODE_LIST_T>
 inline typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list& od_node_pool<NODE_T, OD_NODE_LIST_T>::get_tl_od_node_list( void )
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
-	if ( tl_p_odn_list_ == nullptr ) {
-		tl_p_odn_list_ = new tl_od_node_list( g_odn_list_ );
-		tl_list_list.push_back( std::unique_ptr<countermeasure_gcc_bug_deletable_obj_abst>( tl_p_odn_list_ ) );
+	if ( x_tl_p_odn_list_ == nullptr ) {
+		x_tl_p_odn_list_ = new tl_od_node_list( g_odn_list_ );
+		tl_list_list.push_back( std::unique_ptr<countermeasure_gcc_bug_deletable_obj_abst>( x_tl_p_odn_list_ ) );
 	}
-	return *tl_p_odn_list_;
+	return *x_tl_p_odn_list_;
 #else
-	return tl_odn_list_;
+	return x_tl_odn_list_;
+#endif
+}
+
+template <typename NODE_T, typename OD_NODE_LIST_T>
+inline typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list& od_node_pool<NODE_T, OD_NODE_LIST_T>::get_tl_odn_list_still_in_hazard( void )
+{
+#ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
+	if ( x_tl_p_odn_list_still_in_hazard_ == nullptr ) {
+		x_tl_p_odn_list_still_in_hazard_ = new tl_od_node_list( g_odn_list_ );
+		tl_list_list.push_back( std::unique_ptr<countermeasure_gcc_bug_deletable_obj_abst>( x_tl_p_odn_list_still_in_hazard_ ) );
+	}
+	return *x_tl_p_odn_list_still_in_hazard_;
+#else
+	return x_tl_odn_list_still_in_hazard_;
+#endif
+}
+
+template <typename NODE_T, typename OD_NODE_LIST_T>
+inline typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list& od_node_pool<NODE_T, OD_NODE_LIST_T>::get_tl_odn_list_no_in_hazard( void )
+{
+#ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
+	if ( x_tl_p_odn_list_no_in_hazard_ == nullptr ) {
+		x_tl_p_odn_list_no_in_hazard_ = new tl_od_node_list( g_odn_list_ );
+		tl_list_list.push_back( std::unique_ptr<countermeasure_gcc_bug_deletable_obj_abst>( x_tl_p_odn_list_no_in_hazard_ ) );
+	}
+	return *x_tl_p_odn_list_no_in_hazard_;
+#else
+	return x_tl_odn_list_no_in_hazard_;
 #endif
 }
 

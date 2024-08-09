@@ -137,3 +137,38 @@ TEST( od_node_pool_class, CanPushInOtherThread )
 	EXPECT_EQ( p_tmp2, p_tmp );
 	delete p_tmp2;
 }
+
+TEST( od_node_pool_class, CanCleanAsPossibleAs_NoHazardPtr )
+{
+	// Arrange
+	sut_type sut;
+	auto     p_tmp = new test_od_node_of_pool;
+	sut.push( p_tmp );
+
+	// Act
+	sut.clear_as_possible_as();
+
+	// Assert
+	auto p_tmp2 = sut.pop();
+	EXPECT_EQ( p_tmp2, nullptr );
+}
+
+TEST( od_node_pool_class, CanCleanAsPossibleAs_InHazardPtr )
+{
+	// Arrange
+	sut_type                                            sut;
+	auto                                                p_tmp = new test_od_node_of_pool;
+	typename test_od_node_of_pool::hazard_ptr_handler_t hph( p_tmp );
+	{
+		auto hp_tmp = hph.get();
+		sut.push( p_tmp );
+
+		// Act
+		sut.clear_as_possible_as();
+	}
+
+	// Assert
+	auto p_tmp3 = sut.pop();
+	EXPECT_EQ( p_tmp3, p_tmp );
+	delete p_tmp3;
+}
