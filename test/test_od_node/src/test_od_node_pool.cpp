@@ -19,7 +19,7 @@
 ///////////////////////////////////////////////////////////////////////////////////
 class test_od_node_of_pool : public alpha::concurrent::internal::od_node_base<test_od_node_of_pool> {};
 
-using sut_type = alpha::concurrent::internal::od_node_pool<test_od_node_of_pool, typename test_od_node_of_pool::od_node_base_raw_next_t, typename test_od_node_of_pool::od_node_base_hazard_handler_next_t>;
+using sut_type = alpha::concurrent::internal::od_node_pool<test_od_node_of_pool, typename test_od_node_of_pool::od_node_base_raw_next_t>;
 
 TEST( od_node_pool_class, CanConstructDestruct )
 {
