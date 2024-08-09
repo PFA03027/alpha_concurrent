@@ -101,7 +101,6 @@ public:
 			}
 		}
 
-		// 本当に空っぽなら、試してみる。
 		tl_od_node_list& tl_odn_list_still_in_hazard = get_tl_odn_list_still_in_hazard();
 		if ( tl_odn_list_still_in_hazard.is_empty() ) {
 			return nullptr;
