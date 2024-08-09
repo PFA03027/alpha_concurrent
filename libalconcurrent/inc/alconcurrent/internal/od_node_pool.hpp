@@ -82,7 +82,50 @@ public:
 	{
 		tl_od_node_list& tl_odn_list_ = get_tl_od_node_list();
 		node_pointer     p_ans        = nullptr;
+		node_pointer     p_reserve    = nullptr;
 
+#if 1
+		p_ans = tl_odn_list_.pop_front();
+		if ( p_ans != nullptr ) {
+			if ( !hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
+				p_ans->clear_next();
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+				node_count_total_--;
+#endif
+				return p_ans;
+			}
+			p_reserve = p_ans;
+		}
+
+		if ( tl_odn_list_.is_empty() ) {
+			auto lk = g_odn_list_.try_lock();
+			if ( lk.owns_lock() ) {
+				if ( lk.ref().is_empty() ) {
+					lk.ref().push_back( p_reserve );   // ハザードポインタに登録されていたポインタを、グローバル変数のリストに戻す。
+					return nullptr;
+				} else {
+					tl_odn_list_.merge_push_back( std::move( lk.ref() ) );
+					lk.ref().push_back( p_reserve );   // ハザードポインタに登録されていたポインタを、グローバル変数のリストに戻す。
+					p_reserve = nullptr;
+				}
+			}
+		}
+
+		p_ans = tl_odn_list_.pop_front();
+		tl_odn_list_.push_back( p_reserve );   // return前にハザードポインタに登録されていたポインタを、スレッドローカルな変数に差し戻す。
+		if ( p_ans != nullptr ) {
+			if ( !hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
+				p_ans->clear_next();
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+				node_count_total_--;
+#endif
+				return p_ans;
+			}
+			tl_odn_list_.push_back( p_ans );   // まだハザードポインタに登録されていたので、スレッドローカルな変数に差し戻す。
+		}
+
+		return nullptr;   // 使えるノードがなかった
+#else
 		p_ans = tl_odn_list_.pop_front();
 		if ( p_ans != nullptr ) {
 			if ( !hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans ) ) {
@@ -115,6 +158,7 @@ public:
 		}
 
 		return nullptr;   // 使えるノードがなかった
+#endif
 	}
 
 	static void clear_as_possible_as( void )

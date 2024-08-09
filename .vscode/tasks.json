@@ -114,7 +114,7 @@
         {
             "label": "build with a sanitizer",
             "type": "shell",
-            "command": "bash make_linux_sanitizer_build.sh 6",
+            "command": "make build-test-sanitizer.6.sanitizer",
             "problemMatcher": [
                 "$gcc"
             ]
