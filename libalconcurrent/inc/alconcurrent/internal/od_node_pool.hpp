@@ -191,7 +191,7 @@ public:
 		return ans;
 	}
 
-protected:
+private:
 	using raw_list      = od_node_list_base_impl<NODE_T, RAW_LIST_NEXT_T>;
 	using g_node_list_t = od_node_list_lockable_base<raw_list>;
 	class tl_od_node_list
