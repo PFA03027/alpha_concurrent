@@ -112,7 +112,7 @@ public:
 			return nullptr;
 		}
 
-		raw_list tmp_odn_list_( std::move( tl_odn_list_still_in_hazard ) );
+		raw_list tmp_odn_list_( std::move( tl_odn_list_still_in_hazard.move_to() ) );
 
 		hazard_ptr_mgr::ScanHazardPtrs( [&tmp_odn_list_, &tl_odn_list_still_in_hazard]( void* p_in_hazard ) {
 			auto tt_n_list = tmp_odn_list_.split_if( [p_in_hazard]( const auto& cur_node ) -> bool {
@@ -149,7 +149,7 @@ public:
 		tl_odn_list_no_in_hazard.clear();
 
 		tl_od_node_list& tl_odn_list_still_in_hazard = get_tl_odn_list_still_in_hazard();
-		raw_list         tmp_odn_list                = std::move( tl_odn_list_still_in_hazard );
+		raw_list         tmp_odn_list                = std::move( tl_odn_list_still_in_hazard.move_to() );
 
 		if ( !tmp_odn_list.is_empty() ) {
 			hazard_ptr_mgr::ScanHazardPtrs( [&tmp_odn_list, &tl_odn_list_still_in_hazard]( void* p_in_hazard ) {
@@ -194,36 +194,37 @@ public:
 protected:
 	using raw_list      = od_node_list_base_impl<NODE_T, RAW_LIST_NEXT_T>;
 	using g_node_list_t = od_node_list_lockable_base<raw_list>;
+	class tl_od_node_list
 #ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
-	class tl_od_node_list : public raw_list, public countermeasure_gcc_bug_deletable_obj_abst {
-#else
-	class tl_od_node_list : private raw_list {
+	  : public countermeasure_gcc_bug_deletable_obj_abst
 #endif
+	{
 	public:
 		using node_type    = typename raw_list::node_type;
 		using node_pointer = typename raw_list::node_pointer;
 
 		constexpr tl_od_node_list( g_node_list_t& g_odn_list_arg )
 		  : ref_g_odn_list_( g_odn_list_arg )
+		  , od_list_()
 		{
 		}
 		tl_od_node_list( tl_od_node_list&& src )
-		  : raw_list( std::move( src ) )
-		  , ref_g_odn_list_( src.ref_g_odn_list_ )
+		  : ref_g_odn_list_( src.ref_g_odn_list_ )
+		  , od_list_( std::move( src.od_list_ ) )
 		{
 		}
 		~tl_od_node_list()
 		{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-			internal::LogOutput( log_type::TEST, "mv thread local node %zu (%zu)", raw_list::profile_info_count(), node_count_in_tl_odn_list_.load() );
-			node_count_in_tl_odn_list_ -= raw_list::profile_info_count();
+			internal::LogOutput( log_type::TEST, "mv thread local node %zu (%zu)", od_list_.profile_info_count(), node_count_in_tl_odn_list_.load() );
+			node_count_in_tl_odn_list_ -= od_list_.profile_info_count();
 #endif
-			ref_g_odn_list_.lock().ref().merge_push_back( std::move( *this ) );
+			ref_g_odn_list_.lock().ref().merge_push_back( std::move( od_list_ ) );
 		}
 
 		void push_back( node_pointer p )
 		{
-			raw_list::push_back( p );
+			od_list_.push_back( p );
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			if ( p != nullptr ) {
 				node_count_in_tl_odn_list_++;
@@ -234,13 +235,13 @@ protected:
 		node_pointer pop_front( void )
 		{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-			auto p_ans = raw_list::pop_front();
+			auto p_ans = od_list_.pop_front();
 			if ( p_ans != nullptr ) {
 				node_count_in_tl_odn_list_--;
 			}
 			return p_ans;
 #else
-			return raw_list::pop_front();
+			return od_list_.pop_front();
 #endif
 		}
 
@@ -249,17 +250,33 @@ protected:
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			node_count_in_tl_odn_list_ += src.profile_info_count();
 #endif
-			raw_list::merge_push_back( std::move( src ) );
+			od_list_.merge_push_back( std::move( src ) );
 		}
 
 		bool is_empty( void )
 		{
-			return raw_list::is_empty();
+			return od_list_.is_empty();
+		}
+
+		void clear( void )
+		{
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			node_count_in_tl_odn_list_ -= od_list_.profile_info_count();
+#endif
+			od_list_.clear();
+		}
+
+		raw_list move_to( void )
+		{
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			node_count_in_tl_odn_list_ -= od_list_.profile_info_count();
+#endif
+			return std::move( od_list_ );
 		}
 
 		size_t profile_info_count( void )
 		{
-			return raw_list::profile_info_count();
+			return od_list_.profile_info_count();
 		}
 
 		static size_t profile_info_all_tl_count( void )
@@ -273,6 +290,7 @@ protected:
 
 	private:
 		g_node_list_t& ref_g_odn_list_;
+		raw_list       od_list_;
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		static std::atomic<size_t> node_count_in_tl_odn_list_;
 #endif
