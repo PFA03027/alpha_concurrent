@@ -549,6 +549,9 @@ public:
 		if ( p_ans == nullptr ) return nullptr;
 
 		p_head_ = p_ans->next();
+		if ( p_head_ == nullptr ) {
+			p_tail_ = nullptr;
+		}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		count_--;
@@ -661,7 +664,14 @@ public:
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		if ( count_ == 0 ) {
 			if ( p_head_ != nullptr ) {
-				throw std::runtime_error( "internal error: incorrect counting" );
+				throw std::runtime_error( "internal error: count is zero, but p_head_ is not nullptr. counting and/or internal status is unexpected" );
+			}
+			if ( p_tail_ != nullptr ) {
+				throw std::runtime_error( "internal error: count is zero, but p_tail_ is not nullptr. counting and/or internal status is unexpected" );
+			}
+		} else if ( count_ == 1 ) {
+			if ( p_head_ != p_tail_ ) {
+				throw std::runtime_error( "internal error: count is one, but p_head_ is not same to p_tail_. counting and/or internal status is unexpected" );
 			}
 		}
 		return count_;

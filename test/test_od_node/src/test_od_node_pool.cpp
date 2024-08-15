@@ -29,6 +29,9 @@ TEST( od_node_pool_class, CanConstructDestruct )
 	sut_type sut;
 
 	// Assert
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	EXPECT_EQ( sut.profile_info_count(), 0 );
+#endif
 	EXPECT_EQ( sut.pop(), nullptr );
 }
 
@@ -43,6 +46,9 @@ TEST( od_node_pool_class, CanPushPop1 )
 	auto p_tmp2 = sut.pop();
 
 	// Assert
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	EXPECT_EQ( sut.profile_info_count(), 0 );
+#endif
 	EXPECT_NE( p_tmp2, nullptr );
 	EXPECT_EQ( p_tmp2, p_tmp );
 
@@ -63,11 +69,17 @@ TEST( od_node_pool_class, CanPushPop_InHazard1 )
 		auto p_tmp2 = sut.pop();
 
 		// Assert
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		EXPECT_EQ( sut.profile_info_count(), 1 );
+#endif
 		EXPECT_EQ( p_tmp2, nullptr );
 	}
 
 	// Cleanup
 	delete sut.pop();
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	EXPECT_EQ( sut.profile_info_count(), 0 );
+#endif
 }
 
 TEST( od_node_pool_class, CanPushPop_InHazard2 )
@@ -87,6 +99,9 @@ TEST( od_node_pool_class, CanPushPop_InHazard2 )
 	auto p_tmp3 = sut.pop();
 
 	// Assert
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	EXPECT_EQ( sut.profile_info_count(), 0 );
+#endif
 	EXPECT_EQ( p_tmp3, p_tmp );
 	delete p_tmp3;
 }
@@ -110,12 +125,18 @@ TEST( od_node_pool_class, CanPushPop_InHazard3 )
 		auto p_tmp4 = sut.pop();
 
 		// Assert
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		EXPECT_EQ( sut.profile_info_count(), 1 );
+#endif
 		EXPECT_EQ( p_tmp4, p_tmp2 );
 		delete p_tmp4;
 	}
 
 	// Cleanup
 	delete sut.pop();
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	EXPECT_EQ( sut.profile_info_count(), 0 );
+#endif
 }
 
 TEST( od_node_pool_class, CanPushInOtherThread )
@@ -134,6 +155,9 @@ TEST( od_node_pool_class, CanPushInOtherThread )
 	auto p_tmp2 = sut.pop();
 
 	// Assert
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	EXPECT_EQ( sut.profile_info_count(), 0 );
+#endif
 	EXPECT_EQ( p_tmp2, p_tmp );
 	delete p_tmp2;
 }
@@ -149,6 +173,9 @@ TEST( od_node_pool_class, CanCleanAsPossibleAs_NoHazardPtr )
 	sut.clear_as_possible_as();
 
 	// Assert
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	EXPECT_EQ( sut.profile_info_count(), 0 );
+#endif
 	auto p_tmp2 = sut.pop();
 	EXPECT_EQ( p_tmp2, nullptr );
 }
@@ -168,6 +195,9 @@ TEST( od_node_pool_class, CanCleanAsPossibleAs_InHazardPtr )
 	}
 
 	// Assert
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	EXPECT_EQ( sut.profile_info_count(), 1 );
+#endif
 	auto p_tmp3 = sut.pop();
 	EXPECT_EQ( p_tmp3, p_tmp );
 	delete p_tmp3;

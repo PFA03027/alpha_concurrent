@@ -90,6 +90,9 @@ public:
 		tl_od_node_list& tl_odn_list_no_in_hazard = get_tl_odn_list_no_in_hazard();
 		p_ans                                     = tl_odn_list_no_in_hazard.pop_front();
 		if ( p_ans != nullptr ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			--node_count_total_;
+#endif
 			return p_ans;
 		}
 
@@ -97,6 +100,9 @@ public:
 		if ( lk.owns_lock() ) {
 			p_ans = lk.ref().pop_front();
 			if ( p_ans != nullptr ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+				--node_count_total_;
+#endif
 				return p_ans;
 			}
 		}
@@ -117,6 +123,9 @@ public:
 		p_ans = tmp_odn_list_.pop_front();
 		tl_odn_list_no_in_hazard.merge_push_back( std::move( tmp_odn_list_ ) );
 		if ( p_ans != nullptr ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			--node_count_total_;
+#endif
 			return p_ans;
 		}
 
@@ -127,8 +136,17 @@ public:
 	{
 		auto lk = g_odn_list_.try_lock();
 		if ( lk.owns_lock() ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			node_count_total_.fetch_sub( lk.ref().profile_info_count() );
+#endif
 			lk.ref().clear();
 		}
+
+		tl_od_node_list& tl_odn_list_no_in_hazard = get_tl_odn_list_no_in_hazard();
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		node_count_total_.fetch_sub( tl_odn_list_no_in_hazard.profile_info_count() );
+#endif
+		tl_odn_list_no_in_hazard.clear();
 
 		tl_od_node_list& tl_odn_list_still_in_hazard = get_tl_odn_list_still_in_hazard();
 		raw_list         tmp_odn_list                = std::move( tl_odn_list_still_in_hazard );
@@ -141,6 +159,9 @@ public:
 				tl_odn_list_still_in_hazard.merge_push_back( std::move( tt_n_list ) );
 			} );
 		}
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		node_count_total_.fetch_sub( tmp_odn_list.profile_info_count() );
+#endif
 
 		return;
 	}
@@ -161,7 +182,7 @@ public:
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		ans = "Free nodes:";
 		ans += "\ttotal: " + std::to_string( node_count_total_ );
-		ans += "\ttl_odn_list_: " + std::to_string( tl_od_node_list::profile_info_count() );
+		ans += "\ttl_odn_list_: " + std::to_string( tl_od_node_list::profile_info_all_tl_count() );
 		ans += "\tg_odn_list_: " + std::to_string( g_odn_list_.lock().ref().profile_info_count() );
 #else
 		ans = "ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE is not enabled";
@@ -236,7 +257,12 @@ protected:
 			return raw_list::is_empty();
 		}
 
-		static size_t profile_info_count( void )
+		size_t profile_info_count( void )
+		{
+			return raw_list::profile_info_count();
+		}
+
+		static size_t profile_info_all_tl_count( void )
 		{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			return node_count_in_tl_odn_list_.load( std::memory_order_acquire );
