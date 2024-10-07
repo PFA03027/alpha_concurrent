@@ -140,10 +140,25 @@ bool hazard_ptr_group::check_pointer_is_hazard_pointer( void* p ) noexcept
 {
 	if ( p == nullptr ) return false;
 
+#if 1
+	// 単一スレッド処理においては、余分な中間メモリ処理を介さない分、こちらの方が速い。
 	for ( auto& e : *this ) {
 		// if hazard_ptr_group has a pointer that is same to p, p is hazard pointer
 		if ( e.load( std::memory_order_acquire ) == p ) return true;
 	}
+#else
+	void* p_v_tmp[kArraySize];
+
+	size_t i = 0;
+	for ( auto& e : *this ) {
+		p_v_tmp[i] = e.load( std::memory_order_acquire );
+		i++;
+	}
+	for ( i = 0; i < kArraySize; i++ ) {
+		if ( p_v_tmp[i] == p ) return true;
+	}
+
+#endif
 
 	return false;
 }
