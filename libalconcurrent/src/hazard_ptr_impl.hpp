@@ -348,7 +348,7 @@ private:
 
 class alignas( atomic_variable_align ) hazard_ptr_group {
 public:
-	static constexpr size_t kArraySize = 8;
+	static constexpr size_t kArraySize = 7;
 	using hzrd_p_array_t               = std::array<std::atomic<void*>, kArraySize>;   // std::atomic<void*>をクラスでラップしてアライメントを調整した場合でも、処理負荷は変わらなかった。
 	using reference                    = hzrd_p_array_t::reference;
 	using const_reference              = hzrd_p_array_t::const_reference;
@@ -503,9 +503,9 @@ private:
 	}
 
 	del_markable_pointer delmarkable_valid_chain_next_;
-	alignas( atomic_variable_align ) std::atomic<bool> is_using_;
+	std::atomic<bool>    is_using_;
 	alignas( atomic_variable_align ) hzrd_p_array_t hzrd_ptr_array_;
-	alignas( atomic_variable_align ) iterator next_assign_hint_it_;
+	iterator next_assign_hint_it_;
 };
 
 /**

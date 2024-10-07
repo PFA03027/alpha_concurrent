@@ -44,6 +44,10 @@ TEST_F( TestHazardPtrGroup, CanDefaultConstruct )
 	alpha::concurrent::internal::hazard_ptr_group sut;
 
 	// Assert
+	printf( "sizeof(alpha::concurrent::internal::hazard_ptr_group) = %zu\n", sizeof( alpha::concurrent::internal::hazard_ptr_group ) );
+	printf( "sizeof(std::atomic<void*>) = %zu\n", sizeof( std::atomic<void*> ) );
+	printf( "sizeof(std::array<std::atomic<void*>, kArraySize>) = %zu\n", sizeof( std::array<std::atomic<void*>, alpha::concurrent::internal::hazard_ptr_group::kArraySize> ) );
+	printf( "%p\n", &sut );
 }
 
 TEST_F( TestHazardPtrGroup, CanTryAssing )

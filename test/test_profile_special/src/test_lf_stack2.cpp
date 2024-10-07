@@ -81,50 +81,42 @@ long func_test_stack_list( alpha::concurrent::x_stack_list<long>* p_test_obj )
 	return v;
 }
 
-#if 0
-TEST_F( TestLFSTACK_2_HighLoad, TC_Profile )
+constexpr size_t SUT_N    = 10;
+constexpr size_t THREAD_N = 20;
+
+#if 1
+TEST_F( TestLFSTACK_2_HighLoad, TC_Profile1 )
 {
-	// Arrange
-	pthread_barrier_init( &barrier2, NULL, num_thread + 1 );
+	using TestType = std::size_t;
+	// using TestType = int;
 
-	alpha::concurrent::x_stack_list<long> sut;
-	std::vector<std::future<long>>        results( num_thread );
-	std::vector<std::thread>              threads( num_thread );
-
-	// Act
-	for ( unsigned int i = 0; i < num_thread; i++ ) {
-		std::packaged_task<long( alpha::concurrent::x_stack_list<long>* )> task( func_test_stack_list );
-		results[i] = task.get_future();
-		threads[i] = std::thread( std::move( task ), &sut );
-	}
-	pthread_barrier_wait( &barrier2 );
-
-	// Assert
-	long sum = 0;
-	for ( unsigned int i = 0; i < num_thread; i++ ) {
-		if ( threads[i].joinable() ) {
-			threads[i].join();
-		}
-		sum += results[i].get();
-	}
-
-	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
-	// に等しくなるはず。
-	EXPECT_EQ( num_thread * loop_num, sum );
+	std::cout << "--- pre-cpu kicking x_stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( THREAD_N, 1 );
 }
-#else
 TEST_F( TestLFSTACK_2_HighLoad, TC_Profile2 )
 {
 	using TestType = std::size_t;
 	// using TestType = int;
 
-	constexpr size_t SUT_N = 100;
-
 	std::cout << "--- x_stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
-	// nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 20 * 2, 10 );
-	// nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 20, 10 );
-	// nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 20 / 2, 10 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 20, 10 );
-	// nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( 1, 10 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( THREAD_N, 10 );
+}
+#endif
+#if 1
+TEST_F( TestLFSTACK_2_HighLoad, TC_Profile3 )
+{
+	using TestType = std::size_t;
+	// using TestType = int;
+
+	std::cout << "--- pre-cpu kicking stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( THREAD_N, 1 );
+}
+TEST_F( TestLFSTACK_2_HighLoad, TC_Profile4 )
+{
+	using TestType = std::size_t;
+	// using TestType = int;
+
+	std::cout << "--- stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( THREAD_N, 10 );
 }
 #endif
