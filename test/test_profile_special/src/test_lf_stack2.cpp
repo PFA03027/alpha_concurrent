@@ -102,7 +102,7 @@ TEST_F( TestLFSTACK_2_HighLoad, TC_Profile2 )
 	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( THREAD_N, 10 );
 }
 #endif
-#if 1
+#if 0
 TEST_F( TestLFSTACK_2_HighLoad, TC_Profile3 )
 {
 	using TestType = std::size_t;

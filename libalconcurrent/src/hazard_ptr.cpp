@@ -583,15 +583,13 @@ bool global_scope_hazard_ptr_chain::check_pointer_is_hazard_pointer( void* p ) n
 	hazard_ptr_group* p_cur_chain = get_pointer_from_addr_clr_marker<hazard_ptr_group>( aaddr_top_hzrd_ptr_valid_chain_.load( std::memory_order_acquire ) );
 
 	while ( p_cur_chain != nullptr ) {
-		if ( p_cur_chain->is_used() ) {
-			hazard_ptr_group* p_cur_list = p_cur_chain;
-			while ( p_cur_list != nullptr ) {
-				if ( p_cur_list->check_pointer_is_hazard_pointer( p ) ) {
-					return true;
-				}
-				hazard_ptr_group* p_next_list = p_cur_list->ap_list_next_.load( std::memory_order_acquire );
-				p_cur_list                    = p_next_list;
+		hazard_ptr_group* p_cur_list = p_cur_chain;
+		while ( p_cur_list != nullptr ) {
+			if ( p_cur_list->check_pointer_is_hazard_pointer( p ) ) {
+				return true;
 			}
+			hazard_ptr_group* p_next_list = p_cur_list->ap_list_next_.load( std::memory_order_acquire );
+			p_cur_list                    = p_next_list;
 		}
 		hazard_ptr_group* p_next_chain = p_cur_chain->get_valid_chain_next_reader_accesser().load_pointer<hazard_ptr_group>();
 		p_cur_chain                    = p_next_chain;
@@ -605,14 +603,12 @@ void global_scope_hazard_ptr_chain::scan_hazard_pointers( std::function<void( vo
 	hazard_ptr_group* p_cur_chain = get_pointer_from_addr_clr_marker<hazard_ptr_group>( aaddr_top_hzrd_ptr_valid_chain_.load( std::memory_order_acquire ) );
 
 	while ( p_cur_chain != nullptr ) {
-		if ( p_cur_chain->is_used() ) {
-			hazard_ptr_group* p_cur_list = p_cur_chain;
-			while ( p_cur_list != nullptr ) {
-				p_cur_list->scan_hazard_pointers( pred );
+		hazard_ptr_group* p_cur_list = p_cur_chain;
+		while ( p_cur_list != nullptr ) {
+			p_cur_list->scan_hazard_pointers( pred );
 
-				hazard_ptr_group* p_next_list = p_cur_list->ap_list_next_.load( std::memory_order_acquire );
-				p_cur_list                    = p_next_list;
-			}
+			hazard_ptr_group* p_next_list = p_cur_list->ap_list_next_.load( std::memory_order_acquire );
+			p_cur_list                    = p_next_list;
 		}
 		hazard_ptr_group* p_next_chain = p_cur_chain->get_valid_chain_next_reader_accesser().load_pointer<hazard_ptr_group>();
 		p_cur_chain                    = p_next_chain;
