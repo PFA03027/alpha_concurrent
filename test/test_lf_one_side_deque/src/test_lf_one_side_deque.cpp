@@ -64,7 +64,9 @@ void* func_test_one_side_deque_front2front( void* data )
 #endif
 		if ( !pop_flag ) {
 			printf( "Bugggggggyyyy  func_test_one_side_deque_front2back()!!!  %s\n", std::to_string( v ).c_str() );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 			printf( "list size count: %d\n", p_test_obj->get_size() );
+#endif
 			exit( 1 );
 		}
 		v = vv + 1;
@@ -94,13 +96,17 @@ void* func_test_one_side_deque_back2front( void* data )
 #endif
 		if ( !pop_flag ) {
 			printf( "Bugggggggyyyy  func_test_one_side_deque_back2front()!!!  %s\n", std::to_string( v ).c_str() );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 			printf( "list size count: %d\n", p_test_obj->get_size() );
+#endif
 			exit( 1 );
 		}
 		v = vv + 1;
 	}
 
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 	printf( "final count of p_test_obj is %d", p_test_obj->get_size() );
+#endif
 
 	return reinterpret_cast<void*>( v );
 }
@@ -146,7 +152,9 @@ TEST_F( lfOneSideDeqTest, TC1 )
 
 	delete[] threads;
 
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 	std::cout << "Allocated nodes:    " << count_list.get_allocated_num() << std::endl;
+#endif
 
 	return;
 }

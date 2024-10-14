@@ -152,9 +152,16 @@ public:
 		return hzrd_ptr_.check_ptr_in_hazard_list( p_chk_node );
 	}
 
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 	int get_size( void ) const
 	{
 		return size_count_.load( std::memory_order_acquire );
+	}
+#endif
+
+	bool is_empty( void ) const
+	{
+		return head_.load( std::memory_order_acquire ) == nullptr;
 	}
 
 private:
@@ -179,6 +186,7 @@ private:
 
 }   // namespace internal
 
+#ifdef ALCONCURRENT_EXPERIMENTAL_ENABLE_OBSOLATE_STACK_LIST
 /*!
  * @brief	semi-lock free Stack type queue
  *
@@ -201,7 +209,7 @@ private:
  * To resolve ABA issue, this Stack queue uses hazard pointer approach.
  */
 template <typename T, bool ALLOW_TO_ALLOCATE = true, bool HAS_OWNERSHIP = true>
-class stack_list {
+class obsolate_stack_list {
 public:
 	using lifo_type  = internal::lifo_nd_list<T, HAS_OWNERSHIP>;
 	using input_type = typename lifo_type::input_type;
@@ -214,7 +222,7 @@ public:
 	 * This value should be at least the number of CPUs.
 	 * Also, it is recommended to double the number of threads to access.
 	 */
-	stack_list(
+	obsolate_stack_list(
 		unsigned int pre_alloc_nodes = 1   //!< [in]	number of pre-allocated internal free node
 	)
 	{
@@ -297,6 +305,7 @@ public:
 		return std::tuple<bool, value_type>( true, std::move( ans_value ) );
 	}
 
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 	/*!
 	 * @brief	number of the queued values in FIFO
 	 *
@@ -318,12 +327,13 @@ public:
 	{
 		return free_nd_.get_allocated_num();
 	}
+#endif
 
 private:
-	stack_list( const stack_list& )            = delete;
-	stack_list( stack_list&& )                 = delete;
-	stack_list& operator=( const stack_list& ) = delete;
-	stack_list& operator=( stack_list&& )      = delete;
+	obsolate_stack_list( const obsolate_stack_list& )            = delete;
+	obsolate_stack_list( obsolate_stack_list&& )                 = delete;
+	obsolate_stack_list& operator=( const obsolate_stack_list& ) = delete;
+	obsolate_stack_list& operator=( obsolate_stack_list&& )      = delete;
 
 	using free_nd_storage_type = internal::free_nd_storage;
 	using free_node_type       = typename free_nd_storage_type::node_type;
@@ -374,11 +384,14 @@ private:
 	lifo_type            lifo_;
 	free_nd_storage_type free_nd_;
 };
+#endif
 
 template <typename T>
 class x_stack_list {
 public:
-	static_assert( std::is_default_constructible<T>::value && std::is_move_constructible<T>::value && std::is_move_assignable<T>::value,
+	static_assert( ( !std::is_class<T>::value ) ||
+	                   ( std::is_class<T>::value &&
+	                     std::is_default_constructible<T>::value && std::is_move_constructible<T>::value && std::is_move_assignable<T>::value ),
 	               "T should be default constructible, move constructible and move assignable at least" );
 
 	using value_type = T;
@@ -450,6 +463,11 @@ public:
 		return ans;
 	}
 
+	bool is_empty( void ) const
+	{
+		return lf_stack_impl_.is_empty();
+	}
+
 private:
 	using node_type    = internal::od_node<T>;
 	using node_pointer = node_type*;
@@ -459,6 +477,35 @@ private:
 
 	node_stack_lockfree_t lf_stack_impl_;
 	node_pool_t           unused_node_pool_;
+};
+
+// #define x_stack_list stack_list
+template <typename T>
+class stack_list : public x_stack_list<T> {
+public:
+	stack_list( void ) = default;
+	stack_list( size_t reserve_size ) noexcept
+	  : stack_list()
+	{
+	}
+};
+template <typename T>
+class stack_list<T[]> : public x_stack_list<T*> {
+public:
+	stack_list( void ) = default;
+	stack_list( size_t reserve_size ) noexcept
+	  : stack_list()
+	{
+	}
+};
+template <typename T, size_t N>
+class stack_list<T[N]> : public x_stack_list<T*> {
+public:
+	stack_list( void ) = default;
+	stack_list( size_t reserve_size ) noexcept
+	  : stack_list()
+	{
+	}
 };
 
 }   // namespace concurrent

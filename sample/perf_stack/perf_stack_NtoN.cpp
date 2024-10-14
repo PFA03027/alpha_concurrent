@@ -32,12 +32,12 @@ using TestType = std::size_t;
 template <size_t SUT_N>
 int nwoker_perf_test_stack_NtoN_sub( unsigned int nworker )
 {
-	std::cout << "--- alpha::concurrent::stack_list<> " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( nworker * 2, 1 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( nworker, 1 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( nworker / 2, 1 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( 4, 1 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( 1, 1 );
+	std::cout << "--- alpha::concurrent::obsolate_stack_list<> " << std::to_string( SUT_N ) << " ---" << std::endl;
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::obsolate_stack_list<TestType>, SUT_N>( nworker * 2, 1 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::obsolate_stack_list<TestType>, SUT_N>( nworker, 1 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::obsolate_stack_list<TestType>, SUT_N>( nworker / 2, 1 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::obsolate_stack_list<TestType>, SUT_N>( 4, 1 );
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::obsolate_stack_list<TestType>, SUT_N>( 1, 1 );
 
 	std::cout << "--- x_stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
 	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( nworker * 2, 1 );

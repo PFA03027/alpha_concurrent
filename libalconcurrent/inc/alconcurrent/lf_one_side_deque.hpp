@@ -44,7 +44,7 @@ namespace concurrent {
 template <typename T, bool ALLOW_TO_ALLOCATE = true, bool HAS_OWNERSHIP = true>
 class one_side_deque {
 public:
-	using head_stack_t = stack_list<T, ALLOW_TO_ALLOCATE, HAS_OWNERSHIP>;
+	using head_stack_t = obsolate_stack_list<T, ALLOW_TO_ALLOCATE, HAS_OWNERSHIP>;
 	using tail_fifo_t  = fifo_list<T, ALLOW_TO_ALLOCATE, HAS_OWNERSHIP>;
 
 	using input_type = typename head_stack_t::input_type;
@@ -189,6 +189,7 @@ public:
 		return ans;
 	}
 
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 	/*!
 	 * @brief	number of the queued values in one side deque
 	 *
@@ -210,6 +211,7 @@ public:
 	{
 		return head_side_.get_allocated_num() + tail_size_.get_allocated_num();
 	}
+#endif
 
 private:
 	one_side_deque( const one_side_deque& )            = delete;

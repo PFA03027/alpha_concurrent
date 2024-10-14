@@ -1062,6 +1062,11 @@ public:
 		return hp_cur_head.get();
 	}
 
+	bool is_empty( void ) const
+	{
+		return hph_head_.get().get() == nullptr;
+	}
+
 	size_t profile_info_count( void ) const
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE

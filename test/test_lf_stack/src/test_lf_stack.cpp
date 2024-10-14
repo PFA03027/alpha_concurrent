@@ -276,7 +276,9 @@ void* func_test_fifo( void* data )
 #endif
 		if ( !pop_flag ) {
 			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string( v ).c_str() );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 			printf( "fifo size count: %d\n", p_test_obj->get_size() );
+#endif
 			exit( 1 );
 		}
 		v = vv + 1;
@@ -303,7 +305,9 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( test_lifo_type* p_test_obj[] )
 #endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v1 ).c_str() );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 				printf( "fifo size count idx 0: %d\n", p_test_obj[0]->get_size() );
+#endif
 				exit( 1 );
 			}
 			v1 = vv + 1;
@@ -318,7 +322,9 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( test_lifo_type* p_test_obj[] )
 #endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v2 ).c_str() );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 				printf( "fifo size count idx 1: %d\n", p_test_obj[1]->get_size() );
+#endif
 				exit( 1 );
 			}
 			v2 = vv + 1;
@@ -379,13 +385,15 @@ TEST_F( lfStackTest, TC3 )
 
 	delete[] threads;
 
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 	std::cout << "Allocated nodes #0:    " << p_test_obj[0]->get_allocated_num() << std::endl;
 	std::cout << "Allocated nodes #1:    " << p_test_obj[1]->get_allocated_num() << std::endl;
+#endif
 
 	return;
 }
 
-using test_lifo_type2 = alpha::concurrent::stack_list<std::uintptr_t, false>;
+using test_lifo_type2 = alpha::concurrent::stack_list<std::uintptr_t>;
 
 /**
  * 各スレッドのメインルーチン。
@@ -399,16 +407,7 @@ void* func_test4_fifo( void* data )
 
 	typename test_lifo_type2::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
-		bool push_ret;
-		push_ret = p_test_obj->push( v );
-		if ( !push_ret ) {
-			while ( !push_ret ) {
-				//				printf( "Sleep in short time func_test4_fifo()\n" );
-				std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
-				push_ret = p_test_obj->push( v );
-			}
-			//			printf( "Get!!! func_test4_fifo2()\n" );
-		}
+		p_test_obj->push( v );
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 		auto [pop_flag, vv] = p_test_obj->pop();
 #else
@@ -418,7 +417,9 @@ void* func_test4_fifo( void* data )
 #endif
 		if ( !pop_flag ) {
 			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string( v ).c_str() );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 			printf( "fifo size count: %d\n", p_test_obj->get_size() );
+#endif
 			exit( 1 );
 		}
 		v = vv + 1;
@@ -433,25 +434,8 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( test_lifo_type2* p_test_obj[]
 	typename test_lifo_type2::value_type v1 = 0;
 	typename test_lifo_type2::value_type v2 = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
-		bool push_ret;
-		push_ret = p_test_obj[0]->push( v1 );
-		if ( !push_ret ) {
-			while ( !push_ret ) {
-				//				printf( "Sleep in short time func_test4_fifo2()\n" );
-				std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
-				push_ret = p_test_obj[0]->push( v1 );
-			}
-			//			printf( "Get!!! func_test4_fifo2()\n" );
-		}
-		push_ret = p_test_obj[1]->push( v2 );
-		if ( !push_ret ) {
-			while ( !push_ret ) {
-				//				printf( "Sleep in short time func_test4_fifo2()\n" );
-				std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
-				push_ret = p_test_obj[1]->push( v2 );
-			}
-			//			printf( "Get!!! func_test4_fifo2()\n" );
-		}
+		p_test_obj[0]->push( v1 );
+		p_test_obj[1]->push( v2 );
 
 		{
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
@@ -463,7 +447,9 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( test_lifo_type2* p_test_obj[]
 #endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v1 ).c_str() );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 				printf( "fifo size count idx 0: %d\n", p_test_obj[0]->get_size() );
+#endif
 				exit( 1 );
 			}
 			v1 = vv + 1;
@@ -478,14 +464,18 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( test_lifo_type2* p_test_obj[]
 #endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v2 ).c_str() );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 				printf( "fifo size count idx 1: %d\n", p_test_obj[1]->get_size() );
+#endif
 				exit( 1 );
 			}
 			v2 = vv + 1;
 		}
 	}
 
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 	printf( "final count of p_test_obj[0] is %d", p_test_obj[0]->get_size() );
+#endif
 
 	return std::tuple<uintptr_t, uintptr_t>( v1, v2 );
 }
@@ -541,8 +531,10 @@ TEST_F( lfStackTest, TC4 )
 
 	delete[] threads;
 
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 	std::cout << "Allocated nodes #0:    " << p_test_obj[0]->get_allocated_num() << std::endl;
 	std::cout << "Allocated nodes #1:    " << p_test_obj[1]->get_allocated_num() << std::endl;
+#endif
 
 	delete p_test_obj[0];
 	delete p_test_obj[1];
