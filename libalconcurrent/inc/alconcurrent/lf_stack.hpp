@@ -134,6 +134,8 @@ public:
 template <typename T>
 class stack_list<T[]> : public internal::x_stack_list<T*> {
 public:
+	using value_type = T[];
+
 	stack_list( void ) = default;
 	stack_list( size_t reserve_size ) noexcept
 	  : stack_list()
@@ -143,6 +145,8 @@ public:
 template <typename T, size_t N>
 class stack_list<T[N]> : public internal::x_stack_list<T*> {
 public:
+	using value_type = T[N];
+
 	stack_list( void ) = default;
 	stack_list( size_t reserve_size ) noexcept
 	  : stack_list()
