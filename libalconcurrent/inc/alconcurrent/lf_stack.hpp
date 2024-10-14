@@ -27,7 +27,7 @@ namespace concurrent {
 
 namespace internal {
 
-template <typename T>
+template <typename T, typename VALUE_DELETER = deleter_nothing<T>>
 class x_stack_list {
 public:
 	static_assert( ( !std::is_class<T>::value ) ||
@@ -47,15 +47,22 @@ public:
 	  : x_stack_list()
 	{
 	}
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	~x_stack_list()
 	{
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		if ( node_pool_t::profile_info_count() != 0 ) {
 			internal::LogOutput( log_type::TEST, "%s", node_pool_t::profile_info_string().c_str() );
 			node_pool_t::clear_as_possible_as();
 		}
-	}
 #endif
+
+		VALUE_DELETER                deleter;
+		std::tuple<bool, value_type> tmp = pop();
+		while ( std::get<0>( tmp ) ) {
+			deleter( std::get<1>( tmp ) );
+			tmp = pop();
+		}
+	}
 
 	template <bool IsCopyConstructivle = std::is_copy_constructible<T>::value, bool IsCopyAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsCopyConstructivle && IsCopyAssignable>::type* = nullptr>
 	void push( const T& v_arg )

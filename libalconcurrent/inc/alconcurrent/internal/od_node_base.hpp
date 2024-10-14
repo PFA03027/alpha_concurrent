@@ -970,7 +970,13 @@ public:
 #endif
 	{
 	}
-	od_node_stack_lockfree_base( const od_node_stack_lockfree_base& ) = delete;
+
+	/**
+	 * @brief move constructor
+	 *
+	 * @warning
+	 * This constructor is dengurous, because this api is not consider the concurrency.
+	 */
 	constexpr od_node_stack_lockfree_base( od_node_stack_lockfree_base&& src ) noexcept
 	  : hph_head_( std::move( src.hph_head_ ) )
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
@@ -981,10 +987,10 @@ public:
 		src.count_.store( 0, std::memory_order_release );
 #endif
 	}
-	od_node_stack_lockfree_base& operator=( const od_node_stack_lockfree_base& ) = delete;
-	od_node_stack_lockfree_base& operator=( od_node_stack_lockfree_base&& src )  = delete;
 	~od_node_stack_lockfree_base()
 	{
+		// 以下のコードは一応メモリーリークを避けるための処理。
+		// ただし、deleteで破棄してよいかは状況次第
 		link_node_pointer p_cur = hph_head_.load();
 		hph_head_.store( nullptr );
 		while ( p_cur != nullptr ) {
@@ -993,6 +999,10 @@ public:
 			p_cur = p_nxt;
 		}
 	}
+
+	od_node_stack_lockfree_base( const od_node_stack_lockfree_base& )            = delete;
+	od_node_stack_lockfree_base& operator=( const od_node_stack_lockfree_base& ) = delete;
+	od_node_stack_lockfree_base& operator=( od_node_stack_lockfree_base&& src )  = delete;
 
 	/**
 	 * @brief ノードリストの先頭に、ノード一つを追加する
@@ -1086,6 +1096,12 @@ private:
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	std::atomic<size_t> count_;
 #endif
+};
+
+template <typename T>
+class deleter_nothing {
+public:
+	constexpr void operator()( T& ) {}
 };
 
 }   // namespace internal
