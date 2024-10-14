@@ -28,7 +28,7 @@ TEST( LFSTACK_2, CallDefaultConstruct )
 	// Arrange
 
 	// Act
-	alpha::concurrent::x_stack_list<int> sut;
+	alpha::concurrent::stack_list<int> sut;
 
 	// Assert
 }
@@ -36,7 +36,7 @@ TEST( LFSTACK_2, CallDefaultConstruct )
 TEST( LFSTACK_2, CallPopFromEmpty )
 {
 	// Arrange
-	alpha::concurrent::x_stack_list<int> sut;
+	alpha::concurrent::stack_list<int> sut;
 
 	// Act
 	auto ret = sut.pop();
@@ -48,7 +48,7 @@ TEST( LFSTACK_2, CallPopFromEmpty )
 TEST( LFSTACK_2, CallPushPopOne )
 {
 	// Arrange
-	alpha::concurrent::x_stack_list<int> sut;
+	alpha::concurrent::stack_list<int> sut;
 
 	// Act
 	sut.push( 1 );
@@ -62,7 +62,7 @@ TEST( LFSTACK_2, CallPushPopOne )
 TEST( LFSTACK_2, CallPushPopTwo )
 {
 	// Arrange
-	alpha::concurrent::x_stack_list<int> sut;
+	alpha::concurrent::stack_list<int> sut;
 
 	// Act
 	sut.push( 1 );
@@ -88,12 +88,12 @@ pthread_barrier_t barrier2;
  * 各スレッドのメインルーチン。
  * カウントアップを繰り返す。
  */
-long func_test_stack_list( alpha::concurrent::x_stack_list<long>* p_test_obj )
+long func_test_stack_list( alpha::concurrent::stack_list<long>* p_test_obj )
 {
 
 	pthread_barrier_wait( &barrier2 );
 
-	typename alpha::concurrent::x_stack_list<long>::value_type v = 0;
+	typename alpha::concurrent::stack_list<long>::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		p_test_obj->push( v );
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
@@ -118,13 +118,13 @@ TEST( LFSTACK_2_HighLoad, TC3 )
 	// Arrange
 	pthread_barrier_init( &barrier2, NULL, num_thread + 1 );
 
-	alpha::concurrent::x_stack_list<long> sut;
-	std::vector<std::future<long>>        results( num_thread );
-	std::vector<std::thread>              threads( num_thread );
+	alpha::concurrent::stack_list<long> sut;
+	std::vector<std::future<long>>      results( num_thread );
+	std::vector<std::thread>            threads( num_thread );
 
 	// Act
 	for ( unsigned int i = 0; i < num_thread; i++ ) {
-		std::packaged_task<long( alpha::concurrent::x_stack_list<long>* )> task( func_test_stack_list );
+		std::packaged_task<long( alpha::concurrent::stack_list<long>* )> task( func_test_stack_list );
 		results[i] = task.get_future();
 		threads[i] = std::thread( std::move( task ), &sut );
 	}

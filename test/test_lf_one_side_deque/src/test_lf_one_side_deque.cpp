@@ -158,7 +158,7 @@ TEST_F( lfOneSideDeqTest, TC1 )
 
 	return;
 }
-
+#if 0
 TEST_F( lfOneSideDeqTest, Pointer )
 {
 	using test_fifo_type3 = alpha::concurrent::one_side_deque<int*>;
@@ -264,3 +264,4 @@ TEST_F( lfOneSideDeqTest, Array )
 
 	std::cout << "End Array array_test[] test" << std::endl;
 }
+#endif

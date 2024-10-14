@@ -56,12 +56,12 @@ pthread_barrier_t barrier2;
  * 各スレッドのメインルーチン。
  * カウントアップを繰り返す。
  */
-long func_test_stack_list( alpha::concurrent::x_stack_list<long>* p_test_obj )
+long func_test_stack_list( alpha::concurrent::stack_list<long>* p_test_obj )
 {
 
 	pthread_barrier_wait( &barrier2 );
 
-	typename alpha::concurrent::x_stack_list<long>::value_type v = 0;
+	typename alpha::concurrent::stack_list<long>::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		p_test_obj->push( v );
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
@@ -90,16 +90,16 @@ TEST_F( TestLFSTACK_2_HighLoad, TC_Profile1 )
 	using TestType = std::size_t;
 	// using TestType = int;
 
-	std::cout << "--- pre-cpu kicking x_stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( THREAD_N, 1 );
+	std::cout << "--- pre-cpu kicking stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( THREAD_N, 1 );
 }
 TEST_F( TestLFSTACK_2_HighLoad, TC_Profile2 )
 {
 	using TestType = std::size_t;
 	// using TestType = int;
 
-	std::cout << "--- x_stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::x_stack_list<TestType>, SUT_N>( THREAD_N, 10 );
+	std::cout << "--- stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	nwoker_perf_test_stack_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( THREAD_N, 10 );
 }
 #endif
 #if 0

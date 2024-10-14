@@ -44,10 +44,9 @@ namespace concurrent {
 template <typename T, bool ALLOW_TO_ALLOCATE = true, bool HAS_OWNERSHIP = true>
 class one_side_deque {
 public:
-	using head_stack_t = obsolate_stack_list<T, ALLOW_TO_ALLOCATE, HAS_OWNERSHIP>;
+	using head_stack_t = stack_list<T>;
 	using tail_fifo_t  = fifo_list<T, ALLOW_TO_ALLOCATE, HAS_OWNERSHIP>;
 
-	using input_type = typename head_stack_t::input_type;
 	using value_type = typename head_stack_t::value_type;
 
 	/*!
@@ -75,7 +74,7 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push_back(
-		const input_type& cont_arg   //!< [in]	a value to push this one side deque
+		const value_type& cont_arg   //!< [in]	a value to push this one side deque
 		) -> typename std::enable_if<BOOL_VALUE, void>::type
 	{
 		tail_size_.push( cont_arg );
@@ -83,7 +82,7 @@ public:
 	}
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push_back(
-		input_type&& cont_arg   //!< [in]	a value to push this one side deque
+		value_type&& cont_arg   //!< [in]	a value to push this one side deque
 		) -> typename std::enable_if<BOOL_VALUE, void>::type
 	{
 		tail_size_.push( std::move( cont_arg ) );
@@ -105,14 +104,14 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push_back(
-		const input_type& cont_arg   //!< [in]	a value to push this one side deque
+		const value_type& cont_arg   //!< [in]	a value to push this one side deque
 		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
 	{
 		return tail_size_.push( cont_arg );
 	}
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push_back(
-		input_type&& cont_arg   //!< [in]	a value to push this one side deque
+		value_type&& cont_arg   //!< [in]	a value to push this one side deque
 		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
 	{
 		return tail_size_.push( std::move( cont_arg ) );
@@ -128,7 +127,7 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push_front(
-		const input_type& cont_arg   //!< [in]	a value to push this one side deque
+		const value_type& cont_arg   //!< [in]	a value to push this one side deque
 		) -> typename std::enable_if<BOOL_VALUE, void>::type
 	{
 		head_side_.push( cont_arg );
@@ -136,7 +135,7 @@ public:
 	}
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push_front(
-		input_type&& cont_arg   //!< [in]	a value to push this one side deque
+		value_type&& cont_arg   //!< [in]	a value to push this one side deque
 		) -> typename std::enable_if<BOOL_VALUE, void>::type
 	{
 		head_side_.push( std::move( cont_arg ) );
@@ -158,14 +157,14 @@ public:
 	 */
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push_front(
-		const input_type& cont_arg   //!< [in]	a value to push this one side deque
+		const value_type& cont_arg   //!< [in]	a value to push this one side deque
 		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
 	{
 		return head_side_.push( cont_arg );
 	}
 	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
 	auto push_front(
-		input_type&& cont_arg   //!< [in]	a value to push this one side deque
+		value_type&& cont_arg   //!< [in]	a value to push this one side deque
 		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
 	{
 		return head_side_.push( std::move( cont_arg ) );
