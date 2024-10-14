@@ -145,14 +145,18 @@ void* func_test_fifo( void* p_data )
 #endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 				printf( "fifo size count: %d\n", p_test_obj->get_size() );
+#endif
 
 				auto local_ret = p_test_obj->pop();
 				pop_flag       = std::get<0>( local_ret );
 				p_tmp_alloc    = std::get<1>( local_ret );
 				if ( !pop_flag ) {
 					printf( "Bugggggggyyyy, then Bugggggggyyyy func_test_fifo()!!!\n" );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 					printf( "fifo size count: %d\n", p_test_obj->get_size() );
+#endif
 
 					err_flag.store( true );
 					return nullptr;
@@ -202,14 +206,18 @@ void* func_test_fifo_ggmem( void* p_data )
 #endif
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 				printf( "fifo size count: %d\n", p_test_obj->get_size() );
+#endif
 
 				auto local_ret = p_test_obj->pop();
 				pop_flag       = std::get<0>( local_ret );
 				p_tmp_alloc    = std::get<1>( local_ret );
 				if ( !pop_flag ) {
 					printf( "Bugggggggyyyy, then Bugggggggyyyy func_test_fifo()!!!\n" );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 					printf( "fifo size count: %d\n", p_test_obj->get_size() );
+#endif
 
 					err_flag.store( true );
 					return nullptr;
@@ -251,7 +259,7 @@ void load_test_lockfree_bw_mult_thread( unsigned int num_of_thd, alpha::concurre
 		pthread_join( threads[i], nullptr );
 	}
 
-	EXPECT_EQ( 0, fifo.get_size() );
+	EXPECT_TRUE( fifo.is_empty() );
 	EXPECT_FALSE( err_flag.load() );
 
 #ifdef DEBUG_LOG
@@ -301,7 +309,7 @@ void load_test_lockfree_bw_mult_thread_ggmem( unsigned int num_of_thd )
 		pthread_join( threads[i], nullptr );
 	}
 
-	EXPECT_EQ( 0, fifo.get_size() );
+	EXPECT_TRUE( fifo.is_empty() );
 	EXPECT_FALSE( err_flag.load() );
 
 #ifdef DEBUG_LOG
@@ -358,7 +366,7 @@ void load_test_lockfree_bw_mult_thread_startstop( unsigned int num_of_thd, alpha
 		// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", j, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	}
 
-	EXPECT_EQ( 0, fifo.get_size() );
+	EXPECT_TRUE( fifo.is_empty() );
 	EXPECT_FALSE( err_flag.load() );
 
 #ifdef DEBUG_LOG
@@ -463,7 +471,9 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 #endif
 				if ( !pop_flag ) {
 					printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 					printf( "fifo size count: %d\n", fifo.get_size() );
+#endif
 					err_flag.store( true );
 					break;
 				}
@@ -499,7 +509,9 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 #endif
 				if ( !pop_flag ) {
 					printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 					printf( "fifo size count: %d\n", fifo.get_size() );
+#endif
 					err_flag.store( true );
 					break;
 				}
@@ -538,7 +550,7 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 			exit_cv.wait( lg, [&exit_count]() { return exit_count >= ( total_thread_num * 2 ); } );
 		}
 
-		EXPECT_EQ( 0, fifo.get_size() );
+		EXPECT_TRUE( fifo.is_empty() );
 	}
 
 	// alpha::concurrent::gmem_prune();

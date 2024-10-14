@@ -114,13 +114,17 @@ void* func_test_fifo_consumer( void* data )
 		}
 		if ( p_one_msg == nullptr ) {
 			printf( "Bugggggggyyyy  func_test_fifo_consumer()!!! nullptr!!\n" );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 			printf( "fifo size count: %d\n", p_test_obj->get_size() );
+#endif
 			err_flag.store( true );
 			break;
 		}
 		if ( !p_one_msg->chk_crc() ) {
 			printf( "Bugggggggyyyy  func_test_fifo_consumer()!!! CRC NG!!\n" );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 			printf( "fifo size count: %d\n", p_test_obj->get_size() );
+#endif
 			err_flag.store( true );
 			break;
 		}
@@ -132,7 +136,9 @@ void* func_test_fifo_consumer( void* data )
 		}
 	}
 
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 	printf( "final count of p_test_obj is %d", p_test_obj->get_size() );
+#endif
 
 	return reinterpret_cast<void*>( 1 );
 }
