@@ -57,7 +57,7 @@ constexpr size_t       max_slot_size  = 1000;
 constexpr size_t       max_alloc_size = 900;
 constexpr unsigned int num_loop       = 1000;
 
-using test_fifo_type = alpha::concurrent::fifo_list<void*, true, false>;
+using test_fifo_type = alpha::concurrent::fifo_list<void*, alpha::concurrent::internal::deleter_nothing<void*>>;
 
 struct test_params {
 	test_fifo_type*                           p_test_obj;

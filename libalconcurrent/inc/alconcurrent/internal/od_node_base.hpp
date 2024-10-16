@@ -1103,6 +1103,11 @@ class deleter_nothing {
 public:
 	constexpr void operator()( T& ) {}
 };
+template <>
+class deleter_nothing<void> {
+public:
+	constexpr void operator()( void* ) {}
+};
 
 }   // namespace internal
 }   // namespace concurrent

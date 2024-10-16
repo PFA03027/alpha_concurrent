@@ -45,7 +45,7 @@ template <typename T, bool ALLOW_TO_ALLOCATE = true, bool HAS_OWNERSHIP = true>
 class one_side_deque {
 public:
 	using head_stack_t = stack_list<T>;
-	using tail_fifo_t  = fifo_list<T, ALLOW_TO_ALLOCATE, HAS_OWNERSHIP>;
+	using tail_fifo_t  = fifo_list<T>;
 
 	using value_type = typename head_stack_t::value_type;
 

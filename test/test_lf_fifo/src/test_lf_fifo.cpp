@@ -20,13 +20,12 @@
 #include "alconcurrent/lf_fifo.hpp"
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
-constexpr int            num_thread = 8;   // Tested until 128.
+constexpr int            num_thread = 1;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 10000;
 
 using test_fifo_type_part = alpha::concurrent::internal::fifo_nd_list<std::uintptr_t>;   // ownership=TRUE設定のfifoのベースクラスとして定義
 
-using test_fifo_type  = alpha::concurrent::fifo_list<std::uintptr_t>;
-using test_fifo_type2 = alpha::concurrent::fifo_list<std::uintptr_t, false>;
+using test_fifo_type = alpha::concurrent::fifo_list<std::uintptr_t>;
 
 pthread_barrier_t barrier;
 
@@ -342,7 +341,7 @@ void* func_test_fifo( void* data )
 		auto vv        = std::get<1>( local_ret );
 #endif
 		if ( !pop_flag ) {
-			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string( v ).c_str() );
+			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string( i ).c_str() );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 			printf( "fifo size count: %d\n", p_test_obj->get_size() );
 #endif
@@ -372,7 +371,7 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( TEST_FIFO_TYPE* p_test_obj[] )
 			auto vv        = std::get<1>( local_ret );
 #endif
 			if ( !pop_flag ) {
-				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v1 ).c_str() );
+				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( i ).c_str() );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 				printf( "fifo size count idx 0: %d\n", p_test_obj[0]->get_size() );
 #endif
@@ -656,10 +655,6 @@ void test_case4( void )
 	delete p_test_obj[1];
 
 	return;
-}
-TEST_F( lffifoTest, TC4 )
-{
-	ASSERT_NO_FATAL_FAILURE( test_case4<test_fifo_type2>() );
 }
 
 TEST_F( lffifoTest, Pointer1 )

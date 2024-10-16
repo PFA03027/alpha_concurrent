@@ -188,15 +188,15 @@ int main( void )
 		std::cout << "hardware_concurrency is unknown, therefore let's select templary value. " << std::endl;
 		nworker = 10;
 	}
-	alpha::concurrent::fifo_list<TestType> sut1( ReserveSize );
-	vec_fifo                               sut2;
-	list_fifo                              sut3;
+	alpha::concurrent::obsolate_fifo_list<TestType> sut1( ReserveSize );
+	vec_fifo                                        sut2;
+	list_fifo                                       sut3;
 
-	std::cout << "--- alpha::concurrent::fifo_list<> ---" << std::endl;
-	nwoker_perf_test_stack<alpha::concurrent::fifo_list<TestType>>( nworker * 2, sut1 );
-	nwoker_perf_test_stack<alpha::concurrent::fifo_list<TestType>>( nworker, sut1 );
-	nwoker_perf_test_stack<alpha::concurrent::fifo_list<TestType>>( nworker / 2, sut1 );
-	nwoker_perf_test_stack<alpha::concurrent::fifo_list<TestType>>( 1, sut1 );
+	std::cout << "--- alpha::concurrent::obsolate_fifo_list<> ---" << std::endl;
+	nwoker_perf_test_stack<alpha::concurrent::obsolate_fifo_list<TestType>>( nworker * 2, sut1 );
+	nwoker_perf_test_stack<alpha::concurrent::obsolate_fifo_list<TestType>>( nworker, sut1 );
+	nwoker_perf_test_stack<alpha::concurrent::obsolate_fifo_list<TestType>>( nworker / 2, sut1 );
+	nwoker_perf_test_stack<alpha::concurrent::obsolate_fifo_list<TestType>>( 1, sut1 );
 	std::cout << "--- vec_fifo ---" << std::endl;
 	nwoker_perf_test_stack<vec_fifo>( nworker * 2, sut2 );
 	nwoker_perf_test_stack<vec_fifo>( nworker, sut2 );

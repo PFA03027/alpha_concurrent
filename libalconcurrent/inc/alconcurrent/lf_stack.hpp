@@ -11,6 +11,7 @@
 #ifndef ALCONCCURRENT_INC_LF_STACK_HPP_
 #define ALCONCCURRENT_INC_LF_STACK_HPP_
 
+#include <array>
 #include <atomic>
 #include <memory>
 #include <tuple>
@@ -139,7 +140,16 @@ public:
 	}
 };
 template <typename T>
-class stack_list<T[]> : public internal::x_stack_list<T*> {
+class stack_list<T*> : public internal::x_stack_list<T*, std::default_delete<T>> {
+public:
+	stack_list( void ) = default;
+	stack_list( size_t reserve_size ) noexcept
+	  : stack_list()
+	{
+	}
+};
+template <typename T>
+class stack_list<T[]> : public internal::x_stack_list<T*, std::default_delete<T[]>> {
 public:
 	using value_type = T[];
 
@@ -150,7 +160,7 @@ public:
 	}
 };
 template <typename T, size_t N>
-class stack_list<T[N]> : public internal::x_stack_list<T*> {
+class stack_list<T[N]> : public internal::x_stack_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>> {
 public:
 	using value_type = T[N];
 
@@ -158,6 +168,46 @@ public:
 	stack_list( size_t reserve_size ) noexcept
 	  : stack_list()
 	{
+	}
+
+	void push(
+		const value_type& cont_arg   //!< [in]	a value to push this FIFO queue
+	)
+	{
+		std::array<T, N> tmp;
+		for ( size_t i = 0; i < N; i++ ) {
+			tmp[i] = cont_arg[i];
+		}
+
+		internal::x_stack_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
+	}
+	void push(
+		value_type&& cont_arg   //!< [in]	a value to push this FIFO queue
+	)
+	{
+		std::array<T, N> tmp;
+		for ( size_t i = 0; i < N; i++ ) {
+			tmp[i] = std::move( cont_arg[i] );
+		}
+
+		internal::x_stack_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
+	}
+
+	std::tuple<bool, value_type> pop( void )
+	{
+		std::tuple<bool, value_type> ans;
+		std::get<0>( ans ) = false;
+
+		std::tuple<bool, std::array<T, N>> ret = internal::x_stack_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::pop();
+		if ( !std::get<0>( ret ) ) {
+			return ans;
+		}
+
+		std::get<0>( ans ) = true;
+		for ( size_t i = 0; i < N; i++ ) {
+			std::get<1>( ans )[i] = std::move( std::get<1>( ret )[i] );
+		}
+		return ans;
 	}
 };
 

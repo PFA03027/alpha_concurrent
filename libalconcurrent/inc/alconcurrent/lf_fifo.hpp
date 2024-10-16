@@ -11,6 +11,7 @@
 #ifndef ALCONCCURRENT_INC_LF_FIFO_HPP_
 #define ALCONCCURRENT_INC_LF_FIFO_HPP_
 
+#include <array>
 #include <atomic>
 #include <memory>
 #include <tuple>
@@ -221,18 +222,234 @@ private:
 	hazard_ptr_storage_t hzrd_ptr_;
 };
 
-template <typename T>
+template <typename NODE_T>
+class node_fifo_lockfree_base {
+public:
+	using node_type    = NODE_T;
+	using node_pointer = NODE_T*;
+	using value_type   = typename NODE_T::value_type;
+
+	static_assert( std::is_default_constructible<value_type>::value && std::is_copy_constructible<value_type>::value && std::is_copy_assignable<value_type>::value,
+	               "T should be default constructible, move constructible and move assignable at least" );
+	static_assert( std::is_base_of<od_node<value_type>, NODE_T>::value, "NODE_T is the derived class of od_node<T>" );
+
+	constexpr node_fifo_lockfree_base( node_pointer p_sentinel ) noexcept
+	  : hph_head_( p_sentinel )
+	  , hph_tail_( p_sentinel )
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	  , count_( 0 )
+#endif
+	{
+	}
+
+	/**
+	 * @brief move constructor
+	 *
+	 * @warning
+	 * This constructor is dengurous, because this api is not consider the concurrency.
+	 */
+	constexpr node_fifo_lockfree_base( node_fifo_lockfree_base&& src ) noexcept
+	  : hph_head_( std::move( src.hph_head_ ) )
+	  , hph_tail_( std::move( src.hph_tail_ ) )
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	  , count_( src.count_.load( std::memory_order_acquire ) )
+#endif
+	{
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		src.count_.store( 0, std::memory_order_release );
+#endif
+	}
+
+	~node_fifo_lockfree_base()
+	{
+		// 以下のコードは一応メモリーリークを避けるための処理。
+		// ただし、deleteで破棄してよいかは状況次第。
+		// 本来は、release_sentinel_node()で、空っぽにしてから、破棄することがこのクラスを使う上での期待値
+		hazard_pointer hp_cur = hph_head_.get();
+		hph_head_.store( nullptr );
+		hph_tail_.store( nullptr );
+		while ( hp_cur != nullptr ) {
+			hazard_pointer hp_nxt = hp_cur->get_hazard_ptr_of_next();
+			delete hp_cur.get();
+			hp_cur = std::move( hp_nxt );
+		}
+	}
+
+	node_fifo_lockfree_base( const node_fifo_lockfree_base& )            = delete;
+	node_fifo_lockfree_base& operator=( const node_fifo_lockfree_base& ) = delete;
+	node_fifo_lockfree_base& operator=( node_fifo_lockfree_base&& src )  = delete;
+
+	/**
+	 * @brief ノードリストの先頭に、ノード一つを追加する
+	 *
+	 * @pre
+	 * p_ndは、他スレッドからアクセスされない。
+	 * 自インスタンスは、他スレッドからアクセスされない。
+	 *
+	 * @param p_nd
+	 */
+	void push_back( const value_type& v, node_pointer p_nd ) noexcept
+	{
+		if ( p_nd == nullptr ) return;
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
+		if ( p_nd->next() != nullptr ) {
+			LogOutput( log_type::WARN, "od_node_list_lockfree::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
+		}
+#endif
+
+		p_nd->set( v, nullptr );
+		push_back_common( p_nd );
+
+		return;
+	}
+	void push_back( value_type&& v, node_pointer p_nd ) noexcept
+	{
+		if ( p_nd == nullptr ) return;
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
+		if ( p_nd->next() != nullptr ) {
+			LogOutput( log_type::WARN, "od_node_list_lockfree::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
+		}
+#endif
+
+		p_nd->set( std::move( v ), nullptr );
+		push_back_common( p_nd );
+
+		return;
+	}
+
+	/**
+	 * @brief pop from front
+	 *
+	 * @warning because there is a possibility that a returned node is in hazard pointer, hazard_ptr_handler_t hph_next_ in returned node is not set nullptr.
+	 * And should not write not only nullptr but also any next pointer information during return pointer is in hazard pointer.
+	 *
+	 * @return popped node_pointer. please see warning also.
+	 */
+	std::tuple<node_pointer, value_type> pop_front( void ) noexcept
+	{
+		while ( true ) {
+			hazard_pointer hp_head_node = hph_head_.get();
+			hazard_pointer hp_tail_node = hph_tail_.get();
+			hazard_pointer hp_head_next = hp_head_node->get_hazard_ptr_of_next();
+			// if ( hp_head_node != hph_head_.get() ) continue;
+			if ( hp_head_node == hp_tail_node ) {
+				if ( hp_head_next == nullptr ) {
+					// 番兵ノードしかないので、FIFOキューは空。
+					return std::tuple<node_pointer, value_type> { nullptr, value_type {} };
+				}
+				// 番兵ノードしかないように見えるが、Tailがまだ更新されていないだけ。
+				// tailを更新して、pop処理をし直す。
+				// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
+				// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
+				typename hazard_pointer::pointer hph_tail_expected = hp_tail_node.get();
+				hph_tail_.compare_exchange_weak( hph_tail_expected, hp_head_next.get(), std::memory_order_release, std::memory_order_acquire );
+			} else {
+				if ( hp_head_next == nullptr ) {
+					// headが他のスレッドでpopされた。
+					continue;
+				}
+
+				// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
+				// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
+				typename hazard_pointer::pointer     hph_head_expected = hp_head_node.get();
+				std::tuple<node_pointer, value_type> ans { hph_head_expected, hp_head_next->get() };
+				if ( hph_head_.compare_exchange_weak( hph_head_expected, hp_head_next.get(), std::memory_order_release, std::memory_order_acquire ) ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+					count_--;
+#endif
+					// ここで、headの取り出しと所有権確保が完了
+					// ただし、headノードへのポインタがハザードポインタに登録されているかどうかをチェックしていないため、まだ参照している人がいるかもしれない。
+					return ans;
+				}
+			}
+		}
+	}
+
+	/**
+	 * @brief release sentinel node for destruction
+	 *
+	 * @pre the instance should be empty.
+	 *
+	 * @return node_pointer sentinel node
+	 *
+	 * @post no sentinel node in this instance. therefore, does not work correctly any more except destructor
+	 */
+	node_pointer release_sentinel_node( void ) noexcept
+	{
+		node_pointer p_ans = nullptr;
+		if ( !is_empty() ) {
+			internal::LogOutput( log_type::ERR, "ERR: calling condition is not expected. Before calling release_sentinel_node, this instance should be empty. therefore, now leak all remaining nodes." );
+		}
+
+		p_ans = hph_head_.load();
+		hph_head_.store( nullptr );
+		hph_tail_.store( nullptr );
+		return p_ans;
+	}
+
+	bool is_empty( void ) const
+	{
+		// return hph_head_.get().get() == hph_tail_.get().get();
+		return hph_head_.load() == hph_tail_.load();
+	}
+
+	size_t profile_info_count( void ) const
+	{
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		return count_.load( std::memory_order_acquire );
+#else
+		return 0;
+#endif
+	}
+
+private:
+	using hazard_ptr_handler_t = typename NODE_T::hazard_ptr_handler_t;
+	using hazard_pointer       = typename NODE_T::hazard_pointer;
+
+	void push_back_common( node_pointer p_nd ) noexcept
+	{
+		while ( true ) {
+			hazard_pointer hp_tail_node = hph_tail_.get();
+			hazard_pointer hp_tail_next = hp_tail_node->get_hazard_ptr_of_next();
+			if ( hp_tail_node != hph_tail_.get() ) continue;
+			if ( hp_tail_next == nullptr ) {
+				typename hazard_pointer::pointer expected = nullptr;
+				if ( hp_tail_node->hazard_handler().compare_exchange_weak( expected, p_nd, std::memory_order_release, std::memory_order_acquire ) ) {
+					expected = hp_tail_node.get();
+					hph_tail_.compare_exchange_weak( expected, p_nd, std::memory_order_release, std::memory_order_acquire );
+					break;
+				}
+			} else {
+				typename hazard_pointer::pointer expected = hp_tail_node.get();
+				hph_tail_.compare_exchange_weak( expected, hp_tail_next.get(), std::memory_order_release, std::memory_order_acquire );
+			}
+		}
+
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		count_++;
+#endif
+		return;
+	}
+
+	hazard_ptr_handler_t hph_head_;
+	hazard_ptr_handler_t hph_tail_;
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	std::atomic<size_t> count_;
+#endif
+};
+
+template <typename T, typename VALUE_DELETER = deleter_nothing<T>>
 class x_fifo_list {
 public:
 	static_assert( ( !std::is_class<T>::value ) ||
 	                   ( std::is_class<T>::value &&
-	                     std::is_default_constructible<T>::value && std::is_move_constructible<T>::value && std::is_move_assignable<T>::value ),
+	                     std::is_default_constructible<T>::value && std::is_copy_constructible<T>::value && std::is_copy_assignable<T>::value ),
 	               "T should be default constructible, move constructible and move assignable at least" );
 
 	using value_type = T;
 
 	constexpr x_fifo_list( void ) noexcept
-	  : lf_stack_impl_()
+	  : lf_fifo_impl_( new node_type( nullptr ) )
 	  , unused_node_pool_()
 	{
 	}
@@ -241,77 +458,80 @@ public:
 	  : x_fifo_list()
 	{
 	}
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	~x_fifo_list()
 	{
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		if ( node_pool_t::profile_info_count() != 0 ) {
 			internal::LogOutput( log_type::TEST, "%s", node_pool_t::profile_info_string().c_str() );
 			node_pool_t::clear_as_possible_as();
 		}
-	}
 #endif
 
-	template <bool IsCopyConstructivle = std::is_copy_constructible<T>::value, bool IsCopyAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsCopyConstructivle && IsCopyAssignable>::type* = nullptr>
+		VALUE_DELETER                deleter;
+		std::tuple<bool, value_type> tmp = pop();
+		while ( std::get<0>( tmp ) ) {
+			deleter( std::get<1>( tmp ) );
+			tmp = pop();
+		}
+
+		delete lf_fifo_impl_.release_sentinel_node();
+	}
+
 	void push( const T& v_arg )
 	{
 		node_pointer p_new_nd = unused_node_pool_.pop();
-		if ( p_new_nd != nullptr ) {
-			p_new_nd->get() = v_arg;
-		} else {
-			p_new_nd = new node_type( nullptr, v_arg );
+		if ( p_new_nd == nullptr ) {
+			p_new_nd = new node_type( nullptr );
 		}
-		lf_stack_impl_.push_front( p_new_nd );
+		lf_fifo_impl_.push_back( v_arg, p_new_nd );
 	}
 	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, bool IsMoveAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsMoveConstructivle && IsMoveAssignable>::type* = nullptr>
 	void push( T&& v_arg )
 	{
 		node_pointer p_new_nd = unused_node_pool_.pop();
-		if ( p_new_nd != nullptr ) {
-			p_new_nd->get() = std::move( v_arg );
-		} else {
-			p_new_nd = new node_type( nullptr, std::move( v_arg ) );
+		if ( p_new_nd == nullptr ) {
+			p_new_nd = new node_type( nullptr );
 		}
-		lf_stack_impl_.push_front( p_new_nd );
+		lf_fifo_impl_.push_back( std::move( v_arg ), p_new_nd );
 	}
 
 	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, typename std::enable_if<IsMoveConstructivle>::type* = nullptr>
 	std::tuple<bool, value_type> pop( void )
 	{
 		// TがMove可能である場合に選択されるAPI実装
-		node_pointer p_poped_node = lf_stack_impl_.pop_front();
-		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
+		std::tuple<node_pointer, value_type> pop_val = lf_fifo_impl_.pop_front();
+		if ( std::get<0>( pop_val ) == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
-		std::tuple<bool, value_type> ans { true, std::move( p_poped_node->get() ) };
-		unused_node_pool_.push( p_poped_node );
+		std::tuple<bool, value_type> ans { true, std::move( std::get<1>( pop_val ) ) };
+		unused_node_pool_.push( std::get<0>( pop_val ) );
 		return ans;
 	}
-	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, bool IsCopyConstructivle = std::is_copy_constructible<T>::value,
-	          typename std::enable_if<!IsMoveConstructivle && IsCopyConstructivle>::type* = nullptr>
+	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, typename std::enable_if<!IsMoveConstructivle>::type* = nullptr>
 	std::tuple<bool, value_type> pop( void )
 	{
 		// TがMove不可能であるが、Copy可能である場合に選択されるAPI実装
-		node_pointer p_poped_node = lf_stack_impl_.pop_front();
-		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
+		std::tuple<node_pointer, value_type> pop_val = lf_fifo_impl_.pop_front();
+		if ( std::get<0>( pop_val ) == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
-		std::tuple<bool, value_type> ans { true, p_poped_node->get() };
-		unused_node_pool_.push( p_poped_node );
+		std::tuple<bool, value_type> ans { true, std::get<1>( pop_val ) };
+		unused_node_pool_.push( std::get<0>( pop_val ) );
 		return ans;
 	}
 
 	bool is_empty( void ) const
 	{
-		return lf_stack_impl_.is_empty();
+		return lf_fifo_impl_.is_empty();
 	}
 
 private:
-	using node_type    = internal::od_node<T>;
+	using node_type    = od_node<T>;
 	using node_pointer = node_type*;
 
-	using node_stack_lockfree_t = internal::od_node_stack_lockfree_base<node_type, typename node_type::hazard_handler_next_t>;
-	using node_pool_t           = internal::od_node_pool<node_type, typename node_type::raw_next_t>;
+	using node_fifo_lockfree_t = node_fifo_lockfree_base<node_type>;
+	using node_pool_t          = od_node_pool<node_type, typename node_type::raw_next_t>;
 
-	node_stack_lockfree_t lf_stack_impl_;
-	node_pool_t           unused_node_pool_;
+	node_fifo_lockfree_t lf_fifo_impl_;
+	node_pool_t          unused_node_pool_;
 };
 
 }   // namespace internal
@@ -339,7 +559,7 @@ private:
  * To resolve ABA issue, this FIFO queue uses hazard pointer approach.
  */
 template <typename T, bool ALLOW_TO_ALLOCATE = true, bool HAS_OWNERSHIP = true>
-class fifo_list {
+class obsolate_fifo_list {
 public:
 	using fifo_type  = internal::fifo_nd_list<T, HAS_OWNERSHIP>;
 	using input_type = typename fifo_type::input_type;
@@ -352,7 +572,7 @@ public:
 	 * This value should be at least the number of CPUs.
 	 * Also, it is recommended to double the number of threads to access.
 	 */
-	fifo_list(
+	obsolate_fifo_list(
 		unsigned int pre_alloc_nodes = 1   //!< [in]	number of pre-allocated internal free node
 	)
 	{
@@ -473,10 +693,10 @@ public:
 	}
 
 private:
-	fifo_list( const fifo_list& )            = delete;
-	fifo_list( fifo_list&& )                 = delete;
-	fifo_list& operator=( const fifo_list& ) = delete;
-	fifo_list& operator=( fifo_list&& )      = delete;
+	obsolate_fifo_list( const obsolate_fifo_list& )            = delete;
+	obsolate_fifo_list( obsolate_fifo_list&& )                 = delete;
+	obsolate_fifo_list& operator=( const obsolate_fifo_list& ) = delete;
+	obsolate_fifo_list& operator=( obsolate_fifo_list&& )      = delete;
 
 	using free_nd_storage_type = internal::free_nd_storage;
 	using free_node_type       = typename free_nd_storage_type::node_type;
@@ -531,6 +751,127 @@ private:
 	fifo_type            fifo_;
 	free_nd_storage_type free_nd_;
 };
+
+template <typename T, typename VALUE_DELETER = internal::deleter_nothing<T>>
+class fifo_list : public internal::x_fifo_list<T, VALUE_DELETER> {
+public:
+	fifo_list( void ) = default;
+	fifo_list( size_t reserve_size ) noexcept
+	  : fifo_list()
+	{
+	}
+};
+template <>
+class fifo_list<void*> : public internal::x_fifo_list<void*, internal::deleter_nothing<void>> {
+public:
+	fifo_list( void ) = default;
+	fifo_list( size_t reserve_size ) noexcept
+	  : fifo_list()
+	{
+	}
+};
+template <typename T>
+class fifo_list<T*> : public internal::x_fifo_list<T*, std::default_delete<T>> {
+public:
+	fifo_list( void ) = default;
+	fifo_list( size_t reserve_size ) noexcept
+	  : fifo_list()
+	{
+	}
+};
+template <typename T>
+class fifo_list<T[]> : public internal::x_fifo_list<T*, std::default_delete<T[]>> {
+public:
+	using value_type = T[];
+
+	fifo_list( void ) = default;
+	fifo_list( size_t reserve_size ) noexcept
+	  : fifo_list()
+	{
+	}
+};
+template <typename T, size_t N>
+class fifo_list<T[N]> : public internal::x_fifo_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>> {
+public:
+	using value_type = T[N];
+
+	fifo_list( void ) = default;
+	fifo_list( size_t reserve_size ) noexcept
+	  : fifo_list()
+	{
+	}
+
+	void push(
+		const value_type& cont_arg   //!< [in]	a value to push this FIFO queue
+	)
+	{
+		std::array<T, N> tmp;
+		for ( size_t i = 0; i < N; i++ ) {
+			tmp[i] = cont_arg[i];
+		}
+
+		internal::x_fifo_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
+	}
+	void push(
+		value_type&& cont_arg   //!< [in]	a value to push this FIFO queue
+	)
+	{
+		std::array<T, N> tmp;
+		for ( size_t i = 0; i < N; i++ ) {
+			tmp[i] = std::move( cont_arg[i] );
+		}
+
+		internal::x_fifo_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
+	}
+
+	std::tuple<bool, value_type> pop( void )
+	{
+		std::tuple<bool, value_type> ans;
+		std::get<0>( ans ) = false;
+
+		std::tuple<bool, std::array<T, N>> ret = internal::x_fifo_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::pop();
+		if ( !std::get<0>( ret ) ) {
+			return ans;
+		}
+
+		std::get<0>( ans ) = true;
+		for ( size_t i = 0; i < N; i++ ) {
+			std::get<1>( ans )[i] = std::move( std::get<1>( ret )[i] );
+		}
+		return ans;
+	}
+};
+template <typename T, typename DELETER>
+class fifo_list<T*, DELETER> : public internal::x_fifo_list<T*, DELETER> {
+public:
+	fifo_list( void ) = default;
+	fifo_list( size_t reserve_size ) noexcept
+	  : fifo_list()
+	{
+	}
+};
+template <typename T, typename DELETER>
+class fifo_list<T[], DELETER> : public internal::x_fifo_list<T*, DELETER> {
+public:
+	using value_type = T[];
+
+	fifo_list( void ) = default;
+	fifo_list( size_t reserve_size ) noexcept
+	  : fifo_list()
+	{
+	}
+};
+// template <typename T, size_t N, typename DELETER>
+// class fifo_list<T[N], DELETER> : public internal::x_fifo_list<T*, DELETER> {
+// public:
+// 	using value_type = T[N];
+
+// 	fifo_list( void ) = default;
+// 	fifo_list( size_t reserve_size ) noexcept
+// 	  : fifo_list()
+// 	{
+// 	}
+// };
 
 }   // namespace concurrent
 }   // namespace alpha
