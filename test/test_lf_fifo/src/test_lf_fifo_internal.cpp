@@ -98,6 +98,7 @@ TEST( Internal_New_FIFO, CanPushPush_then_Pop_return_ValidNode_and_value )
 	EXPECT_TRUE( sut.is_empty() );
 	EXPECT_NE( std::get<0>( ret ), nullptr );
 	EXPECT_EQ( std::get<1>( ret ), 2 );
+	delete std::get<0>( ret );
 
 	// Cleanup
 	delete sut.release_sentinel_node();
