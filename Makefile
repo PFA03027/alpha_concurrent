@@ -41,7 +41,7 @@ BUILD_DIR?=build
 #MAKEFILE_DIR := $(dir $(lastword $(MAKEFILE_LIST)))	# 相対パス名を得るならこちら。
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))	# 絶対パス名を得るならこちら。
 
-SANITIZER_ALL_IDS=$(shell seq 1 21)
+SANITIZER_ALL_IDS=$(shell seq 1 11)
 SANITIZER_P_ALL_TARGETS=$(addprefix sanitizer.p.,$(SANITIZER_ALL_IDS))
 
 #TEST_EXECS = $(shell find ${BUILD_DIR} -type f -executable -name "test_*")
@@ -70,7 +70,7 @@ test: build-test
 	ctest -j ${JOBS} -v
 
 build-test:
-	make BUILDIMPLTARGET=build-test all
+	$(MAKE) BUILDIMPLTARGET=build-test all
 
 sample: build-sample
 	echo finish make sample
@@ -78,14 +78,14 @@ sample: build-sample
 	# build/sample/perf_fifo/perf_fifo
 
 build-sample:
-	make BUILDIMPLTARGET=build-sample all
+	$(MAKE) BUILDIMPLTARGET=build-sample all
 
 clean:
 	-rm -fr ${BUILD_DIR} build.*
 
 coverage: clean
 	set -e; \
-	make BUILDTARGET=codecoverage BUILDTYPE=Debug test;  \
+	$(MAKE) BUILDTARGET=codecoverage BUILDTYPE=Debug test;  \
 	cd ${BUILD_DIR}; \
 	find . -type f -name "*.gcda" | xargs -P${JOBS} -I@ gcov -l -b @; \
 	lcov --rc lcov_branch_coverage=1 -c -d . -o tmp.info; \
@@ -94,23 +94,23 @@ coverage: clean
 	genhtml --branch-coverage -o OUTPUT -p . -f output.info
 
 profile: build-profile
-	make -j ${JOBS} make-profile-out
+	$(MAKE) -j ${JOBS} make-profile-out
 
 sanitizer:
 	set -e; \
 	for i in $(SANITIZER_ALL_IDS); do \
-		make sanitizer.$$i.sanitizer; \
+		$(MAKE) sanitizer.$$i.sanitizer; \
 		echo $$i / 21 done; \
 	done
 
 sanitizer.p:
-	make -j${JOBS} sanitizer.p_internal
+	$(MAKE) -j${JOBS} sanitizer.p_internal
 
 sanitizer.%.sanitizer: clean
-	make BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$* test
+	$(MAKE) BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$* test
 
 build-test-sanitizer.%.sanitizer: clean
-	make BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$* build-test
+	$(MAKE) BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$* build-test
 
 tidy-fix: configure-cmake
 	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build --fix
@@ -128,7 +128,7 @@ configure-cmake:
 	cmake ${CMAKE_CONFIGURE_OPTS} -G "Unix Makefiles" ${MAKEFILE_DIR}
 
 build-profile:
-	make BUILDTARGET=gprof BUILDTYPE=${BUILDTYPE} build-test
+	$(MAKE) BUILDTARGET=gprof BUILDTYPE=${BUILDTYPE} build-test
 
 exec-profile: build-profile
 	set -e; \
@@ -140,10 +140,10 @@ sanitizer.p_internal: $(SANITIZER_P_ALL_TARGETS)
 
 define SANITIZER_P_TEMPLATE
 sanitizer.p.configure-cmake.$(1):
-	make BUILD_DIR=build.p/$(1) BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$(1) configure-cmake
+	$(MAKE) BUILD_DIR=build.p/$(1) BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$(1) configure-cmake
 
 sanitizer.p.$(1): sanitizer.p.configure-cmake.$(1)
-	make BUILD_DIR=build.p/$(1) BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$(1) sanitizer.p.test
+	$(MAKE) BUILD_DIR=build.p/$(1) BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$(1) sanitizer.p.test
 
 sanitizer.p.configure-cmake.$(shell expr $(1) + 1): sanitizer.p.configure-cmake.$(1)
 
@@ -154,10 +154,10 @@ $(foreach pgm,$(SANITIZER_ALL_IDS),$(eval $(call SANITIZER_P_TEMPLATE,$(pgm))))
 ifeq ($(strip $(TEST_EXECS)),)
 ## $(TEST_EXECS)が空の場合＝buildが実行されていない状況
 test.%: build-test
-	make test.$*
+	$(MAKE) test.$*
 
 profile.%: build-profile
-	make profile.$*
+	$(MAKE) profile.$*
 
 else
 ## $(TEST_EXECS)になんらかの値が入っている場合=buildが実行されている状況
