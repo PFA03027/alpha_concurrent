@@ -18,7 +18,7 @@
 #endif
 
 #include "alconcurrent/hazard_ptr.hpp"
-#include "alconcurrent/internal/od_node_base.hpp"
+#include "alconcurrent/internal/od_node_base_old1.hpp"
 
 namespace alpha {
 namespace concurrent {
