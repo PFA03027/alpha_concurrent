@@ -53,9 +53,9 @@ std::atomic<bool> err_flag( false );
 
 static pthread_barrier_t barrier;
 
-constexpr size_t       max_slot_size  = 1000;
-constexpr size_t       max_alloc_size = 900;
-constexpr unsigned int num_loop       = 1000;
+constexpr size_t       max_slot_size           = 1000;
+constexpr size_t       max_alloc_size          = 900;
+constexpr unsigned int TEST_CONDITION_num_loop = 1000;
 
 using test_fifo_type = alpha::concurrent::fifo_list<void*, alpha::concurrent::internal::deleter_nothing<void*>>;
 
@@ -239,7 +239,7 @@ void load_test_lockfree_bw_mult_thread( unsigned int num_of_thd, alpha::concurre
 	test_params tda;
 	tda.p_test_obj = &fifo;
 	tda.p_tmg      = p_tmg_arg;
-	tda.num_loop   = num_loop / num_of_thd;
+	tda.num_loop   = TEST_CONDITION_num_loop / num_of_thd;
 
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
@@ -289,7 +289,7 @@ void load_test_lockfree_bw_mult_thread_ggmem( unsigned int num_of_thd )
 	test_params tda;
 	tda.p_test_obj = &fifo;
 	tda.p_tmg      = nullptr;
-	tda.num_loop   = num_loop / num_of_thd;
+	tda.num_loop   = TEST_CONDITION_num_loop / num_of_thd;
 
 	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
@@ -343,7 +343,7 @@ void load_test_lockfree_bw_mult_thread_startstop( unsigned int num_of_thd, alpha
 	test_params tda;
 	tda.p_test_obj = &fifo;
 	tda.p_tmg      = p_tmg_arg;
-	tda.num_loop   = num_loop / start_stop_reqeat / num_of_thd;
+	tda.num_loop   = TEST_CONDITION_num_loop / start_stop_reqeat / num_of_thd;
 
 #ifdef DEBUG_LOG
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();

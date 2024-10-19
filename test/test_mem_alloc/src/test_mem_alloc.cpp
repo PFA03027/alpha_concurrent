@@ -20,8 +20,6 @@
 #include "alconcurrent/lf_mem_alloc.hpp"
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
-alpha::concurrent::param_chunk_allocation param = { 27, 2 };
-
 class ChunkHeaderMultiSlotMaltiThread : public testing::TestWithParam<unsigned int> {
 	// You can implement all the usual fixture class members here.
 	// To access the test parameter, call GetParam() from class
@@ -161,8 +159,10 @@ public:
 
 TEST_F( lfmemAllocInside, TestChunkHeaderMultiSlot )
 {
-	alpha::concurrent::internal::alloc_only_chamber       allocator( true, 4 * 1024 );
-	alpha::concurrent::internal::chunk_list_statistics    test_st;
+	alpha::concurrent::internal::alloc_only_chamber    allocator( true, 4 * 1024 );
+	alpha::concurrent::internal::chunk_list_statistics test_st;
+	alpha::concurrent::param_chunk_allocation          param = { 27, 2 };
+
 	alpha::concurrent::internal::chunk_header_multi_slot* p_chms = new ( allocator ) alpha::concurrent::internal::chunk_header_multi_slot( param, 0, &test_st );
 
 	void* test_ptr1 = p_chms->allocate_mem_slot( 27, sizeof( uintptr_t ) );
@@ -217,6 +217,8 @@ TEST_F( lfmemAllocInside, TestChunkHeaderMultiSlot )
 TEST_F( lfmemAllocInside, TestChunkList_AdditionalAlloc )
 {
 	alpha::concurrent::internal::alloc_only_chamber allocator( true, 4 * 1024 );
+	alpha::concurrent::param_chunk_allocation       param = { 27, 2 };
+
 	// max slot数２に対し、３つ目のスロットを要求した場合のテスト
 	alpha::concurrent::internal::chunk_list* p_ch_lst = new alpha::concurrent::internal::chunk_list( param, &allocator );
 
@@ -244,6 +246,8 @@ TEST_F( lfmemAllocInside, TestChunkList_AdditionalAlloc )
 TEST_F( lfmemAllocInside, TestChunkList_IllegalAddressFree )
 {
 	alpha::concurrent::internal::alloc_only_chamber allocator( true, 4 * 1024 );
+	alpha::concurrent::param_chunk_allocation       param = { 27, 2 };
+
 	// max slot数２に対し、３つ目のスロットを要求した場合のテスト
 	alpha::concurrent::internal::chunk_list* p_ch_lst = new alpha::concurrent::internal::chunk_list( param, &allocator );
 
