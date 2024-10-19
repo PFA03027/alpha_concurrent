@@ -449,7 +449,26 @@ public:
 	{
 		src.p_ = nullptr;
 	}
-	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR_BODY hazard_ptr& operator=( hazard_ptr&& src )
+	hazard_ptr& operator=( const hazard_ptr& src )
+	{
+		if ( this == &src ) return *this;
+
+		p_ = src.p_;
+		if ( p_ == nullptr ) {
+			if ( os_ != nullptr ) {
+				os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
+			}
+		} else {
+			if ( os_ == nullptr ) {
+				os_ = internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_ );
+			} else {
+				os_->store( p_, std::memory_order_release );
+			}
+		}
+
+		return *this;
+	}
+	hazard_ptr& operator=( hazard_ptr&& src )
 	{
 		if ( this == &src ) return *this;
 
@@ -480,6 +499,22 @@ private:
 	  : p_( p_arg )
 	  , os_( std::move( os_arg ) )
 	{
+	}
+
+	void store( T* p_arg )
+	{
+		p_ = p_arg;
+		if ( p_ == nullptr ) {
+			if ( os_ != nullptr ) {
+				os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
+			}
+		} else {
+			if ( os_ == nullptr ) {
+				os_ = internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_ );
+			} else {
+				os_->store( p_, std::memory_order_release );
+			}
+		}
 	}
 
 	T*                              p_;
@@ -683,9 +718,10 @@ public:
 	hazard_ptr_handler( hazard_ptr_handler&& src ) noexcept
 	  : ap_target_p_()
 	{
-		// TODO: should do CAS ?
-		ap_target_p_.store( src.ap_target_p_.load( std::memory_order_acquire ), std::memory_order_release );
-		src.ap_target_p_.store( nullptr, std::memory_order_release );
+		pointer p_expect = src.ap_target_p_.load( std::memory_order_acquire );
+		do {
+			ap_target_p_.store( p_expect, std::memory_order_release );
+		} while ( !src.ap_target_p_.compare_exchange_weak( p_expect, nullptr, std::memory_order_release, std::memory_order_acquire ) );
 	}
 	hazard_ptr_handler& operator=( const hazard_ptr_handler& src ) noexcept
 	{
@@ -699,9 +735,10 @@ public:
 	{
 		if ( this == &src ) return *this;
 
-		auto p_tmp = src.ap_target_p_.load( std::memory_order_acquire );
-		src.ap_target_p_.store( nullptr, std::memory_order_release );
-		ap_target_p_.store( p_tmp, std::memory_order_release );
+		pointer p_expect = src.ap_target_p_.load( std::memory_order_acquire );
+		do {
+			ap_target_p_.store( p_expect, std::memory_order_release );
+		} while ( !src.ap_target_p_.compare_exchange_weak( p_expect, nullptr, std::memory_order_release, std::memory_order_acquire ) );
 
 		return *this;
 	}
@@ -716,10 +753,11 @@ public:
 
 		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
 		if ( p_expect == nullptr ) {
-			return hazard_pointer( p_expect, nullptr );
+			return hazard_pointer( p_expect, std::move( hso ) );
 		}
 		hso->store( p_expect, std::memory_order_release );
 
+		// TODO: is there any Redundancy ? この方法に冗長性はないか？
 		while ( !ap_target_p_.compare_exchange_weak( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 			internal::loop_count_in_hazard_ptr_get_++;
@@ -737,7 +775,50 @@ public:
 		return hazard_pointer( p_expect, std::move( hso ) );
 	}
 
-	// TODO: このI/Fを本当に用意していいのか？ get()に限定しなくてよいのか？
+	void reuse( hazard_pointer& hp_reuse )
+	{
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+		internal::call_count_hazard_ptr_get_++;
+#endif
+
+		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
+		hp_reuse.store( p_expect );
+		if ( p_expect == nullptr ) {
+			return;
+		}
+
+		// TODO: is there any Redundancy ? この方法に冗長性はないか？
+		while ( !ap_target_p_.compare_exchange_weak( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+			internal::loop_count_in_hazard_ptr_get_++;
+#endif
+			hp_reuse.store( p_expect );
+		}
+
+		return;
+	}
+
+#if 0
+	static hazard_pointer get_hazard_pointer( pointer p_as_hazard_pointer )
+	{
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+		internal::call_count_hazard_ptr_get_++;
+#endif
+
+		internal::hzrd_slot_ownership_t hso;
+
+		// 再利用しやすいように、nullptrであってもスロットの割り当てを行う。
+		// to make better to reuse, even if p_as_hazard_pointer is nullptr, assign hazard pointer slot
+		if ( p_as_hazard_pointer == nullptr ) {
+			hso = internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) );
+		} else {
+			hso = internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_as_hazard_pointer );
+		}
+
+		return hazard_pointer( p_as_hazard_pointer, std::move( hso ) );
+	}
+#endif
+
 	pointer load( std::memory_order order = std::memory_order_acquire ) const noexcept
 	{
 		return ap_target_p_.load( order );

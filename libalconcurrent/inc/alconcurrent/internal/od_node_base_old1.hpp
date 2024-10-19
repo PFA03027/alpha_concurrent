@@ -289,12 +289,17 @@ public:
 		return hph_next_.get();
 	}
 
-	hazard_ptr_handler_t& hazard_handler( void ) noexcept
+	void reuse_hazard_ptr_of_next( hazard_pointer& hp )
+	{
+		return hph_next_.reuse( hp );
+	}
+
+	hazard_ptr_handler_t& hazard_handler_of_next( void ) noexcept
 	{
 		return hph_next_;
 	}
 
-	const hazard_ptr_handler_t& hazard_handler( void ) const noexcept
+	const hazard_ptr_handler_t& hazard_handler_of_next( void ) const noexcept
 	{
 		return hph_next_;
 	}
@@ -1050,8 +1055,8 @@ public:
 		link_node_pointer p_new_head_link_t = p_expected_link_t->next();
 		node_pointer      p_new_head        = safe_static_pointer_down_cast<node_pointer>( p_new_head_link_t );
 		while ( !hph_head_.compare_exchange_weak( p_expected, p_new_head, std::memory_order_release, std::memory_order_relaxed ) ) {
-			hp_cur_head = hph_head_.get();
-			p_expected  = hp_cur_head.get();
+			hph_head_.reuse( hp_cur_head );
+			p_expected = hp_cur_head.get();
 			if ( p_expected == nullptr ) {
 				return nullptr;
 			}

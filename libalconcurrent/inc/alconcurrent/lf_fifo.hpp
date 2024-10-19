@@ -239,6 +239,10 @@ public:
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	  , count_( 0 )
 #endif
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+	  , pushpop_count_( 0 )
+	  , pushpop_loop_count_( 0 )
+#endif
 	{
 	}
 
@@ -254,9 +258,17 @@ public:
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	  , count_( src.count_.load( std::memory_order_acquire ) )
 #endif
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+	  , pushpop_count_( src.pushpop_count_.load( std::memory_order_acquire ) )
+	  , pushpop_loop_count_( src.pushpop_loop_count_.load( std::memory_order_acquire ) )
+#endif
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		src.count_.store( 0, std::memory_order_release );
+#endif
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+		src.pushpop_count_.store( 0, std::memory_order_release );
+		src.pushpop_loop_count_.store( 0, std::memory_order_release );
 #endif
 	}
 
@@ -273,6 +285,13 @@ public:
 			delete hp_cur.get();
 			hp_cur = std::move( hp_nxt );
 		}
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+		LogOutput(
+			log_type::DUMP,
+			"node_fifo_lockfree_base statisc: push/pop call count = %zu, loop count = %zu, ratio =%f",
+			pushpop_count_.load(), pushpop_loop_count_.load(),
+			static_cast<double>( pushpop_loop_count_.load() ) / static_cast<double>( pushpop_count_.load() ) );
+#endif
 	}
 
 	node_fifo_lockfree_base( const node_fifo_lockfree_base& )            = delete;
@@ -327,10 +346,16 @@ public:
 	 */
 	std::tuple<node_pointer, value_type> pop_front( void ) noexcept
 	{
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+		pushpop_count_++;
+#endif
+		hazard_pointer hp_head_node = hph_head_.get();
+		hazard_pointer hp_tail_node = hph_tail_.get();
+		hazard_pointer hp_head_next = hp_head_node->get_hazard_ptr_of_next();
 		while ( true ) {
-			hazard_pointer hp_head_node = hph_head_.get();
-			hazard_pointer hp_tail_node = hph_tail_.get();
-			hazard_pointer hp_head_next = hp_head_node->get_hazard_ptr_of_next();
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+			pushpop_loop_count_++;
+#endif
 			if ( hp_head_node == hp_tail_node ) {
 				if ( hp_head_next == nullptr ) {
 					// 番兵ノードしかないので、FIFOキューは空。
@@ -345,22 +370,24 @@ public:
 			} else {
 				if ( hp_head_next == nullptr ) {
 					// headが他のスレッドでpopされた。
-					continue;
-				}
-
-				// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
-				// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
-				typename hazard_pointer::pointer     hph_head_expected = hp_head_node.get();
-				std::tuple<node_pointer, value_type> ans { hph_head_expected, hp_head_next->get() };
-				if ( hph_head_.compare_exchange_weak( hph_head_expected, hp_head_next.get(), std::memory_order_release, std::memory_order_acquire ) ) {
+				} else {
+					// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
+					// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
+					typename hazard_pointer::pointer     hph_head_expected = hp_head_node.get();
+					std::tuple<node_pointer, value_type> ans { hph_head_expected, hp_head_next->get() };
+					if ( hph_head_.compare_exchange_weak( hph_head_expected, hp_head_next.get(), std::memory_order_release, std::memory_order_acquire ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-					count_--;
+						count_--;
 #endif
-					// ここで、headの取り出しと所有権確保が完了
-					// ただし、headノードへのポインタがハザードポインタに登録されているかどうかをチェックしていないため、まだ参照している人がいるかもしれない。
-					return ans;
+						// ここで、headの取り出しと所有権確保が完了
+						// ただし、headノードへのポインタがハザードポインタに登録されているかどうかをチェックしていないため、まだ参照している人がいるかもしれない。
+						return ans;
+					}
 				}
 			}
+			hph_head_.reuse( hp_head_node );
+			hph_tail_.reuse( hp_tail_node );
+			hp_head_node->reuse_hazard_ptr_of_next( hp_head_next );
 		}
 	}
 
@@ -407,20 +434,28 @@ private:
 
 	void push_back_common( node_pointer p_nd ) noexcept
 	{
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+		pushpop_count_++;
+#endif
+		hazard_pointer hp_tail_node = hph_tail_.get();
+		hazard_pointer hp_tail_next = hp_tail_node->get_hazard_ptr_of_next();
 		while ( true ) {
-			hazard_pointer hp_tail_node = hph_tail_.get();
-			hazard_pointer hp_tail_next = hp_tail_node->get_hazard_ptr_of_next();
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+			pushpop_loop_count_++;
+#endif
 			if ( hp_tail_next == nullptr ) {
 				typename hazard_pointer::pointer expected = nullptr;
-				if ( hp_tail_node->hazard_handler().compare_exchange_weak( expected, p_nd, std::memory_order_release, std::memory_order_acquire ) ) {
+				if ( hp_tail_node->hazard_handler_of_next().compare_exchange_weak( expected, p_nd, std::memory_order_release, std::memory_order_acquire ) ) {
 					expected = hp_tail_node.get();
 					hph_tail_.compare_exchange_weak( expected, p_nd, std::memory_order_release, std::memory_order_acquire );
 					break;
 				}
 			} else {
-				typename hazard_pointer::pointer expected = hp_tail_node.get();
-				hph_tail_.compare_exchange_weak( expected, hp_tail_next.get(), std::memory_order_release, std::memory_order_acquire );
+				typename hazard_pointer::pointer p_expected = hp_tail_node.get();
+				hph_tail_.compare_exchange_weak( p_expected, hp_tail_next.get(), std::memory_order_release, std::memory_order_acquire );
 			}
+			hph_tail_.reuse( hp_tail_node );
+			hp_tail_node->reuse_hazard_ptr_of_next( hp_tail_next );
 		}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
@@ -433,6 +468,10 @@ private:
 	hazard_ptr_handler_t hph_tail_;
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	std::atomic<size_t> count_;
+#endif
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+	std::atomic<size_t> pushpop_count_;
+	std::atomic<size_t> pushpop_loop_count_;
 #endif
 };
 
