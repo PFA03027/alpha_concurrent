@@ -434,6 +434,9 @@ template <typename T>
 class hazard_ptr_handler;
 
 template <typename T>
+class hazard_ptr_w_mark_handler;
+
+template <typename T>
 class hazard_ptr {
 public:
 	using element_type = T;
@@ -518,6 +521,7 @@ private:
 	internal::hzrd_slot_ownership_t os_;
 
 	friend class hazard_ptr_handler<T>;
+	friend class hazard_ptr_w_mark_handler<T>;
 
 	template <class T1, class T2>
 	friend constexpr bool operator==( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept;
