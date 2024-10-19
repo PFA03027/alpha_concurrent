@@ -21,6 +21,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <tuple>
 
 #include "dynamic_tls.hpp"
 #include "internal/alloc_only_allocator.hpp"
@@ -438,16 +439,22 @@ public:
 	using element_type = T;
 	using pointer      = T*;
 
-	constexpr hazard_ptr( void )
+	hazard_ptr( void )
 	  : p_( nullptr )
-	  , os_( nullptr )
+	  , os_( internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) ) )
+	{
+	}
+	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR_BODY hazard_ptr( const hazard_ptr& src )
+	  : p_( src.p_ )
+	  , os_( internal::hazard_ptr_mgr::AssignHazardPtrSlot( src.p_ ) )
 	{
 	}
 	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR_BODY hazard_ptr( hazard_ptr&& src )
 	  : p_( src.p_ )
 	  , os_( std::move( src.os_ ) )
 	{
-		src.p_ = nullptr;
+		src.p_  = nullptr;
+		src.os_ = internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) );
 	}
 	hazard_ptr& operator=( const hazard_ptr& src )
 	{
@@ -455,15 +462,9 @@ public:
 
 		p_ = src.p_;
 		if ( p_ == nullptr ) {
-			if ( os_ != nullptr ) {
-				os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
-			}
+			os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
 		} else {
-			if ( os_ == nullptr ) {
-				os_ = internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_ );
-			} else {
-				os_->store( p_, std::memory_order_release );
-			}
+			os_->store( p_, std::memory_order_release );
 		}
 
 		return *this;
@@ -475,7 +476,8 @@ public:
 		p_  = src.p_;
 		os_ = std::move( src.os_ );
 
-		src.p_ = nullptr;
+		src.p_  = nullptr;
+		src.os_ = internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) );
 
 		return *this;
 	}
@@ -499,21 +501,16 @@ private:
 	  : p_( p_arg )
 	  , os_( std::move( os_arg ) )
 	{
+		// 事前条件： os_argには、p_argが格納されていること。
 	}
 
 	void store( T* p_arg )
 	{
 		p_ = p_arg;
 		if ( p_ == nullptr ) {
-			if ( os_ != nullptr ) {
-				os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
-			}
+			os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
 		} else {
-			if ( os_ == nullptr ) {
-				os_ = internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_ );
-			} else {
-				os_->store( p_, std::memory_order_release );
-			}
+			os_->store( p_, std::memory_order_release );
 		}
 	}
 
@@ -782,42 +779,19 @@ public:
 #endif
 
 		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
-		hp_reuse.store( p_expect );
-		if ( p_expect == nullptr ) {
-			return;
-		}
-
-		// TODO: is there any Redundancy ? この方法に冗長性はないか？
-		while ( !ap_target_p_.compare_exchange_weak( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) ) {
+		do {
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 			internal::loop_count_in_hazard_ptr_get_++;
 #endif
 			hp_reuse.store( p_expect );
-		}
+			if ( p_expect == nullptr ) {
+				return;
+			}
+		} while ( !ap_target_p_.compare_exchange_weak( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) );
+		// TODO: is there any Redundancy ? この方法に冗長性はないか？
 
 		return;
 	}
-
-#if 0
-	static hazard_pointer get_hazard_pointer( pointer p_as_hazard_pointer )
-	{
-#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
-		internal::call_count_hazard_ptr_get_++;
-#endif
-
-		internal::hzrd_slot_ownership_t hso;
-
-		// 再利用しやすいように、nullptrであってもスロットの割り当てを行う。
-		// to make better to reuse, even if p_as_hazard_pointer is nullptr, assign hazard pointer slot
-		if ( p_as_hazard_pointer == nullptr ) {
-			hso = internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) );
-		} else {
-			hso = internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_as_hazard_pointer );
-		}
-
-		return hazard_pointer( p_as_hazard_pointer, std::move( hso ) );
-	}
-#endif
 
 	pointer load( std::memory_order order = std::memory_order_acquire ) const noexcept
 	{
@@ -864,6 +838,208 @@ private:
 	alignas( internal::atomic_variable_align )
 #endif
 	std::atomic<pointer> ap_target_p_;
+};
+
+template <typename T>
+class hazard_ptr_w_mark_handler {
+public:
+	using element_type   = T;
+	using pointer        = T*;
+	using hazard_pointer = hazard_ptr<T>;
+
+	hazard_ptr_w_mark_handler( void ) noexcept
+	  : a_target_addr_()
+	{
+		a_target_addr_.store( static_cast<addr_markable>( 0U ), std::memory_order_release );
+	}
+	explicit hazard_ptr_w_mark_handler( T* p_desired ) noexcept
+	  : a_target_addr_()
+	{
+		a_target_addr_.store( reinterpret_cast<addr_markable>( p_desired ), std::memory_order_release );
+	}
+	hazard_ptr_w_mark_handler( const hazard_ptr_w_mark_handler& src ) noexcept
+	  : a_target_addr_()
+	{
+		a_target_addr_.store( src.a_target_addr_.load( std::memory_order_acquire ), std::memory_order_release );
+	}
+	hazard_ptr_w_mark_handler( hazard_ptr_w_mark_handler&& src ) noexcept
+	  : a_target_addr_()
+	{
+		addr_markable addr_expect = src.a_target_addr_.load( std::memory_order_acquire );
+		do {
+			a_target_addr_.store( addr_expect, std::memory_order_release );
+		} while ( !src.a_target_addr_.compare_exchange_weak( addr_expect, static_cast<addr_markable>( 0U ), std::memory_order_release, std::memory_order_acquire ) );
+	}
+	hazard_ptr_w_mark_handler& operator=( const hazard_ptr_w_mark_handler& src ) noexcept
+	{
+		if ( this == &src ) return *this;
+
+		a_target_addr_.store( src.a_target_addr_.load( std::memory_order_acquire ), std::memory_order_release );
+
+		return *this;
+	}
+	hazard_ptr_w_mark_handler& operator=( hazard_ptr_w_mark_handler&& src ) noexcept
+	{
+		if ( this == &src ) return *this;
+
+		constexpr addr_markable clear_val   = zip_tuple_to_addr_markable( std::tuple<pointer, bool> { nullptr, false } );
+		addr_markable           addr_expect = src.a_target_addr_.load( std::memory_order_acquire );
+		do {
+			a_target_addr_.store( addr_expect, std::memory_order_release );
+		} while ( !src.a_target_addr_.compare_exchange_weak( addr_expect, clear_val, std::memory_order_release, std::memory_order_acquire ) );
+
+		return *this;
+	}
+
+	std::tuple<hazard_pointer, bool> get( void )
+	{
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+		internal::call_count_hazard_ptr_get_++;
+#endif
+
+		hazard_pointer ans_hp( nullptr, internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) ) );
+		bool           ans_b = false;
+
+		addr_markable addr_expect = a_target_addr_.load( std::memory_order_acquire );
+
+		do {
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+			internal::loop_count_in_hazard_ptr_get_++;
+#endif
+			std::tuple<pointer, bool> pointer_w_mark_expect = unzip_addr_markable_to_tuple( addr_expect );
+			pointer                   p_expect              = std::get<0>( pointer_w_mark_expect );
+			ans_b                                           = std::get<1>( pointer_w_mark_expect );
+
+			ans_hp.store( p_expect );
+			if ( p_expect == nullptr ) {
+				return std::tuple<hazard_pointer, bool> { std::move( ans_hp ), false };
+			}
+
+		} while ( !a_target_addr_.compare_exchange_weak( addr_expect, addr_expect, std::memory_order_release, std::memory_order_relaxed ) );
+		// TODO: is there any Redundancy ? この方法に冗長性はないか？
+
+		return std::tuple<hazard_pointer, bool> { std::move( ans_hp ), ans_b };
+	}
+
+	void reuse( std::tuple<hazard_pointer, bool>& hp_reuse )
+	{
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+		internal::call_count_hazard_ptr_get_++;
+#endif
+
+		addr_markable addr_expect = a_target_addr_.load( std::memory_order_acquire );
+
+		do {
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+			internal::loop_count_in_hazard_ptr_get_++;
+#endif
+			std::tuple<pointer, bool> pointer_w_mark_expect = unzip_addr_markable_to_tuple( addr_expect );
+			pointer                   p_expect              = std::get<0>( pointer_w_mark_expect );
+			bool                      expect_mark           = std::get<1>( pointer_w_mark_expect );
+
+			if ( p_expect == nullptr ) {
+				std::get<0>( hp_reuse ).store( p_expect );
+				std::get<1>( hp_reuse ) = false;
+				return;
+			}
+			std::get<0>( hp_reuse ).store( p_expect );
+			std::get<1>( hp_reuse ) = expect_mark;
+		} while ( !a_target_addr_.compare_exchange_weak( addr_expect, addr_expect, std::memory_order_release, std::memory_order_relaxed ) );
+		// TODO: is there any Redundancy ? この方法に冗長性はないか？
+
+		return;
+	}
+
+	std::tuple<pointer, bool> load( std::memory_order order = std::memory_order_acquire ) const noexcept
+	{
+		return unzip_addr_markable_to_tuple( a_target_addr_.load( order ) );
+	}
+
+	void store( const std::tuple<pointer, bool>& desired, std::memory_order order = std::memory_order_release ) noexcept
+	{
+		a_target_addr_.store( zip_tuple_to_addr_markable( desired ), order );
+	}
+
+	bool compare_exchange_weak( std::tuple<pointer, bool>&       expected,
+	                            const std::tuple<pointer, bool>& desired,
+	                            std::memory_order                success,
+	                            std::memory_order                failure ) noexcept
+	{
+		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
+		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );
+		bool          ret           = a_target_addr_.compare_exchange_weak( addr_expected, addr_desired, success, failure );
+		if ( !ret ) {
+			expected = unzip_addr_markable_to_tuple( addr_expected );
+		}
+		return ret;
+	}
+
+	bool compare_exchange_weak( std::tuple<pointer, bool>&       expected,
+	                            const std::tuple<pointer, bool>& desired,
+	                            std::memory_order                order = std::memory_order_seq_cst ) noexcept
+	{
+		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
+		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );
+		bool          ret           = a_target_addr_.compare_exchange_weak( addr_expected, addr_desired, order );
+		if ( !ret ) {
+			expected = unzip_addr_markable_to_tuple( addr_expected );
+		}
+		return ret;
+	}
+
+	bool compare_exchange_strong( std::tuple<pointer, bool>&       expected,
+	                              const std::tuple<pointer, bool>& desired,
+	                              std::memory_order                success,
+	                              std::memory_order                failure ) noexcept
+	{
+		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
+		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );
+		bool          ret           = a_target_addr_.compare_exchange_strong( addr_expected, addr_desired, success, failure );
+		if ( !ret ) {
+			expected = unzip_addr_markable_to_tuple( addr_expected );
+		}
+		return ret;
+	}
+
+	bool compare_exchange_strong( std::tuple<pointer, bool>&       expected,
+	                              const std::tuple<pointer, bool>& desired,
+	                              std::memory_order                order = std::memory_order_seq_cst ) noexcept
+	{
+		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
+		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );
+		bool          ret           = a_target_addr_.compare_exchange_strong( addr_expected, addr_desired, order );
+		if ( !ret ) {
+			expected = unzip_addr_markable_to_tuple( addr_expected );
+		}
+		return ret;
+	}
+
+private:
+	using addr_markable = std::uintptr_t;
+
+	static constexpr addr_markable zip_tuple_to_addr_markable( const std::tuple<pointer, bool>& tp )
+	{
+		addr_markable ans;
+		ans = reinterpret_cast<addr_markable>( std::get<0>( tp ) );
+		if ( std::get<1>( tp ) ) {
+			ans |= static_cast<addr_markable>( 1U );
+		} /*
+		else {
+		    ans &= ~(static_cast<addr_markable>(1U));
+		} */
+		return ans;
+	}
+	static constexpr std::tuple<pointer, bool> unzip_addr_markable_to_tuple( addr_markable addr )
+	{
+		pointer p_ans = reinterpret_cast<pointer>( addr & ( ~( static_cast<addr_markable>( 1U ) ) ) );
+		bool    b_ans = ( ( addr & static_cast<addr_markable>( 1U ) ) == 0 ) ? false : true;
+		return std::tuple<pointer, bool> { p_ans, b_ans };
+	}
+
+#if 0
+	alignas( internal::atomic_variable_align )
+#endif
+	std::atomic<addr_markable> a_target_addr_;
 };
 
 }   // namespace concurrent
