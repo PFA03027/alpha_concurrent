@@ -331,7 +331,6 @@ public:
 			hazard_pointer hp_head_node = hph_head_.get();
 			hazard_pointer hp_tail_node = hph_tail_.get();
 			hazard_pointer hp_head_next = hp_head_node->get_hazard_ptr_of_next();
-			// if ( hp_head_node != hph_head_.get() ) continue;
 			if ( hp_head_node == hp_tail_node ) {
 				if ( hp_head_next == nullptr ) {
 					// 番兵ノードしかないので、FIFOキューは空。
@@ -411,7 +410,6 @@ private:
 		while ( true ) {
 			hazard_pointer hp_tail_node = hph_tail_.get();
 			hazard_pointer hp_tail_next = hp_tail_node->get_hazard_ptr_of_next();
-			if ( hp_tail_node != hph_tail_.get() ) continue;
 			if ( hp_tail_next == nullptr ) {
 				typename hazard_pointer::pointer expected = nullptr;
 				if ( hp_tail_node->hazard_handler().compare_exchange_weak( expected, p_nd, std::memory_order_release, std::memory_order_acquire ) ) {
