@@ -701,6 +701,7 @@ public:
 	using pointer        = T*;
 	using hazard_pointer = hazard_ptr<T>;
 
+#if 0
 	hazard_ptr_handler( void ) noexcept
 	  : ap_target_p_()
 	{
@@ -716,6 +717,20 @@ public:
 	{
 		ap_target_p_.store( src.ap_target_p_.load( std::memory_order_acquire ), std::memory_order_release );
 	}
+#else
+	constexpr hazard_ptr_handler( void ) noexcept
+	  : ap_target_p_( nullptr )
+	{
+	}
+	explicit constexpr hazard_ptr_handler( T* p_desired ) noexcept
+	  : ap_target_p_( p_desired )
+	{
+	}
+	constexpr hazard_ptr_handler( const hazard_ptr_handler& src ) noexcept
+	  : ap_target_p_( src.ap_target_p_.load( std::memory_order_acquire ) )
+	{
+	}
+#endif
 	hazard_ptr_handler( hazard_ptr_handler&& src ) noexcept
 	  : ap_target_p_()
 	{
@@ -886,7 +901,7 @@ public:
 	{
 		if ( this == &src ) return *this;
 
-		constexpr addr_markable clear_val   = zip_tuple_to_addr_markable( std::tuple<pointer, bool> { nullptr, false } );
+		constexpr addr_markable clear_val   = 0;
 		addr_markable           addr_expect = src.a_target_addr_.load( std::memory_order_acquire );
 		do {
 			a_target_addr_.store( addr_expect, std::memory_order_release );
@@ -1021,10 +1036,10 @@ public:
 private:
 	using addr_markable = std::uintptr_t;
 
-	static constexpr addr_markable zip_tuple_to_addr_markable( const std::tuple<pointer, bool>& tp )
+	static addr_markable zip_tuple_to_addr_markable( const std::tuple<pointer, bool>& tp )
 	{
-		addr_markable ans;
-		ans = reinterpret_cast<addr_markable>( std::get<0>( tp ) );
+		// reinterpret_castはconstexprの中では使えない。
+		addr_markable ans = reinterpret_cast<addr_markable>( std::get<0>( tp ) );
 		if ( std::get<1>( tp ) ) {
 			ans |= static_cast<addr_markable>( 1U );
 		} /*
@@ -1033,8 +1048,9 @@ private:
 		} */
 		return ans;
 	}
-	static constexpr std::tuple<pointer, bool> unzip_addr_markable_to_tuple( addr_markable addr )
+	static std::tuple<pointer, bool> unzip_addr_markable_to_tuple( addr_markable addr )
 	{
+		// reinterpret_castはconstexprの中では使えない。
 		pointer p_ans = reinterpret_cast<pointer>( addr & ( ~( static_cast<addr_markable>( 1U ) ) ) );
 		bool    b_ans = ( ( addr & static_cast<addr_markable>( 1U ) ) == 0 ) ? false : true;
 		return std::tuple<pointer, bool> { p_ans, b_ans };
