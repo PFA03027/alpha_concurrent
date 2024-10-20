@@ -1023,7 +1023,7 @@ public:
 		if ( p_nd == nullptr ) return;
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
 		if ( p_nd->next() != nullptr ) {
-			LogOutput( log_type::WARN, "od_node_list_lockfree::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
+			LogOutput( log_type::WARN, "od_node_stack_lockfree_base::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
 		}
 #endif
 		link_node_pointer p_nd_link_p = p_nd;
