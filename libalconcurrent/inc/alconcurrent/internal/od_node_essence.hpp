@@ -24,11 +24,11 @@ namespace internal {
  */
 class od_node_simple_link {
 public:
-	explicit od_node_simple_link( od_node_simple_link* p_next_arg = nullptr ) noexcept
+	explicit constexpr od_node_simple_link( od_node_simple_link* p_next_arg = nullptr ) noexcept
 	  : p_raw_next_( p_next_arg )
 	{
 	}
-	od_node_simple_link( const od_node_simple_link& src ) noexcept = default;
+	constexpr od_node_simple_link( const od_node_simple_link& src ) noexcept = default;
 	od_node_simple_link( od_node_simple_link&& src ) noexcept
 	  : p_raw_next_( src.p_raw_next_ )
 	{
@@ -107,6 +107,16 @@ public:
 		return hph_next_;
 	}
 
+	void* get_pointer_of_hazard_check( void ) noexcept
+	{
+		return reinterpret_cast<void*>( this );
+	}
+
+	const void* get_pointer_of_hazard_check( void ) const noexcept
+	{
+		return reinterpret_cast<const void*>( this );
+	}
+
 private:
 	hazard_ptr_handler_t hph_next_;
 };
@@ -160,8 +170,110 @@ public:
 		return hph_next_;
 	}
 
+	void* get_pointer_of_hazard_check( void ) noexcept
+	{
+		return reinterpret_cast<void*>( this );
+	}
+
+	const void* get_pointer_of_hazard_check( void ) const noexcept
+	{
+		return reinterpret_cast<const void*>( this );
+	}
+
 private:
 	hazard_ptr_handler_t hph_next_;
+};
+
+/**
+ * @brief node of one direction list
+ *
+ * @tparam T value type kept in this class
+ */
+template <typename T>
+class od_node_basic : public od_node_simple_link, public od_node_link_by_hazard_handler {
+public:
+	using value_type           = T;
+	using reference_type       = T&;
+	using const_reference_type = const T&;
+
+	template <bool IsDefaultConstructible = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructible>::type* = nullptr>
+	od_node_basic( od_node_basic* p_next_arg ) noexcept( std::is_nothrow_default_constructible<value_type>::value )
+	  : od_node_simple_link()
+	  , od_node_link_by_hazard_handler()
+	  , v_ {}
+	{
+		od_node_link_by_hazard_handler::set_next( p_next_arg );
+	}
+
+	template <bool IsCopyable = std::is_copy_constructible<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
+	od_node_basic( od_node_basic* p_next_arg, const value_type& v_arg ) noexcept( std::is_nothrow_copy_constructible<value_type>::value )
+	  : od_node_simple_link()
+	  , od_node_link_by_hazard_handler()
+	  , v_( v_arg )
+	{
+		od_node_link_by_hazard_handler::set_next( p_next_arg );
+	}
+
+	template <bool IsMovable = std::is_move_constructible<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+	od_node_basic( od_node_basic* p_next_arg, value_type&& v_arg ) noexcept( std::is_nothrow_move_constructible<value_type>::value )
+	  : od_node_simple_link()
+	  , od_node_link_by_hazard_handler()
+	  , v_( std::move( v_arg ) )
+	{
+		od_node_link_by_hazard_handler::set_next( p_next_arg );
+	}
+
+	template <typename Arg1st, typename... RemainingArgs,
+	          typename RemoveCVArg1st                                                          = typename std::remove_reference<typename std::remove_const<Arg1st>::type>::type,
+	          typename std::enable_if<!std::is_same<RemoveCVArg1st, value_type>::value>::type* = nullptr>
+	od_node_basic( od_node_basic* p_next_arg, Arg1st&& arg1, RemainingArgs&&... args )
+	  : od_node_simple_link()
+	  , od_node_link_by_hazard_handler()
+	  , v_( std::forward<Arg1st>( arg1 ), std::forward<RemainingArgs>( args )... )
+	{
+		od_node_link_by_hazard_handler::set_next( p_next_arg );
+	}
+
+	template <bool IsCopyable = std::is_copy_assignable<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
+	void set( const value_type& v_arg, od_node_basic* p_next_arg ) noexcept( std::is_nothrow_copy_assignable<value_type>::value )
+	{
+		v_ = v_arg;
+		od_node_link_by_hazard_handler::set_next( p_next_arg );
+	}
+
+	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+	void set( value_type&& v_arg, od_node_basic* p_next_arg ) noexcept( std::is_nothrow_move_assignable<value_type>::value )
+	{
+		v_ = std::move( v_arg );
+		od_node_link_by_hazard_handler::set_next( p_next_arg );
+	}
+
+	reference_type get( void ) &
+	{
+		return v_;
+	}
+
+	const_reference_type get( void ) const&
+	{
+		return v_;
+	}
+
+	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+	value_type get( void ) &&
+	{
+		return std::move( v_ );
+	}
+
+	template <bool IsCopyable                                          = std::is_copy_assignable<value_type>::value,
+	          bool IsMovable                                           = std::is_move_assignable<value_type>::value,
+	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
+	value_type get( void ) const&&
+	{
+		return v_;
+	}
+
+private:
+	value_type v_;
 };
 
 }   // namespace internal

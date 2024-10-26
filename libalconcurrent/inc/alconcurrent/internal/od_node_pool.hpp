@@ -19,6 +19,7 @@
 
 #include "alconcurrent/hazard_ptr.hpp"
 #include "alconcurrent/internal/od_node_base_old1.hpp"
+#include "alconcurrent/internal/od_simple_list.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -35,12 +36,16 @@ struct countermeasure_gcc_bug_deletable_obj_abst {
 #endif
 
 // template <typename NODE_T, typename OD_NODE_LIST_T = od_node_raw_list_base<NODE_T>, typename OD_NODE_LOCKFREE_STACK_T = od_node_stack_lockfree_base<NODE_T>>
-template <typename NODE_T, typename RAW_LIST_NEXT_T>
+template <typename NODE_T>
 class od_node_pool {
-	static_assert( std::is_base_of<RAW_LIST_NEXT_T, NODE_T>::value, "RAW_LIST_NEXT_T should be a base class of NODE_T." );
+	static_assert( std::is_base_of<od_node_simple_link, NODE_T>::value, "NODE_T should be a derived class of od_node_simple_link." );
+	static_assert(
+		std::is_base_of<od_node_link_by_hazard_handler, NODE_T>::value ||
+			std::is_base_of<od_node_1bit_markable_link_by_hazard_handler, NODE_T>::value,
+		"NODE_T should be a derived class of od_node_simple_link." );
 
 public:
-	using node_t       = NODE_T;
+	using node_type    = NODE_T;
 	using node_pointer = NODE_T*;
 
 	static void push( node_pointer p_nd )
@@ -63,7 +68,7 @@ public:
 
 		tl_od_node_list& tl_odn_list_no_in_hazard = get_tl_odn_list_no_in_hazard();
 
-		if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p_nd ) ) {
+		if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p_nd->get_pointer_of_hazard_check() ) ) {
 			get_tl_odn_list_still_in_hazard().push_back( p_nd );
 			return;
 		}
@@ -88,7 +93,7 @@ public:
 		node_pointer p_ans = nullptr;
 
 		tl_od_node_list& tl_odn_list_no_in_hazard = get_tl_odn_list_no_in_hazard();
-		p_ans                                     = tl_odn_list_no_in_hazard.pop_front();
+		p_ans                                     = static_cast<node_pointer>( tl_odn_list_no_in_hazard.pop_front() );   // このクラスが保持するノードはnode_typeであることをpush関数が保証しているので、dynamic_cast<>は不要。
 		if ( p_ans != nullptr ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			--node_count_total_;
@@ -98,7 +103,7 @@ public:
 
 		auto lk = g_odn_list_.try_lock();
 		if ( lk.owns_lock() ) {
-			p_ans = lk.ref().pop_front();
+			p_ans = static_cast<node_pointer>( lk.ref().pop_front() );
 			if ( p_ans != nullptr ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 				--node_count_total_;
@@ -115,12 +120,16 @@ public:
 		raw_list tmp_odn_list_( std::move( tl_odn_list_still_in_hazard.move_to() ) );
 
 		hazard_ptr_mgr::ScanHazardPtrs( [&tmp_odn_list_, &tl_odn_list_still_in_hazard]( void* p_in_hazard ) {
-			auto tt_n_list = tmp_odn_list_.split_if( [p_in_hazard]( const auto& cur_node ) -> bool {
-				return p_in_hazard == &cur_node;   // pointerが同じならtrueを返す。
+			auto tt_n_list = tmp_odn_list_.split_if( [p_in_hazard]( auto p_cur_node ) -> bool {
+				// cur_nodeの型は、od_node_simple_linkへの参照型で渡される。
+				// cur_nodeの本来の型は、od_node_poolが保持する型node_typeである。
+				// よって、ハザードポインタに登録されているポインタは、od_node_poolが保持する型node_typeへのポインタである。
+				// 従って、比較すべきポインタは、od_node_poolが保持する型node_typeのポインター型である必要がある。
+				return p_in_hazard == static_cast<const_node_pointer>( p_cur_node )->get_pointer_of_hazard_check();   // pointerが同じならtrueを返す。
 			} );
 			tl_odn_list_still_in_hazard.merge_push_back( std::move( tt_n_list ) );
 		} );
-		p_ans = tmp_odn_list_.pop_front();
+		p_ans = static_cast<node_pointer>( tmp_odn_list_.pop_front() );
 		tl_odn_list_no_in_hazard.merge_push_back( std::move( tmp_odn_list_ ) );
 		if ( p_ans != nullptr ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
@@ -153,8 +162,8 @@ public:
 
 		if ( !tmp_odn_list.is_empty() ) {
 			hazard_ptr_mgr::ScanHazardPtrs( [&tmp_odn_list, &tl_odn_list_still_in_hazard]( void* p_in_hazard ) {
-				auto tt_n_list = tmp_odn_list.split_if( [p_in_hazard]( const auto& cur_node ) -> bool {
-					return p_in_hazard == &cur_node;   // pointerが同じならtrueを返す。
+				auto tt_n_list = tmp_odn_list.split_if( [p_in_hazard]( auto p_cur_node ) -> bool {
+					return p_in_hazard == static_cast<const_node_pointer>( p_cur_node )->get_pointer_of_hazard_check();   // pointerが同じならtrueを返す。
 				} );
 				tl_odn_list_still_in_hazard.merge_push_back( std::move( tt_n_list ) );
 			} );
@@ -192,15 +201,16 @@ public:
 	}
 
 private:
-	using raw_list      = od_node_list_base_impl<NODE_T, RAW_LIST_NEXT_T>;
-	using g_node_list_t = od_node_list_lockable_base<raw_list>;
+	using const_node_pointer = const NODE_T*;
+	using raw_list           = od_simple_list;
+	using g_node_list_t      = od_simple_list_lockable;
+
 	class tl_od_node_list
 #ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
 	  : public countermeasure_gcc_bug_deletable_obj_abst
 #endif
 	{
 	public:
-		using node_type    = typename raw_list::node_type;
 		using node_pointer = typename raw_list::node_pointer;
 
 		constexpr tl_od_node_list( g_node_list_t& g_odn_list_arg )
@@ -312,31 +322,31 @@ private:
 #endif
 };
 
-template <typename NODE_T, typename OD_NODE_LIST_T>
-typename od_node_pool<NODE_T, OD_NODE_LIST_T>::g_node_list_t od_node_pool<NODE_T, OD_NODE_LIST_T>::g_odn_list_;
+template <typename NODE_T>
+typename od_node_pool<NODE_T>::g_node_list_t od_node_pool<NODE_T>::g_odn_list_;
 
 #ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
 extern thread_local std::list<std::unique_ptr<countermeasure_gcc_bug_deletable_obj_abst>> tl_list_list;
-template <typename NODE_T, typename OD_NODE_LIST_T>
-thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list* od_node_pool<NODE_T, OD_NODE_LIST_T>::x_tl_p_odn_list_still_in_hazard_ = nullptr;
-template <typename NODE_T, typename OD_NODE_LIST_T>
-thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list* od_node_pool<NODE_T, OD_NODE_LIST_T>::x_tl_p_odn_list_no_in_hazard_ = nullptr;
+template <typename NODE_T>
+thread_local typename od_node_pool<NODE_T>::tl_od_node_list* od_node_pool<NODE_T>::x_tl_p_odn_list_still_in_hazard_ = nullptr;
+template <typename NODE_T>
+thread_local typename od_node_pool<NODE_T>::tl_od_node_list* od_node_pool<NODE_T>::x_tl_p_odn_list_no_in_hazard_ = nullptr;
 #else
-template <typename NODE_T, typename OD_NODE_LIST_T>
-thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list od_node_pool<NODE_T, OD_NODE_LIST_T>::x_tl_odn_list_still_in_hazard_( od_node_pool<NODE_T, OD_NODE_LIST_T>::g_odn_list_ );
-template <typename NODE_T, typename OD_NODE_LIST_T>
-thread_local typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list od_node_pool<NODE_T, OD_NODE_LIST_T>::x_tl_odn_list_no_in_hazard_( od_node_pool<NODE_T, OD_NODE_LIST_T>::g_odn_list_ );
+template <typename NODE_T>
+thread_local typename od_node_pool<NODE_T>::tl_od_node_list od_node_pool<NODE_T>::x_tl_odn_list_still_in_hazard_( od_node_pool<NODE_T>::g_odn_list_ );
+template <typename NODE_T>
+thread_local typename od_node_pool<NODE_T>::tl_od_node_list od_node_pool<NODE_T>::x_tl_odn_list_no_in_hazard_( od_node_pool<NODE_T>::g_odn_list_ );
 #endif
 
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-template <typename NODE_T, typename OD_NODE_LIST_T>
-std::atomic<size_t> od_node_pool<NODE_T, OD_NODE_LIST_T>::node_count_total_( 0 );
-template <typename NODE_T, typename OD_NODE_LIST_T>
-std::atomic<size_t> od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list::node_count_in_tl_odn_list_( 0 );
+template <typename NODE_T>
+std::atomic<size_t> od_node_pool<NODE_T>::node_count_total_( 0 );
+template <typename NODE_T>
+std::atomic<size_t> od_node_pool<NODE_T>::tl_od_node_list::node_count_in_tl_odn_list_( 0 );
 #endif
 
-template <typename NODE_T, typename OD_NODE_LIST_T>
-inline typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list& od_node_pool<NODE_T, OD_NODE_LIST_T>::get_tl_odn_list_still_in_hazard( void )
+template <typename NODE_T>
+inline typename od_node_pool<NODE_T>::tl_od_node_list& od_node_pool<NODE_T>::get_tl_odn_list_still_in_hazard( void )
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
 	if ( x_tl_p_odn_list_still_in_hazard_ == nullptr ) {
@@ -349,8 +359,8 @@ inline typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list& od_node_p
 #endif
 }
 
-template <typename NODE_T, typename OD_NODE_LIST_T>
-inline typename od_node_pool<NODE_T, OD_NODE_LIST_T>::tl_od_node_list& od_node_pool<NODE_T, OD_NODE_LIST_T>::get_tl_odn_list_no_in_hazard( void )
+template <typename NODE_T>
+inline typename od_node_pool<NODE_T>::tl_od_node_list& od_node_pool<NODE_T>::get_tl_odn_list_no_in_hazard( void )
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
 	if ( x_tl_p_odn_list_no_in_hazard_ == nullptr ) {

@@ -151,11 +151,11 @@ int nwoker_perf_test_stack_NtoN_sub( unsigned int nworker )
 int nwoker_perf_test_stack_NtoN_main( unsigned int nworker )
 {
 	nwoker_perf_test_stack_NtoN_sub<1>( nworker );
-	std::cout << "*** number of retire_node: " << std::to_string( alpha::concurrent::internal::retire_node_abst::get_allocate_count() ) << " ***" << std::endl;
+	// std::cout << "*** number of retire_node: " << std::to_string( alpha::concurrent::internal::retire_node_abst::get_allocate_count() ) << " ***" << std::endl;
 	nwoker_perf_test_stack_NtoN_sub<10>( nworker );
-	std::cout << "*** number of retire_node: " << std::to_string( alpha::concurrent::internal::retire_node_abst::get_allocate_count() ) << " ***" << std::endl;
+	// std::cout << "*** number of retire_node: " << std::to_string( alpha::concurrent::internal::retire_node_abst::get_allocate_count() ) << " ***" << std::endl;
 	nwoker_perf_test_stack_NtoN_sub<100>( nworker );
-	std::cout << "*** number of retire_node: " << std::to_string( alpha::concurrent::internal::retire_node_abst::get_allocate_count() ) << " ***" << std::endl;
+	// std::cout << "*** number of retire_node: " << std::to_string( alpha::concurrent::internal::retire_node_abst::get_allocate_count() ) << " ***" << std::endl;
 
 	return 0;
 }

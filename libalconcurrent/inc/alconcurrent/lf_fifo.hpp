@@ -222,16 +222,15 @@ private:
 	hazard_ptr_storage_t hzrd_ptr_;
 };
 
-template <typename NODE_T>
+template <typename T>
 class node_fifo_lockfree_base {
 public:
-	using node_type    = NODE_T;
-	using node_pointer = NODE_T*;
-	using value_type   = typename NODE_T::value_type;
+	using node_type    = od_node_basic<T>;
+	using node_pointer = od_node_basic<T>*;
+	using value_type   = T;
 
 	static_assert( std::is_default_constructible<value_type>::value && std::is_copy_constructible<value_type>::value && std::is_copy_assignable<value_type>::value,
 	               "T should be default constructible, move constructible and move assignable at least" );
-	static_assert( std::is_base_of<od_node<value_type>, NODE_T>::value, "NODE_T is the derived class of od_node<T>" );
 
 	constexpr node_fifo_lockfree_base( node_pointer p_sentinel ) noexcept
 	  : hph_head_( p_sentinel )
@@ -373,9 +372,13 @@ public:
 				} else {
 					// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
 					// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
-					typename hazard_pointer::pointer     hph_head_expected = hp_head_node.get();
-					std::tuple<node_pointer, value_type> ans { hph_head_expected, hp_head_next->get() };
-					if ( hph_head_.compare_exchange_weak( hph_head_expected, hp_head_next.get(), std::memory_order_release, std::memory_order_acquire ) ) {
+					typename hazard_pointer::pointer p_head_expected_base = hp_head_node.get();                                  // od_node_link_by_hazard_handler*
+					node_pointer                     p_head_expected      = static_cast<node_pointer>( p_head_expected_base );   // od_node_basic<T>*に変換する。このクラスで保持しているノードは、すべてx_fifo_node<T>のインスタンスであることをpush関数時点で保証しているので、dynamic_cast<>は不要。
+					typename hazard_pointer::pointer p_head_next_base     = hp_head_next.get();                                  // od_node_link_by_hazard_handler*
+					node_pointer                     p_head_next          = static_cast<node_pointer>( p_head_next_base );       // od_node_basic<T>*に変換する。このクラスで保持しているノードは、すべてx_fifo_node<T>のインスタンスであることをpush関数時点で保証しているので、dynamic_cast<>は不要。
+
+					std::tuple<node_pointer, value_type> ans { p_head_expected, p_head_next->get() };
+					if ( hph_head_.compare_exchange_weak( p_head_expected_base, p_head_next_base, std::memory_order_release, std::memory_order_acquire ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 						count_--;
 #endif
@@ -407,7 +410,7 @@ public:
 			internal::LogOutput( log_type::ERR, "ERR: calling condition is not expected. Before calling release_sentinel_node, this instance should be empty. therefore, now leak all remaining nodes." );
 		}
 
-		p_ans = hph_head_.load();
+		p_ans = static_cast<node_pointer>( hph_head_.load() );
 		hph_head_.store( nullptr );
 		hph_tail_.store( nullptr );
 		return p_ans;
@@ -429,25 +432,26 @@ public:
 	}
 
 private:
-	using hazard_ptr_handler_t = typename NODE_T::hazard_ptr_handler_t;
-	using hazard_pointer       = typename NODE_T::hazard_pointer;
+	using hazard_ptr_handler_t = typename od_node_link_by_hazard_handler::hazard_ptr_handler_t;
+	using hazard_pointer       = typename od_node_link_by_hazard_handler::hazard_pointer;
 
 	void push_back_common( node_pointer p_nd ) noexcept
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 		pushpop_count_++;
 #endif
-		hazard_pointer hp_tail_node = hph_tail_.get();
-		hazard_pointer hp_tail_next = hp_tail_node->get_hazard_ptr_of_next();
+		typename hazard_pointer::pointer p_link_of_nd = p_nd;                                     // od_node_link_by_hazard_handler*
+		hazard_pointer                   hp_tail_node = hph_tail_.get();                          // od_node_link_by_hazard_handler::hazard_pointer
+		hazard_pointer                   hp_tail_next = hp_tail_node->get_hazard_ptr_of_next();   // od_node_link_by_hazard_handler::hazard_pointer
 		while ( true ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 			pushpop_loop_count_++;
 #endif
 			if ( hp_tail_next == nullptr ) {
-				typename hazard_pointer::pointer expected = nullptr;
-				if ( hp_tail_node->hazard_handler_of_next().compare_exchange_weak( expected, p_nd, std::memory_order_release, std::memory_order_acquire ) ) {
+				typename hazard_pointer::pointer expected = nullptr;   // od_node_link_by_hazard_handler*
+				if ( hp_tail_node->hazard_handler_of_next().compare_exchange_weak( expected, p_link_of_nd, std::memory_order_release, std::memory_order_acquire ) ) {
 					expected = hp_tail_node.get();
-					hph_tail_.compare_exchange_weak( expected, p_nd, std::memory_order_release, std::memory_order_acquire );
+					hph_tail_.compare_exchange_weak( expected, p_link_of_nd, std::memory_order_release, std::memory_order_acquire );
 					break;
 				}
 			} else {
@@ -539,9 +543,8 @@ public:
 		std::tuple<node_pointer, value_type> pop_val = lf_fifo_impl_.pop_front();
 		if ( std::get<0>( pop_val ) == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
-		std::tuple<bool, value_type> ans { true, std::move( std::get<1>( pop_val ) ) };
 		unused_node_pool_.push( std::get<0>( pop_val ) );
-		return ans;
+		return std::tuple<bool, value_type> { true, std::move( std::get<1>( pop_val ) ) };
 	}
 	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, typename std::enable_if<!IsMoveConstructivle>::type* = nullptr>
 	std::tuple<bool, value_type> pop( void )
@@ -550,9 +553,8 @@ public:
 		std::tuple<node_pointer, value_type> pop_val = lf_fifo_impl_.pop_front();
 		if ( std::get<0>( pop_val ) == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
-		std::tuple<bool, value_type> ans { true, std::get<1>( pop_val ) };
 		unused_node_pool_.push( std::get<0>( pop_val ) );
-		return ans;
+		return std::tuple<bool, value_type> { true, std::get<1>( pop_val ) };
 	}
 
 	bool is_empty( void ) const
@@ -561,11 +563,11 @@ public:
 	}
 
 private:
-	using node_type    = od_node<T>;
+	using node_type    = od_node_basic<T>;
 	using node_pointer = node_type*;
 
-	using node_fifo_lockfree_t = node_fifo_lockfree_base<node_type>;
-	using node_pool_t          = od_node_pool<node_type, typename node_type::raw_next_t>;
+	using node_fifo_lockfree_t = node_fifo_lockfree_base<value_type>;
+	using node_pool_t          = od_node_pool<node_type>;
 
 	node_fifo_lockfree_t lf_fifo_impl_;
 	node_pool_t          unused_node_pool_;

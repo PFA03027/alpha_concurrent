@@ -476,8 +476,12 @@ public:
 	{
 		if ( this == &src ) return *this;
 
-		p_  = src.p_;
-		os_ = std::move( src.os_ );
+		p_ = src.p_;
+		if ( p_ == nullptr ) {
+			os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
+		} else {
+			os_->store( p_, std::memory_order_release );
+		}
 
 		src.p_  = nullptr;
 		src.os_ = internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) );
@@ -485,11 +489,14 @@ public:
 		return *this;
 	}
 
-	T* operator->() const noexcept
+	template <bool IsVoid = std::is_same<T, void>::value, typename std::enable_if<!IsVoid>::type* = nullptr>
+	auto operator->() const noexcept -> typename std::add_pointer<typename std::enable_if<!IsVoid, T>::type>::type
 	{
 		return p_;
 	}
-	T& operator*() const noexcept
+
+	template <bool IsVoid = std::is_same<T, void>::value, typename std::enable_if<!IsVoid>::type* = nullptr>
+	auto operator*() const noexcept -> typename std::add_lvalue_reference<typename std::enable_if<!IsVoid, T>::type>::type
 	{
 		return *p_;
 	}
@@ -497,6 +504,22 @@ public:
 	T* get() const noexcept
 	{
 		return p_;
+	}
+
+	template <typename CAST_T>
+	auto get_pointer_by_static_cast( void ) const -> typename std::conditional<std::is_const<T>::value, typename std::remove_const<CAST_T>::type*, CAST_T*>::type
+	{
+#ifdef ALCONCURRENT_CONF_REPLACE_STATIC_CAST_OF_ZDPTR_TO_DYNAMIC_CASTH
+		return dynamic_cast<typename std::conditional<std::is_const<T>, typename std::remove_const<CAST_T>::type*, CAST_T*>::type>( p_ );
+#else
+		return static_cast<typename std::conditional<std::is_const<T>::value, typename std::remove_const<CAST_T>::type*, CAST_T*>::type>( p_ );
+#endif
+	}
+
+	template <typename CAST_T>
+	auto get_pointer_by_dynamic_cast( void ) const -> typename std::conditional<std::is_const<T>::value, typename std::remove_const<CAST_T>::type*, CAST_T*>::type
+	{
+		return dynamic_cast<typename std::conditional<std::is_const<T>::value, typename std::remove_const<CAST_T>::type*, CAST_T*>::type>( p_ );
 	}
 
 private:
@@ -785,9 +808,6 @@ public:
 			}
 		}
 
-		if ( p_expect == nullptr ) {
-			return hazard_pointer( p_expect, nullptr );
-		}
 		return hazard_pointer( p_expect, std::move( hso ) );
 	}
 

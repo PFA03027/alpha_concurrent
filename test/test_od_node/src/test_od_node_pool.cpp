@@ -17,9 +17,9 @@
 #include "alconcurrent/internal/od_node_pool.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////////
-class test_od_node_of_pool : public alpha::concurrent::internal::od_node_base<test_od_node_of_pool> {};
+class test_od_node_of_pool : public alpha::concurrent::internal::od_node_simple_link, public alpha::concurrent::internal::od_node_link_by_hazard_handler {};
 
-using sut_type = alpha::concurrent::internal::od_node_pool<test_od_node_of_pool, typename test_od_node_of_pool::od_node_base_raw_next_t>;
+using sut_type = alpha::concurrent::internal::od_node_pool<test_od_node_of_pool>;
 
 TEST( od_node_pool_class, CanConstructDestruct )
 {
@@ -58,9 +58,9 @@ TEST( od_node_pool_class, CanPushPop1 )
 TEST( od_node_pool_class, CanPushPop_InHazard1 )
 {
 	// Arrange
-	sut_type                                            sut;
-	auto                                                p_tmp = new test_od_node_of_pool;
-	typename test_od_node_of_pool::hazard_ptr_handler_t hph( p_tmp );
+	sut_type                                    sut;
+	auto                                        p_tmp = new test_od_node_of_pool;
+	alpha::concurrent::hazard_ptr_handler<void> hph( p_tmp->get_pointer_of_hazard_check() );
 	{
 		auto hp_tmp = hph.get();
 		sut.push( p_tmp );
@@ -85,9 +85,9 @@ TEST( od_node_pool_class, CanPushPop_InHazard1 )
 TEST( od_node_pool_class, CanPushPop_InHazard2 )
 {
 	// Arrange
-	sut_type                                            sut;
-	auto                                                p_tmp = new test_od_node_of_pool;
-	typename test_od_node_of_pool::hazard_ptr_handler_t hph( p_tmp );
+	sut_type                                    sut;
+	auto                                        p_tmp = new test_od_node_of_pool;
+	alpha::concurrent::hazard_ptr_handler<void> hph( p_tmp->get_pointer_of_hazard_check() );
 	{
 		auto hp_tmp = hph.get();
 		sut.push( p_tmp );
@@ -109,10 +109,10 @@ TEST( od_node_pool_class, CanPushPop_InHazard2 )
 TEST( od_node_pool_class, CanPushPop_InHazard3 )
 {
 	// Arrange
-	sut_type                                            sut;
-	auto                                                p_tmp  = new test_od_node_of_pool;
-	auto                                                p_tmp2 = new test_od_node_of_pool;
-	typename test_od_node_of_pool::hazard_ptr_handler_t hph( p_tmp );
+	sut_type                                    sut;
+	auto                                        p_tmp  = new test_od_node_of_pool;
+	auto                                        p_tmp2 = new test_od_node_of_pool;
+	alpha::concurrent::hazard_ptr_handler<void> hph( p_tmp->get_pointer_of_hazard_check() );
 
 	{
 		auto hp_tmp = hph.get();
@@ -183,9 +183,9 @@ TEST( od_node_pool_class, CanCleanAsPossibleAs_NoHazardPtr )
 TEST( od_node_pool_class, CanCleanAsPossibleAs_InHazardPtr )
 {
 	// Arrange
-	sut_type                                            sut;
-	auto                                                p_tmp = new test_od_node_of_pool;
-	typename test_od_node_of_pool::hazard_ptr_handler_t hph( p_tmp );
+	sut_type                                    sut;
+	auto                                        p_tmp = new test_od_node_of_pool;
+	alpha::concurrent::hazard_ptr_handler<void> hph( p_tmp->get_pointer_of_hazard_check() );
 	{
 		auto hp_tmp = hph.get();
 		sut.push( p_tmp );

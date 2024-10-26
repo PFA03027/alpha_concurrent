@@ -28,6 +28,9 @@ namespace internal {
  */
 class od_simple_list {
 public:
+	using node_pointer       = od_node_simple_link*;
+	using const_node_pointer = const od_node_simple_link*;
+
 	constexpr od_simple_list( void ) noexcept = default;
 	od_simple_list( const od_simple_list& )   = delete;
 	od_simple_list( od_simple_list&& src ) noexcept;
@@ -38,16 +41,16 @@ public:
 	void swap( od_simple_list& src ) noexcept;
 	void clear( void );
 
-	void push_front( od_node_simple_link* p_nd ) noexcept;
-	void push_back( od_node_simple_link* p_nd ) noexcept;
+	void push_front( node_pointer p_nd ) noexcept;
+	void push_back( node_pointer p_nd ) noexcept;
 
 	void merge_push_front( od_simple_list&& src ) noexcept;
-	void merge_push_front( od_node_simple_link* p_nd ) noexcept;
+	void merge_push_front( node_pointer p_nd ) noexcept;
 
 	void merge_push_back( od_simple_list&& src ) noexcept;
-	void merge_push_back( od_node_simple_link* p_nd ) noexcept;
+	void merge_push_back( node_pointer p_nd ) noexcept;
 
-	od_node_simple_link* pop_front( void ) noexcept;
+	node_pointer pop_front( void ) noexcept;
 
 	bool is_empty( void ) const
 	{
@@ -57,28 +60,28 @@ public:
 	/**
 	 * @brief if pred return true, that node is purged and push it into return value
 	 *
-	 * @param pred callable pred(const od_node_simple_link*) and return bool
+	 * @param pred callable pred(const_node_pointer) and return bool
 	 * @return od_simple_list has the purged nodes
 	 */
-	od_simple_list split_if( std::function<bool( const od_node_simple_link* )> pred );
+	od_simple_list split_if( std::function<bool( const_node_pointer )> pred );
 
 	/**
 	 * @brief purge all nodes and apply Pred
 	 *
 	 * Pred becomes an onwer of a node. therefore Pred should not leak the memory of a node pointer
 	 *
-	 * @param pred callable pred( od_node_simple_link*) and return bool
+	 * @param pred callable pred( node_pointer) and return bool
 	 */
-	void clear( std::function<void( od_node_simple_link* )> pred );
+	void clear( std::function<void( node_pointer )> pred );
 
 	size_t profile_info_count( void ) const;
 
 private:
-	void merge_push_front( od_node_simple_link* p_nd_head, od_node_simple_link* p_nd_tail ) noexcept;
-	void merge_push_back( od_node_simple_link* p_nd_head, od_node_simple_link* p_nd_tail ) noexcept;
+	void merge_push_front( node_pointer p_nd_head, node_pointer p_nd_tail ) noexcept;
+	void merge_push_back( node_pointer p_nd_head, node_pointer p_nd_tail ) noexcept;
 
-	od_node_simple_link* p_head_ = nullptr;
-	od_node_simple_link* p_tail_ = nullptr;
+	node_pointer p_head_ = nullptr;
+	node_pointer p_tail_ = nullptr;
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	size_t count_ = 0;
 #endif
