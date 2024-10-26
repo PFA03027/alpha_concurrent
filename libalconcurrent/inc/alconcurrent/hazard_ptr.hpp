@@ -791,13 +791,9 @@ public:
 		internal::hzrd_slot_ownership_t hso = internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) );
 
 		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
-		if ( p_expect == nullptr ) {
-			return hazard_pointer( p_expect, std::move( hso ) );
-		}
-		hso->store( p_expect, std::memory_order_release );
 
 		// TODO: is there any Redundancy ? この方法に冗長性はないか？
-		while ( !ap_target_p_.compare_exchange_weak( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) ) {
+		do {
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 			internal::loop_count_in_hazard_ptr_get_++;
 #endif
@@ -805,8 +801,9 @@ public:
 				hso->store( p_expect, std::memory_order_release );
 			} else {
 				hso->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
+				return hazard_pointer( p_expect, std::move( hso ) );
 			}
-		}
+		} while ( !ap_target_p_.compare_exchange_weak( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) );
 
 		return hazard_pointer( p_expect, std::move( hso ) );
 	}
