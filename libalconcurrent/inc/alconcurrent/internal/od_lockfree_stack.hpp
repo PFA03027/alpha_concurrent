@@ -26,6 +26,8 @@ public:
 	  : hph_head_()
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	  , count_( 0 )
+	  , pushpop_call_count_( 0 )
+	  , pushpop_loop__count_( 0 )
 #endif
 	{
 	}
@@ -75,6 +77,8 @@ private:
 	hazard_ptr_handler_t hph_head_;
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	std::atomic<size_t> count_;
+	std::atomic<size_t> pushpop_call_count_;
+	std::atomic<size_t> pushpop_loop__count_;
 #endif
 };
 

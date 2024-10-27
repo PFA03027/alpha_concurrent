@@ -526,7 +526,7 @@ public:
 		}
 		lf_fifo_impl_.push_back( v_arg, p_new_nd );
 	}
-	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, bool IsMoveAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsMoveConstructivle && IsMoveAssignable>::type* = nullptr>
+	template <bool IsMoveConstructible = std::is_move_constructible<T>::value, bool IsMoveAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
 	void push( T&& v_arg )
 	{
 		node_pointer p_new_nd = unused_node_pool_.pop();
@@ -536,7 +536,7 @@ public:
 		lf_fifo_impl_.push_back( std::move( v_arg ), p_new_nd );
 	}
 
-	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, typename std::enable_if<IsMoveConstructivle>::type* = nullptr>
+	template <bool IsMoveConstructible = std::is_move_constructible<T>::value, typename std::enable_if<IsMoveConstructible>::type* = nullptr>
 	std::tuple<bool, value_type> pop( void )
 	{
 		// TがMove可能である場合に選択されるAPI実装
@@ -546,7 +546,7 @@ public:
 		unused_node_pool_.push( std::get<0>( pop_val ) );
 		return std::tuple<bool, value_type> { true, std::move( std::get<1>( pop_val ) ) };
 	}
-	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, typename std::enable_if<!IsMoveConstructivle>::type* = nullptr>
+	template <bool IsMoveConstructible = std::is_move_constructible<T>::value, typename std::enable_if<!IsMoveConstructible>::type* = nullptr>
 	std::tuple<bool, value_type> pop( void )
 	{
 		// TがMove不可能であるが、Copy可能である場合に選択されるAPI実装

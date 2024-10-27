@@ -489,6 +489,14 @@ public:
 		return *this;
 	}
 
+	void swap( hazard_ptr& src )
+	{
+		auto p_tmp = p_;
+		p_         = src.p_;
+		src.p_     = p_tmp;
+		os_.swap( src.so_ );
+	}
+
 	template <bool IsVoid = std::is_same<T, void>::value, typename std::enable_if<!IsVoid>::type* = nullptr>
 	auto operator->() const noexcept -> typename std::add_pointer<typename std::enable_if<!IsVoid, T>::type>::type
 	{
@@ -530,7 +538,7 @@ private:
 		// 事前条件： os_argには、p_argが格納されていること。
 	}
 
-	void store( T* p_arg )
+	void store( pointer p_arg )
 	{
 		p_ = p_arg;
 		if ( p_ == nullptr ) {
@@ -540,7 +548,7 @@ private:
 		}
 	}
 
-	T*                              p_;
+	pointer                         p_;
 	internal::hzrd_slot_ownership_t os_;
 
 	friend class hazard_ptr_handler<T>;
@@ -788,22 +796,25 @@ public:
 		internal::call_count_hazard_ptr_get_++;
 #endif
 
-		internal::hzrd_slot_ownership_t hso = internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) );
+		internal::hzrd_slot_ownership_t hso;
 
 		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
-
-		// TODO: is there any Redundancy ? この方法に冗長性はないか？
-		do {
+		if ( p_expect != nullptr ) {
+			hso = internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_expect );
+			while ( !ap_target_p_.compare_exchange_strong( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
-			internal::loop_count_in_hazard_ptr_get_++;
+				internal::loop_count_in_hazard_ptr_get_++;
 #endif
-			if ( p_expect != nullptr ) {
-				hso->store( p_expect, std::memory_order_release );
-			} else {
-				hso->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
-				return hazard_pointer( p_expect, std::move( hso ) );
+				if ( p_expect != nullptr ) {
+					hso->store( p_expect, std::memory_order_release );
+				} else {
+					hso->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
+					break;
+				}
 			}
-		} while ( !ap_target_p_.compare_exchange_weak( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) );
+		} else {
+			hso = internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) );
+		}
 
 		return hazard_pointer( p_expect, std::move( hso ) );
 	}
@@ -823,7 +834,7 @@ public:
 			if ( p_expect == nullptr ) {
 				return;
 			}
-		} while ( !ap_target_p_.compare_exchange_weak( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) );
+		} while ( !ap_target_p_.compare_exchange_strong( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) );
 		// TODO: is there any Redundancy ? この方法に冗長性はないか？
 
 		return;
@@ -867,6 +878,38 @@ public:
 	                              std::memory_order order = std::memory_order_seq_cst ) noexcept
 	{
 		return ap_target_p_.compare_exchange_strong( expected, desired, order );
+	}
+
+	bool compare_exchange_weak( hazard_pointer&   expected_hzd_ptr,
+	                            pointer           desired,
+	                            std::memory_order success,
+	                            std::memory_order failure ) noexcept
+	{
+		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, failure );
+		if ( !ret ) {
+			// 置き換えに失敗した場合、新たな値が、expected_hzd_ptr.p_に設定されている。
+			// しかし、まだハザードポインタ用のスロットには反映されていないため、更新を行う。
+			do {
+				expected_hzd_ptr.os_->store( expected_hzd_ptr.p_, std::memory_order_release );
+			} while ( !ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, expected_hzd_ptr.p_, std::memory_order_release, std::memory_order_relaxed ) );
+		}
+		return ret;
+	}
+
+	bool compare_exchange_strong( hazard_pointer&   expected_hzd_ptr,
+	                              pointer           desired,
+	                              std::memory_order success,
+	                              std::memory_order failure ) noexcept
+	{
+		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, failure );
+		if ( !ret ) {
+			// 置き換えに失敗した場合、新たな値が、expected_hzd_ptr.p_に設定されている。
+			// しかし、まだハザードポインタ用のスロットには反映されていないため、更新を行う。
+			do {
+				expected_hzd_ptr.os_->store( expected_hzd_ptr.p_, std::memory_order_release );
+			} while ( !ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, expected_hzd_ptr.p_, std::memory_order_release, std::memory_order_relaxed ) );
+		}
+		return ret;
 	}
 
 private:

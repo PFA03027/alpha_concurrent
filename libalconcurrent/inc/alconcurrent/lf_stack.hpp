@@ -70,7 +70,7 @@ public:
 		}
 	}
 
-	template <bool IsCopyConstructivle = std::is_copy_constructible<T>::value, bool IsCopyAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsCopyConstructivle && IsCopyAssignable>::type* = nullptr>
+	template <bool IsCopyConstructible = std::is_copy_constructible<T>::value, bool IsCopyAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsCopyConstructible && IsCopyAssignable>::type* = nullptr>
 	void push( const T& v_arg )
 	{
 		node_pointer p_new_nd = unused_node_pool_.pop();
@@ -81,7 +81,7 @@ public:
 		}
 		lf_stack_impl_.push_front( p_new_nd );
 	}
-	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, bool IsMoveAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsMoveConstructivle && IsMoveAssignable>::type* = nullptr>
+	template <bool IsMoveConstructible = std::is_move_constructible<T>::value, bool IsMoveAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
 	void push( T&& v_arg )
 	{
 		node_pointer p_new_nd = unused_node_pool_.pop();
@@ -93,7 +93,7 @@ public:
 		lf_stack_impl_.push_front( p_new_nd );
 	}
 
-	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, typename std::enable_if<IsMoveConstructivle>::type* = nullptr>
+	template <bool IsMoveConstructible = std::is_move_constructible<T>::value, typename std::enable_if<IsMoveConstructible>::type* = nullptr>
 	std::tuple<bool, value_type> pop( void )
 	{
 		// TがMove可能である場合に選択されるAPI実装
@@ -104,12 +104,12 @@ public:
 		unused_node_pool_.push( p_poped_node );
 		return ans;
 	}
-	template <bool IsMoveConstructivle = std::is_move_constructible<T>::value, bool IsCopyConstructivle = std::is_copy_constructible<T>::value,
-	          typename std::enable_if<!IsMoveConstructivle && IsCopyConstructivle>::type* = nullptr>
+	template <bool IsMoveConstructible = std::is_move_constructible<T>::value, bool IsCopyConstructible = std::is_copy_constructible<T>::value,
+	          typename std::enable_if<!IsMoveConstructible && IsCopyConstructible>::type* = nullptr>
 	std::tuple<bool, value_type> pop( void )
 	{
 		// TがMove不可能であるが、Copy可能である場合に選択されるAPI実装
-		node_pointer p_poped_node = lf_stack_impl_.pop_front();
+		node_pointer p_poped_node = static_cast<node_pointer>( lf_stack_impl_.pop_front() );   // このクラスが保持するノードは、すべてnode_pointerであることをpush関数で保証しているので、dynamic_castは不要。
 		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
 		std::tuple<bool, value_type> ans { true, p_poped_node->get() };

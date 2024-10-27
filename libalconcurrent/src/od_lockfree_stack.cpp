@@ -36,6 +36,10 @@ od_lockfree_stack::~od_lockfree_stack()
 		delete p_cur;
 		p_cur = p_nxt;
 	}
+
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	LogOutput( log_type::DUMP, "od_lockfree_stack push/pop: call count = %zu, loop count = %zu", pushpop_call_count_.load(), pushpop_loop__count_.load() );
+#endif
 }
 
 void od_lockfree_stack::push_front( node_pointer p_nd ) noexcept
@@ -46,10 +50,17 @@ void od_lockfree_stack::push_front( node_pointer p_nd ) noexcept
 		LogOutput( log_type::WARN, "od_lockfree_stack::push_front() receives a od_node<T> that has non nullptr in hph_next_" );
 	}
 #endif
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	pushpop_call_count_++;
+#endif
+
 	node_pointer p_expected = hph_head_.load();
 	do {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		pushpop_loop__count_++;
+#endif
 		p_nd->set_next( p_expected );
-	} while ( !hph_head_.compare_exchange_weak( p_expected, p_nd, std::memory_order_release, std::memory_order_relaxed ) );
+	} while ( !hph_head_.compare_exchange_strong( p_expected, p_nd, std::memory_order_release, std::memory_order_relaxed ) );
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	count_++;
 #endif
@@ -57,20 +68,19 @@ void od_lockfree_stack::push_front( node_pointer p_nd ) noexcept
 
 od_lockfree_stack::node_pointer od_lockfree_stack::pop_front( void ) noexcept
 {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	pushpop_call_count_++;
+#endif
+
 	hazard_pointer hp_cur_head = hph_head_.get();
-	node_pointer   p_expected  = hp_cur_head.get();
-	if ( p_expected == nullptr ) return nullptr;
-
-	node_pointer p_new_head = p_expected->next();
-	while ( !hph_head_.compare_exchange_weak( p_expected, p_new_head, std::memory_order_release, std::memory_order_relaxed ) ) {
-		hph_head_.reuse( hp_cur_head );
+	node_pointer   p_expected;
+	do {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		pushpop_loop__count_++;
+#endif
 		p_expected = hp_cur_head.get();
-		if ( p_expected == nullptr ) {
-			return nullptr;
-		}
-
-		p_new_head = p_expected->next();
-	}
+		if ( p_expected == nullptr ) return nullptr;
+	} while ( !hph_head_.compare_exchange_strong( hp_cur_head, p_expected->next(), std::memory_order_release, std::memory_order_relaxed ) );
 
 	// ここに来た時点で、hp_cur_head で保持されているノードの所有権を確保できた。
 	// ※ 確保しているノードへのポインタを他スレッドでも持っているかもしれないが、
