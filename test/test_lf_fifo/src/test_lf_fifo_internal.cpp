@@ -16,12 +16,13 @@
 TEST( Internal_New_FIFO, CanConstruct )
 {
 	// Arrenge
-	using sut_node_type = alpha::concurrent::internal::od_node<int>;
+	using sut_type      = alpha::concurrent::internal::node_fifo_lockfree_base<int>;
+	using sut_node_type = alpha::concurrent::internal::node_fifo_lockfree_base<int>::node_type;
 
 	sut_node_type* p_sentinel = new sut_node_type( nullptr );
 
 	// Act
-	alpha::concurrent::internal::node_fifo_lockfree_base<sut_node_type> sut( p_sentinel );
+	sut_type sut( p_sentinel );
 
 	// Assert
 	EXPECT_TRUE( sut.is_empty() );
@@ -33,10 +34,11 @@ TEST( Internal_New_FIFO, CanConstruct )
 TEST( Internal_New_FIFO, CanPop_from_Empty_return_Nullptr )
 {
 	// Arrenge
-	using sut_node_type = alpha::concurrent::internal::od_node<int>;
+	using sut_type      = alpha::concurrent::internal::node_fifo_lockfree_base<int>;
+	using sut_node_type = alpha::concurrent::internal::node_fifo_lockfree_base<int>::node_type;
 
-	sut_node_type*                                                      p_sentinel = new sut_node_type( nullptr );
-	alpha::concurrent::internal::node_fifo_lockfree_base<sut_node_type> sut( p_sentinel );
+	sut_node_type* p_sentinel = new sut_node_type( nullptr );
+	sut_type       sut( p_sentinel );
 
 	// Act
 	auto ret = sut.pop_front();
@@ -51,11 +53,12 @@ TEST( Internal_New_FIFO, CanPop_from_Empty_return_Nullptr )
 TEST( Internal_New_FIFO, CanPush_then_Pop_return_ValidNode_and_value )
 {
 	// Arrenge
-	using sut_node_type = alpha::concurrent::internal::od_node<int>;
+	using sut_type      = alpha::concurrent::internal::node_fifo_lockfree_base<int>;
+	using sut_node_type = alpha::concurrent::internal::node_fifo_lockfree_base<int>::node_type;
 
-	sut_node_type*                                                      p_sentinel = new sut_node_type( nullptr );
-	alpha::concurrent::internal::node_fifo_lockfree_base<sut_node_type> sut( p_sentinel );
-	sut_node_type*                                                      p_node = new sut_node_type( nullptr );
+	sut_node_type* p_sentinel = new sut_node_type( nullptr );
+	sut_type       sut( p_sentinel );
+	sut_node_type* p_node = new sut_node_type( nullptr );
 
 	// Act
 	sut.push_back( 1, p_node );
@@ -75,11 +78,12 @@ TEST( Internal_New_FIFO, CanPush_then_Pop_return_ValidNode_and_value )
 TEST( Internal_New_FIFO, CanPushPush_then_Pop_return_ValidNode_and_value )
 {
 	// Arrenge
-	using sut_node_type = alpha::concurrent::internal::od_node<int>;
+	using sut_type      = alpha::concurrent::internal::node_fifo_lockfree_base<int>;
+	using sut_node_type = alpha::concurrent::internal::node_fifo_lockfree_base<int>::node_type;
 
-	sut_node_type*                                                      p_sentinel = new sut_node_type( nullptr );
-	alpha::concurrent::internal::node_fifo_lockfree_base<sut_node_type> sut( p_sentinel );
-	sut_node_type*                                                      p_node = new sut_node_type( nullptr );
+	sut_node_type* p_sentinel = new sut_node_type( nullptr );
+	sut_type       sut( p_sentinel );
+	sut_node_type* p_node = new sut_node_type( nullptr );
 	sut.push_back( 1, p_node );
 	p_node = new sut_node_type( nullptr );
 

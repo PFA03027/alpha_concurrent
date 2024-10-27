@@ -28,8 +28,7 @@ protected:
 
 	void TearDown() override
 	{
-		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
-
+		// alpha::concurrent::internal::retire_mgr::stop_prune_thread();
 		alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
 
 		int cw, ce;

@@ -28,6 +28,7 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
+#if 0
 std::atomic<size_t> retire_node_abst::count_allocate_;
 
 class retire_node_list : public od_node_list_base_impl<retire_node_abst, typename retire_node_abst::od_node_base_raw_next_t> {
@@ -279,6 +280,8 @@ void retire_mgr::retire_impl( retire_node_abst* p_new_retire )
 
 	unorder_retire_node_buffer::push( p_new_retire );
 }
+
+#endif
 
 }   // namespace internal
 }   // namespace concurrent

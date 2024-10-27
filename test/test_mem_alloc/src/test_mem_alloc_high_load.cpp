@@ -51,9 +51,9 @@ TEST( lfmemAllocOneChunk, TC_Load )
 
 	void* alloc_addr[max_slot_size];
 
-	static alpha::concurrent::param_chunk_allocation param = { 256, 20 };
+	static alpha::concurrent::param_chunk_allocation local_param = { 256, 20 };
 
-	alpha::concurrent::internal::chunk_header_multi_slot chms( param, 0, &test_st );
+	alpha::concurrent::internal::chunk_header_multi_slot chms( local_param, 0, &test_st );
 
 	//	pthread_barrier_wait( &barrier );
 
@@ -73,8 +73,8 @@ TEST( lfmemAllocOneChunk, TC_Load )
 		}
 	}
 
-	alpha::concurrent::chunk_statistics e = chms.get_statistics();
-	printf( "%s\n", e.print().c_str() );
+	alpha::concurrent::chunk_statistics cs = chms.get_statistics();
+	printf( "%s\n", cs.print().c_str() );
 
 	auto statistics = alpha::concurrent::gmem_get_statistics();
 	for ( auto& e : statistics.ch_st_ ) {

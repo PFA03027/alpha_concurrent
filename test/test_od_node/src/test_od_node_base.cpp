@@ -13,7 +13,7 @@
 
 #include "gtest/gtest.h"
 
-#include "alconcurrent/internal/od_node_base.hpp"
+#include "alconcurrent/internal/od_node_base_old1.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////////
 class test_od_node_base : public alpha::concurrent::internal::od_node_base<test_od_node_base> {
@@ -1582,57 +1582,4 @@ TEST( od_node_raw_list_base_class, CanSplitWithEvenTrue3 )
 	EXPECT_FALSE( ret.is_empty() );
 	delete ret.pop_front();
 	EXPECT_TRUE( ret.is_empty() );
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-class test_od_node_list_lockfree_base : public alpha::concurrent::internal::od_node_stack_lockfree_base<test_od_node_base, typename test_od_node_base::od_node_base_hazard_handler_next_t> {
-};
-
-TEST( od_node_list_lockfree_base_class, CanDefaultConstruct )
-{
-	// Arrange
-
-	// Act
-	test_od_node_list_lockfree_base sut;
-
-	// Assert
-	EXPECT_EQ( sut.pop_front(), nullptr );
-}
-
-TEST( od_node_list_lockfree_base_class, DoesNotAllow )
-{
-	static_assert( !std::is_copy_constructible<test_od_node_list_lockfree_base>::value, "does not allow copy constructor" );
-	static_assert( !std::is_copy_assignable<test_od_node_list_lockfree_base>::value, "does not allow copy assignable" );
-	static_assert( !std::is_move_assignable<test_od_node_list_lockfree_base>::value, "does not allow move assignable" );
-}
-
-TEST( od_node_list_lockfree_base_class, CanMoveConstruct0 )
-{
-	// Arrange
-	test_od_node_list_lockfree_base src;
-	EXPECT_EQ( src.pop_front(), nullptr );
-
-	// Act
-	test_od_node_list_lockfree_base sut( std::move( src ) );
-
-	// Assert
-	EXPECT_EQ( sut.pop_front(), nullptr );
-	EXPECT_EQ( src.pop_front(), nullptr );
-}
-
-TEST( od_node_list_lockfree_base_class, CanMoveConstruct1 )
-{
-	// Arrange
-	test_od_node_list_lockfree_base src;
-	src.push_front( new test_od_node_base( nullptr ) );
-
-	// Act
-	test_od_node_list_lockfree_base sut( std::move( src ) );
-
-	// Assert
-	auto p = sut.pop_front();
-	ASSERT_NE( p, nullptr );
-	delete p;
-	EXPECT_EQ( sut.pop_front(), nullptr );
-	EXPECT_EQ( src.pop_front(), nullptr );
 }

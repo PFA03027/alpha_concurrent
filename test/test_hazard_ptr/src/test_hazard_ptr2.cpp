@@ -813,7 +813,7 @@ protected:
 
 	void TearDown() override
 	{
-		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
+		// alpha::concurrent::internal::retire_mgr::stop_prune_thread();
 
 		int cw, ce;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
@@ -845,7 +845,7 @@ protected:
 
 	void TearDown() override
 	{
-		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
+		// alpha::concurrent::internal::retire_mgr::stop_prune_thread();
 		alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
 
 		int cw, ce;
@@ -1057,6 +1057,254 @@ TEST_F( TestHazardPtrHandler, Call_HazardPtr_get_for_nullptr )
 }
 
 /////////////////////////////////////////////////////////////////////////////////
+class TestHazardPtrWMarkHandler : public ::testing::Test {
+protected:
+	void SetUp() override
+	{
+		alpha::concurrent::GetErrorWarningLogCountAndReset( nullptr, nullptr );
+	}
+
+	void TearDown() override
+	{
+		// alpha::concurrent::internal::retire_mgr::stop_prune_thread();
+		alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
+
+		int cw, ce;
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
+		EXPECT_EQ( ce, 0 );
+		EXPECT_EQ( cw, 0 );
+	}
+};
+
+TEST_F( TestHazardPtrWMarkHandler, CallDefaultConstructor )
+{
+	// Arrange
+
+	// Act
+	alpha::concurrent::hazard_ptr_w_mark_handler<int> sut;
+
+	// Assert
+	auto hp2 = sut.get();
+	EXPECT_EQ( std::get<0>( hp2 ), nullptr );
+	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_FALSE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( nullptr ) );
+}
+
+TEST_F( TestHazardPtrWMarkHandler, CallTransConstructor )
+{
+	// Arrange
+	int dummy1 = 1;
+
+	// Act
+	alpha::concurrent::hazard_ptr_w_mark_handler<int> sut( &dummy1 );
+
+	// Assert
+	auto hp2 = sut.get();
+	EXPECT_EQ( std::get<0>( hp2 ), &dummy1 );
+	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
+}
+
+TEST_F( TestHazardPtrWMarkHandler, CallCopyConstructor )
+{
+	// Arrange
+	int                                               dummy1 = 1;
+	alpha::concurrent::hazard_ptr_w_mark_handler<int> src( &dummy1 );
+
+	auto hp1 = src.get();
+	EXPECT_EQ( std::get<0>( hp1 ), &dummy1 );
+	EXPECT_FALSE( std::get<1>( hp1 ) );
+
+	// Act
+	alpha::concurrent::hazard_ptr_w_mark_handler<int> sut( src );
+
+	// Assert
+	auto hp2 = sut.get();
+	EXPECT_EQ( std::get<0>( hp2 ), &dummy1 );
+	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
+}
+
+TEST_F( TestHazardPtrWMarkHandler, CallMoveConstructor )
+{
+	// Arrange
+	int                                               dummy1 = 1;
+	alpha::concurrent::hazard_ptr_w_mark_handler<int> src( &dummy1 );
+
+	auto hp1 = src.get();
+	EXPECT_EQ( std::get<0>( hp1 ), &dummy1 );
+	EXPECT_FALSE( std::get<1>( hp1 ) );
+
+	// Act
+	alpha::concurrent::hazard_ptr_w_mark_handler<int> sut( std::move( src ) );
+
+	// Assert
+	hp1 = src.get();
+	EXPECT_EQ( std::get<0>( hp1 ), nullptr );
+	EXPECT_FALSE( std::get<1>( hp1 ) );
+	auto hp2 = sut.get();
+	EXPECT_EQ( std::get<0>( hp2 ), &dummy1 );
+	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
+}
+
+TEST_F( TestHazardPtrWMarkHandler, CallCopyAssingment )
+{
+	// Arrange
+	int                                               dummy1 = 1;
+	int                                               dummy2 = 2;
+	alpha::concurrent::hazard_ptr_w_mark_handler<int> src( &dummy1 );
+	alpha::concurrent::hazard_ptr_w_mark_handler<int> sut( &dummy2 );
+
+	auto hp1 = src.get();
+	EXPECT_EQ( std::get<0>( hp1 ), &dummy1 );
+	EXPECT_FALSE( std::get<1>( hp1 ) );
+	auto hp2 = sut.get();
+	EXPECT_EQ( std::get<0>( hp2 ), &dummy2 );
+	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 ) );
+
+	// Act
+	sut = src;
+
+	// Assert
+	hp1 = src.get();
+	EXPECT_EQ( std::get<0>( hp1 ), &dummy1 );
+	EXPECT_FALSE( std::get<1>( hp1 ) );
+	hp2 = sut.get();
+	EXPECT_EQ( std::get<0>( hp2 ), &dummy1 );
+	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
+	EXPECT_FALSE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 ) );
+}
+
+TEST_F( TestHazardPtrWMarkHandler, CallMoveAssingment )
+{
+	// Arrange
+	int                                               dummy1 = 1;
+	int                                               dummy2 = 2;
+	alpha::concurrent::hazard_ptr_w_mark_handler<int> src( &dummy1 );
+	alpha::concurrent::hazard_ptr_w_mark_handler<int> sut( &dummy2 );
+
+	auto hp1 = src.get();
+	EXPECT_EQ( std::get<0>( hp1 ), &dummy1 );
+	EXPECT_FALSE( std::get<1>( hp1 ) );
+	auto hp2 = sut.get();
+	EXPECT_EQ( std::get<0>( hp2 ), &dummy2 );
+	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 ) );
+
+	// Act
+	sut = std::move( src );
+
+	// Assert
+	hp1 = src.get();
+	EXPECT_EQ( std::get<0>( hp1 ), nullptr );
+	EXPECT_FALSE( std::get<1>( hp1 ) );
+	hp2 = sut.get();
+	EXPECT_EQ( std::get<0>( hp2 ), &dummy1 );
+	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
+	EXPECT_FALSE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 ) );
+}
+
+TEST_F( TestHazardPtrWMarkHandler, Call_HazardPtr_get1 )
+{
+	// Arrange
+	int                                               dummy1 = 1;
+	alpha::concurrent::hazard_ptr_w_mark_handler<int> sut( &dummy1 );
+
+	// Act
+	auto hp2 = sut.get();
+
+	// Assert
+	ASSERT_EQ( std::get<0>( hp2 ), &dummy1 );
+	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_EQ( *( std::get<0>( hp2 ) ), 1 );
+}
+
+TEST_F( TestHazardPtrWMarkHandler, Call_HazardPtr_get1_and_assignment )
+{
+	// Arrange
+	int                                               dummy1 = 1;
+	alpha::concurrent::hazard_ptr_w_mark_handler<int> sut( &dummy1 );
+
+	auto hp2 = sut.get();
+	ASSERT_EQ( std::get<0>( hp2 ), &dummy1 );
+	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_EQ( *( std::get<0>( hp2 ) ), 1 );
+
+	// Act
+	*( std::get<0>( hp2 ) ) = 2;
+
+	// Assert
+	EXPECT_EQ( dummy1, 2 );
+}
+
+TEST_F( TestHazardPtrWMarkHandler, Call_HazardPtr_get2 )
+{
+	// Arrange
+	struct A {
+		int x;
+		int y;
+	};
+	A                                               dummy1 { 1, 2 };
+	alpha::concurrent::hazard_ptr_w_mark_handler<A> sut( &dummy1 );
+
+	// Act
+	auto hp2 = sut.get();
+
+	// Assert
+	auto hp20 = std::get<0>( hp2 );
+	bool hp21 = std::get<1>( hp2 );
+	ASSERT_EQ( hp20, &dummy1 );
+	EXPECT_FALSE( hp21 );
+	EXPECT_EQ( hp20->x, 1 );
+	EXPECT_EQ( hp20->y, 2 );
+}
+
+TEST_F( TestHazardPtrWMarkHandler, Call_HazardPtr_get2_assignment )
+{
+	// Arrange
+	struct A {
+		int x;
+		int y;
+	};
+	A                                               dummy1 { 1, 2 };
+	alpha::concurrent::hazard_ptr_w_mark_handler<A> sut( &dummy1 );
+
+	auto hp2  = sut.get();
+	auto hp20 = std::get<0>( hp2 );
+	bool hp21 = std::get<1>( hp2 );
+	ASSERT_EQ( hp20, &dummy1 );
+	EXPECT_FALSE( hp21 );
+	EXPECT_EQ( hp20->x, 1 );
+	EXPECT_EQ( hp20->y, 2 );
+
+	// Act
+	hp20->x = 3;
+	hp20->y = 4;
+
+	// Assert
+	EXPECT_EQ( dummy1.x, 3 );
+	EXPECT_EQ( dummy1.y, 4 );
+}
+
+TEST_F( TestHazardPtrWMarkHandler, Call_HazardPtr_get_for_nullptr )
+{
+	// Arrange
+	alpha::concurrent::hazard_ptr_w_mark_handler<int> sut( nullptr );
+
+	// Act
+	auto hp2 = sut.get();
+
+	// Assert
+	EXPECT_EQ( std::get<0>( hp2 ), nullptr );
+}
+
+/////////////////////////////////////////////////////////////////////////////////
 class TestHazardPtr : public ::testing::Test {
 protected:
 	using test_type = int;
@@ -1071,7 +1319,7 @@ protected:
 
 	void TearDown() override
 	{
-		alpha::concurrent::internal::retire_mgr::stop_prune_thread();
+		// alpha::concurrent::internal::retire_mgr::stop_prune_thread();
 		alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
 
 		int cw, ce;

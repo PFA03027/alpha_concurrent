@@ -33,7 +33,7 @@
 constexpr size_t SUT_N    = 10;
 constexpr size_t THREAD_N = 20;
 
-#if 0
+#if 1
 TEST_F( TestLF_2_HighLoad, TC_STACK_Profile1 )
 {
 	using TestType = std::size_t;

@@ -39,7 +39,7 @@ TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile1 )
 	using TestType = std::size_t;
 	// using TestType = int;
 
-	std::cout << "--- pre-cpu kicking stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	std::cout << "--- pre-cpu kicking fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
 	nwoker_perf_test_stack_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( THREAD_N, 1 );
 }
 TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile2 )
@@ -47,11 +47,11 @@ TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile2 )
 	using TestType = std::size_t;
 	// using TestType = int;
 
-	std::cout << "--- stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	std::cout << "--- fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
 	nwoker_perf_test_stack_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( THREAD_N, 10 );
 }
 #endif
-#if 1
+#if 0
 TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile3 )
 {
 	using TestType = std::size_t;
