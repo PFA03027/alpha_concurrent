@@ -25,11 +25,11 @@ std::tuple<std::size_t, typename FIFOType::value_type> worker_task_stack_NtoN(
 	std::atomic_bool&        loop_flag,
 	std::array<FIFOType, N>& sut )
 {
-	std::random_device    seed_gen;
-	std::mt19937          engine( seed_gen() );
-	std::size_t           count = 0;
-	std::array<size_t, N> cur_access_idxs_pop;
-	std::array<size_t, N> cur_access_idxs_push;
+	static std::random_device seed_gen;
+	std::mt19937              engine( seed_gen() );
+	std::size_t               count = 0;
+	std::array<size_t, N>     cur_access_idxs_pop;
+	std::array<size_t, N>     cur_access_idxs_push;
 
 	for ( size_t i = 0; i < N; i++ ) {
 		cur_access_idxs_pop[i]  = i;
