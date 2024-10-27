@@ -486,7 +486,7 @@ public:
 		auto p_tmp = p_;
 		p_         = src.p_;
 		src.p_     = p_tmp;
-		os_.swap( src.so_ );
+		os_.swap( src.os_ );
 	}
 
 	template <bool IsVoid = std::is_same<T, void>::value, typename std::enable_if<!IsVoid>::type* = nullptr>

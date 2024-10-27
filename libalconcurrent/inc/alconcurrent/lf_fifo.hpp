@@ -368,25 +368,26 @@ public:
 					// 番兵ノードしかないので、FIFOキューは空。
 					return std::tuple<node_pointer, value_type> { nullptr, value_type {} };
 				}
-				// 番兵ノードしかないように見えるが、Tailがまだ更新されていないだけ。
+				// ここに来た場合、番兵ノードしかないように見えるが、Tailがまだ更新されていないだけ。
 				// tailを更新して、pop処理をし直す。
 				// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
 				// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
-				typename hazard_pointer::pointer hph_tail_expected = hp_tail_node.get();
-				hph_tail_.compare_exchange_weak( hph_tail_expected, hp_head_next.get(), std::memory_order_release, std::memory_order_acquire );
+				if ( hph_tail_.compare_exchange_weak( hp_tail_node, hp_head_next.get(), std::memory_order_release, std::memory_order_acquire ) ) {
+					hph_tail_.reuse( hp_tail_node );
+				}
 			} else {
 				if ( hp_head_next == nullptr ) {
 					// headが他のスレッドでpopされた。
+					hph_head_.reuse( hp_head_node );
+					hph_tail_.reuse( hp_tail_node );
 				} else {
 					// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
 					// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
-					typename hazard_pointer::pointer p_head_expected_base = hp_head_node.get();                                  // od_node_link_by_hazard_handler*
-					node_pointer                     p_head_expected      = static_cast<node_pointer>( p_head_expected_base );   // od_node_basic<T>*に変換する。このクラスで保持しているノードは、すべてx_fifo_node<T>のインスタンスであることをpush関数時点で保証しているので、dynamic_cast<>は不要。
-					typename hazard_pointer::pointer p_head_next_base     = hp_head_next.get();                                  // od_node_link_by_hazard_handler*
-					node_pointer                     p_head_next          = static_cast<node_pointer>( p_head_next_base );       // od_node_basic<T>*に変換する。このクラスで保持しているノードは、すべてx_fifo_node<T>のインスタンスであることをpush関数時点で保証しているので、dynamic_cast<>は不要。
+					std::tuple<node_pointer, value_type> ans {
+						static_cast<node_pointer>( hp_head_node.get() ),
+						static_cast<node_pointer>( hp_head_next.get() )->get() };
 
-					std::tuple<node_pointer, value_type> ans { p_head_expected, p_head_next->get() };
-					if ( hph_head_.compare_exchange_weak( p_head_expected_base, p_head_next_base, std::memory_order_release, std::memory_order_acquire ) ) {
+					if ( hph_head_.compare_exchange_weak( hp_head_node, hp_head_next.get(), std::memory_order_release, std::memory_order_acquire ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 						count_--;
 #endif
@@ -396,8 +397,6 @@ public:
 					}
 				}
 			}
-			hph_head_.reuse( hp_head_node );
-			hph_tail_.reuse( hp_tail_node );
 			hp_head_node->reuse_hazard_ptr_of_next( hp_head_next );
 		}
 	}
@@ -456,17 +455,17 @@ private:
 			pushpop_loop_count_++;
 #endif
 			if ( hp_tail_next == nullptr ) {
-				typename hazard_pointer::pointer expected = nullptr;   // od_node_link_by_hazard_handler*
-				if ( hp_tail_node->hazard_handler_of_next().compare_exchange_weak( expected, p_link_of_nd, std::memory_order_release, std::memory_order_acquire ) ) {
-					expected = hp_tail_node.get();
-					hph_tail_.compare_exchange_weak( expected, p_link_of_nd, std::memory_order_release, std::memory_order_acquire );
+				// typename hazard_pointer::pointer expected = nullptr;   // od_node_link_by_hazard_handler*
+				if ( hp_tail_node->hazard_handler_of_next().compare_exchange_weak( hp_tail_next, p_link_of_nd, std::memory_order_release, std::memory_order_acquire ) ) {
+					hph_tail_.compare_exchange_weak( hp_tail_node, p_link_of_nd, std::memory_order_release, std::memory_order_acquire );
 					break;
 				}
-			} else {
-				typename hazard_pointer::pointer p_expected = hp_tail_node.get();
-				hph_tail_.compare_exchange_weak( p_expected, hp_tail_next.get(), std::memory_order_release, std::memory_order_acquire );
 			}
-			hph_tail_.reuse( hp_tail_node );
+			if ( hph_tail_.compare_exchange_weak( hp_tail_node, hp_tail_next.get(), std::memory_order_release, std::memory_order_acquire ) ) {
+				hp_tail_node.swap( hp_tail_next );
+			} else {
+				// こっちに来た場合は、すでに、hp_tail_node は更新済みなので、ハザードポインタの更新作業はなし。
+			}
 			hp_tail_node->reuse_hazard_ptr_of_next( hp_tail_next );
 		}
 
@@ -500,6 +499,9 @@ public:
 	constexpr x_fifo_list( void ) noexcept
 	  : lf_fifo_impl_( new node_type( nullptr ) )
 	  , unused_node_pool_()
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	  , allocated_node_count_( 0 )
+#endif
 	{
 	}
 
@@ -514,6 +516,7 @@ public:
 			internal::LogOutput( log_type::TEST, "%s", node_pool_t::profile_info_string().c_str() );
 			node_pool_t::clear_as_possible_as();
 		}
+		internal::LogOutput( log_type::DUMP, "x_stack_list: allocated_node_count = %zu", allocated_node_count_.load() );
 #endif
 
 		VALUE_DELETER                deleter;
@@ -530,6 +533,9 @@ public:
 	{
 		node_pointer p_new_nd = unused_node_pool_.pop();
 		if ( p_new_nd == nullptr ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			allocated_node_count_++;
+#endif
 			p_new_nd = new node_type( nullptr );
 		}
 		lf_fifo_impl_.push_back( v_arg, p_new_nd );
@@ -539,6 +545,9 @@ public:
 	{
 		node_pointer p_new_nd = unused_node_pool_.pop();
 		if ( p_new_nd == nullptr ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			allocated_node_count_++;
+#endif
 			p_new_nd = new node_type( nullptr );
 		}
 		lf_fifo_impl_.push_back( std::move( v_arg ), p_new_nd );
@@ -579,6 +588,10 @@ private:
 
 	node_fifo_lockfree_t lf_fifo_impl_;
 	node_pool_t          unused_node_pool_;
+
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	std::atomic<size_t> allocated_node_count_;
+#endif
 };
 
 }   // namespace internal
