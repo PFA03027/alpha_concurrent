@@ -891,7 +891,7 @@ public:
 			// しかし、まだハザードポインタ用のスロットには反映されていないため、更新を行う。
 			do {
 				expected_hzd_ptr.os_->store( expected_hzd_ptr.p_, std::memory_order_release );
-			} while ( !ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, expected_hzd_ptr.p_, std::memory_order_release, std::memory_order_relaxed ) );
+			} while ( !ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, expected_hzd_ptr.p_, success, failure ) );
 		}
 		return ret;
 	}
@@ -907,7 +907,7 @@ public:
 			// しかし、まだハザードポインタ用のスロットには反映されていないため、更新を行う。
 			do {
 				expected_hzd_ptr.os_->store( expected_hzd_ptr.p_, std::memory_order_release );
-			} while ( !ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, expected_hzd_ptr.p_, std::memory_order_release, std::memory_order_relaxed ) );
+			} while ( !ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, expected_hzd_ptr.p_, success, failure ) );
 		}
 		return ret;
 	}
