@@ -19,10 +19,14 @@ od_lockfree_stack::od_lockfree_stack( od_lockfree_stack&& src ) noexcept
   : hph_head_( std::move( src.hph_head_ ) )
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
   , count_( src.count_.load( std::memory_order_acquire ) )
+  , pushpop_call_count_( src.pushpop_call_count_.load( std::memory_order_acquire ) )
+  , pushpop_loop_count_( src.pushpop_loop_count_.load( std::memory_order_acquire ) )
 #endif
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	src.count_.store( 0, std::memory_order_release );
+	src.pushpop_call_count_.store( 0, std::memory_order_release );
+	src.pushpop_loop_count_.store( 0, std::memory_order_release );
 #endif
 }
 od_lockfree_stack::~od_lockfree_stack()
@@ -38,7 +42,7 @@ od_lockfree_stack::~od_lockfree_stack()
 	}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-	LogOutput( log_type::DUMP, "od_lockfree_stack push/pop: call count = %zu, loop count = %zu", pushpop_call_count_.load(), pushpop_loop__count_.load() );
+	LogOutput( log_type::DUMP, "od_lockfree_stack push/pop: call count = %zu, loop count = %zu", pushpop_call_count_.load(), pushpop_loop_count_.load() );
 #endif
 }
 
@@ -57,7 +61,7 @@ void od_lockfree_stack::push_front( node_pointer p_nd ) noexcept
 	node_pointer p_expected = hph_head_.load();
 	do {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-		pushpop_loop__count_++;
+		pushpop_loop_count_++;
 #endif
 		p_nd->set_next( p_expected );
 	} while ( !hph_head_.compare_exchange_strong( p_expected, p_nd, std::memory_order_release, std::memory_order_relaxed ) );
@@ -76,7 +80,7 @@ od_lockfree_stack::node_pointer od_lockfree_stack::pop_front( void ) noexcept
 	node_pointer   p_expected;
 	do {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-		pushpop_loop__count_++;
+		pushpop_loop_count_++;
 #endif
 		p_expected = hp_cur_head.get();
 		if ( p_expected == nullptr ) return nullptr;
