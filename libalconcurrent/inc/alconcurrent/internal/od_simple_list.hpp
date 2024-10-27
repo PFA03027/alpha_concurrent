@@ -96,7 +96,7 @@ private:
 };
 
 /**
- * @brief od_node list that supports exclusive control
+ * @brief od_simple_list list that supports exclusive control
  *
  */
 class od_simple_list_lockable {

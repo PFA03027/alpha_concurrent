@@ -94,7 +94,7 @@ void od_simple_list::push_front( node_pointer p_nd ) noexcept
 	if ( p_nd == nullptr ) return;
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
 	if ( p_nd->next() != nullptr ) {
-		LogOutput( log_type::WARN, "od_simple_list::push_front() receives a od_node<T> that has non nullptr in next" );
+		LogOutput( log_type::WARN, "od_simple_list::push_front() receives a od_node_simple_link that has non nullptr in next()" );
 		p_nd->set_next( nullptr );
 	}
 #endif
@@ -115,7 +115,7 @@ void od_simple_list::push_back( node_pointer p_nd ) noexcept
 	if ( p_nd == nullptr ) return;
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
 	if ( p_nd->next() != nullptr ) {
-		LogOutput( log_type::WARN, "od_simple_list::push_back() receives a od_node<T> that has non nullptr in next" );
+		LogOutput( log_type::WARN, "od_simple_list::push_back() receives a od_node_simple_link that has non nullptr in next()" );
 		p_nd->set_next( nullptr );
 	}
 #endif

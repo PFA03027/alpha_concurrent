@@ -18,8 +18,6 @@
 #include "../hazard_ptr.hpp"
 #include "../lf_mem_alloc.hpp"
 
-#include "od_node_base_old1.hpp"
-
 namespace alpha {
 namespace concurrent {
 
@@ -358,104 +356,6 @@ private:
 
 	dynamic_tls<thread_local_fifo_list, rcv_fifo_list_handler> tls_fifo_;   //!< dynamic_tlsで指定しているrcv_fifo_list_handlerによって、デストラクタ実行時にrcv_thread_local_fifo_list_に残留データをpushする。そのため、メンバ変数rcv_thread_local_fifo_list_よりも後に変数宣言を行っている。
 };
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/**
- * @brief node of one direction list
- *
- * @tparam T value type kept in this class
- */
-template <typename T>
-class od_node : public od_node_base<od_node<T>> {
-public:
-	using value_type            = T;
-	using reference_type        = T&;
-	using const_reference_type  = const T&;
-	using raw_next_t            = typename od_node_base<od_node<T>>::od_node_base_raw_next_t;
-	using hazard_handler_next_t = typename od_node_base<od_node<T>>::od_node_base_hazard_handler_next_t;
-
-	template <bool IsDefaultConstructible = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructible>::type* = nullptr>
-	od_node( od_node* p_next_arg ) noexcept( std::is_nothrow_default_constructible<value_type>::value )
-	  : od_node_base<od_node>()
-	  , v_ {}
-	{
-		hazard_handler_next_t::set_next( p_next_arg );
-	}
-
-	template <bool IsCopyable = std::is_copy_constructible<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
-	od_node( od_node* p_next_arg, const value_type& v_arg ) noexcept( std::is_nothrow_copy_constructible<value_type>::value )
-	  : od_node_base<od_node>()
-	  , v_( v_arg )
-	{
-		hazard_handler_next_t::set_next( p_next_arg );
-	}
-
-	template <bool IsMovable = std::is_move_constructible<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
-	od_node( od_node* p_next_arg, value_type&& v_arg ) noexcept( std::is_nothrow_move_constructible<value_type>::value )
-	  : od_node_base<od_node>()
-	  , v_( std::move( v_arg ) )
-	{
-		hazard_handler_next_t::set_next( p_next_arg );
-	}
-
-	template <typename Arg1st, typename... RemainingArgs,
-	          typename RemoveCVArg1st                                                          = typename std::remove_reference<typename std::remove_const<Arg1st>::type>::type,
-	          typename std::enable_if<!std::is_same<RemoveCVArg1st, value_type>::value>::type* = nullptr>
-	od_node( od_node* p_next_arg, Arg1st&& arg1, RemainingArgs&&... args )
-	  : od_node_base<od_node>()
-	  , v_( std::forward<Arg1st>( arg1 ), std::forward<RemainingArgs>( args )... )
-	{
-		hazard_handler_next_t::set_next( p_next_arg );
-	}
-
-	template <bool IsCopyable = std::is_copy_assignable<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
-	void set( const value_type& v_arg, od_node* p_next_arg ) noexcept( std::is_nothrow_copy_assignable<value_type>::value )
-	{
-		v_ = v_arg;
-		hazard_handler_next_t::set_next( p_next_arg );
-	}
-
-	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
-	void set( value_type&& v_arg, od_node* p_next_arg ) noexcept( std::is_nothrow_move_assignable<value_type>::value )
-	{
-		v_ = std::move( v_arg );
-		hazard_handler_next_t::set_next( p_next_arg );
-	}
-
-	reference_type get( void ) &
-	{
-		return v_;
-	}
-
-	const_reference_type get( void ) const&
-	{
-		return v_;
-	}
-
-	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
-	value_type get( void ) &&
-	{
-		return std::move( v_ );
-	}
-
-	template <bool IsCopyable                                          = std::is_copy_assignable<value_type>::value,
-	          bool IsMovable                                           = std::is_move_assignable<value_type>::value,
-	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
-	value_type get( void ) const&&
-	{
-		return v_;
-	}
-
-private:
-	value_type v_;
-};
-
-template <typename T>
-using od_node_list = od_node_list_base_impl<od_node<T>, typename od_node<T>::raw_next_t>;
-
-template <typename T>
-using od_node_list_lockable = od_node_list_lockable_base<od_node_list<T>>;
 
 }   // namespace internal
 

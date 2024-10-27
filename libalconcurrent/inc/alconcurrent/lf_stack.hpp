@@ -18,12 +18,9 @@
 
 #include "hazard_ptr.hpp"
 #include "internal/free_node_storage.hpp"
-#include "internal/one_way_list_node.hpp"
-
-#include "internal/od_node_base_old1.hpp"
-
 #include "internal/od_lockfree_stack.hpp"
 #include "internal/od_node_pool.hpp"
+#include "internal/one_way_list_node.hpp"
 
 namespace alpha {
 namespace concurrent {

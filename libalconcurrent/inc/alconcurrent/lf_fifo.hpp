@@ -312,9 +312,12 @@ public:
 	{
 		if ( p_nd == nullptr ) return;
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
-		if ( p_nd->next() != nullptr ) {
-			LogOutput( log_type::WARN, "node_fifo_lockfree_base::push_back() receives a od_node<T> that has non nullptr in hph_next_" );
+		if ( p_nd->od_node_simple_link::next() != nullptr ) {
+			LogOutput( log_type::WARN, "node_fifo_lockfree_base::push_back() receives a od_node_basic<T> that has non nullptr in od_node_simple_link::next()" );
 		}
+		// if ( p_nd->od_node_link_by_hazard_handler::next() != nullptr ) {
+		// 	LogOutput( log_type::WARN, "node_fifo_lockfree_base::push_back() receives a od_node_basic<T> that has non nullptr in od_node_link_by_hazard_handler::next()" );
+		// }
 #endif
 
 		p_nd->set( v, nullptr );
@@ -326,9 +329,12 @@ public:
 	{
 		if ( p_nd == nullptr ) return;
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
-		if ( p_nd->next() != nullptr ) {
-			LogOutput( log_type::WARN, "node_fifo_lockfree_base::push_back() receives a od_node<T> that has non nullptr in hph_next_" );
+		if ( p_nd->od_node_simple_link::next() != nullptr ) {
+			LogOutput( log_type::WARN, "node_fifo_lockfree_base::push_back() receives a od_node_basic<T> that has non nullptr in od_node_simple_link::next()" );
 		}
+		// if ( p_nd->od_node_link_by_hazard_handler::next() != nullptr ) {
+		// 	LogOutput( log_type::WARN, "node_fifo_lockfree_base::push_back() receives a od_node_basic<T> that has non nullptr in od_node_link_by_hazard_handler::next()" );
+		// }
 #endif
 
 		p_nd->set( std::move( v ), nullptr );

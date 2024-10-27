@@ -1,7 +1,7 @@
 /**
  * @file od_node_pool.hpp
  * @author Teruaki Ata (PFA03027@nifty.com)
- * @brief od_node<T> pool that keeps od_node<T> globally
+ * @brief
  * @version 0.1
  * @date 2024-06-30
  *
@@ -18,7 +18,6 @@
 #endif
 
 #include "alconcurrent/hazard_ptr.hpp"
-#include "alconcurrent/internal/od_node_base_old1.hpp"
 #include "alconcurrent/internal/od_simple_list.hpp"
 
 namespace alpha {
@@ -35,7 +34,6 @@ struct countermeasure_gcc_bug_deletable_obj_abst {
 };
 #endif
 
-// template <typename NODE_T, typename OD_NODE_LIST_T = od_node_raw_list_base<NODE_T>, typename OD_NODE_LOCKFREE_STACK_T = od_node_stack_lockfree_base<NODE_T>>
 template <typename NODE_T>
 class od_node_pool {
 	static_assert( std::is_base_of<od_node_simple_link, NODE_T>::value, "NODE_T should be a derived class of od_node_simple_link." );
@@ -52,16 +50,6 @@ public:
 	{
 		if ( p_nd == nullptr ) return;
 
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
-		if ( p_nd->p_raw_next_ != nullptr ) {
-			LogOutput( log_type::WARN, "od_node_pool::push() receives a od_node<T> that has non nullptr in raw next" );
-			p_nd->p_raw_next_ = nullptr;
-		}
-		if ( p_nd->hph_next_.load() != nullptr ) {
-			LogOutput( log_type::WARN, "od_node_pool::push() receives a od_node<T> that has non nullptr in hph next" );
-			p_nd->hph_next_.store( nullptr );
-		}
-#endif
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		++node_count_total_;
 #endif

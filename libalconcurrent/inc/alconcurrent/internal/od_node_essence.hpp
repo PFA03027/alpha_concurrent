@@ -18,6 +18,17 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
+template <typename T>
+class deleter_nothing {
+public:
+	constexpr void operator()( T& ) {}
+};
+template <>
+class deleter_nothing<void> {
+public:
+	constexpr void operator()( void* ) {}
+};
+
 /**
  * @brief node of one direction linking simply
  *
