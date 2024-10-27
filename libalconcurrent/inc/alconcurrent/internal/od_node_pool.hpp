@@ -73,8 +73,11 @@ public:
 
 		tl_od_node_list& tl_odn_list_no_in_hazard = get_tl_odn_list_no_in_hazard();
 
-		if ( tl_odn_list_no_in_hazard.is_empty() ) {
-			tl_odn_list_no_in_hazard.push_back( p_nd );   // スレッドローカルな変数が空だったので、スレッドローカルな変数に保存する。
+		// スレッドローカルな変数に格納されているノードが少なかったら、スレッドローカルな変数に保存する。
+		// 少ないの判定を簡単にするために、判定が簡単な1以下で少ないと判定している。
+		// こうすることで、スレッドローカルなノードの再利用の機会が増え、新たなノードの割り当てによるメモリ消費を抑制できる。
+		if ( !tl_odn_list_no_in_hazard.is_more_than_one() ) {
+			tl_odn_list_no_in_hazard.push_back( p_nd );
 			return;
 		}
 
@@ -275,6 +278,10 @@ private:
 		bool is_one( void )
 		{
 			return od_list_.is_one();
+		}
+		bool is_more_than_one( void )
+		{
+			return od_list_.is_more_than_one();
 		}
 
 		void clear( void )
