@@ -422,14 +422,6 @@ private:
 	typename hazard_ptr_storage<T, N>::node_for_hazard_ptr* p_node_hzd_ptr_;
 };
 
-#if 0
-/*!
- * @brief	推論補助
- */
-template <class HZD_PTR>
-hazard_ptr_scoped_ref( HZD_PTR&, int ) -> hazard_ptr_scoped_ref<typename HZD_PTR::hzrd_type, HZD_PTR::hzrd_max_slot>;
-#endif
-
 template <typename T>
 class hazard_ptr_handler;
 
@@ -913,9 +905,6 @@ public:
 	}
 
 private:
-#if 0
-	alignas( internal::atomic_variable_align )
-#endif
 	std::atomic<pointer> ap_target_p_;
 };
 
@@ -1116,9 +1105,6 @@ private:
 		return std::tuple<pointer, bool> { p_ans, b_ans };
 	}
 
-#if 0
-	alignas( internal::atomic_variable_align )
-#endif
 	std::atomic<addr_markable> a_target_addr_;
 };
 

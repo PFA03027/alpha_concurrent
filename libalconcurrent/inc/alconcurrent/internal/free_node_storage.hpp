@@ -19,7 +19,6 @@
 #include "../lf_mem_alloc.hpp"
 
 #include "od_node_base_old1.hpp"
-#include "retire_mgr.hpp"
 
 namespace alpha {
 namespace concurrent {

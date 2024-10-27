@@ -268,15 +268,6 @@ void free_nd_storage::rcv_thread_local_fifo_list( thread_local_fifo_list* p_rcv 
 	return;
 }
 
-#if 0
-// example
-static param_chunk_allocation param[] = {
-	{ 32, 100 },
-	{ 64, 100 },
-	{ 128, 100 },
-};
-#endif
-
 void* node_of_list::operator new( std::size_t n )   // usual new...(1)
 {
 	void* p_ans;
