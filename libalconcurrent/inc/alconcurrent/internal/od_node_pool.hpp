@@ -66,12 +66,12 @@ public:
 		++node_count_total_;
 #endif
 
-		tl_od_node_list& tl_odn_list_no_in_hazard = get_tl_odn_list_no_in_hazard();
-
 		if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p_nd->get_pointer_of_hazard_check() ) ) {
 			get_tl_odn_list_still_in_hazard().push_back( p_nd );
 			return;
 		}
+
+		tl_od_node_list& tl_odn_list_no_in_hazard = get_tl_odn_list_no_in_hazard();
 
 		if ( tl_odn_list_no_in_hazard.is_empty() ) {
 			tl_odn_list_no_in_hazard.push_back( p_nd );   // スレッドローカルな変数が空だったので、スレッドローカルな変数に保存する。
@@ -90,10 +90,9 @@ public:
 
 	static node_pointer pop( void )
 	{
-		node_pointer p_ans = nullptr;
-
 		tl_od_node_list& tl_odn_list_no_in_hazard = get_tl_odn_list_no_in_hazard();
-		p_ans                                     = static_cast<node_pointer>( tl_odn_list_no_in_hazard.pop_front() );   // このクラスが保持するノードはnode_typeであることをpush関数が保証しているので、dynamic_cast<>は不要。
+
+		node_pointer p_ans = static_cast<node_pointer>( tl_odn_list_no_in_hazard.pop_front() );   // このクラスが保持するノードはnode_typeであることをpush関数が保証しているので、dynamic_cast<>は不要。
 		if ( p_ans != nullptr ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			--node_count_total_;
@@ -114,31 +113,37 @@ public:
 
 		tl_od_node_list& tl_odn_list_still_in_hazard = get_tl_odn_list_still_in_hazard();
 		if ( tl_odn_list_still_in_hazard.is_empty() ) {
-			return nullptr;
-		}
+			return nullptr;   // 使えるノードがなかった
+		} else if ( tl_odn_list_still_in_hazard.is_one() ) {
+			p_ans = static_cast<node_pointer>( tl_odn_list_still_in_hazard.pop_front() );
+			if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p_ans->get_pointer_of_hazard_check() ) ) {
+				tl_odn_list_still_in_hazard.push_back( p_ans );
+				return nullptr;   // 使えるノードがなかった
+			}
+		} else {
+			raw_list tmp_odn_list_( std::move( tl_odn_list_still_in_hazard.move_to() ) );
 
-		raw_list tmp_odn_list_( std::move( tl_odn_list_still_in_hazard.move_to() ) );
-
-		hazard_ptr_mgr::ScanHazardPtrs( [&tmp_odn_list_, &tl_odn_list_still_in_hazard]( void* p_in_hazard ) {
-			auto tt_n_list = tmp_odn_list_.split_if( [p_in_hazard]( auto p_cur_node ) -> bool {
-				// cur_nodeの型は、od_node_simple_linkへの参照型で渡される。
-				// cur_nodeの本来の型は、od_node_poolが保持する型node_typeである。
-				// よって、ハザードポインタに登録されているポインタは、od_node_poolが保持する型node_typeへのポインタである。
-				// 従って、比較すべきポインタは、od_node_poolが保持する型node_typeのポインター型である必要がある。
-				return p_in_hazard == static_cast<const_node_pointer>( p_cur_node )->get_pointer_of_hazard_check();   // pointerが同じならtrueを返す。
+			hazard_ptr_mgr::ScanHazardPtrs( [&tmp_odn_list_, &tl_odn_list_still_in_hazard]( void* p_in_hazard ) {
+				auto tt_n_list = tmp_odn_list_.split_if( [p_in_hazard]( auto p_cur_node ) -> bool {
+					// cur_nodeの型は、od_node_simple_linkへの参照型で渡される。
+					// cur_nodeの本来の型は、od_node_poolが保持する型node_typeである。
+					// よって、ハザードポインタに登録されているポインタは、od_node_poolが保持する型node_typeへのポインタである。
+					// 従って、比較すべきポインタは、od_node_poolが保持する型node_typeのポインター型である必要がある。
+					return p_in_hazard == static_cast<const_node_pointer>( p_cur_node )->get_pointer_of_hazard_check();   // pointerが同じならtrueを返す。
+				} );
+				tl_odn_list_still_in_hazard.merge_push_back( std::move( tt_n_list ) );
 			} );
-			tl_odn_list_still_in_hazard.merge_push_back( std::move( tt_n_list ) );
-		} );
-		p_ans = static_cast<node_pointer>( tmp_odn_list_.pop_front() );
-		tl_odn_list_no_in_hazard.merge_push_back( std::move( tmp_odn_list_ ) );
-		if ( p_ans != nullptr ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-			--node_count_total_;
-#endif
-			return p_ans;
+			p_ans = static_cast<node_pointer>( tmp_odn_list_.pop_front() );
+			tl_odn_list_no_in_hazard.merge_push_back( std::move( tmp_odn_list_ ) );
+			if ( p_ans == nullptr ) {
+				return nullptr;   // 使えるノードがなかった
+			}
 		}
 
-		return nullptr;   // 使えるノードがなかった
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		--node_count_total_;
+#endif
+		return p_ans;
 	}
 
 	static void clear_as_possible_as( void )
@@ -266,6 +271,10 @@ private:
 		bool is_empty( void )
 		{
 			return od_list_.is_empty();
+		}
+		bool is_one( void )
+		{
+			return od_list_.is_one();
 		}
 
 		void clear( void )

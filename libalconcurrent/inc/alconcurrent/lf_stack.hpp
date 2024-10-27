@@ -46,6 +46,9 @@ public:
 	constexpr x_stack_list( void ) noexcept
 	  : lf_stack_impl_()
 	  , unused_node_pool_()
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	  , allocated_node_count_( 0 )
+#endif
 	{
 	}
 
@@ -60,6 +63,7 @@ public:
 			internal::LogOutput( log_type::TEST, "%s", node_pool_t::profile_info_string().c_str() );
 			node_pool_t::clear_as_possible_as();
 		}
+		internal::LogOutput( log_type::DUMP, "x_stack_list: allocated_node_count = %zu", allocated_node_count_.load() );
 #endif
 
 		VALUE_DELETER                deleter;
@@ -77,6 +81,9 @@ public:
 		if ( p_new_nd != nullptr ) {
 			p_new_nd->get() = v_arg;
 		} else {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			allocated_node_count_++;
+#endif
 			p_new_nd = new node_type( nullptr, v_arg );
 		}
 		lf_stack_impl_.push_front( p_new_nd );
@@ -88,6 +95,9 @@ public:
 		if ( p_new_nd != nullptr ) {
 			p_new_nd->get() = std::move( v_arg );
 		} else {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			allocated_node_count_++;
+#endif
 			p_new_nd = new node_type( nullptr, std::move( v_arg ) );
 		}
 		lf_stack_impl_.push_front( p_new_nd );
@@ -131,6 +141,10 @@ private:
 
 	node_stack_lockfree_t lf_stack_impl_;
 	node_pool_t           unused_node_pool_;
+
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	std::atomic<size_t> allocated_node_count_;
+#endif
 };
 
 }   // namespace internal

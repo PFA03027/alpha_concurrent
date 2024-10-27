@@ -56,6 +56,14 @@ public:
 	{
 		return p_head_ == nullptr;
 	}
+	bool is_one( void ) const
+	{
+		return ( p_head_ != nullptr ) && ( p_head_ == p_tail_ );
+	}
+	bool is_more_than_one( void ) const
+	{
+		return ( p_head_ != nullptr ) && ( p_head_ != p_tail_ );
+	}
 
 	/**
 	 * @brief if pred return true, that node is purged and push it into return value
