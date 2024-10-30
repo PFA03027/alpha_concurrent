@@ -372,7 +372,7 @@ public:
 				// tailを更新して、pop処理をし直す。
 				// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
 				// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
-				if ( hph_tail_.compare_exchange_weak( hp_tail_node, hp_head_next.get(), std::memory_order_release, std::memory_order_acquire ) ) {
+				if ( hph_tail_.compare_exchange_strong( hp_tail_node, hp_head_next.get(), std::memory_order_release, std::memory_order_acquire ) ) {
 					hph_tail_.reuse( hp_tail_node );
 				}
 			} else {
@@ -387,7 +387,7 @@ public:
 						static_cast<node_pointer>( hp_head_node.get() ),
 						static_cast<node_pointer>( hp_head_next.get() )->get() };
 
-					if ( hph_head_.compare_exchange_weak( hp_head_node, hp_head_next.get(), std::memory_order_release, std::memory_order_acquire ) ) {
+					if ( hph_head_.compare_exchange_strong( hp_head_node, hp_head_next.get(), std::memory_order_release, std::memory_order_acquire ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 						count_--;
 #endif
@@ -456,12 +456,12 @@ private:
 #endif
 			if ( hp_tail_next == nullptr ) {
 				// typename hazard_pointer::pointer expected = nullptr;   // od_node_link_by_hazard_handler*
-				if ( hp_tail_node->hazard_handler_of_next().compare_exchange_weak( hp_tail_next, p_link_of_nd, std::memory_order_release, std::memory_order_acquire ) ) {
-					hph_tail_.compare_exchange_weak( hp_tail_node, p_link_of_nd, std::memory_order_release, std::memory_order_acquire );
+				if ( hp_tail_node->hazard_handler_of_next().compare_exchange_strong( hp_tail_next, p_link_of_nd, std::memory_order_release, std::memory_order_acquire ) ) {
+					hph_tail_.compare_exchange_strong( hp_tail_node, p_link_of_nd, std::memory_order_release, std::memory_order_acquire );
 					break;
 				}
 			}
-			if ( hph_tail_.compare_exchange_weak( hp_tail_node, hp_tail_next.get(), std::memory_order_release, std::memory_order_acquire ) ) {
+			if ( hph_tail_.compare_exchange_strong( hp_tail_node, hp_tail_next.get(), std::memory_order_release, std::memory_order_acquire ) ) {
 				hp_tail_node.swap( hp_tail_next );
 			} else {
 				// こっちに来た場合は、すでに、hp_tail_node は更新済みなので、ハザードポインタの更新作業はなし。
