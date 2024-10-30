@@ -15,8 +15,10 @@
 #include <iostream>
 #include <thread>
 
+#include "../inc_common/perf_pushpop_NtoN.hpp"
 #include "alconcurrent/lf_fifo.hpp"
-#include "perf_fifo_NtoN.hpp"
+
+int nwoker_perf_test_fifo_NtoN_main( unsigned int nworker );
 
 int main( void )
 {
@@ -28,7 +30,7 @@ int main( void )
 		nworker = 10;
 	}
 
-	nwoker_perf_test_stack_NtoN_main( nworker );
+	nwoker_perf_test_fifo_NtoN_main( nworker );
 
 	return EXIT_SUCCESS;
 }

@@ -1,35 +1,36 @@
 /**
- * @file perf_stack_1toN.hpp
+ * @file perf_pushpop_NtoN.hpp
  * @author Teruaki Ata (PFA03027@nifty.com)
  * @brief
  * @version 0.1
- * @date 2024-05-06
+ * @date 2024-10-30
  *
  * @copyright Copyright (c) 2024, Teruaki Ata (PFA03027@nifty.com)
  *
  */
 
-#ifndef SAMPLE_PERF_STACK_PERF_STACK_NTON_HPP_
-#define SAMPLE_PERF_STACK_PERF_STACK_NTON_HPP_
+#ifndef SAMPLE_PERF_INC_COMMON_PERF_PUSHPOP_NTON_HPP_
+#define SAMPLE_PERF_INC_COMMON_PERF_PUSHPOP_NTON_HPP_
 
 #include <algorithm>
 #include <array>
+#include <future>
 #include <latch>
 #include <random>
 #include <thread>
 #include <tuple>
 
 template <typename FIFOType, size_t N>
-std::tuple<std::size_t, typename FIFOType::value_type> worker_task_stack_NtoN(
+std::tuple<std::size_t, typename FIFOType::value_type> worker_task_pushpop_NtoN(
 	std::latch&              start_sync_latch,
 	std::atomic_bool&        loop_flag,
 	std::array<FIFOType, N>& sut )
 {
-	static std::random_device seed_gen;
-	std::mt19937              engine( seed_gen() );
-	std::size_t               count = 0;
-	std::array<size_t, N>     cur_access_idxs_pop;
-	std::array<size_t, N>     cur_access_idxs_push;
+	std::random_device    seed_gen;
+	std::mt19937          engine( seed_gen() );
+	std::size_t           count = 0;
+	std::array<size_t, N> cur_access_idxs_pop;
+	std::array<size_t, N> cur_access_idxs_push;
 
 	for ( size_t i = 0; i < N; i++ ) {
 		cur_access_idxs_pop[i]  = i;
@@ -68,7 +69,7 @@ std::tuple<std::size_t, typename FIFOType::value_type> worker_task_stack_NtoN(
 }
 
 template <typename FIFOType, size_t N>
-int nwoker_perf_test_stack_NtoN( unsigned int nworker, unsigned int exec_sec )
+int nwoker_perf_test_pushpop_NtoN( unsigned int nworker, unsigned int exec_sec )
 {
 	std::array<FIFOType, N> sut;
 
@@ -76,7 +77,7 @@ int nwoker_perf_test_stack_NtoN( unsigned int nworker, unsigned int exec_sec )
 
 	std::latch       start_sync_latch( nworker + 1 );
 	std::atomic_bool loop_flag( true );
-	using result_type = decltype( worker_task_stack_NtoN<FIFOType, N>( start_sync_latch, loop_flag, sut ) );
+	using result_type = decltype( worker_task_pushpop_NtoN<FIFOType, N>( start_sync_latch, loop_flag, sut ) );
 
 	std::vector<std::future<result_type>> rets;
 	rets.reserve( nworker );
@@ -84,7 +85,7 @@ int nwoker_perf_test_stack_NtoN( unsigned int nworker, unsigned int exec_sec )
 	for ( auto& t : task_threads ) {
 		std::packaged_task<result_type()> task(
 			[&start_sync_latch, &loop_flag, &sut]() {
-				return worker_task_stack_NtoN<FIFOType, N>( start_sync_latch, loop_flag, sut );
+				return worker_task_pushpop_NtoN<FIFOType, N>( start_sync_latch, loop_flag, sut );
 			} );   // 非同期実行する関数を登録する
 		rets.emplace_back( task.get_future() );
 		t = std::thread( std::move( task ) );
@@ -111,7 +112,5 @@ int nwoker_perf_test_stack_NtoN( unsigned int nworker, unsigned int exec_sec )
 
 	return 0;
 }
-
-int nwoker_perf_test_stack_NtoN_main( unsigned int nworker );
 
 #endif

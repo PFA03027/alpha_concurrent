@@ -23,8 +23,10 @@
 
 #include "alconcurrent/lf_stack.hpp"
 
-#include "perf_stack_NtoN.hpp"
+#include "../inc_common/perf_pushpop_NtoN.hpp"
 #include "perf_stack_comparison.hpp"
+
+int nwoker_perf_test_stack_NtoN_main( unsigned int nworker );
 
 // ===========================================================
 using TestType = std::size_t;

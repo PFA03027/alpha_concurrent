@@ -22,7 +22,7 @@
 
 #include "alconcurrent/lf_fifo.hpp"
 
-#include "perf_fifo_NtoN.hpp"
+#include "../inc_common/perf_pushpop_NtoN.hpp"
 
 // ===========================================================
 constexpr std::size_t ReserveSize = 10000;
@@ -114,41 +114,41 @@ template <size_t SUT_N>
 int nwoker_perf_test_stack_NtoN_sub( unsigned int nworker )
 {
 	std::cout << "--- obsolate_fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( nworker * 2, 1 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( nworker, 1 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( nworker / 2, 1 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( 4, 1 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( 2, 1 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( 1, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( nworker * 2, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( nworker, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( nworker / 2, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( 4, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( 2, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( 1, 1 );
 
 	std::cout << "--- fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( nworker * 2, 1 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( nworker, 1 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( nworker / 2, 1 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( 4, 1 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( 2, 1 );
-	nwoker_perf_test_stack_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( 1, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( nworker * 2, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( nworker, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( nworker / 2, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( 4, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( 2, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( 1, 1 );
 
 	std::cout << "--- vec_fifo " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_stack_NtoN<vec_fifo<TestType>, SUT_N>( nworker * 2, 1 );
-	nwoker_perf_test_stack_NtoN<vec_fifo<TestType>, SUT_N>( nworker, 1 );
-	nwoker_perf_test_stack_NtoN<vec_fifo<TestType>, SUT_N>( nworker / 2, 1 );
-	nwoker_perf_test_stack_NtoN<vec_fifo<TestType>, SUT_N>( 4, 1 );
-	nwoker_perf_test_stack_NtoN<vec_fifo<TestType>, SUT_N>( 2, 1 );
-	nwoker_perf_test_stack_NtoN<vec_fifo<TestType>, SUT_N>( 1, 1 );
+	nwoker_perf_test_pushpop_NtoN<vec_fifo<TestType>, SUT_N>( nworker * 2, 1 );
+	nwoker_perf_test_pushpop_NtoN<vec_fifo<TestType>, SUT_N>( nworker, 1 );
+	nwoker_perf_test_pushpop_NtoN<vec_fifo<TestType>, SUT_N>( nworker / 2, 1 );
+	nwoker_perf_test_pushpop_NtoN<vec_fifo<TestType>, SUT_N>( 4, 1 );
+	nwoker_perf_test_pushpop_NtoN<vec_fifo<TestType>, SUT_N>( 2, 1 );
+	nwoker_perf_test_pushpop_NtoN<vec_fifo<TestType>, SUT_N>( 1, 1 );
 
 	std::cout << "--- list_fifo " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_stack_NtoN<list_fifo<TestType>, SUT_N>( nworker * 2, 1 );
-	nwoker_perf_test_stack_NtoN<list_fifo<TestType>, SUT_N>( nworker, 1 );
-	nwoker_perf_test_stack_NtoN<list_fifo<TestType>, SUT_N>( nworker / 2, 1 );
-	nwoker_perf_test_stack_NtoN<list_fifo<TestType>, SUT_N>( 4, 1 );
-	nwoker_perf_test_stack_NtoN<list_fifo<TestType>, SUT_N>( 2, 1 );
-	nwoker_perf_test_stack_NtoN<list_fifo<TestType>, SUT_N>( 1, 1 );
+	nwoker_perf_test_pushpop_NtoN<list_fifo<TestType>, SUT_N>( nworker * 2, 1 );
+	nwoker_perf_test_pushpop_NtoN<list_fifo<TestType>, SUT_N>( nworker, 1 );
+	nwoker_perf_test_pushpop_NtoN<list_fifo<TestType>, SUT_N>( nworker / 2, 1 );
+	nwoker_perf_test_pushpop_NtoN<list_fifo<TestType>, SUT_N>( 4, 1 );
+	nwoker_perf_test_pushpop_NtoN<list_fifo<TestType>, SUT_N>( 2, 1 );
+	nwoker_perf_test_pushpop_NtoN<list_fifo<TestType>, SUT_N>( 1, 1 );
 
 	return 0;
 }
 
-int nwoker_perf_test_stack_NtoN_main( unsigned int nworker )
+int nwoker_perf_test_fifo_NtoN_main( unsigned int nworker )
 {
 	nwoker_perf_test_stack_NtoN_sub<1>( nworker );
 	// std::cout << "*** number of retire_node: " << std::to_string( alpha::concurrent::internal::retire_node_abst::get_allocate_count() ) << " ***" << std::endl;
