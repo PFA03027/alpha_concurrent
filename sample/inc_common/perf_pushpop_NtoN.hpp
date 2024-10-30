@@ -21,6 +21,26 @@
 #include <tuple>
 
 template <typename FIFOType, size_t N>
+void one_cycle_pushpop(
+	std::array<FIFOType, N>& sut,
+	std::array<size_t, N>&   cur_access_idxs_pop,
+	std::array<size_t, N>&   cur_access_idxs_push,
+	std::size_t&             count )
+{
+	for ( size_t i = 0; i < N; i++ ) {
+		auto [sf, pop_value] = sut[cur_access_idxs_pop[i]].pop();
+		if ( !sf ) {
+			std::cout << "SUT has bug!!!" << std::endl;
+			abort();
+		}
+		pop_value += 1;
+		sut[cur_access_idxs_push[i]].push( pop_value );
+
+		count++;
+	}
+}
+
+template <typename FIFOType, size_t N>
 std::tuple<std::size_t, typename FIFOType::value_type> worker_task_pushpop_NtoN(
 	std::latch&              start_sync_latch,
 	std::atomic_bool&        loop_flag,
@@ -43,17 +63,8 @@ std::tuple<std::size_t, typename FIFOType::value_type> worker_task_pushpop_NtoN(
 		// シャッフル
 		std::shuffle( cur_access_idxs_pop.begin(), cur_access_idxs_pop.end(), engine );
 		std::shuffle( cur_access_idxs_push.begin(), cur_access_idxs_push.end(), engine );
-		for ( size_t i = 0; i < N; i++ ) {
-			auto [sf, pop_value] = sut[cur_access_idxs_pop[i]].pop();
-			if ( !sf ) {
-				std::cout << "SUT has bug!!!" << std::endl;
-				abort();
-			}
-			pop_value += 1;
-			sut[cur_access_idxs_push[i]].push( pop_value );
 
-			count++;
-		}
+		one_cycle_pushpop( sut, cur_access_idxs_pop, cur_access_idxs_push, count );
 	}
 	size_t pop_value_sum = 0;
 	for ( size_t i = 0; i < N; i++ ) {
