@@ -84,7 +84,7 @@ int nwoker_perf_test_pushpop_NtoN( unsigned int nworker, unsigned int exec_sec )
 {
 	std::array<FIFOType, N> sut;
 
-	std::cout << "number of worker thread is " << nworker << ", N=" << std::to_string( N ) << std::endl;
+	std::cout << "[Conflictable Parallel] number of worker thread is " << nworker << ", N=" << std::to_string( N ) << " \t=-> ";
 
 	std::latch       start_sync_latch( nworker + 1 );
 	std::atomic_bool loop_flag( true );
@@ -120,6 +120,92 @@ int nwoker_perf_test_pushpop_NtoN( unsigned int nworker, unsigned int exec_sec )
 	}
 
 	std::cout << "result is count_sum: " << count_sum << "\t\ttotal sum: " << total_sum << "\t\t" << ( ( count_sum == total_sum ) ? "Good" : "FAILED" ) << std::endl;
+
+	return 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
+
+template <typename FIFOType>
+std::tuple<std::size_t, typename FIFOType::value_type> worker_task_pushpop_One(
+	std::latch&       start_sync_latch,
+	std::atomic_bool& loop_flag,
+	FIFOType&         sut )
+{
+	std::size_t count = 0;
+
+	sut.push( 0 );
+
+	start_sync_latch.arrive_and_wait();
+	while ( loop_flag.load( std::memory_order_acquire ) ) {
+		// シャッフル
+		auto [sf, pop_value] = sut.pop();
+		if ( !sf ) {
+			std::cout << "SUT has bug!!!" << std::endl;
+			abort();
+		}
+		pop_value += 1;
+		sut.push( pop_value );
+
+		count++;
+	}
+	size_t pop_value_sum = 0;
+
+	auto [sf, pop_value] = sut.pop();
+	if ( !sf ) {
+		std::cout << "SUT has bug in completion phase!!!" << std::endl;
+		abort();
+	}
+	pop_value_sum += pop_value;
+
+	return { count, pop_value_sum };
+}
+
+template <typename FIFOType, size_t N>
+int nwoker_perf_test_pushpop_NParallel( unsigned int exec_sec )
+{
+	std::cout << "[Pure Parallel]         number of worker thread is " << std::to_string( N ) << ", N=" << std::to_string( N ) << " \t=-> ";
+
+	std::latch       start_sync_latch( N + 1 );
+	std::atomic_bool loop_flag( true );
+
+	using result_type = std::tuple<std::size_t, typename FIFOType::value_type>;
+	struct thread_data {
+		FIFOType                 sut_;
+		std::thread              worker_;
+		std::future<result_type> ret_;
+	};
+
+	std::array<thread_data, N> tasks_and_threads;
+	for ( auto& t : tasks_and_threads ) {
+		std::packaged_task<result_type( std::latch&, std::atomic_bool&, FIFOType& )> task(
+			[]( std::latch& sync_latch, std::atomic_bool& lf, FIFOType& sut ) {
+				return worker_task_pushpop_One<FIFOType>( sync_latch, lf, sut );
+			} );   // 非同期実行する関数を登録する
+		t.ret_    = task.get_future();
+		t.worker_ = std::thread( std::move( task ), std::ref( start_sync_latch ), std::ref( loop_flag ), std::ref( t.sut_ ) );
+	}
+
+	start_sync_latch.arrive_and_wait();
+	sleep( exec_sec );
+	loop_flag.store( false, std::memory_order_release );
+
+	std::size_t count_sum = 0;
+	std::size_t total_sum = 0;
+	for ( auto& t : tasks_and_threads ) {
+		auto [count_ret, sum_ret] = t.ret_.get();
+		count_sum += count_ret;
+		total_sum += sum_ret;
+	}
+
+	std::cout << "result is count_sum: " << count_sum << "\t\ttotal sum: " << total_sum << "\t\t" << ( ( count_sum == total_sum ) ? "Good" : "FAILED" ) << std::endl;
+
+	for ( auto& t : tasks_and_threads ) {
+		if ( t.worker_.joinable() ) {
+			t.worker_.join();
+		}
+	}
 
 	return 0;
 }

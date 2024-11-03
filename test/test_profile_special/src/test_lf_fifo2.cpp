@@ -30,7 +30,7 @@
 #include "test_lf_fixture.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////
-constexpr size_t SUT_N    = 100;
+constexpr size_t SUT_N    = 1;
 constexpr size_t THREAD_N = 2;
 
 #if 1
@@ -42,16 +42,45 @@ TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile1 )
 	std::cout << "--- pre-cpu kicking fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( THREAD_N, 1 );
 }
-TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile2 )
+// TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile2 )
+// {
+// 	using TestType = std::size_t;
+// 	// using TestType = int;
+
+// 	std::cout << "--- fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+// 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( THREAD_N, 10 );
+// }
+TEST_F( TestLF_2_HighLoad, TC_FIFO2_Profile1 )
 {
 	using TestType = std::size_t;
 	// using TestType = int;
 
-	std::cout << "--- fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( THREAD_N, 10 );
+	std::cout << "--- pre-cpu kicking fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, 1>( 1, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, 2>( 2, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, 4>( 4, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, 8>( 8, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, 16>( 16, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, 32>( 32, 1 );
+	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::fifo_list<TestType>, 1>( 1 );
+	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::fifo_list<TestType>, 2>( 1 );
+	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::fifo_list<TestType>, 4>( 1 );
+	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::fifo_list<TestType>, 8>( 1 );
+	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::fifo_list<TestType>, 16>( 1 );
+	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::fifo_list<TestType>, 32>( 1 );
 }
+// TEST_F( TestLF_2_HighLoad, TC_FIFO2_Profile2 )
+// {
+// 	using TestType = std::size_t;
+// 	// using TestType = int;
+
+// 	std::cout << "--- fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+// 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, THREAD_N>( THREAD_N, 10 );
+// 	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::fifo_list<TestType>, 1>( 10 );
+// 	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::fifo_list<TestType>, THREAD_N>( 10 );
+// }
 #endif
-#if 0
+#if 1
 TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile3 )
 {
 	using TestType = std::size_t;
@@ -60,12 +89,31 @@ TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile3 )
 	std::cout << "--- pre-cpu kicking obsolate_fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( THREAD_N, 1 );
 }
-TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile4 )
+TEST_F( TestLF_2_HighLoad, TC_FIFO2_Profile3 )
 {
 	using TestType = std::size_t;
 	// using TestType = int;
 
-	std::cout << "--- obsolate_fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( THREAD_N, 10 );
+	std::cout << "--- pre-cpu kicking obsolate_fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, 1>( 1, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, 2>( 2, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, 4>( 4, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, 8>( 8, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, 16>( 16, 1 );
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, 32>( 32, 1 );
+	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::obsolate_fifo_list<TestType>, 1>( 1 );
+	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::obsolate_fifo_list<TestType>, 2>( 1 );
+	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::obsolate_fifo_list<TestType>, 4>( 1 );
+	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::obsolate_fifo_list<TestType>, 8>( 1 );
+	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::obsolate_fifo_list<TestType>, 16>( 1 );
+	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::obsolate_fifo_list<TestType>, 32>( 1 );
 }
+// TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile4 )
+// {
+// 	using TestType = std::size_t;
+// 	// using TestType = int;
+
+// 	std::cout << "--- obsolate_fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+// 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( THREAD_N, 10 );
+// }
 #endif
