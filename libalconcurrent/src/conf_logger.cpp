@@ -8,8 +8,11 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
+#include <cxxabi.h>
+
 #include <atomic>
 #include <cstdlib>
+#include <string>
 
 #include "alconcurrent/conf_logger.hpp"
 
@@ -85,6 +88,63 @@ bool is_allowed_to_output(
 }   // namespace internal
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static char* search_char( char* p_str, char c, size_t max )
+{
+	for ( size_t i = 0; i < max; i++ ) {
+		if ( *p_str == c ) {
+			return p_str;
+		}
+		p_str++;
+	}
+
+	return nullptr;
+}
+
+static std::string demangle_symbol( char* p_raw_symbol_str )
+{
+	if ( p_raw_symbol_str == nullptr ) {
+		return std::string( "Fail to demangle: argument p_raw_symbol_str is nullptr" );
+	}
+
+	size_t demangled_sz  = 1024;
+	char*  demangled_str = (char*)malloc( demangled_sz );
+	if ( !demangled_str ) {
+		perror( "malloc() returns NULL" );
+		return std::string( "malloc() returns NULL for symbol demangle" );
+	}
+
+	//  strings[j] には "ファイル名 ( シンボル名 + オフセット) アドレス" という形式の文字列が格納されてるので
+	//  "("　から "+"　の部分を探して，シンボル名を切り出す
+	char* p_start  = search_char( p_raw_symbol_str, '(', demangled_sz );
+	char* p_offset = search_char( p_start, '+', demangled_sz );
+
+	std::string ans( p_raw_symbol_str );
+	if ( p_start != nullptr && p_offset != nullptr ) {
+		if ( p_offset - p_start > 1 ) {
+			// シンボル名が見つかった場合は demangle する
+			*p_start       = '\0';
+			*p_offset      = '\0';
+			char* p_symbol = ( p_start + 1 );
+			char* ret      = abi::__cxa_demangle( p_symbol, demangled_str, &demangled_sz, NULL );
+			if ( ret ) {
+				demangled_str = ret;
+			} else {
+				ret = nullptr;
+			}
+			ans = std::string( p_raw_symbol_str );
+			ans += "(";
+			ans += ( ret != nullptr ) ? ret : "";
+			ans += "+";
+			ans += ( p_offset + 1 );
+			ans += ")";
+		}
+	}
+	free( demangled_str );
+
+	return ans;
+}
+
 void bt_info::dump_to_log( log_type lt, char c, int id ) const noexcept
 {
 	if ( count_ == 0 ) {
@@ -97,7 +157,8 @@ void bt_info::dump_to_log( log_type lt, char c, int id ) const noexcept
 	int    actual_count = ( count_ < 0 ) ? -count_ : count_;
 	char** bt_strings   = backtrace_symbols( bt_, actual_count );
 	for ( int i = 0; i < actual_count; i++ ) {
-		internal::LogOutput( lt, "[%d-%c] [%d] %s", id, c, i, bt_strings[i] );
+		auto symbol = demangle_symbol( bt_strings[i] );
+		internal::LogOutput( lt, "[%d-%c] [%d] %s", id, c, i, symbol.c_str() );
 	}
 	std::free( bt_strings );
 
