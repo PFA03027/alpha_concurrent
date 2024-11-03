@@ -65,23 +65,28 @@ hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 
 	hzrd_slot_ownership_t ans( nullptr );   // expect RVO
 
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
 	if ( p == nullptr ) {
+		throw std::logic_error( "Fail to try_assign hazard pointer slot. I/F spec violation for nullptr. this is logic error" );
+	}
+#endif
+
+	// 未割当スロットかどうかをチェックする。
+	// なお、thisのインスタンスはスレッドローカル変数なので、スレッド間競合は考えなくてよい。
+	if ( next_assign_hint_it_->load( std::memory_order_acquire ) == nullptr ) {
+		next_assign_hint_it_->store( p, std::memory_order_release );
+		ans = hzrd_slot_ownership_t( &( *next_assign_hint_it_ ) );
+		++next_assign_hint_it_;
+		if ( next_assign_hint_it_ == end() ) {
+			next_assign_hint_it_ = begin();
+		}
 		return ans;
 	}
 
-	{
-		if ( next_assign_hint_it_->load( std::memory_order_acquire ) == nullptr ) {
-			next_assign_hint_it_->store( p, std::memory_order_release );
-			ans = hzrd_slot_ownership_t( &( *next_assign_hint_it_ ) );
-			++next_assign_hint_it_;
-			if ( next_assign_hint_it_ == end() ) {
-				next_assign_hint_it_ = begin();
-			}
-			return ans;
-		}
-	}
-
-	for ( auto it = next_assign_hint_it_; it != end(); it++ ) {
+	// next_assign_hint_it_以降の未割当スロットを探す。
+	auto stpoint = next_assign_hint_it_;
+	stpoint++;
+	for ( auto it = stpoint; it != end(); it++ ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 		loop_count_in_try_assign_++;
 #endif
@@ -96,6 +101,7 @@ hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 			return ans;
 		}
 	}
+	// next_assign_hint_it_以降の未割当スロットは無かったので、先頭からnext_assign_hint_it_までの間で未割当スロットを探す。
 	auto wraparound_end = next_assign_hint_it_;
 	for ( auto it = begin(); it != wraparound_end; it++ ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
@@ -113,6 +119,7 @@ hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 		}
 	}
 
+	// 未割当スロットは見つからなかった。
 	return ans;
 }
 
@@ -468,14 +475,15 @@ bind_hazard_ptr_list::~bind_hazard_ptr_list()
 
 hzrd_slot_ownership_t bind_hazard_ptr_list::slot_assign( void* p )
 {
+	void* p_for_store = p;
 	if ( p == nullptr ) {
-		return nullptr;
+		p_for_store = reinterpret_cast<void*>( static_cast<std::uintptr_t>( 1U ) );
 	}
 
 	hazard_ptr_group* p_pre_list = nullptr;
 	hazard_ptr_group* p_cur_list = ownership_ticket_.get();
 	while ( p_cur_list != nullptr ) {
-		hzrd_slot_ownership_t ans = p_cur_list->try_assign( p );
+		hzrd_slot_ownership_t ans = p_cur_list->try_assign( p_for_store );
 		if ( ans != nullptr ) {
 			return ans;   // success to assign the slot of hazard pointer
 		}
@@ -497,10 +505,12 @@ hzrd_slot_ownership_t bind_hazard_ptr_list::slot_assign( void* p )
 		p_new_hpg         = ownership_ticket_.get();
 	}
 
-	hzrd_slot_ownership_t ans = p_new_hpg->try_assign( p );
+	hzrd_slot_ownership_t ans = p_new_hpg->try_assign( p_for_store );
+	// #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
 	if ( ans == nullptr ) {
 		throw std::logic_error( "Fail to assign hazard pointer slot. this is logic error" );
 	}
+	// #endif
 	return ans;
 }
 

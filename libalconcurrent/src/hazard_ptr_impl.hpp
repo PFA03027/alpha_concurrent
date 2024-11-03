@@ -387,13 +387,15 @@ public:
 	/**
 	 * @brief try to assing a pointer, p, as hazard pointer
 	 *
-	 * @param p
+	 * @param p p must not be nullptr. if you would like to set nullptr, please use std::uintptr_t and value is 1U as nullptr
 	 * @return std::atomic<void*>* pointer to hazard ptr slot.
 	 * @retval nullptr: fail to get hazard pointer slot.
 	 * @retval non-nullptr: success to get hazard pointer slot
 	 *
 	 * @warning
-	 * if p is nullptr, this api will be fail and return nullptr.
+	 * if you set nullptr to p and call this I/F, this I/F set nullptr to slot.
+	 * Then the algorithm that uses hazard pointer do the unexpected behaviour.
+	 * This unexpected behaviour impacts all hazard pointer user.
 	 */
 	hzrd_slot_ownership_t try_assign( void* p );
 

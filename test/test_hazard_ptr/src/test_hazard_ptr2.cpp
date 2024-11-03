@@ -59,7 +59,8 @@ TEST_F( TestHazardPtrGroup, CanTryAssing )
 	auto righofownership = sut.try_assign( &dummy );
 
 	// Assert
-	EXPECT_NE( righofownership, nullptr );
+	ASSERT_NE( righofownership, nullptr );
+	EXPECT_EQ( *righofownership, &dummy );
 }
 
 TEST_F( TestHazardPtrGroup, CanTryAssingForNullptr )
@@ -67,11 +68,16 @@ TEST_F( TestHazardPtrGroup, CanTryAssingForNullptr )
 	// Arrange
 	alpha::concurrent::internal::hazard_ptr_group sut;
 
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+	ASSERT_ANY_THROW( sut.try_assign( nullptr ) );
+#else
 	// Act
-	auto righofownership = sut.try_assign( nullptr );
+	auto righofownership = sut.try_assign( nullptr );   // I/F spec violation use case
 
 	// Assert
-	EXPECT_EQ( righofownership, nullptr );
+	ASSERT_NE( righofownership, nullptr );
+	EXPECT_EQ( *righofownership, nullptr );
+#endif
 }
 
 TEST_F( TestHazardPtrGroup, CanTryAssingWithFull )

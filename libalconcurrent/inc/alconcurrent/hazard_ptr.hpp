@@ -436,7 +436,7 @@ public:
 
 	hazard_ptr( void )
 	  : p_( nullptr )
-	  , os_( internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) ) )
+	  , os_( internal::hazard_ptr_mgr::AssignHazardPtrSlot( nullptr ) )
 	{
 	}
 	~hazard_ptr() = default;
@@ -450,18 +450,16 @@ public:
 	  , os_( std::move( src.os_ ) )
 	{
 		src.p_  = nullptr;
-		src.os_ = internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) );
+		src.os_ = internal::hazard_ptr_mgr::AssignHazardPtrSlot( nullptr );
 	}
 	hazard_ptr& operator=( const hazard_ptr& src )
 	{
 		if ( this == &src ) return *this;
 
 		p_ = src.p_;
-		if ( p_ == nullptr ) {
-			os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
-		} else {
-			os_->store( p_, std::memory_order_release );
-		}
+		os_->store( src.os_->load( std::memory_order_acquire ), std::memory_order_release );
+		// nullptrが特別扱いされるため、src側がnullptrだった場合に自然に対応できるようにload()を使う。
+		// p == nullptrで判定しても良いが、どちら効率的かは不明。。。
 
 		return *this;
 	}
@@ -469,15 +467,7 @@ public:
 	{
 		if ( this == &src ) return *this;
 
-		p_ = src.p_;
-		if ( p_ == nullptr ) {
-			os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
-		} else {
-			os_->store( p_, std::memory_order_release );
-		}
-
-		src.p_  = nullptr;
-		src.os_ = internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) );
+		swap( src );
 
 		return *this;
 	}
@@ -791,23 +781,20 @@ public:
 
 		internal::hzrd_slot_ownership_t hso;
 
+		// pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
+		hso              = internal::hazard_ptr_mgr::AssignHazardPtrSlot( nullptr );
 		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
-		if ( p_expect != nullptr ) {
-			hso = internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_expect );
-			while ( !ap_target_p_.compare_exchange_strong( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) ) {
+		do {
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
-				internal::loop_count_in_hazard_ptr_get_++;
+			internal::loop_count_in_hazard_ptr_get_++;
 #endif
-				if ( p_expect != nullptr ) {
-					hso->store( p_expect, std::memory_order_release );
-				} else {
-					hso->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
-					break;
-				}
+			if ( p_expect != nullptr ) {
+				hso->store( p_expect, std::memory_order_release );
+			} else {
+				hso->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );   // important
+				break;
 			}
-		} else {
-			hso = internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) );
-		}
+		} while ( !ap_target_p_.compare_exchange_strong( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) );
 
 		return hazard_pointer( p_expect, std::move( hso ) );
 	}
@@ -975,7 +962,7 @@ public:
 		internal::call_count_hazard_ptr_get_++;
 #endif
 
-		hazard_pointer ans_hp( nullptr, internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) ) );
+		hazard_pointer ans_hp( nullptr, internal::hazard_ptr_mgr::AssignHazardPtrSlot( nullptr ) );
 		bool           ans_b = false;
 
 		addr_markable addr_expect = a_target_addr_.load( std::memory_order_acquire );
@@ -990,7 +977,8 @@ public:
 
 			ans_hp.store( p_expect );
 			if ( p_expect == nullptr ) {
-				return std::tuple<hazard_pointer, bool> { std::move( ans_hp ), false };
+				ans_b = false;
+				break;
 			}
 
 		} while ( !a_target_addr_.compare_exchange_weak( addr_expect, addr_expect, std::memory_order_release, std::memory_order_relaxed ) );
