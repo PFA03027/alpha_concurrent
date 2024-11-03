@@ -19,6 +19,21 @@
 #include "alconcurrent/internal/hazard_ptr_internal.hpp"
 #include "hazard_ptr_impl.hpp"
 
+TEST( TestHazardSlotOwnershipT, DoDestroy_Then_ClearSlot )
+{
+	// Arrange
+	int                dummy = 1;
+	std::atomic<void*> dummy2( &dummy );
+
+	{
+		// Act
+		alpha::concurrent::internal::hzrd_slot_ownership_t sut( &dummy2 );
+	}
+
+	// Assert
+	EXPECT_EQ( dummy2.load( std::memory_order_acquire ), nullptr );
+}
+
 class TestHazardPtrGroup : public ::testing::Test {
 protected:
 	void SetUp() override
