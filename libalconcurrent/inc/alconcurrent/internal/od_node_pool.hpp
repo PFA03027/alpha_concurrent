@@ -64,10 +64,17 @@ public:
 		// スレッドローカルな変数に格納されているノードが少なかったら、スレッドローカルな変数に保存する。
 		// 少ないの判定を簡単にするために、判定が簡単な1以下で少ないと判定している。
 		// こうすることで、スレッドローカルなノードの再利用の機会が増え、新たなノードの割り当てによるメモリ消費を抑制できる。
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
+		if ( tl_odn_list_no_in_hazard.size() < 100 ) {
+			tl_odn_list_no_in_hazard.push_back( p_nd );
+			return;
+		}
+#else
 		if ( !tl_odn_list_no_in_hazard.is_more_than_one() ) {
 			tl_odn_list_no_in_hazard.push_back( p_nd );
 			return;
 		}
+#endif
 
 		auto lk = g_odn_list_.try_lock();
 		if ( lk.owns_lock() ) {
@@ -297,6 +304,15 @@ private:
 		{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			return node_count_in_tl_odn_list_.load( std::memory_order_acquire );
+#else
+			return 0;
+#endif
+		}
+
+		size_t size( void ) const noexcept
+		{
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
+			return od_list_.size();
 #else
 			return 0;
 #endif

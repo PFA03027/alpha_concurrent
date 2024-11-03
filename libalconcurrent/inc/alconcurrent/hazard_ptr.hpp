@@ -439,6 +439,7 @@ public:
 	  , os_( internal::hazard_ptr_mgr::AssignHazardPtrSlot( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) ) )
 	{
 	}
+	~hazard_ptr() = default;
 	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR_BODY hazard_ptr( const hazard_ptr& src )
 	  : p_( src.p_ )
 	  , os_( internal::hazard_ptr_mgr::AssignHazardPtrSlot( src.p_ ) )
@@ -842,40 +843,40 @@ public:
 		ap_target_p_.store( p_desired, order );
 	}
 
-	bool compare_exchange_weak( pointer&          expected,
-	                            pointer           desired,
-	                            std::memory_order success,
-	                            std::memory_order failure ) noexcept
+	inline bool compare_exchange_weak( pointer&          expected,
+	                                   pointer           desired,
+	                                   std::memory_order success,
+	                                   std::memory_order failure ) noexcept
 	{
 		return ap_target_p_.compare_exchange_weak( expected, desired, success, failure );
 	}
 
-	bool compare_exchange_weak( pointer&          expected,
-	                            pointer           desired,
-	                            std::memory_order order = std::memory_order_seq_cst ) noexcept
+	inline bool compare_exchange_weak( pointer&          expected,
+	                                   pointer           desired,
+	                                   std::memory_order order = std::memory_order_seq_cst ) noexcept
 	{
 		return ap_target_p_.compare_exchange_weak( expected, desired, order );
 	}
 
-	bool compare_exchange_strong( pointer&          expected,
-	                              pointer           desired,
-	                              std::memory_order success,
-	                              std::memory_order failure ) noexcept
+	inline bool compare_exchange_strong( pointer&          expected,
+	                                     pointer           desired,
+	                                     std::memory_order success,
+	                                     std::memory_order failure ) noexcept
 	{
 		return ap_target_p_.compare_exchange_strong( expected, desired, success, failure );
 	}
 
-	bool compare_exchange_strong( pointer&          expected,
-	                              pointer           desired,
-	                              std::memory_order order = std::memory_order_seq_cst ) noexcept
+	inline bool compare_exchange_strong( pointer&          expected,
+	                                     pointer           desired,
+	                                     std::memory_order order = std::memory_order_seq_cst ) noexcept
 	{
 		return ap_target_p_.compare_exchange_strong( expected, desired, order );
 	}
 
-	bool compare_exchange_weak( hazard_pointer&   expected_hzd_ptr,
-	                            pointer           desired,
-	                            std::memory_order success,
-	                            std::memory_order failure ) noexcept
+	inline bool compare_exchange_weak( hazard_pointer&   expected_hzd_ptr,
+	                                   pointer           desired,
+	                                   std::memory_order success,
+	                                   std::memory_order failure ) noexcept
 	{
 		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, failure );
 		if ( !ret ) {
@@ -888,10 +889,10 @@ public:
 		return ret;
 	}
 
-	bool compare_exchange_strong( hazard_pointer&   expected_hzd_ptr,
-	                              pointer           desired,
-	                              std::memory_order success,
-	                              std::memory_order failure ) noexcept
+	inline bool compare_exchange_strong( hazard_pointer&   expected_hzd_ptr,
+	                                     pointer           desired,
+	                                     std::memory_order success,
+	                                     std::memory_order failure ) noexcept
 	{
 		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, failure );
 		if ( !ret ) {
@@ -901,6 +902,15 @@ public:
 				expected_hzd_ptr.os_->store( expected_hzd_ptr.p_, std::memory_order_release );
 			} while ( !ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, expected_hzd_ptr.p_, success, failure ) );
 		}
+		return ret;
+	}
+
+	inline bool compare_exchange_strong( hazard_pointer&&  expected_hzd_ptr,
+	                                     pointer           desired,
+	                                     std::memory_order success,
+	                                     std::memory_order failure ) noexcept
+	{
+		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, failure );
 		return ret;
 	}
 

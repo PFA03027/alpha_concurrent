@@ -84,13 +84,20 @@ public:
 
 	size_t profile_info_count( void ) const;
 
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
+	size_t size( void ) const noexcept
+	{
+		return count_;
+	}
+#endif
+
 private:
 	void merge_push_front( node_pointer p_nd_head, node_pointer p_nd_tail ) noexcept;
 	void merge_push_back( node_pointer p_nd_head, node_pointer p_nd_tail ) noexcept;
 
 	node_pointer p_head_ = nullptr;
 	node_pointer p_tail_ = nullptr;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	size_t count_ = 0;
 #endif
 };

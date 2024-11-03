@@ -21,13 +21,13 @@ namespace internal {
 od_simple_list::od_simple_list( od_simple_list&& src ) noexcept
   : p_head_( src.p_head_ )
   , p_tail_( src.p_tail_ )
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
   , count_( src.count_ )
 #endif
 {
 	src.p_head_ = nullptr;
 	src.p_tail_ = nullptr;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	src.count_ = 0;
 #endif
 
@@ -72,7 +72,7 @@ void od_simple_list::swap( od_simple_list& src ) noexcept
 	p_tail_     = src.p_tail_;
 	src.p_tail_ = p_tmp;
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	size_t tmp_cnt;
 	tmp_cnt    = count_;
 	count_     = src.count_;
@@ -105,7 +105,7 @@ void od_simple_list::push_front( node_pointer p_nd ) noexcept
 	p_nd_link_t->set_next( p_head_ );
 	p_head_ = p_nd_link_t;
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	count_++;
 #endif
 }
@@ -127,7 +127,7 @@ void od_simple_list::push_back( node_pointer p_nd ) noexcept
 		p_tail_ = p_nd;
 	}
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	count_++;
 #endif
 }
@@ -138,7 +138,7 @@ void od_simple_list::merge_push_front( od_simple_list&& src ) noexcept
 
 	node_pointer p_src_head = src.p_head_;
 	node_pointer p_src_tail = src.p_tail_;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	size_t tmp_cnt = src.count_;
 	src.count_     = 0;
 #endif
@@ -146,7 +146,7 @@ void od_simple_list::merge_push_front( od_simple_list&& src ) noexcept
 	src.p_tail_ = nullptr;
 
 	merge_push_front( p_src_head, p_src_tail );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	count_ += tmp_cnt;
 #endif
 }
@@ -155,7 +155,7 @@ void od_simple_list::merge_push_front( node_pointer p_nd ) noexcept
 {
 	if ( p_nd == nullptr ) return;
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	size_t tmp_cnt = 0;
 #endif
 	node_pointer p_cur = p_nd;
@@ -163,13 +163,13 @@ void od_simple_list::merge_push_front( node_pointer p_nd ) noexcept
 	while ( p_nxt != nullptr ) {
 		p_cur = p_nxt;
 		p_nxt = p_cur->next();
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 		tmp_cnt++;
 #endif
 	}
 
 	merge_push_front( p_nd, p_cur );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	count_ += tmp_cnt;
 #endif
 }
@@ -180,7 +180,7 @@ void od_simple_list::merge_push_back( od_simple_list&& src ) noexcept
 
 	node_pointer p_src_head = src.p_head_;
 	node_pointer p_src_tail = src.p_tail_;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	size_t tmp_cnt = src.count_;
 	src.count_     = 0;
 #endif
@@ -188,7 +188,7 @@ void od_simple_list::merge_push_back( od_simple_list&& src ) noexcept
 	src.p_tail_ = nullptr;
 
 	merge_push_back( p_src_head, p_src_tail );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	count_ += tmp_cnt;
 #endif
 }
@@ -197,7 +197,7 @@ void od_simple_list::merge_push_back( node_pointer p_nd ) noexcept
 {
 	if ( p_nd == nullptr ) return;
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	size_t tmp_cnt = 0;
 #endif
 	node_pointer p_cur = p_nd;
@@ -205,13 +205,13 @@ void od_simple_list::merge_push_back( node_pointer p_nd ) noexcept
 	while ( p_nxt != nullptr ) {
 		p_cur = p_nxt;
 		p_nxt = p_cur->next();
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 		tmp_cnt++;
 #endif
 	}
 
 	merge_push_back( p_nd, p_cur );
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	count_ += tmp_cnt;
 #endif
 }
@@ -226,7 +226,7 @@ od_simple_list::node_pointer od_simple_list::pop_front( void ) noexcept
 		p_tail_ = nullptr;
 	}
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	count_--;
 #endif
 
@@ -257,7 +257,7 @@ od_simple_list od_simple_list::split_if( std::function<bool( const_node_pointer 
 	while ( p_cur != nullptr ) {
 		node_pointer p_next = p_cur->next();
 		if ( pred( p_cur ) ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 			count_--;
 #endif
 			if ( p_pre == nullptr ) {
@@ -302,14 +302,14 @@ void od_simple_list::clear( std::function<void( node_pointer )> pred )
 		p_cur = p_nxt;
 	}
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	count_ = 0;
 #endif
 }
 
 size_t od_simple_list::profile_info_count( void ) const
 {
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 	if ( count_ == 0 ) {
 		if ( p_head_ != nullptr ) {
 			throw std::runtime_error( "internal error: count is zero, but p_head_ is not nullptr. counting and/or internal status is unexpected" );

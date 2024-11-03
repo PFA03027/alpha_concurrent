@@ -40,7 +40,7 @@ extern std::atomic<size_t> loop_count_in_hazard_ptr_get_;
 
 class hzrd_slot_releaser {
 public:
-	void operator()( std::atomic<void*>* ptr ) const
+	inline void operator()( std::atomic<void*>* ptr ) const noexcept
 	{
 		if ( ptr == nullptr ) return;
 		ptr->store( nullptr, std::memory_order_release );

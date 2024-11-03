@@ -30,7 +30,7 @@
 #include "test_lf_fixture.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////
-constexpr size_t SUT_N    = 10;
+constexpr size_t SUT_N    = 100;
 constexpr size_t THREAD_N = 20;
 
 #if 0
