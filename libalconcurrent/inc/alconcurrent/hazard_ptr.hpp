@@ -959,13 +959,6 @@ public:
 		return ap_target_p_.compare_exchange_weak( expected, desired, success, failure );
 	}
 
-	inline bool compare_exchange_weak( pointer&          expected,
-	                                   pointer           desired,
-	                                   std::memory_order order = std::memory_order_seq_cst ) noexcept
-	{
-		return ap_target_p_.compare_exchange_weak( expected, desired, order );
-	}
-
 	inline bool compare_exchange_strong( pointer&          expected,
 	                                     pointer           desired,
 	                                     std::memory_order success,
@@ -974,13 +967,21 @@ public:
 		return ap_target_p_.compare_exchange_strong( expected, desired, success, failure );
 	}
 
-	inline bool compare_exchange_strong( pointer&          expected,
-	                                     pointer           desired,
-	                                     std::memory_order order = std::memory_order_seq_cst ) noexcept
-	{
-		return ap_target_p_.compare_exchange_strong( expected, desired, order );
-	}
-
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_weak を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、
+	 * そうでなければ failure メモリオーダーで expected_hzd_ptr を現在の値で置き換える。
+	 * また、failureケースの置き換え時に自身の現在の値との一致を再確認し、再確認成功後、関数が完了する。
+	 * そのため、compare_exchange_strong_to_verify_exchangeよりも処理が重い。
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。また、expected_hzd_ptrは呼び出し前の状態を維持している。
+	 * @return false CAS操作に失敗。自身が保持するあらなたポインタでexpected_hzd_ptrを置き換えられている。
+	 */
 	inline bool compare_exchange_weak( hazard_pointer&   expected_hzd_ptr,
 	                                   pointer           desired,
 	                                   std::memory_order success,
@@ -997,6 +998,21 @@ public:
 		return ret;
 	}
 
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_strong を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、
+	 * そうでなければ failure メモリオーダーで expected_hzd_ptr を現在の値で置き換える。
+	 * また、failureケースの置き換え時に自身の現在の値との一致を再確認し、再確認成功後、関数が完了する。
+	 * そのため、compare_exchange_strong_to_verify_exchangeよりも処理が重い。
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。また、expected_hzd_ptrは呼び出し前の状態を維持している。
+	 * @return false CAS操作に失敗。自身が保持するあらなたポインタでexpected_hzd_ptrを置き換えられている。
+	 */
 	inline bool compare_exchange_strong( hazard_pointer&   expected_hzd_ptr,
 	                                     pointer           desired,
 	                                     std::memory_order success,
@@ -1013,24 +1029,61 @@ public:
 		return ret;
 	}
 
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_weak を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、
+	 *
+	 * なお、expected_hzd_ptr 使用できない状態となるため、expected_hzd_ptr を使い捨てにする場合に使用するI/F。
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照。呼び出し完了後、hazard_ptrとして使用できない。
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @return true CAS操作に成功。
+	 * @return false CAS操作に失敗。
+	 */
 	inline bool compare_exchange_weak( hazard_pointer&&  expected_hzd_ptr,
 	                                   pointer           desired,
-	                                   std::memory_order success,
-	                                   std::memory_order failure ) noexcept
+	                                   std::memory_order success ) noexcept
 	{
-		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, failure );
+		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, std::memory_order_relaxed );
 		return ret;
 	}
 
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_strong を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、
+	 *
+	 * なお、expected_hzd_ptr 使用できない状態となるため、expected_hzd_ptr を使い捨てにする場合に使用するI/F。
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照。呼び出し完了後、hazard_ptrとして使用できない。
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @return true CAS操作に成功。
+	 * @return false CAS操作に失敗。
+	 */
 	inline bool compare_exchange_strong( hazard_pointer&&  expected_hzd_ptr,
 	                                     pointer           desired,
-	                                     std::memory_order success,
-	                                     std::memory_order failure ) noexcept
+	                                     std::memory_order success ) noexcept
 	{
-		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, failure );
+		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, std::memory_order_relaxed );
 		return ret;
 	}
 
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_weak を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、expected_hzd_ptr に、desired を反映する。
+	 * そうでなければ failure メモリオーダーで expected_hzd_ptr を現在の値で置き換える。
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。expected_hzd_ptr は、desired で置き換えられている。
+	 * @return false CAS操作に失敗。自身が保持する現在のポインタでexpected_hzd_ptrを置き換えられている。
+	 */
 	inline bool compare_exchange_weak_to_verify_exchange1( hazard_pointer&   expected_hzd_ptr,
 	                                                       pointer           desired,
 	                                                       std::memory_order success,
@@ -1048,6 +1101,19 @@ public:
 		return ret;
 	}
 
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_weak を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、
+	 * そうでなければ failure メモリオーダーで expected_hzd_ptr を現在の値で置き換える
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。また、expected_hzd_ptrは呼び出し前の状態を維持している。
+	 * @return false CAS操作に失敗。自身が保持するあらなたポインタでexpected_hzd_ptrを置き換えられている。
+	 */
 	inline bool compare_exchange_weak_to_verify_exchange2( hazard_pointer&   expected_hzd_ptr,
 	                                                       pointer           desired,
 	                                                       std::memory_order success,
@@ -1062,6 +1128,19 @@ public:
 		return ret;
 	}
 
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_strong を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、expected_hzd_ptr に、desired を反映する。
+	 * そうでなければ failure メモリオーダーで expected_hzd_ptr を現在の値で置き換える。
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。expected_hzd_ptr は、desired で置き換えられている。
+	 * @return false CAS操作に失敗。自身が保持する現在のポインタでexpected_hzd_ptrを置き換えられている。
+	 */
 	inline bool compare_exchange_strong_to_verify_exchange1( hazard_pointer&   expected_hzd_ptr,
 	                                                         pointer           desired,
 	                                                         std::memory_order success,
@@ -1079,6 +1158,19 @@ public:
 		return ret;
 	}
 
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_strong を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、
+	 * そうでなければ failure メモリオーダーで expected_hzd_ptr を現在の値で置き換える
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。また、expected_hzd_ptrは呼び出し前の状態を維持している。
+	 * @return false CAS操作に失敗。自身が保持するあらなたポインタでexpected_hzd_ptrを置き換えられている。
+	 */
 	inline bool compare_exchange_strong_to_verify_exchange2( hazard_pointer&   expected_hzd_ptr,
 	                                                         pointer           desired,
 	                                                         std::memory_order success,

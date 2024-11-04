@@ -69,7 +69,6 @@ void od_lockfree_fifo::push_back( node_pointer p_nd ) noexcept
 		pushpop_loop_count_++;
 #endif
 
-		hph_tail_.reuse_to_verify_exchange( hp_tail_node );
 		if ( !hph_tail_.verify_exchange( hp_tail_node ) ) {
 			continue;
 		}
@@ -82,7 +81,7 @@ void od_lockfree_fifo::push_back( node_pointer p_nd ) noexcept
 			if ( hp_tail_node->hazard_handler_of_next().compare_exchange_weak_to_verify_exchange2( hp_tail_next, p_nd, std::memory_order_release, std::memory_order_acquire ) ) {
 				// ここに来た時点で、push_backは成功
 				// hph_tail_を可能であれば、更新する。ここで、更新できなくても、自スレッドを含むどこかのスレッドでのop/pushの際に、うまく更新される。
-				hph_tail_.compare_exchange_weak( std::move( hp_tail_node ), p_nd, std::memory_order_release, std::memory_order_acquire );
+				hph_tail_.compare_exchange_weak( std::move( hp_tail_node ), p_nd, std::memory_order_release );
 				break;
 			}
 			hph_tail_.reuse_to_verify_exchange( hp_tail_node );
@@ -96,6 +95,7 @@ void od_lockfree_fifo::push_back( node_pointer p_nd ) noexcept
 #endif
 	return;
 }
+
 od_lockfree_fifo::node_pointer od_lockfree_fifo::pop_front( void ) noexcept
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
@@ -108,9 +108,6 @@ od_lockfree_fifo::node_pointer od_lockfree_fifo::pop_front( void ) noexcept
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 		pushpop_loop_count_++;
 #endif
-
-		hph_head_.reuse_to_verify_exchange( hp_head_node );
-		hph_tail_.reuse_to_verify_exchange( hp_tail_node );
 
 		if ( !hph_head_.verify_exchange( hp_head_node ) ) {
 			continue;
@@ -166,12 +163,11 @@ void od_lockfree_fifo::pop_front_candidate_callback( const node_pointer p_node_s
 
 od_lockfree_fifo::node_pointer od_lockfree_fifo::release_sentinel_node( void ) noexcept
 {
-	node_pointer p_ans = nullptr;
 	if ( !is_empty() ) {
 		internal::LogOutput( log_type::ERR, "ERR: calling condition is not expected. Before calling release_sentinel_node, this instance should be empty. therefore, now leak all remaining nodes." );
 	}
 
-	p_ans = static_cast<node_pointer>( hph_head_.load() );
+	node_pointer p_ans = hph_head_.load();
 	if ( p_ans == nullptr ) {
 		internal::LogOutput( log_type::WARN, "WARN: sentinel node has already released." );
 	}

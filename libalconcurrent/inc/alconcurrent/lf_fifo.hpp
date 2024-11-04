@@ -457,7 +457,7 @@ private:
 			if ( hp_tail_next == nullptr ) {
 				// typename hazard_pointer::pointer expected = nullptr;   // od_node_link_by_hazard_handler*
 				if ( hp_tail_node->hazard_handler_of_next().compare_exchange_strong( hp_tail_next, p_link_of_nd, std::memory_order_release, std::memory_order_acquire ) ) {
-					hph_tail_.compare_exchange_strong( std::move( hp_tail_node ), p_link_of_nd, std::memory_order_release, std::memory_order_acquire );
+					hph_tail_.compare_exchange_strong( std::move( hp_tail_node ), p_link_of_nd, std::memory_order_release );
 					break;
 				}
 			}

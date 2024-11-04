@@ -134,7 +134,31 @@ protected:
 	test_fifo_type* p_sut_;
 };
 
-TEST_F( Test_od_lockfree_fifo_Highload2, NThread_PushPop )
+TEST_F( Test_od_lockfree_fifo_Highload2, NThread_1thread_PushPop )
+{
+	// Arrange
+	Nthread_push_pop_task_with_node_pool sut_env( 1, *p_sut_ );
+
+	// Act
+	bool ret = sut_env.test_task( 1000 );
+
+	// Assert
+	EXPECT_TRUE( ret );
+}
+
+TEST_F( Test_od_lockfree_fifo_Highload2, NThread_2threads_PushPop )
+{
+	// Arrange
+	Nthread_push_pop_task_with_node_pool sut_env( 2, *p_sut_ );
+
+	// Act
+	bool ret = sut_env.test_task( 1000 );
+
+	// Assert
+	EXPECT_TRUE( ret );
+}
+
+TEST_F( Test_od_lockfree_fifo_Highload2, NThread_32threads_PushPop )
 {
 	// Arrange
 	Nthread_push_pop_task_with_node_pool sut_env( 32, *p_sut_ );
