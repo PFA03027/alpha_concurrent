@@ -449,11 +449,28 @@ public:
 	  : p_( src.p_ )
 	  , os_( std::move( src.os_ ) )
 	{
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
+		if ( os_ == nullptr ) {
+			internal::LogOutput( log_type::ERR, "slot of hazard pointer in hazard_ptr is nullptr" );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+			std::terminate();
+#endif
+		}
+#endif
 		src.p_  = nullptr;
 		src.os_ = internal::hazard_ptr_mgr::AssignHazardPtrSlot( nullptr );
 	}
 	hazard_ptr& operator=( const hazard_ptr& src )
 	{
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
+		if ( os_ == nullptr ) {
+			internal::LogOutput( log_type::ERR, "slot of hazard pointer in hazard_ptr is nullptr" );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+			std::terminate();
+#endif
+		}
+#endif
+
 		if ( this == &src ) return *this;
 
 		p_ = src.p_;
@@ -514,16 +531,92 @@ public:
 	}
 
 private:
-	constexpr hazard_ptr( T* p_arg, internal::hzrd_slot_ownership_t&& os_arg )
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
+#else
+	constexpr
+#endif
+	hazard_ptr( T* p_arg, internal::hzrd_slot_ownership_t os_arg )
 	  : p_( p_arg )
 	  , os_( std::move( os_arg ) )
 	{
 		// 事前条件： os_argには、p_argが格納されていること。
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
+		static std::atomic<int> id_cnt( 1 );
+		int                     cur_id = id_cnt.fetch_add( 1 );
+		if ( os_ == nullptr ) {
+			internal::LogOutput( log_type::ERR, "slot of hazard pointer in hazard_ptr is nullptr, os_.get()=%p vs p_=%p", os_.get(), p_ );
+			bt_info cur_bt;
+			RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
+			cur_bt.dump_to_log( log_type::ERR, 'a', cur_id );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+			throw std::logic_error( "slot of hazard pointer in hazard_ptr is nullptr" );
+#else
+#endif
+		}
+		if ( p_ == nullptr ) {
+			if ( os_->load( std::memory_order_acquire ) != reinterpret_cast<void*>( static_cast<std::uintptr_t>( 1U ) ) ) {
+				internal::LogOutput( log_type::ERR, "p_ is nullptr, but slot of hazard pointer in hazard_ptr is not 1U, os_.get()=%p vs p_=%p", os_.get(), p_ );
+				bt_info cur_bt;
+				RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
+				cur_bt.dump_to_log( log_type::ERR, 'b', cur_id );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+				throw std::logic_error( "p_ is nullptr, but slot of hazard pointer in hazard_ptr is not 1U" );
+#else
+#endif
+			}
+		} else {
+			if ( os_->load( std::memory_order_acquire ) != reinterpret_cast<void*>( p_ ) ) {
+				internal::LogOutput( log_type::ERR, "slot of hazard pointer in hazard_ptr is not same to p_, os_.get()=%p vs p_=%p", os_.get(), p_ );
+				bt_info cur_bt;
+				RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
+				cur_bt.dump_to_log( log_type::ERR, 'c', cur_id );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+				throw std::logic_error( "slot of hazard pointer in hazard_ptr is not same to p_" );
+#else
+#endif
+			}
+		}
+#endif
 	}
 
-	void store( pointer p_arg )
+	void store( pointer p_arg ) noexcept
 	{
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
+		if ( os_ == nullptr ) {
+			internal::LogOutput( log_type::ERR, "slot of hazard pointer in hazard_ptr is nullptr, p_=%p", p_ );
+			bt_info cur_bt;
+			RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
+			cur_bt.dump_to_log( log_type::ERR, 'd', 1 );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+			throw std::logic_error( "slot of hazard pointer in hazard_ptr is nullptr" );
+#else
+#endif
+		}
+#endif
+
 		p_ = p_arg;
+		if ( p_ == nullptr ) {
+			os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
+		} else {
+			os_->store( p_, std::memory_order_release );
+		}
+	}
+
+	void reflect_from_p( void ) noexcept
+	{
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
+		if ( os_ == nullptr ) {
+			internal::LogOutput( log_type::ERR, "slot of hazard pointer in hazard_ptr is nullptr, p_=%p", p_ );
+			bt_info cur_bt;
+			RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
+			cur_bt.dump_to_log( log_type::ERR, 'd', 1 );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+			throw std::logic_error( "slot of hazard pointer in hazard_ptr is nullptr" );
+#else
+#endif
+		}
+#endif
+
 		if ( p_ == nullptr ) {
 			os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
 		} else {
@@ -799,6 +892,26 @@ public:
 		return hazard_pointer( p_expect, std::move( hso ) );
 	}
 
+	hazard_pointer get_to_verify_exchange( void )
+	{
+
+		internal::hzrd_slot_ownership_t hso;
+
+		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
+		hso              = internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_expect );
+
+		return hazard_pointer( p_expect, std::move( hso ) );
+	}
+	bool verify_exchange( hazard_pointer& hp )
+	{
+		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
+		bool    ret      = ( p_expect == hp );
+		if ( !ret ) {
+			hp.store( p_expect );
+		}
+		return ret;
+	}
+
 	void reuse( hazard_pointer& hp_reuse )
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
@@ -816,6 +929,14 @@ public:
 			}
 		} while ( !ap_target_p_.compare_exchange_strong( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) );
 		// TODO: is there any Redundancy ? この方法に冗長性はないか？
+
+		return;
+	}
+
+	void reuse_to_verify_exchange( hazard_pointer& hp_reuse ) const noexcept
+	{
+		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
+		hp_reuse.store( p_expect );
 
 		return;
 	}
@@ -870,7 +991,7 @@ public:
 			// 置き換えに失敗した場合、新たな値が、expected_hzd_ptr.p_に設定されている。
 			// しかし、まだハザードポインタ用のスロットには反映されていないため、更新を行う。
 			do {
-				expected_hzd_ptr.os_->store( expected_hzd_ptr.p_, std::memory_order_release );
+				expected_hzd_ptr.reflect_from_p();
 			} while ( !ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, expected_hzd_ptr.p_, success, failure ) );
 		}
 		return ret;
@@ -886,9 +1007,18 @@ public:
 			// 置き換えに失敗した場合、新たな値が、expected_hzd_ptr.p_に設定されている。
 			// しかし、まだハザードポインタ用のスロットには反映されていないため、更新を行う。
 			do {
-				expected_hzd_ptr.os_->store( expected_hzd_ptr.p_, std::memory_order_release );
+				expected_hzd_ptr.reflect_from_p();
 			} while ( !ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, expected_hzd_ptr.p_, success, failure ) );
 		}
+		return ret;
+	}
+
+	inline bool compare_exchange_weak( hazard_pointer&&  expected_hzd_ptr,
+	                                   pointer           desired,
+	                                   std::memory_order success,
+	                                   std::memory_order failure ) noexcept
+	{
+		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, failure );
 		return ret;
 	}
 
@@ -898,6 +1028,68 @@ public:
 	                                     std::memory_order failure ) noexcept
 	{
 		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, failure );
+		return ret;
+	}
+
+	inline bool compare_exchange_weak_to_verify_exchange1( hazard_pointer&   expected_hzd_ptr,
+	                                                       pointer           desired,
+	                                                       std::memory_order success,
+	                                                       std::memory_order failure ) noexcept
+	{
+		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, failure );
+		if ( ret ) {
+			// 置き換えに成功した場合、desiredがまだハザードポインタ用のスロットには反映されていないため、更新を行う。
+			expected_hzd_ptr.store( desired );
+		} else {
+			// 置き換えに失敗した場合、新たな値が、expected_hzd_ptr.p_に設定されている。
+			// しかし、まだハザードポインタ用のスロットには反映されていないため、更新を行う。
+			expected_hzd_ptr.reflect_from_p();
+		}
+		return ret;
+	}
+
+	inline bool compare_exchange_weak_to_verify_exchange2( hazard_pointer&   expected_hzd_ptr,
+	                                                       pointer           desired,
+	                                                       std::memory_order success,
+	                                                       std::memory_order failure ) noexcept
+	{
+		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, failure );
+		if ( !ret ) {
+			// 置き換えに失敗した場合、新たな値が、expected_hzd_ptr.p_に設定されている。
+			// しかし、まだハザードポインタ用のスロットには反映されていないため、更新を行う。
+			expected_hzd_ptr.reflect_from_p();
+		}
+		return ret;
+	}
+
+	inline bool compare_exchange_strong_to_verify_exchange1( hazard_pointer&   expected_hzd_ptr,
+	                                                         pointer           desired,
+	                                                         std::memory_order success,
+	                                                         std::memory_order failure ) noexcept
+	{
+		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, failure );
+		if ( ret ) {
+			// 置き換えに成功した場合、desiredがまだハザードポインタ用のスロットには反映されていないため、更新を行う。
+			expected_hzd_ptr.store( desired );
+		} else {
+			// 置き換えに失敗した場合、新たな値が、expected_hzd_ptr.p_に設定されている。
+			// しかし、まだハザードポインタ用のスロットには反映されていないため、更新を行う。
+			expected_hzd_ptr.reflect_from_p();
+		}
+		return ret;
+	}
+
+	inline bool compare_exchange_strong_to_verify_exchange2( hazard_pointer&   expected_hzd_ptr,
+	                                                         pointer           desired,
+	                                                         std::memory_order success,
+	                                                         std::memory_order failure ) noexcept
+	{
+		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, failure );
+		if ( !ret ) {
+			// 置き換えに失敗した場合、新たな値が、expected_hzd_ptr.p_に設定されている。
+			// しかし、まだハザードポインタ用のスロットには反映されていないため、更新を行う。
+			expected_hzd_ptr.reflect_from_p();
+		}
 		return ret;
 	}
 

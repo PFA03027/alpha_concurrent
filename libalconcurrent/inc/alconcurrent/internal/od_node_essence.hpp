@@ -103,11 +103,6 @@ public:
 		return hph_next_.get();
 	}
 
-	void reuse_hazard_ptr_of_next( hazard_pointer& hp )
-	{
-		return hph_next_.reuse( hp );
-	}
-
 	hazard_ptr_handler_t& hazard_handler_of_next( void ) noexcept
 	{
 		return hph_next_;
@@ -164,11 +159,6 @@ public:
 	std::tuple<hazard_pointer, bool> get_hazard_ptr_of_next( void )
 	{
 		return hph_next_.get();
-	}
-
-	void reuse_hazard_ptr_of_next( std::tuple<hazard_pointer, bool>& hp )
-	{
-		return hph_next_.reuse( hp );
 	}
 
 	hazard_ptr_handler_t& hazard_handler_of_next( void ) noexcept

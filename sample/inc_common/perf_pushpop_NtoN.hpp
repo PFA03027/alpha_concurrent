@@ -80,7 +80,7 @@ std::tuple<std::size_t, typename FIFOType::value_type> worker_task_pushpop_NtoN(
 }
 
 template <typename FIFOType, size_t N>
-int nwoker_perf_test_pushpop_NtoN( unsigned int nworker, unsigned int exec_sec )
+bool nwoker_perf_test_pushpop_NtoN( unsigned int nworker, unsigned int exec_sec )
 {
 	std::array<FIFOType, N> sut;
 
@@ -121,7 +121,7 @@ int nwoker_perf_test_pushpop_NtoN( unsigned int nworker, unsigned int exec_sec )
 
 	std::cout << "result is count_sum: " << count_sum << "\t\ttotal sum: " << total_sum << "\t\t" << ( ( count_sum == total_sum ) ? "Good" : "FAILED" ) << std::endl;
 
-	return 0;
+	return ( count_sum == total_sum );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -163,7 +163,7 @@ std::tuple<std::size_t, typename FIFOType::value_type> worker_task_pushpop_One(
 }
 
 template <typename FIFOType, size_t N>
-int nwoker_perf_test_pushpop_NParallel( unsigned int exec_sec )
+bool nwoker_perf_test_pushpop_NParallel( unsigned int exec_sec )
 {
 	std::cout << "[Pure Parallel]         number of worker thread is " << std::to_string( N ) << ", N=" << std::to_string( N ) << " \t=-> ";
 
@@ -207,7 +207,7 @@ int nwoker_perf_test_pushpop_NParallel( unsigned int exec_sec )
 		}
 	}
 
-	return 0;
+	return ( count_sum == total_sum );
 }
 
 #endif

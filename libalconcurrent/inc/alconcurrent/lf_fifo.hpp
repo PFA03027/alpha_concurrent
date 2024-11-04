@@ -397,7 +397,7 @@ public:
 					}
 				}
 			}
-			hp_head_node->reuse_hazard_ptr_of_next( hp_head_next );
+			hp_head_node->hazard_handler_of_next().reuse( hp_head_next );
 		}
 	}
 
@@ -466,7 +466,7 @@ private:
 			} else {
 				// こっちに来た場合は、すでに、hp_tail_node は更新済みなので、ハザードポインタの更新作業はなし。
 			}
-			hp_tail_node->reuse_hazard_ptr_of_next( hp_tail_next );
+			hp_tail_node->hazard_handler_of_next().reuse( hp_tail_next );
 		}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
