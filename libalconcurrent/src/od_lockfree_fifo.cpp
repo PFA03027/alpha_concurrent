@@ -60,6 +60,7 @@ void od_lockfree_fifo::push_back( node_pointer p_nd ) noexcept
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 	pushpop_count_++;
 #endif
+	p_nd->set_next( nullptr );
 
 	hazard_pointer hp_tail_node = hph_tail_.get_to_verify_exchange();   // od_node_link_by_hazard_handler::hazard_pointer
 	hazard_pointer hp_tail_next;                                        // od_node_link_by_hazard_handler::hazard_pointer

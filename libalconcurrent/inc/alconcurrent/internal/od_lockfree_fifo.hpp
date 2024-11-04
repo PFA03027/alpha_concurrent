@@ -42,7 +42,7 @@ public:
 	 * This constructor is dengurous, because this api is not consider the concurrency.
 	 */
 	od_lockfree_fifo( od_lockfree_fifo&& src ) noexcept;
-	~od_lockfree_fifo();
+	virtual ~od_lockfree_fifo();
 
 	od_lockfree_fifo( const od_lockfree_fifo& )            = delete;
 	od_lockfree_fifo& operator=( const od_lockfree_fifo& ) = delete;
