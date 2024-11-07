@@ -434,9 +434,9 @@ public:
 	using element_type = T;
 	using pointer      = T*;
 
-	hazard_ptr( void )
-	  : p_( nullptr )
-	  , os_( internal::hazard_ptr_mgr::AssignHazardPtrSlot( nullptr ) )
+	hazard_ptr( pointer p_arg = nullptr )
+	  : p_( p_arg )
+	  , os_( internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_arg ) )
 	{
 	}
 	~hazard_ptr() = default;
@@ -530,6 +530,25 @@ public:
 		return dynamic_cast<typename std::conditional<std::is_const<T>::value, typename std::remove_const<CAST_T>::type*, CAST_T*>::type>( p_ );
 	}
 
+	void store( pointer p_arg ) noexcept
+	{
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
+		if ( os_ == nullptr ) {
+			internal::LogOutput( log_type::ERR, "slot of hazard pointer in hazard_ptr is nullptr, p_=%p", p_ );
+			bt_info cur_bt;
+			RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
+			cur_bt.dump_to_log( log_type::ERR, 'd', 1 );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+			throw std::logic_error( "slot of hazard pointer in hazard_ptr is nullptr" );
+#else
+#endif
+		}
+#endif
+
+		p_ = p_arg;
+		reflect_from_p();
+	}
+
 private:
 #if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
 #else
@@ -579,29 +598,6 @@ private:
 #endif
 	}
 
-	void store( pointer p_arg ) noexcept
-	{
-#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
-		if ( os_ == nullptr ) {
-			internal::LogOutput( log_type::ERR, "slot of hazard pointer in hazard_ptr is nullptr, p_=%p", p_ );
-			bt_info cur_bt;
-			RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
-			cur_bt.dump_to_log( log_type::ERR, 'd', 1 );
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-			throw std::logic_error( "slot of hazard pointer in hazard_ptr is nullptr" );
-#else
-#endif
-		}
-#endif
-
-		p_ = p_arg;
-		if ( p_ == nullptr ) {
-			os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
-		} else {
-			os_->store( p_, std::memory_order_release );
-		}
-	}
-
 	void reflect_from_p( void ) noexcept
 	{
 #if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
@@ -618,9 +614,9 @@ private:
 #endif
 
 		if ( p_ == nullptr ) {
-			os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
+			os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) /*, std::memory_order_release*/ );
 		} else {
-			os_->store( p_, std::memory_order_release );
+			os_->store( p_ /*, std::memory_order_release */ );
 		}
 	}
 
@@ -872,35 +868,23 @@ public:
 		internal::call_count_hazard_ptr_get_++;
 #endif
 
-		internal::hzrd_slot_ownership_t hso;
-
-		// pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
-		hso              = internal::hazard_ptr_mgr::AssignHazardPtrSlot( nullptr );
-		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
-		do {
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+		internal::loop_count_in_hazard_ptr_get_++;
+#endif
+		hazard_pointer hp_ans( ap_target_p_.load( std::memory_order_acquire ) );
+		while ( !ap_target_p_.compare_exchange_strong( hp_ans.p_, hp_ans.p_, std::memory_order_release, std::memory_order_relaxed ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 			internal::loop_count_in_hazard_ptr_get_++;
 #endif
-			if ( p_expect != nullptr ) {
-				hso->store( p_expect, std::memory_order_release );
-			} else {
-				hso->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );   // important
-				break;
-			}
-		} while ( !ap_target_p_.compare_exchange_strong( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) );
+			hp_ans.reflect_from_p();
+		}
 
-		return hazard_pointer( p_expect, std::move( hso ) );
+		return hp_ans;
 	}
 
 	hazard_pointer get_to_verify_exchange( void )
 	{
-
-		internal::hzrd_slot_ownership_t hso;
-
-		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
-		hso              = internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_expect );
-
-		return hazard_pointer( p_expect, std::move( hso ) );
+		return hazard_pointer( ap_target_p_.load( std::memory_order_acquire ) );
 	}
 	bool verify_exchange( hazard_pointer& hp )
 	{

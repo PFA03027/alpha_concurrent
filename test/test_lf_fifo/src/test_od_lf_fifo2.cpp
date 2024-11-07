@@ -23,8 +23,8 @@
 #include "alconcurrent/internal/od_node_pool.hpp"
 
 using test_fifo_type = alpha::concurrent::internal::od_lockfree_fifo;
-// class test_node_type : public alpha::concurrent::internal::od_node_simple_link, public alpha::concurrent::internal::od_node_link_by_hazard_handler {};
-class test_node_type : public alpha::concurrent::internal::od_node_link_by_hazard_handler, public alpha::concurrent::internal::od_node_simple_link {};
+class test_node_type : public alpha::concurrent::internal::od_node_simple_link, public alpha::concurrent::internal::od_node_link_by_hazard_handler {};
+// class test_node_type : public alpha::concurrent::internal::od_node_link_by_hazard_handler, public alpha::concurrent::internal::od_node_simple_link {};
 using test_pool_type = alpha::concurrent::internal::od_node_pool<test_node_type>;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +56,7 @@ struct Nthread_push_pop_task_with_node_pool {
 			}
 			sut_.push_back( p_nd_tmp );
 
-			typename test_fifo_type::node_pointer p_poped_node = sut_.pop_front();
+			typename test_fifo_type::node_pointer p_poped_node = sut_.pop_front( nullptr );
 			if ( p_poped_node == nullptr ) {
 				return false;
 			}
@@ -124,6 +124,8 @@ protected:
 		typename test_fifo_type::node_pointer p_released_sentinel_node = p_sut_->release_sentinel_node();
 		ASSERT_NE( p_released_sentinel_node, nullptr );
 		delete p_released_sentinel_node;
+
+		delete p_sut_;
 
 		int cw, ce;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );

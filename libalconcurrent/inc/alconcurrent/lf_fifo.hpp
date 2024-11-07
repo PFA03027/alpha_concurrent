@@ -18,6 +18,7 @@
 
 #include "hazard_ptr.hpp"
 #include "internal/free_node_storage.hpp"
+#include "internal/od_lockfree_fifo.hpp"
 #include "internal/od_node_essence.hpp"
 #include "internal/od_node_pool.hpp"
 #include "internal/one_way_list_node.hpp"
@@ -224,6 +225,7 @@ private:
 	hazard_ptr_storage_t hzrd_ptr_;
 };
 
+#if 0
 template <typename T>
 class node_fifo_lockfree_base {
 public:
@@ -593,6 +595,165 @@ private:
 	std::atomic<size_t> allocated_node_count_;
 #endif
 };
+
+#else
+template <typename T, typename VALUE_DELETER = deleter_nothing<T>>
+class x_fifo_list {
+public:
+	static_assert( ( !std::is_class<T>::value ) ||
+	                   ( std::is_class<T>::value &&
+	                     std::is_default_constructible<T>::value && std::is_copy_constructible<T>::value && std::is_copy_assignable<T>::value ),
+	               "T should be default constructible, move constructible and move assignable at least" );
+
+	using value_type = T;
+
+	constexpr x_fifo_list( void ) noexcept
+	  : lf_fifo_impl_()
+	  , unused_node_pool_()
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	  , allocated_node_count_( 0 )
+#endif
+	{
+	}
+
+	~x_fifo_list()
+	{
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		internal::LogOutput( log_type::DUMP, "x_stack_list: allocated_node_count = %zu", allocated_node_count_.load() );
+#endif
+
+		VALUE_DELETER                deleter;
+		std::tuple<bool, value_type> tmp = pop();
+		while ( std::get<0>( tmp ) ) {
+			deleter( std::get<1>( tmp ) );
+			tmp = pop();
+		}
+
+		unused_node_pool_.push( lf_fifo_impl_.release_sentinel_node() );
+	}
+
+	void push( const T& v_arg )
+	{
+		node_pointer p_new_nd = unused_node_pool_.pop();
+		if ( p_new_nd == nullptr ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			allocated_node_count_++;
+#endif
+			p_new_nd = new node_type;
+		}
+		p_new_nd->set_value( v_arg );
+		lf_fifo_impl_.push_back( p_new_nd );
+	}
+
+	std::tuple<bool, value_type> pop( void )
+	{
+		value_type   popped_value_storage;
+		node_pointer p_popped_node = lf_fifo_impl_.pop_front( &popped_value_storage );
+		if ( p_popped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
+
+		unused_node_pool_.push( p_popped_node );
+		return std::tuple<bool, value_type> { true, popped_value_storage };
+	}
+
+	bool is_empty( void ) const
+	{
+		return lf_fifo_impl_.is_empty();
+	}
+
+private:
+	class node_type : public alpha::concurrent::internal::od_node_simple_link, public alpha::concurrent::internal::od_node_link_by_hazard_handler {
+	public:
+		using value_type = T;
+
+		node_type( void ) noexcept( std::is_nothrow_default_constructible<value_type>::value )
+		  : od_node_simple_link()
+		  , od_node_link_by_hazard_handler()
+		  , v_ {}
+		{
+		}
+
+		template <bool IsCopyable = std::is_copy_constructible<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
+		explicit node_type( const value_type& v_arg ) noexcept( std::is_nothrow_copy_constructible<value_type>::value )
+		  : od_node_simple_link()
+		  , od_node_link_by_hazard_handler()
+		  , v_( v_arg )
+		{
+		}
+
+		template <bool IsMovable = std::is_move_constructible<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+		explicit node_type( value_type&& v_arg ) noexcept( std::is_nothrow_move_constructible<value_type>::value )
+		  : od_node_simple_link()
+		  , od_node_link_by_hazard_handler()
+		  , v_( std::move( v_arg ) )
+		{
+		}
+
+		void set_value( const value_type& v_arg ) noexcept
+		{
+			v_.store( v_arg, std::memory_order_release );
+		}
+
+		value_type get_value( void ) const noexcept
+		{
+			return v_.load( std::memory_order_acquire );
+		}
+
+	private:
+		std::atomic<value_type> v_;
+	};
+
+	using node_pointer = node_type*;
+
+	class node_fifo_lockfree_t : private od_lockfree_fifo {
+	public:
+		node_fifo_lockfree_t( void )
+		  : od_lockfree_fifo( new x_fifo_list::node_type )
+		{
+		}
+
+		void push_back( x_fifo_list::node_pointer p_nd ) noexcept
+		{
+			od_lockfree_fifo::push_back( p_nd );
+		}
+		x_fifo_list::node_pointer pop_front( x_fifo_list::value_type* p_context_local_data ) noexcept
+		{
+			od_lockfree_fifo::node_pointer p_node = od_lockfree_fifo::pop_front( p_context_local_data );
+			if ( p_node == nullptr ) return nullptr;
+			return static_cast<x_fifo_list::node_pointer>( p_node );
+		}
+
+		x_fifo_list::node_pointer release_sentinel_node( void ) noexcept
+		{
+			od_lockfree_fifo::node_pointer p_node = od_lockfree_fifo::release_sentinel_node();
+			if ( p_node == nullptr ) return nullptr;
+			return static_cast<x_fifo_list::node_pointer>( p_node );
+		}
+
+		bool is_empty( void ) const
+		{
+			return od_lockfree_fifo::is_empty();
+		}
+
+	private:
+		void pop_front_candidate_callback( const od_lockfree_fifo::node_pointer p_node_stored_value, void* p_context_local_data ) override
+		{
+			x_fifo_list::node_type& node_stored_value = *( static_cast<x_fifo_list::node_pointer>( p_node_stored_value ) );   // od_lockfree_fifoに保管されているノードはnode_pointerであることを保証しているため、static_castを使用する。
+
+			x_fifo_list::value_type* p_storage_for_popped_value_ = reinterpret_cast<x_fifo_list::value_type*>( p_context_local_data );
+			*p_storage_for_popped_value_                         = node_stored_value.get_value();
+		}
+	};
+
+	using node_pool_t = od_node_pool<node_type>;
+
+	node_fifo_lockfree_t lf_fifo_impl_;
+	node_pool_t          unused_node_pool_;
+
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	std::atomic<size_t> allocated_node_count_;
+#endif
+};
+#endif
 
 }   // namespace internal
 

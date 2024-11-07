@@ -113,8 +113,8 @@ TEST_F( Test_od_lockfree_fifo, CanPush_Then_Pop )
 
 	// Act
 	sut.push_back( new test_node_type );
-	test_node_type* p_poped_node1 = sut.pop_front();
-	test_node_type* p_poped_node2 = sut.pop_front();
+	test_node_type* p_poped_node1 = sut.pop_front( nullptr );
+	test_node_type* p_poped_node2 = sut.pop_front( nullptr );
 
 	// Assert
 	EXPECT_NE( p_poped_node1, nullptr );
@@ -134,9 +134,9 @@ TEST_F( Test_od_lockfree_fifo, CanPush2_Then_Pop2 )
 	sut.push_back( new test_node_type );
 
 	// Act
-	test_node_type* p_poped_node1 = sut.pop_front();
-	test_node_type* p_poped_node2 = sut.pop_front();
-	test_node_type* p_poped_node3 = sut.pop_front();
+	test_node_type* p_poped_node1 = sut.pop_front( nullptr );
+	test_node_type* p_poped_node2 = sut.pop_front( nullptr );
+	test_node_type* p_poped_node3 = sut.pop_front( nullptr );
 
 	// Assert
 	EXPECT_NE( p_poped_node1, nullptr );
@@ -190,7 +190,7 @@ TEST_F( Test_od_lockfree_fifo, Push_CallIsEmpty_Then_False )
 	// Assert
 	EXPECT_FALSE( ret );
 
-	test_node_type* p_poped_node1 = sut.pop_front();
+	test_node_type* p_poped_node1 = sut.pop_front( nullptr );
 	EXPECT_NE( p_poped_node1, nullptr );
 	delete p_poped_node1;
 
@@ -204,7 +204,7 @@ TEST_F( Test_od_lockfree_fifo, PushPop_CallIsEmpty_Then_True )
 	// Arrange
 	test_fifo_type sut( new test_node_type );
 	sut.push_back( new test_node_type );
-	test_node_type* p_poped_node1 = sut.pop_front();
+	test_node_type* p_poped_node1 = sut.pop_front( nullptr );
 	EXPECT_NE( p_poped_node1, nullptr );
 	delete p_poped_node1;
 
@@ -247,7 +247,7 @@ struct Nthread_push_pop_task {
 
 		while ( loop_flag.load( std::memory_order_acquire ) ) {
 			sut.push_back( new test_node_type );
-			test_node_type* p_poped_node = sut.pop_front();
+			test_node_type* p_poped_node = sut.pop_front( nullptr );
 			if ( p_poped_node == nullptr ) {
 				return false;
 			}
@@ -314,6 +314,8 @@ protected:
 		EXPECT_NE( p_released_sentinel_node, nullptr );
 		delete p_released_sentinel_node;
 
+		delete p_sut_;
+
 		int cw, ce;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
 		EXPECT_EQ( ce, 0 );
@@ -323,7 +325,29 @@ protected:
 	test_fifo_type* p_sut_;
 };
 
-TEST_F( Test_od_lockfree_fifo_Highload, NThread_PushPop )
+TEST_F( Test_od_lockfree_fifo_Highload, NThread_1thread_PushPop )
+{
+	// Arrange
+
+	// Act
+	bool ret = Nthread_push_pop_task::test_task( 1, 1000, *p_sut_ );
+
+	// Assert
+	EXPECT_TRUE( ret );
+}
+
+TEST_F( Test_od_lockfree_fifo_Highload, NThread_2threads_PushPop )
+{
+	// Arrange
+
+	// Act
+	bool ret = Nthread_push_pop_task::test_task( 2, 1000, *p_sut_ );
+
+	// Assert
+	EXPECT_TRUE( ret );
+}
+
+TEST_F( Test_od_lockfree_fifo_Highload, NThread_32threads_PushPop )
 {
 	// Arrange
 

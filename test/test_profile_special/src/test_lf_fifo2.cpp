@@ -39,7 +39,7 @@ TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile1 )
 	using TestType = std::size_t;
 	// using TestType = int;
 
-	std::cout << "--- pre-cpu kicking fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	std::cout << "--- kicking fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
 	bool ret = nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( THREAD_N, 1 );
 
 	// Assert
@@ -47,20 +47,22 @@ TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile1 )
 }
 TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile2 )
 {
-	// using TestType = std::size_t;
+	using TestType = std::size_t;
+	// using TestType = int;
+	bool ret = true;
 
-	// std::cout << "--- fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
-	// bool ret = nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( THREAD_N, 10 );
+	std::cout << "--- kicking fifo_list " << std::to_string( 2 ) << " ---" << std::endl;
+	ret = ret && nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, 2>( 2, 1 );
 
-	// EXPECT_TRUE( ret );
+	EXPECT_TRUE( ret );
 }
-TEST_F( TestLF_2_HighLoad, TC_FIFO2_Profile1 )
+TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile3 )
 {
 	using TestType = std::size_t;
 	// using TestType = int;
 	bool ret = true;
 
-	std::cout << "--- pre-cpu kicking fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	std::cout << "--- kicking fifo_list ---" << std::endl;
 	ret = ret && nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, 1>( 1, 1 );
 	ret = ret && nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, 2>( 2, 1 );
 	ret = ret && nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, 4>( 4, 1 );
@@ -77,32 +79,30 @@ TEST_F( TestLF_2_HighLoad, TC_FIFO2_Profile1 )
 	// Assert
 	EXPECT_TRUE( ret );
 }
-// TEST_F( TestLF_2_HighLoad, TC_FIFO2_Profile2 )
-// {
-// 	using TestType = std::size_t;
-// 	// using TestType = int;
-
-// 	std::cout << "--- fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
-// 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, THREAD_N>( THREAD_N, 10 );
-// 	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::fifo_list<TestType>, 1>( 10 );
-// 	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::fifo_list<TestType>, THREAD_N>( 10 );
-// }
 #endif
 #if 0
-TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile3 )
+TEST_F( TestLF_2_HighLoad, TC_FIFO2_Profile1 )
 {
 	using TestType = std::size_t;
 	// using TestType = int;
 
-	std::cout << "--- pre-cpu kicking obsolate_fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	std::cout << "--- kicking obsolate_fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( THREAD_N, 1 );
+}
+TEST_F( TestLF_2_HighLoad, TC_FIFO2_Profile2 )
+{
+	using TestType = std::size_t;
+	// using TestType = int;
+
+	std::cout << "---kicking obsolate_fifo_list " << std::to_string( 2 ) << " ---" << std::endl;
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, 2>( 2, 1 );
 }
 TEST_F( TestLF_2_HighLoad, TC_FIFO2_Profile3 )
 {
 	using TestType = std::size_t;
 	// using TestType = int;
 
-	std::cout << "--- pre-cpu kicking obsolate_fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	std::cout << "--- kicking obsolate_fifo_list ---" << std::endl;
 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, 1>( 1, 1 );
 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, 2>( 2, 1 );
 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, 4>( 4, 1 );
@@ -116,12 +116,4 @@ TEST_F( TestLF_2_HighLoad, TC_FIFO2_Profile3 )
 	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::obsolate_fifo_list<TestType>, 16>( 1 );
 	nwoker_perf_test_pushpop_NParallel<alpha::concurrent::obsolate_fifo_list<TestType>, 32>( 1 );
 }
-// TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile4 )
-// {
-// 	using TestType = std::size_t;
-// 	// using TestType = int;
-
-// 	std::cout << "--- obsolate_fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
-// 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( THREAD_N, 10 );
-// }
 #endif

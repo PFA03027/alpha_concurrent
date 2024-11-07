@@ -120,6 +120,14 @@
             ]
         },
         {
+            "label": "build with a sanitizer 8",
+            "type": "shell",
+            "command": "make build-test-sanitizer.8.sanitizer",
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
             "label": "test with a sanitizer",
             "type": "shell",
             "command": "bash make_linux_full_sanitizer.sh 6",
