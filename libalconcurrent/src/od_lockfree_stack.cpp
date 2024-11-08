@@ -49,11 +49,6 @@ od_lockfree_stack::~od_lockfree_stack()
 void od_lockfree_stack::push_front( node_pointer p_nd ) noexcept
 {
 	if ( p_nd == nullptr ) return;
-#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_PUSH_FRONT_FUNCTION_NULLPTR
-		// if ( p_nd->next() != nullptr ) {
-		// 	LogOutput( log_type::WARN, "od_lockfree_stack::push_front() receives a od_node_link_by_hazard_handler that has non nullptr in od_node_link_by_hazard_handler::next()" );
-		// }
-#endif
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	pushpop_call_count_++;
 #endif
@@ -64,7 +59,7 @@ void od_lockfree_stack::push_front( node_pointer p_nd ) noexcept
 		pushpop_loop_count_++;
 #endif
 		p_nd->set_next( p_expected );
-	} while ( !hph_head_.compare_exchange_strong( p_expected, p_nd, std::memory_order_release, std::memory_order_relaxed ) );
+	} while ( !hph_head_.compare_exchange_strong( p_expected, p_nd ) );
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	count_++;
 #endif
@@ -76,15 +71,23 @@ od_lockfree_stack::node_pointer od_lockfree_stack::pop_front( void ) noexcept
 	pushpop_call_count_++;
 #endif
 
-	hazard_pointer hp_cur_head = hph_head_.get();
-	node_pointer   p_expected;
-	do {
+	hazard_pointer          hp_cur_head = hph_head_.get_to_verify_exchange();
+	hazard_pointer::pointer p_new_head;
+	while ( true ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		pushpop_loop_count_++;
 #endif
-		p_expected = hp_cur_head.get();
-		if ( p_expected == nullptr ) return nullptr;
-	} while ( !hph_head_.compare_exchange_strong( hp_cur_head, p_expected->next(), std::memory_order_release, std::memory_order_relaxed ) );
+		if ( !hph_head_.verify_exchange( hp_cur_head ) ) {
+			continue;
+		}
+		if ( hp_cur_head == nullptr ) return nullptr;
+
+		p_new_head = hp_cur_head->next();
+		if ( hph_head_.compare_exchange_strong_to_verify_exchange2( hp_cur_head, p_new_head ) ) {
+			// hp_cur_headの所有権を獲得
+			break;
+		}
+	}
 
 	// ここに来た時点で、hp_cur_head で保持されているノードの所有権を確保できた。
 	// ※ 確保しているノードへのポインタを他スレッドでも持っているかもしれないが、
