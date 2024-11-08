@@ -474,7 +474,7 @@ public:
 		if ( this == &src ) return *this;
 
 		p_ = src.p_;
-		os_->store( src.os_->load( std::memory_order_acquire ), std::memory_order_release );
+		os_->store( src.os_->load( std::memory_order_acquire ), internal::hzrd_slot_memory_order_for_store );
 		// nullptrが特別扱いされるため、src側がnullptrだった場合に自然に対応できるようにload()を使う。
 		// p == nullptrで判定しても良いが、どちら効率的かは不明。。。
 
@@ -613,11 +613,7 @@ private:
 		}
 #endif
 
-		if ( p_ == nullptr ) {
-			os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) /*, std::memory_order_release*/ );
-		} else {
-			os_->store( p_ /*, std::memory_order_release */ );
-		}
+		os_->store( ( p_ == nullptr ) ? reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) : p_, internal::hzrd_slot_memory_order_for_store );
 	}
 
 	pointer                         p_;
@@ -840,7 +836,7 @@ public:
 		pointer p_expect = src.ap_target_p_.load( std::memory_order_acquire );
 		do {
 			ap_target_p_.store( p_expect, std::memory_order_release );
-		} while ( !src.ap_target_p_.compare_exchange_weak( p_expect, nullptr, std::memory_order_release, std::memory_order_acquire ) );
+		} while ( !src.ap_target_p_.compare_exchange_weak( p_expect, nullptr, std::memory_order_acq_rel, std::memory_order_acquire ) );
 	}
 	hazard_ptr_handler& operator=( const hazard_ptr_handler& src ) noexcept
 	{
@@ -857,7 +853,7 @@ public:
 		pointer p_expect = src.ap_target_p_.load( std::memory_order_acquire );
 		do {
 			ap_target_p_.store( p_expect, std::memory_order_release );
-		} while ( !src.ap_target_p_.compare_exchange_weak( p_expect, nullptr, std::memory_order_release, std::memory_order_acquire ) );
+		} while ( !src.ap_target_p_.compare_exchange_weak( p_expect, nullptr, std::memory_order_acq_rel, std::memory_order_acquire ) );
 
 		return *this;
 	}
@@ -872,7 +868,7 @@ public:
 		internal::loop_count_in_hazard_ptr_get_++;
 #endif
 		hazard_pointer hp_ans( ap_target_p_.load( std::memory_order_acquire ) );
-		while ( !ap_target_p_.compare_exchange_strong( hp_ans.p_, hp_ans.p_, std::memory_order_release, std::memory_order_relaxed ) ) {
+		while ( !ap_target_p_.compare_exchange_strong( hp_ans.p_, hp_ans.p_, std::memory_order_acq_rel, std::memory_order_acquire ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 			internal::loop_count_in_hazard_ptr_get_++;
 #endif
@@ -911,7 +907,7 @@ public:
 			if ( p_expect == nullptr ) {
 				return;
 			}
-		} while ( !ap_target_p_.compare_exchange_strong( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) );
+		} while ( !ap_target_p_.compare_exchange_strong( p_expect, p_expect, std::memory_order_acq_rel, std::memory_order_acquire ) );
 		// TODO: is there any Redundancy ? この方法に冗長性はないか？
 
 		return;
@@ -937,16 +933,16 @@ public:
 
 	inline bool compare_exchange_weak( pointer&          expected,
 	                                   pointer           desired,
-	                                   std::memory_order success,
-	                                   std::memory_order failure ) noexcept
+	                                   std::memory_order success = std::memory_order_acq_rel,
+	                                   std::memory_order failure = std::memory_order_acquire ) noexcept
 	{
 		return ap_target_p_.compare_exchange_weak( expected, desired, success, failure );
 	}
 
 	inline bool compare_exchange_strong( pointer&          expected,
 	                                     pointer           desired,
-	                                     std::memory_order success,
-	                                     std::memory_order failure ) noexcept
+	                                     std::memory_order success = std::memory_order_acq_rel,
+	                                     std::memory_order failure = std::memory_order_acquire ) noexcept
 	{
 		return ap_target_p_.compare_exchange_strong( expected, desired, success, failure );
 	}
@@ -968,8 +964,8 @@ public:
 	 */
 	inline bool compare_exchange_weak( hazard_pointer&   expected_hzd_ptr,
 	                                   pointer           desired,
-	                                   std::memory_order success,
-	                                   std::memory_order failure ) noexcept
+	                                   std::memory_order success = std::memory_order_acq_rel,
+	                                   std::memory_order failure = std::memory_order_acquire ) noexcept
 	{
 		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, failure );
 		if ( !ret ) {
@@ -999,8 +995,8 @@ public:
 	 */
 	inline bool compare_exchange_strong( hazard_pointer&   expected_hzd_ptr,
 	                                     pointer           desired,
-	                                     std::memory_order success,
-	                                     std::memory_order failure ) noexcept
+	                                     std::memory_order success = std::memory_order_acq_rel,
+	                                     std::memory_order failure = std::memory_order_acquire ) noexcept
 	{
 		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, failure );
 		if ( !ret ) {
@@ -1028,7 +1024,7 @@ public:
 	 */
 	inline bool compare_exchange_weak( hazard_pointer&&  expected_hzd_ptr,
 	                                   pointer           desired,
-	                                   std::memory_order success ) noexcept
+	                                   std::memory_order success = std::memory_order_acq_rel ) noexcept
 	{
 		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, std::memory_order_relaxed );
 		return ret;
@@ -1049,7 +1045,7 @@ public:
 	 */
 	inline bool compare_exchange_strong( hazard_pointer&&  expected_hzd_ptr,
 	                                     pointer           desired,
-	                                     std::memory_order success ) noexcept
+	                                     std::memory_order success = std::memory_order_acq_rel ) noexcept
 	{
 		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, std::memory_order_relaxed );
 		return ret;
@@ -1070,8 +1066,9 @@ public:
 	 */
 	inline bool compare_exchange_weak_to_verify_exchange1( hazard_pointer&   expected_hzd_ptr,
 	                                                       pointer           desired,
-	                                                       std::memory_order success,
-	                                                       std::memory_order failure ) noexcept
+	                                                       std::memory_order success = std::memory_order_acq_rel,
+	                                                       std::memory_order failure = std::memory_order_acquire ) noexcept
+
 	{
 		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, failure );
 		if ( ret ) {
@@ -1100,8 +1097,8 @@ public:
 	 */
 	inline bool compare_exchange_weak_to_verify_exchange2( hazard_pointer&   expected_hzd_ptr,
 	                                                       pointer           desired,
-	                                                       std::memory_order success,
-	                                                       std::memory_order failure ) noexcept
+	                                                       std::memory_order success = std::memory_order_acq_rel,
+	                                                       std::memory_order failure = std::memory_order_acquire ) noexcept
 	{
 		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, failure );
 		if ( !ret ) {
@@ -1127,8 +1124,8 @@ public:
 	 */
 	inline bool compare_exchange_strong_to_verify_exchange1( hazard_pointer&   expected_hzd_ptr,
 	                                                         pointer           desired,
-	                                                         std::memory_order success,
-	                                                         std::memory_order failure ) noexcept
+	                                                         std::memory_order success = std::memory_order_acq_rel,
+	                                                         std::memory_order failure = std::memory_order_acquire ) noexcept
 	{
 		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, failure );
 		if ( ret ) {
@@ -1157,8 +1154,8 @@ public:
 	 */
 	inline bool compare_exchange_strong_to_verify_exchange2( hazard_pointer&   expected_hzd_ptr,
 	                                                         pointer           desired,
-	                                                         std::memory_order success,
-	                                                         std::memory_order failure ) noexcept
+	                                                         std::memory_order success = std::memory_order_acq_rel,
+	                                                         std::memory_order failure = std::memory_order_acquire ) noexcept
 	{
 		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, failure );
 		if ( !ret ) {
@@ -1201,7 +1198,7 @@ public:
 		addr_markable addr_expect = src.a_target_addr_.load( std::memory_order_acquire );
 		do {
 			a_target_addr_.store( addr_expect, std::memory_order_release );
-		} while ( !src.a_target_addr_.compare_exchange_weak( addr_expect, static_cast<addr_markable>( 0U ), std::memory_order_release, std::memory_order_acquire ) );
+		} while ( !src.a_target_addr_.compare_exchange_weak( addr_expect, static_cast<addr_markable>( 0U ), std::memory_order_acq_rel, std::memory_order_acquire ) );
 	}
 	hazard_ptr_w_mark_handler& operator=( const hazard_ptr_w_mark_handler& src ) noexcept
 	{
@@ -1219,7 +1216,7 @@ public:
 		addr_markable           addr_expect = src.a_target_addr_.load( std::memory_order_acquire );
 		do {
 			a_target_addr_.store( addr_expect, std::memory_order_release );
-		} while ( !src.a_target_addr_.compare_exchange_weak( addr_expect, clear_val, std::memory_order_release, std::memory_order_acquire ) );
+		} while ( !src.a_target_addr_.compare_exchange_weak( addr_expect, clear_val, std::memory_order_acq_rel, std::memory_order_acquire ) );
 
 		return *this;
 	}
@@ -1249,7 +1246,7 @@ public:
 				break;
 			}
 
-		} while ( !a_target_addr_.compare_exchange_weak( addr_expect, addr_expect, std::memory_order_release, std::memory_order_relaxed ) );
+		} while ( !a_target_addr_.compare_exchange_weak( addr_expect, addr_expect, std::memory_order_acq_rel, std::memory_order_acquire ) );
 		// TODO: is there any Redundancy ? この方法に冗長性はないか？
 
 		return std::tuple<hazard_pointer, bool> { std::move( ans_hp ), ans_b };
@@ -1278,7 +1275,7 @@ public:
 			}
 			std::get<0>( hp_reuse ).store( p_expect );
 			std::get<1>( hp_reuse ) = expect_mark;
-		} while ( !a_target_addr_.compare_exchange_weak( addr_expect, addr_expect, std::memory_order_release, std::memory_order_relaxed ) );
+		} while ( !a_target_addr_.compare_exchange_weak( addr_expect, addr_expect, std::memory_order_acq_rel, std::memory_order_acquire ) );
 		// TODO: is there any Redundancy ? この方法に冗長性はないか？
 
 		return;
@@ -1296,8 +1293,8 @@ public:
 
 	bool compare_exchange_weak( std::tuple<pointer, bool>&       expected,
 	                            const std::tuple<pointer, bool>& desired,
-	                            std::memory_order                success,
-	                            std::memory_order                failure ) noexcept
+	                            std::memory_order                success = std::memory_order_acq_rel,
+	                            std::memory_order                failure = std::memory_order_acquire ) noexcept
 	{
 		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
 		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );
@@ -1323,8 +1320,8 @@ public:
 
 	bool compare_exchange_strong( std::tuple<pointer, bool>&       expected,
 	                              const std::tuple<pointer, bool>& desired,
-	                              std::memory_order                success,
-	                              std::memory_order                failure ) noexcept
+	                              std::memory_order                success = std::memory_order_acq_rel,
+	                              std::memory_order                failure = std::memory_order_acquire ) noexcept
 	{
 		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
 		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );

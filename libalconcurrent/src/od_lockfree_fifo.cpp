@@ -74,14 +74,14 @@ void od_lockfree_fifo::push_back( node_pointer p_nd ) noexcept
 		hazard_pointer::pointer p_tail_next = hp_tail_node->hazard_handler_of_next().load();
 		if ( p_tail_next != nullptr ) {
 			// tailがまだ最後のノードを指していないので、更新して、やり直す。
-			hph_tail_.compare_exchange_strong_to_verify_exchange1( hp_tail_node, p_tail_next, std::memory_order_release, std::memory_order_acquire );
+			hph_tail_.compare_exchange_strong_to_verify_exchange1( hp_tail_node, p_tail_next );
 			continue;
 		}
 
-		if ( hp_tail_node->hazard_handler_of_next().compare_exchange_strong( p_tail_next, p_nd, std::memory_order_release, std::memory_order_acquire ) ) {
+		if ( hp_tail_node->hazard_handler_of_next().compare_exchange_strong( p_tail_next, p_nd ) ) {
 			// ここに来た時点で、push_backは成功
 			// hph_tail_を可能であれば、更新する。ここで、更新できなくても、自スレッドを含むどこかのスレッドでのpop/pushの際に、うまく更新される。
-			hph_tail_.compare_exchange_weak( std::move( hp_tail_node ), p_nd, std::memory_order_release );
+			hph_tail_.compare_exchange_weak( std::move( hp_tail_node ), p_nd );
 			break;
 		}
 	}
@@ -116,7 +116,7 @@ od_lockfree_fifo::node_pointer od_lockfree_fifo::pop_front( void* p_context_loca
 		hazard_pointer::pointer p_tail_node = hph_tail_.load();
 		if ( hp_head_node == p_tail_node ) {
 			// ここに来た場合、番兵ノードしかないように見えるが、Tailはまだ更新されていないので、tailを更新する。
-			hph_tail_.compare_exchange_strong( p_tail_node, p_head_next, std::memory_order_release, std::memory_order_relaxed );
+			hph_tail_.compare_exchange_strong( p_tail_node, p_head_next );
 			// CASに成功しても失敗しても、処理を続行する。
 			// たとえCASに失敗しても、(他スレッドによって)tailが更新されたことに変わりはないため。
 		}
@@ -128,7 +128,7 @@ od_lockfree_fifo::node_pointer od_lockfree_fifo::pop_front( void* p_context_loca
 
 		// ここに到達した時点で、hp_head_nodeとhp_head_nextがハザードポインタとして登録済みの状態。
 
-		if ( hph_head_.compare_exchange_strong_to_verify_exchange2( hp_head_node, hp_head_next.get(), std::memory_order_release, std::memory_order_acquire ) ) {
+		if ( hph_head_.compare_exchange_strong_to_verify_exchange2( hp_head_node, hp_head_next.get() ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			count_--;
 #endif
