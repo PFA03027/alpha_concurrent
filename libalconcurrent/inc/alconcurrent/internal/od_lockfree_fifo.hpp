@@ -55,7 +55,7 @@ public:
 	 *
 	 * @return od_lockfree_fifo::node_pointer popされたノード。なお、このノードが保持している情報は、すでに無効情報となっている。
 	 */
-	od_lockfree_fifo::node_pointer pop_front( void ) noexcept;
+	od_lockfree_fifo::node_pointer pop_front( void* p_context_local_data ) noexcept;
 
 	/**
 	 * @brief pop_front()処理時に、popの見込みがある場合に、値が入っているノードを参照用に渡す。呼び出される側は必要に応じて、値をコピーする。
@@ -68,7 +68,7 @@ public:
 	 * また、呼び出されたとしても、pop_front()がnullptrを返した場合、popに失敗、つまり他スレッドが先にpopを完了し、保持しているノードがなくなった状態となる場合がある。
 	 * その場合、pop_front_candidate_callback()の呼び出しが無効扱いとすること。
 	 */
-	virtual void pop_front_candidate_callback( const node_pointer p_node_stored_value );
+	virtual void pop_front_candidate_callback( const node_pointer p_node_stored_value, void* p_context_local_data );
 
 	node_pointer release_sentinel_node( void ) noexcept;
 

@@ -434,9 +434,9 @@ public:
 	using element_type = T;
 	using pointer      = T*;
 
-	hazard_ptr( void )
-	  : p_( nullptr )
-	  , os_( internal::hazard_ptr_mgr::AssignHazardPtrSlot( nullptr ) )
+	hazard_ptr( pointer p_arg = nullptr )
+	  : p_( p_arg )
+	  , os_( internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_arg ) )
 	{
 	}
 	~hazard_ptr() = default;
@@ -474,7 +474,7 @@ public:
 		if ( this == &src ) return *this;
 
 		p_ = src.p_;
-		os_->store( src.os_->load( std::memory_order_acquire ), std::memory_order_release );
+		os_->store( src.os_->load( std::memory_order_acquire ), internal::hzrd_slot_memory_order_for_store );
 		// nullptrが特別扱いされるため、src側がnullptrだった場合に自然に対応できるようにload()を使う。
 		// p == nullptrで判定しても良いが、どちら効率的かは不明。。。
 
@@ -530,6 +530,25 @@ public:
 		return dynamic_cast<typename std::conditional<std::is_const<T>::value, typename std::remove_const<CAST_T>::type*, CAST_T*>::type>( p_ );
 	}
 
+	void store( pointer p_arg ) noexcept
+	{
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
+		if ( os_ == nullptr ) {
+			internal::LogOutput( log_type::ERR, "slot of hazard pointer in hazard_ptr is nullptr, p_=%p", p_ );
+			bt_info cur_bt;
+			RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
+			cur_bt.dump_to_log( log_type::ERR, 'd', 1 );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+			throw std::logic_error( "slot of hazard pointer in hazard_ptr is nullptr" );
+#else
+#endif
+		}
+#endif
+
+		p_ = p_arg;
+		reflect_from_p();
+	}
+
 private:
 #if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
 #else
@@ -579,29 +598,6 @@ private:
 #endif
 	}
 
-	void store( pointer p_arg ) noexcept
-	{
-#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
-		if ( os_ == nullptr ) {
-			internal::LogOutput( log_type::ERR, "slot of hazard pointer in hazard_ptr is nullptr, p_=%p", p_ );
-			bt_info cur_bt;
-			RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
-			cur_bt.dump_to_log( log_type::ERR, 'd', 1 );
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-			throw std::logic_error( "slot of hazard pointer in hazard_ptr is nullptr" );
-#else
-#endif
-		}
-#endif
-
-		p_ = p_arg;
-		if ( p_ == nullptr ) {
-			os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
-		} else {
-			os_->store( p_, std::memory_order_release );
-		}
-	}
-
 	void reflect_from_p( void ) noexcept
 	{
 #if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
@@ -617,11 +613,7 @@ private:
 		}
 #endif
 
-		if ( p_ == nullptr ) {
-			os_->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );
-		} else {
-			os_->store( p_, std::memory_order_release );
-		}
+		os_->store( ( p_ == nullptr ) ? reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ) : p_, internal::hzrd_slot_memory_order_for_store );
 	}
 
 	pointer                         p_;
@@ -808,23 +800,6 @@ public:
 	using pointer        = T*;
 	using hazard_pointer = hazard_ptr<T>;
 
-#if 0
-	hazard_ptr_handler( void ) noexcept
-	  : ap_target_p_()
-	{
-		ap_target_p_.store( nullptr, std::memory_order_release );
-	}
-	explicit hazard_ptr_handler( T* p_desired ) noexcept
-	  : ap_target_p_()
-	{
-		ap_target_p_.store( p_desired, std::memory_order_release );
-	}
-	hazard_ptr_handler( const hazard_ptr_handler& src ) noexcept
-	  : ap_target_p_()
-	{
-		ap_target_p_.store( src.ap_target_p_.load( std::memory_order_acquire ), std::memory_order_release );
-	}
-#else
 	constexpr hazard_ptr_handler( void ) noexcept
 	  : ap_target_p_( nullptr )
 	{
@@ -837,14 +812,13 @@ public:
 	  : ap_target_p_( src.ap_target_p_.load( std::memory_order_acquire ) )
 	{
 	}
-#endif
 	hazard_ptr_handler( hazard_ptr_handler&& src ) noexcept
 	  : ap_target_p_()
 	{
 		pointer p_expect = src.ap_target_p_.load( std::memory_order_acquire );
 		do {
 			ap_target_p_.store( p_expect, std::memory_order_release );
-		} while ( !src.ap_target_p_.compare_exchange_weak( p_expect, nullptr, std::memory_order_release, std::memory_order_acquire ) );
+		} while ( !src.ap_target_p_.compare_exchange_weak( p_expect, nullptr, std::memory_order_acq_rel, std::memory_order_acquire ) );
 	}
 	hazard_ptr_handler& operator=( const hazard_ptr_handler& src ) noexcept
 	{
@@ -861,7 +835,7 @@ public:
 		pointer p_expect = src.ap_target_p_.load( std::memory_order_acquire );
 		do {
 			ap_target_p_.store( p_expect, std::memory_order_release );
-		} while ( !src.ap_target_p_.compare_exchange_weak( p_expect, nullptr, std::memory_order_release, std::memory_order_acquire ) );
+		} while ( !src.ap_target_p_.compare_exchange_weak( p_expect, nullptr, std::memory_order_acq_rel, std::memory_order_acquire ) );
 
 		return *this;
 	}
@@ -872,35 +846,23 @@ public:
 		internal::call_count_hazard_ptr_get_++;
 #endif
 
-		internal::hzrd_slot_ownership_t hso;
-
-		// pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
-		hso              = internal::hazard_ptr_mgr::AssignHazardPtrSlot( nullptr );
-		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
-		do {
+#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
+		internal::loop_count_in_hazard_ptr_get_++;
+#endif
+		hazard_pointer hp_ans( ap_target_p_.load( std::memory_order_acquire ) );
+		while ( !ap_target_p_.compare_exchange_strong( hp_ans.p_, hp_ans.p_, std::memory_order_acq_rel, std::memory_order_acquire ) ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 			internal::loop_count_in_hazard_ptr_get_++;
 #endif
-			if ( p_expect != nullptr ) {
-				hso->store( p_expect, std::memory_order_release );
-			} else {
-				hso->store( reinterpret_cast<pointer>( static_cast<std::uintptr_t>( 1U ) ), std::memory_order_release );   // important
-				break;
-			}
-		} while ( !ap_target_p_.compare_exchange_strong( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) );
+			hp_ans.reflect_from_p();
+		}
 
-		return hazard_pointer( p_expect, std::move( hso ) );
+		return hp_ans;
 	}
 
 	hazard_pointer get_to_verify_exchange( void )
 	{
-
-		internal::hzrd_slot_ownership_t hso;
-
-		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
-		hso              = internal::hazard_ptr_mgr::AssignHazardPtrSlot( p_expect );
-
-		return hazard_pointer( p_expect, std::move( hso ) );
+		return hazard_pointer( ap_target_p_.load( std::memory_order_acquire ) );
 	}
 	bool verify_exchange( hazard_pointer& hp )
 	{
@@ -927,7 +889,7 @@ public:
 			if ( p_expect == nullptr ) {
 				return;
 			}
-		} while ( !ap_target_p_.compare_exchange_strong( p_expect, p_expect, std::memory_order_release, std::memory_order_relaxed ) );
+		} while ( !ap_target_p_.compare_exchange_strong( p_expect, p_expect, std::memory_order_acq_rel, std::memory_order_acquire ) );
 		// TODO: is there any Redundancy ? この方法に冗長性はないか？
 
 		return;
@@ -953,38 +915,39 @@ public:
 
 	inline bool compare_exchange_weak( pointer&          expected,
 	                                   pointer           desired,
-	                                   std::memory_order success,
-	                                   std::memory_order failure ) noexcept
+	                                   std::memory_order success = std::memory_order_acq_rel,
+	                                   std::memory_order failure = std::memory_order_acquire ) noexcept
 	{
 		return ap_target_p_.compare_exchange_weak( expected, desired, success, failure );
 	}
 
-	inline bool compare_exchange_weak( pointer&          expected,
-	                                   pointer           desired,
-	                                   std::memory_order order = std::memory_order_seq_cst ) noexcept
-	{
-		return ap_target_p_.compare_exchange_weak( expected, desired, order );
-	}
-
 	inline bool compare_exchange_strong( pointer&          expected,
 	                                     pointer           desired,
-	                                     std::memory_order success,
-	                                     std::memory_order failure ) noexcept
+	                                     std::memory_order success = std::memory_order_acq_rel,
+	                                     std::memory_order failure = std::memory_order_acquire ) noexcept
 	{
 		return ap_target_p_.compare_exchange_strong( expected, desired, success, failure );
 	}
 
-	inline bool compare_exchange_strong( pointer&          expected,
-	                                     pointer           desired,
-	                                     std::memory_order order = std::memory_order_seq_cst ) noexcept
-	{
-		return ap_target_p_.compare_exchange_strong( expected, desired, order );
-	}
-
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_weak を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、
+	 * そうでなければ failure メモリオーダーで expected_hzd_ptr を現在の値で置き換える。
+	 * また、failureケースの置き換え時に自身の現在の値との一致を再確認し、再確認成功後、関数が完了する。
+	 * そのため、compare_exchange_strong_to_verify_exchangeよりも処理が重い。
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。また、expected_hzd_ptrは呼び出し前の状態を維持している。
+	 * @return false CAS操作に失敗。自身が保持するあらなたポインタでexpected_hzd_ptrを置き換えられている。
+	 */
 	inline bool compare_exchange_weak( hazard_pointer&   expected_hzd_ptr,
 	                                   pointer           desired,
-	                                   std::memory_order success,
-	                                   std::memory_order failure ) noexcept
+	                                   std::memory_order success = std::memory_order_acq_rel,
+	                                   std::memory_order failure = std::memory_order_acquire ) noexcept
 	{
 		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, failure );
 		if ( !ret ) {
@@ -997,10 +960,25 @@ public:
 		return ret;
 	}
 
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_strong を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、
+	 * そうでなければ failure メモリオーダーで expected_hzd_ptr を現在の値で置き換える。
+	 * また、failureケースの置き換え時に自身の現在の値との一致を再確認し、再確認成功後、関数が完了する。
+	 * そのため、compare_exchange_strong_to_verify_exchangeよりも処理が重い。
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。また、expected_hzd_ptrは呼び出し前の状態を維持している。
+	 * @return false CAS操作に失敗。自身が保持するあらなたポインタでexpected_hzd_ptrを置き換えられている。
+	 */
 	inline bool compare_exchange_strong( hazard_pointer&   expected_hzd_ptr,
 	                                     pointer           desired,
-	                                     std::memory_order success,
-	                                     std::memory_order failure ) noexcept
+	                                     std::memory_order success = std::memory_order_acq_rel,
+	                                     std::memory_order failure = std::memory_order_acquire ) noexcept
 	{
 		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, failure );
 		if ( !ret ) {
@@ -1013,28 +991,66 @@ public:
 		return ret;
 	}
 
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_weak を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、
+	 *
+	 * なお、expected_hzd_ptr 使用できない状態となるため、expected_hzd_ptr を使い捨てにする場合に使用するI/F。
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照。呼び出し完了後、hazard_ptrとして使用できない。
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @return true CAS操作に成功。
+	 * @return false CAS操作に失敗。
+	 */
 	inline bool compare_exchange_weak( hazard_pointer&&  expected_hzd_ptr,
 	                                   pointer           desired,
-	                                   std::memory_order success,
-	                                   std::memory_order failure ) noexcept
+	                                   std::memory_order success = std::memory_order_acq_rel ) noexcept
 	{
-		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, failure );
+		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, std::memory_order_relaxed );
 		return ret;
 	}
 
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_strong を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、
+	 *
+	 * なお、expected_hzd_ptr 使用できない状態となるため、expected_hzd_ptr を使い捨てにする場合に使用するI/F。
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照。呼び出し完了後、hazard_ptrとして使用できない。
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @return true CAS操作に成功。
+	 * @return false CAS操作に失敗。
+	 */
 	inline bool compare_exchange_strong( hazard_pointer&&  expected_hzd_ptr,
 	                                     pointer           desired,
-	                                     std::memory_order success,
-	                                     std::memory_order failure ) noexcept
+	                                     std::memory_order success = std::memory_order_acq_rel ) noexcept
 	{
-		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, failure );
+		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, std::memory_order_relaxed );
 		return ret;
 	}
 
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_weak を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、expected_hzd_ptr に、desired を反映する。
+	 * そうでなければ failure メモリオーダーで expected_hzd_ptr を現在の値で置き換える。
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。expected_hzd_ptr は、desired で置き換えられている。
+	 * @return false CAS操作に失敗。自身が保持する現在のポインタでexpected_hzd_ptrを置き換えられている。
+	 */
 	inline bool compare_exchange_weak_to_verify_exchange1( hazard_pointer&   expected_hzd_ptr,
 	                                                       pointer           desired,
-	                                                       std::memory_order success,
-	                                                       std::memory_order failure ) noexcept
+	                                                       std::memory_order success = std::memory_order_acq_rel,
+	                                                       std::memory_order failure = std::memory_order_acquire ) noexcept
+
 	{
 		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, failure );
 		if ( ret ) {
@@ -1048,10 +1064,23 @@ public:
 		return ret;
 	}
 
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_weak を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、
+	 * そうでなければ failure メモリオーダーで expected_hzd_ptr を現在の値で置き換える
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。また、expected_hzd_ptrは呼び出し前の状態を維持している。
+	 * @return false CAS操作に失敗。自身が保持するあらなたポインタでexpected_hzd_ptrを置き換えられている。
+	 */
 	inline bool compare_exchange_weak_to_verify_exchange2( hazard_pointer&   expected_hzd_ptr,
 	                                                       pointer           desired,
-	                                                       std::memory_order success,
-	                                                       std::memory_order failure ) noexcept
+	                                                       std::memory_order success = std::memory_order_acq_rel,
+	                                                       std::memory_order failure = std::memory_order_acquire ) noexcept
 	{
 		bool ret = ap_target_p_.compare_exchange_weak( expected_hzd_ptr.p_, desired, success, failure );
 		if ( !ret ) {
@@ -1062,10 +1091,23 @@ public:
 		return ret;
 	}
 
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_strong を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、expected_hzd_ptr に、desired を反映する。
+	 * そうでなければ failure メモリオーダーで expected_hzd_ptr を現在の値で置き換える。
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。expected_hzd_ptr は、desired で置き換えられている。
+	 * @return false CAS操作に失敗。自身が保持する現在のポインタでexpected_hzd_ptrを置き換えられている。
+	 */
 	inline bool compare_exchange_strong_to_verify_exchange1( hazard_pointer&   expected_hzd_ptr,
 	                                                         pointer           desired,
-	                                                         std::memory_order success,
-	                                                         std::memory_order failure ) noexcept
+	                                                         std::memory_order success = std::memory_order_acq_rel,
+	                                                         std::memory_order failure = std::memory_order_acquire ) noexcept
 	{
 		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, failure );
 		if ( ret ) {
@@ -1079,10 +1121,23 @@ public:
 		return ret;
 	}
 
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_strong を使用する。
+	 *
+	 * 現在の値と expected_hzd_ptr が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、
+	 * そうでなければ failure メモリオーダーで expected_hzd_ptr を現在の値で置き換える
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。また、expected_hzd_ptrは呼び出し前の状態を維持している。
+	 * @return false CAS操作に失敗。自身が保持するあらなたポインタでexpected_hzd_ptrを置き換えられている。
+	 */
 	inline bool compare_exchange_strong_to_verify_exchange2( hazard_pointer&   expected_hzd_ptr,
 	                                                         pointer           desired,
-	                                                         std::memory_order success,
-	                                                         std::memory_order failure ) noexcept
+	                                                         std::memory_order success = std::memory_order_acq_rel,
+	                                                         std::memory_order failure = std::memory_order_acquire ) noexcept
 	{
 		bool ret = ap_target_p_.compare_exchange_strong( expected_hzd_ptr.p_, desired, success, failure );
 		if ( !ret ) {
@@ -1125,7 +1180,7 @@ public:
 		addr_markable addr_expect = src.a_target_addr_.load( std::memory_order_acquire );
 		do {
 			a_target_addr_.store( addr_expect, std::memory_order_release );
-		} while ( !src.a_target_addr_.compare_exchange_weak( addr_expect, static_cast<addr_markable>( 0U ), std::memory_order_release, std::memory_order_acquire ) );
+		} while ( !src.a_target_addr_.compare_exchange_weak( addr_expect, static_cast<addr_markable>( 0U ), std::memory_order_acq_rel, std::memory_order_acquire ) );
 	}
 	hazard_ptr_w_mark_handler& operator=( const hazard_ptr_w_mark_handler& src ) noexcept
 	{
@@ -1143,7 +1198,7 @@ public:
 		addr_markable           addr_expect = src.a_target_addr_.load( std::memory_order_acquire );
 		do {
 			a_target_addr_.store( addr_expect, std::memory_order_release );
-		} while ( !src.a_target_addr_.compare_exchange_weak( addr_expect, clear_val, std::memory_order_release, std::memory_order_acquire ) );
+		} while ( !src.a_target_addr_.compare_exchange_weak( addr_expect, clear_val, std::memory_order_acq_rel, std::memory_order_acquire ) );
 
 		return *this;
 	}
@@ -1173,7 +1228,7 @@ public:
 				break;
 			}
 
-		} while ( !a_target_addr_.compare_exchange_weak( addr_expect, addr_expect, std::memory_order_release, std::memory_order_relaxed ) );
+		} while ( !a_target_addr_.compare_exchange_weak( addr_expect, addr_expect, std::memory_order_acq_rel, std::memory_order_acquire ) );
 		// TODO: is there any Redundancy ? この方法に冗長性はないか？
 
 		return std::tuple<hazard_pointer, bool> { std::move( ans_hp ), ans_b };
@@ -1202,7 +1257,7 @@ public:
 			}
 			std::get<0>( hp_reuse ).store( p_expect );
 			std::get<1>( hp_reuse ) = expect_mark;
-		} while ( !a_target_addr_.compare_exchange_weak( addr_expect, addr_expect, std::memory_order_release, std::memory_order_relaxed ) );
+		} while ( !a_target_addr_.compare_exchange_weak( addr_expect, addr_expect, std::memory_order_acq_rel, std::memory_order_acquire ) );
 		// TODO: is there any Redundancy ? この方法に冗長性はないか？
 
 		return;
@@ -1220,8 +1275,8 @@ public:
 
 	bool compare_exchange_weak( std::tuple<pointer, bool>&       expected,
 	                            const std::tuple<pointer, bool>& desired,
-	                            std::memory_order                success,
-	                            std::memory_order                failure ) noexcept
+	                            std::memory_order                success = std::memory_order_acq_rel,
+	                            std::memory_order                failure = std::memory_order_acquire ) noexcept
 	{
 		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
 		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );
@@ -1247,8 +1302,8 @@ public:
 
 	bool compare_exchange_strong( std::tuple<pointer, bool>&       expected,
 	                              const std::tuple<pointer, bool>& desired,
-	                              std::memory_order                success,
-	                              std::memory_order                failure ) noexcept
+	                              std::memory_order                success = std::memory_order_acq_rel,
+	                              std::memory_order                failure = std::memory_order_acquire ) noexcept
 	{
 		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
 		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );

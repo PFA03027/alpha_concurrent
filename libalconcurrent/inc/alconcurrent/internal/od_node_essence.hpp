@@ -78,7 +78,7 @@ public:
 	using hazard_ptr_handler_t = hazard_ptr_handler<od_node_link_by_hazard_handler>;
 	using hazard_pointer       = typename hazard_ptr_handler<od_node_link_by_hazard_handler>::hazard_pointer;
 
-	explicit od_node_link_by_hazard_handler( od_node_link_by_hazard_handler* p_next_arg = nullptr ) noexcept
+	explicit constexpr od_node_link_by_hazard_handler( od_node_link_by_hazard_handler* p_next_arg = nullptr ) noexcept
 	  : hph_next_( p_next_arg )
 	{
 	}

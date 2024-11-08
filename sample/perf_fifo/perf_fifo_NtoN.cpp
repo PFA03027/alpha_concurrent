@@ -113,14 +113,6 @@ using TestType = std::size_t;
 template <size_t SUT_N>
 int nwoker_perf_test_stack_NtoN_sub( unsigned int nworker )
 {
-	std::cout << "--- obsolate_fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( nworker * 2, 1 );
-	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( nworker, 1 );
-	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( nworker / 2, 1 );
-	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( 4, 1 );
-	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( 2, 1 );
-	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_fifo_list<TestType>, SUT_N>( 1, 1 );
-
 	std::cout << "--- fifo_list " << std::to_string( SUT_N ) << " ---" << std::endl;
 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( nworker * 2, 1 );
 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::fifo_list<TestType>, SUT_N>( nworker, 1 );

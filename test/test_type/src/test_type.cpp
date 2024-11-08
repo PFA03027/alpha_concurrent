@@ -51,7 +51,6 @@ int main( void )
 	               "Oh no..." );
 	alpha::concurrent::internal::one_way_list_node<int*>       a5;
 	alpha::concurrent::internal::one_way_list_node<int, false> a6;
-	alpha::concurrent::internal::fifo_nd_list<int>             a7;
 	alpha::concurrent::fifo_list<int>                          a8;
 	alpha::concurrent::fifo_list<int*>                         b9;    // move ownership
 	alpha::concurrent::fifo_list<int*, false>                  c10;   // no move ownership

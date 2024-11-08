@@ -23,8 +23,8 @@
 #include "alconcurrent/internal/od_node_pool.hpp"
 
 using test_fifo_type = alpha::concurrent::internal::od_lockfree_fifo;
-// class test_node_type : public alpha::concurrent::internal::od_node_simple_link, public alpha::concurrent::internal::od_node_link_by_hazard_handler {};
-class test_node_type : public alpha::concurrent::internal::od_node_link_by_hazard_handler, public alpha::concurrent::internal::od_node_simple_link {};
+class test_node_type : public alpha::concurrent::internal::od_node_simple_link, public alpha::concurrent::internal::od_node_link_by_hazard_handler {};
+// class test_node_type : public alpha::concurrent::internal::od_node_link_by_hazard_handler, public alpha::concurrent::internal::od_node_simple_link {};
 using test_pool_type = alpha::concurrent::internal::od_node_pool<test_node_type>;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +56,7 @@ struct Nthread_push_pop_task_with_node_pool {
 			}
 			sut_.push_back( p_nd_tmp );
 
-			typename test_fifo_type::node_pointer p_poped_node = sut_.pop_front();
+			typename test_fifo_type::node_pointer p_poped_node = sut_.pop_front( nullptr );
 			if ( p_poped_node == nullptr ) {
 				return false;
 			}
@@ -125,6 +125,8 @@ protected:
 		ASSERT_NE( p_released_sentinel_node, nullptr );
 		delete p_released_sentinel_node;
 
+		delete p_sut_;
+
 		int cw, ce;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
 		EXPECT_EQ( ce, 0 );
@@ -134,7 +136,31 @@ protected:
 	test_fifo_type* p_sut_;
 };
 
-TEST_F( Test_od_lockfree_fifo_Highload2, NThread_PushPop )
+TEST_F( Test_od_lockfree_fifo_Highload2, NThread_1thread_PushPop )
+{
+	// Arrange
+	Nthread_push_pop_task_with_node_pool sut_env( 1, *p_sut_ );
+
+	// Act
+	bool ret = sut_env.test_task( 1000 );
+
+	// Assert
+	EXPECT_TRUE( ret );
+}
+
+TEST_F( Test_od_lockfree_fifo_Highload2, NThread_2threads_PushPop )
+{
+	// Arrange
+	Nthread_push_pop_task_with_node_pool sut_env( 2, *p_sut_ );
+
+	// Act
+	bool ret = sut_env.test_task( 1000 );
+
+	// Assert
+	EXPECT_TRUE( ret );
+}
+
+TEST_F( Test_od_lockfree_fifo_Highload2, NThread_32threads_PushPop )
 {
 	// Arrange
 	Nthread_push_pop_task_with_node_pool sut_env( 32, *p_sut_ );

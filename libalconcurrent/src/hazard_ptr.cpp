@@ -74,7 +74,7 @@ hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 	// 未割当スロットかどうかをチェックする。
 	// なお、thisのインスタンスはスレッドローカル変数なので、スレッド間競合は考えなくてよい。
 	if ( next_assign_hint_it_->load( std::memory_order_acquire ) == nullptr ) {
-		next_assign_hint_it_->store( p, std::memory_order_release );
+		next_assign_hint_it_->store( p, internal::hzrd_slot_memory_order_for_store );
 		ans = hzrd_slot_ownership_t( &( *next_assign_hint_it_ ) );
 		++next_assign_hint_it_;
 		if ( next_assign_hint_it_ == end() ) {
@@ -91,7 +91,7 @@ hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 		loop_count_in_try_assign_++;
 #endif
 		if ( it->load( std::memory_order_acquire ) == nullptr ) {
-			it->store( p, std::memory_order_release );
+			it->store( p, internal::hzrd_slot_memory_order_for_store );
 			ans = hzrd_slot_ownership_t( &( *it ) );
 			++it;
 			if ( it == end() ) {
@@ -108,7 +108,7 @@ hzrd_slot_ownership_t hazard_ptr_group::try_assign( void* p )
 		loop_count_in_try_assign_++;
 #endif
 		if ( it->load( std::memory_order_acquire ) == nullptr ) {
-			it->store( p, std::memory_order_release );
+			it->store( p, internal::hzrd_slot_memory_order_for_store );
 			ans = hzrd_slot_ownership_t( &( *it ) );
 			++it;
 			if ( it == end() ) {
