@@ -462,8 +462,6 @@ TEST_F( lffifoTest, Array2 )
 }
 
 // 以下はtrivially_copyableではないクラスでfifoを使用する場合のテストケース。
-// trivially_copyableではないクラスに適応後、復活させる。
-#if 0
 TEST_F( lffifoTest, FixedArray1 )
 {
 	using test_fifo_type3 = alpha::concurrent::fifo_list<array_test[2]>;
@@ -506,4 +504,3 @@ TEST_F( lffifoTest, FixedArray2 )
 
 	std::cout << "End Array array_test[2] test" << std::endl;
 }
-#endif

@@ -121,16 +121,26 @@ private:
 
 		void set_value( const value_type& v_arg ) noexcept
 		{
-			v_.store( v_arg, std::memory_order_release );
+			// v_.store( v_arg, std::memory_order_release );
+			v_ = v_arg;
 		}
 
-		value_type get_value( void ) const noexcept
+		const value_type& get_value( void ) const& noexcept
 		{
-			return v_.load( std::memory_order_acquire );
+			return v_;
+		}
+		value_type& get_value( void ) & noexcept
+		{
+			return v_;
+		}
+		value_type get_value( void ) && noexcept
+		{
+			return std::move( v_ );
 		}
 
 	private:
-		std::atomic<value_type> v_;
+		// std::atomic<value_type> v_;
+		value_type v_;
 	};
 
 	using node_pointer = node_type*;
