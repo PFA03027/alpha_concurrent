@@ -27,9 +27,6 @@ namespace concurrent {
 
 namespace internal {
 
-class x_stack_node : public od_node_simple_link, public od_node_link_by_hazard_handler {
-};
-
 template <typename T, typename VALUE_DELETER = deleter_nothing<T>>
 class x_stack_list {
 public:
@@ -42,7 +39,6 @@ public:
 
 	constexpr x_stack_list( void ) noexcept
 	  : lf_stack_impl_()
-	  , unused_node_pool_()
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	  , allocated_node_count_( 0 )
 #endif
@@ -74,28 +70,28 @@ public:
 	template <bool IsCopyConstructible = std::is_copy_constructible<T>::value, bool IsCopyAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsCopyConstructible && IsCopyAssignable>::type* = nullptr>
 	void push( const T& v_arg )
 	{
-		node_pointer p_new_nd = unused_node_pool_.pop();
+		node_pointer p_new_nd = node_pool_t::pop();
 		if ( p_new_nd != nullptr ) {
-			p_new_nd->get() = v_arg;
+			p_new_nd->set_value( v_arg );
 		} else {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			allocated_node_count_++;
 #endif
-			p_new_nd = new node_type( nullptr, v_arg );
+			p_new_nd = new node_type( v_arg );
 		}
 		lf_stack_impl_.push_front( p_new_nd );
 	}
 	template <bool IsMoveConstructible = std::is_move_constructible<T>::value, bool IsMoveAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
 	void push( T&& v_arg )
 	{
-		node_pointer p_new_nd = unused_node_pool_.pop();
+		node_pointer p_new_nd = node_pool_t::pop();
 		if ( p_new_nd != nullptr ) {
-			p_new_nd->get() = std::move( v_arg );
+			p_new_nd->set_value( std::move( v_arg ) );
 		} else {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			allocated_node_count_++;
 #endif
-			p_new_nd = new node_type( nullptr, std::move( v_arg ) );
+			p_new_nd = new node_type( std::move( v_arg ) );
 		}
 		lf_stack_impl_.push_front( p_new_nd );
 	}
@@ -107,8 +103,8 @@ public:
 		node_pointer p_poped_node = static_cast<node_pointer>( lf_stack_impl_.pop_front() );   // このクラスが保持するノードは、すべてnode_pointerであることをpush関数で保証しているので、dynamic_castは不要。
 		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
-		std::tuple<bool, value_type> ans { true, std::move( p_poped_node->get() ) };
-		unused_node_pool_.push( p_poped_node );
+		std::tuple<bool, value_type> ans { true, std::move( p_poped_node->get_value() ) };
+		node_pool_t::push( p_poped_node );
 		return ans;
 	}
 	template <bool IsMoveConstructible = std::is_move_constructible<T>::value, bool IsCopyConstructible = std::is_copy_constructible<T>::value,
@@ -119,8 +115,8 @@ public:
 		node_pointer p_poped_node = static_cast<node_pointer>( lf_stack_impl_.pop_front() );   // このクラスが保持するノードは、すべてnode_pointerであることをpush関数で保証しているので、dynamic_castは不要。
 		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
-		std::tuple<bool, value_type> ans { true, p_poped_node->get() };
-		unused_node_pool_.push( p_poped_node );
+		std::tuple<bool, value_type> ans { true, p_poped_node->get_value() };
+		node_pool_t::push( p_poped_node );
 		return ans;
 	}
 
@@ -130,14 +126,57 @@ public:
 	}
 
 private:
-	using node_type    = od_node_basic<T>;
-	using node_pointer = od_node_basic<T>*;
+	/**
+	 * @brief node of this x_stack_list class
+	 */
+	class x_stack_list_node : public value_carrier<T>, public od_node_simple_link, public od_node_link_by_hazard_handler {
+	public:
+		using value_type           = T;
+		using reference_type       = T&;
+		using const_reference_type = const T&;
+
+		template <bool IsDefaultConstructible = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructible>::type* = nullptr>
+		x_stack_list_node( void ) noexcept( std::is_nothrow_default_constructible<value_type>::value )
+		  : value_carrier<T>()
+		  , od_node_simple_link()
+		  , od_node_link_by_hazard_handler()
+		{
+		}
+
+		template <bool IsCopyable = std::is_copy_constructible<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
+		x_stack_list_node( const value_type& v_arg ) noexcept( std::is_nothrow_copy_constructible<value_type>::value )
+		  : value_carrier<T>( v_arg )
+		  , od_node_simple_link()
+		  , od_node_link_by_hazard_handler()
+		{
+		}
+
+		template <bool IsMovable = std::is_move_constructible<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+		x_stack_list_node( value_type&& v_arg ) noexcept( std::is_nothrow_move_constructible<value_type>::value )
+		  : value_carrier<T>( std::move( v_arg ) )
+		  , od_node_simple_link()
+		  , od_node_link_by_hazard_handler()
+		{
+		}
+
+		template <typename Arg1st, typename... RemainingArgs,
+		          typename RemoveCVArg1st                                                          = typename std::remove_reference<typename std::remove_const<Arg1st>::type>::type,
+		          typename std::enable_if<!std::is_same<RemoveCVArg1st, value_type>::value>::type* = nullptr>
+		x_stack_list_node( Arg1st&& arg1, RemainingArgs&&... args )
+		  : value_carrier<T>( std::forward<Arg1st>( arg1 ), std::forward<RemainingArgs>( args )... )
+		  , od_node_simple_link()
+		  , od_node_link_by_hazard_handler()
+		{
+		}
+	};
+
+	using node_type    = x_stack_list_node;
+	using node_pointer = x_stack_list_node*;
 
 	using node_stack_lockfree_t = od_lockfree_stack;
 	using node_pool_t           = od_node_pool<node_type>;
 
 	node_stack_lockfree_t lf_stack_impl_;
-	node_pool_t           unused_node_pool_;
 
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	std::atomic<size_t> allocated_node_count_;

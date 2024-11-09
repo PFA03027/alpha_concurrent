@@ -40,7 +40,6 @@ public:
 
 	constexpr x_fifo_list( void ) noexcept
 	  : lf_fifo_impl_()
-	  , unused_node_pool_()
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	  , allocated_node_count_( 0 )
 #endif
@@ -60,12 +59,12 @@ public:
 			tmp = pop();
 		}
 
-		unused_node_pool_.push( lf_fifo_impl_.release_sentinel_node() );
+		node_pool_t::push( lf_fifo_impl_.release_sentinel_node() );
 	}
 
 	void push( const T& v_arg )
 	{
-		node_pointer p_new_nd = unused_node_pool_.pop();
+		node_pointer p_new_nd = node_pool_t::pop();
 		if ( p_new_nd == nullptr ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			allocated_node_count_++;
@@ -82,7 +81,7 @@ public:
 		node_pointer p_popped_node = lf_fifo_impl_.pop_front( &popped_value_storage );
 		if ( p_popped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
 
-		unused_node_pool_.push( p_popped_node );
+		node_pool_t::push( p_popped_node );
 		return std::tuple<bool, value_type> { true, popped_value_storage };
 	}
 
@@ -188,7 +187,6 @@ private:
 	using node_pool_t = od_node_pool<node_type>;
 
 	node_fifo_lockfree_t lf_fifo_impl_;
-	node_pool_t          unused_node_pool_;
 
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	std::atomic<size_t> allocated_node_count_;
