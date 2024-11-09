@@ -236,6 +236,7 @@ struct Nthread_push_pop_task {
 				while ( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( used_nodes_list_.front() ) ) {
 					std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
 				}
+				delete used_nodes_list_.front();
 			}
 			used_nodes_list_.pop_front();
 		}
