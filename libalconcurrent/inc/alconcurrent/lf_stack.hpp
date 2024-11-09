@@ -66,7 +66,10 @@ public:
 		}
 	}
 
-	template <bool IsCopyConstructible = std::is_copy_constructible<T>::value, bool IsCopyAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsCopyConstructible && IsCopyAssignable>::type* = nullptr>
+	template <bool IsCopyConstructible = std::is_copy_constructible<value_type>::value,
+	          bool IsCopyAssignable    = std::is_copy_assignable<value_type>::value,
+	          typename std::enable_if<
+				  IsCopyConstructible && IsCopyAssignable>::type* = nullptr>
 	void push( const T& v_arg )
 	{
 		node_pointer p_new_nd = node_pool_t::pop();
@@ -80,7 +83,11 @@ public:
 		}
 		lf_stack_impl_.push_front( p_new_nd );
 	}
-	template <bool IsMoveConstructible = std::is_move_constructible<T>::value, bool IsMoveAssignable = std::is_copy_assignable<T>::value, typename std::enable_if<IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
+
+	template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
+	          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
+	          typename std::enable_if<
+				  IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
 	void push( T&& v_arg )
 	{
 		node_pointer p_new_nd = node_pool_t::pop();
@@ -95,7 +102,10 @@ public:
 		lf_stack_impl_.push_front( p_new_nd );
 	}
 
-	template <bool IsMoveConstructible = std::is_move_constructible<T>::value, typename std::enable_if<IsMoveConstructible>::type* = nullptr>
+	template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
+	          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
+	          typename std::enable_if<
+				  IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
 	std::tuple<bool, value_type> pop( void )
 	{
 		// TがMove可能である場合に選択されるAPI実装
@@ -106,8 +116,13 @@ public:
 		node_pool_t::push( p_poped_node );
 		return ans;
 	}
-	template <bool IsMoveConstructible = std::is_move_constructible<T>::value, bool IsCopyConstructible = std::is_copy_constructible<T>::value,
-	          typename std::enable_if<!IsMoveConstructible && IsCopyConstructible>::type* = nullptr>
+
+	template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
+	          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
+	          bool IsCopyConstructible = std::is_copy_constructible<value_type>::value,
+	          bool IsCopyAssignable    = std::is_copy_assignable<value_type>::value,
+	          typename std::enable_if<
+				  !( IsMoveConstructible && IsMoveAssignable ) && ( IsCopyConstructible && IsCopyAssignable )>::type* = nullptr>
 	std::tuple<bool, value_type> pop( void )
 	{
 		// TがMove不可能であるが、Copy可能である場合に選択されるAPI実装

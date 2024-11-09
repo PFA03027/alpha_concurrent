@@ -362,6 +362,28 @@ TEST_F( lfStackTest, Pointer2 )
 	std::cout << "End Pointer test" << std::endl;
 }
 
+TEST_F( lfStackTest, CanCal_With_Unique_ptr )
+{
+	// Arrange
+	using test_fifo_type3 = alpha::concurrent::stack_list<std::unique_ptr<int>>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "unique_ptr test" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	std::unique_ptr<int> up_tv( new int );
+	*up_tv = 12;
+
+	// Act
+	p_test_obj->push( std::move( up_tv ) );
+	auto ret = p_test_obj->pop();
+
+	// Assert
+	ASSERT_TRUE( std::get<0>( ret ) );
+	ASSERT_NE( std::get<1>( ret ), nullptr );
+	EXPECT_EQ( *( std::get<1>( ret ) ), 12 );
+}
+
 class array_test {
 public:
 	array_test( void )

@@ -66,35 +66,46 @@ public:
 		node_pool_t::push( lf_fifo_impl_.release_sentinel_node() );
 	}
 
-	template <bool IsCopyable = std::is_copy_assignable<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
+	template <bool IsCopyConstructible = std::is_copy_constructible<value_type>::value,
+	          bool IsCopyAssignable    = std::is_copy_assignable<value_type>::value,
+	          typename std::enable_if<
+				  IsCopyConstructible && IsCopyAssignable>::type* = nullptr>
 	void push( const T& v_arg )
 	{
 		node_pointer p_new_nd = node_pool_t::pop();
-		if ( p_new_nd == nullptr ) {
+		if ( p_new_nd != nullptr ) {
+			p_new_nd->set_value( v_arg );
+		} else {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			allocated_node_count_++;
 #endif
-			p_new_nd = new node_type;
+			p_new_nd = new node_type( v_arg );
 		}
-		p_new_nd->set_value( v_arg );
 		lf_fifo_impl_.push_back( p_new_nd );
 	}
 
-	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+	template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
+	          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
+	          typename std::enable_if<
+				  IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
 	void push( T&& v_arg )
 	{
 		node_pointer p_new_nd = node_pool_t::pop();
-		if ( p_new_nd == nullptr ) {
+		if ( p_new_nd != nullptr ) {
+			p_new_nd->set_value( std::move( v_arg ) );
+		} else {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			allocated_node_count_++;
 #endif
-			p_new_nd = new node_type;
+			p_new_nd = new node_type( std::move( v_arg ) );
 		}
-		p_new_nd->set_value( std::move( v_arg ) );
 		lf_fifo_impl_.push_back( p_new_nd );
 	}
 
-	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+	template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
+	          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
+	          typename std::enable_if<
+				  IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
 	std::tuple<bool, value_type> pop( void )
 	{
 		value_type   popped_value_storage;
@@ -105,9 +116,12 @@ public:
 		return std::tuple<bool, value_type> { true, std::move( popped_value_storage ) };
 	}
 
-	template <bool IsMovable                                           = std::is_move_assignable<value_type>::value,
-	          bool IsCopyable                                          = std::is_copy_assignable<value_type>::value,
-	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
+	template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
+	          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
+	          bool IsCopyConstructible = std::is_copy_constructible<value_type>::value,
+	          bool IsCopyAssignable    = std::is_copy_assignable<value_type>::value,
+	          typename std::enable_if<
+				  !( IsMoveConstructible && IsMoveAssignable ) && ( IsCopyConstructible && IsCopyAssignable )>::type* = nullptr>
 	std::tuple<bool, value_type> pop( void )
 	{
 		value_type   popped_value_storage;
