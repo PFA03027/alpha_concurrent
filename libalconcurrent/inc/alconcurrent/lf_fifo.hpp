@@ -176,7 +176,7 @@ private:
 		}
 
 	private:
-		void pop_front_candidate_callback( const od_lockfree_fifo::node_pointer p_node_stored_value, void* p_context_local_data ) override
+		void callback_to_pick_up_value( od_lockfree_fifo::node_pointer p_node_stored_value, void* p_context_local_data ) override
 		{
 			x_fifo_list::node_type& node_stored_value = *( static_cast<x_fifo_list::node_pointer>( p_node_stored_value ) );   // od_lockfree_fifoに保管されているノードはnode_pointerであることを保証しているため、static_castを使用する。
 

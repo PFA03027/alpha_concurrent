@@ -132,7 +132,7 @@ od_lockfree_fifo::node_pointer od_lockfree_fifo::pop_front( void* p_context_loca
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			count_--;
 #endif
-			pop_front_candidate_callback( hp_head_next.get(), p_context_local_data );
+			callback_to_pick_up_value( hp_head_next.get(), p_context_local_data );
 			// ここで、headの取り出しと所有権確保が完了
 			// ただし、headノードへのポインタがハザードポインタに登録されているかどうかをチェックしていないため、まだ参照している人がいるかもしれない。
 			return hp_head_node.get();
@@ -142,7 +142,7 @@ od_lockfree_fifo::node_pointer od_lockfree_fifo::pop_front( void* p_context_loca
 	return nullptr;
 }
 
-void od_lockfree_fifo::pop_front_candidate_callback( const node_pointer p_node_stored_value, void* p_context_local_data )
+void od_lockfree_fifo::callback_to_pick_up_value( node_pointer p_node_stored_value, void* p_context_local_data )
 {
 }
 
