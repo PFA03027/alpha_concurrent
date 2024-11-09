@@ -263,6 +263,100 @@ private:
 	value_type v_;
 };
 
+/**
+ * @brief node of one direction list
+ *
+ * @tparam T value type kept in this class
+ */
+template <typename T>
+class od_node_type1 : public value_carrier<T>, public od_node_simple_link, public od_node_link_by_hazard_handler {
+public:
+	using value_type           = T;
+	using reference_type       = T&;
+	using const_reference_type = const T&;
+
+	template <bool IsDefaultConstructible = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructible>::type* = nullptr>
+	od_node_type1( void ) noexcept( std::is_nothrow_default_constructible<value_type>::value )
+	  : value_carrier<T>()
+	  , od_node_simple_link()
+	  , od_node_link_by_hazard_handler()
+	{
+	}
+
+	template <bool IsCopyable = std::is_copy_constructible<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
+	od_node_type1( const value_type& v_arg ) noexcept( std::is_nothrow_copy_constructible<value_type>::value )
+	  : value_carrier<T>( v_arg )
+	  , od_node_simple_link()
+	  , od_node_link_by_hazard_handler()
+	{
+	}
+
+	template <bool IsMovable = std::is_move_constructible<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+	od_node_type1( value_type&& v_arg ) noexcept( std::is_nothrow_move_constructible<value_type>::value )
+	  : value_carrier<T>( std::move( v_arg ) )
+	  , od_node_simple_link()
+	  , od_node_link_by_hazard_handler()
+	{
+	}
+
+	template <typename Arg1st, typename... RemainingArgs,
+	          typename RemoveCVArg1st                                                          = typename std::remove_reference<typename std::remove_const<Arg1st>::type>::type,
+	          typename std::enable_if<!std::is_same<RemoveCVArg1st, value_type>::value>::type* = nullptr>
+	od_node_type1( Arg1st&& arg1, RemainingArgs&&... args )
+	  : value_carrier<T>( std::forward<Arg1st>( arg1 ), std::forward<RemainingArgs>( args )... )
+	  , od_node_simple_link()
+	  , od_node_link_by_hazard_handler()
+	{
+	}
+};
+
+/**
+ * @brief node of one direction list
+ *
+ * @tparam T value type kept in this class
+ */
+template <typename T>
+class od_node_type2 : public value_carrier<T>, public od_node_simple_link, public od_node_1bit_markable_link_by_hazard_handler {
+public:
+	using value_type           = T;
+	using reference_type       = T&;
+	using const_reference_type = const T&;
+
+	template <bool IsDefaultConstructible = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructible>::type* = nullptr>
+	od_node_type2( void ) noexcept( std::is_nothrow_default_constructible<value_type>::value )
+	  : value_carrier<T>()
+	  , od_node_simple_link()
+	  , od_node_1bit_markable_link_by_hazard_handler()
+	{
+	}
+
+	template <bool IsCopyable = std::is_copy_constructible<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
+	od_node_type2( const value_type& v_arg ) noexcept( std::is_nothrow_copy_constructible<value_type>::value )
+	  : value_carrier<T>( v_arg )
+	  , od_node_simple_link()
+	  , od_node_1bit_markable_link_by_hazard_handler()
+	{
+	}
+
+	template <bool IsMovable = std::is_move_constructible<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+	od_node_type2( value_type&& v_arg ) noexcept( std::is_nothrow_move_constructible<value_type>::value )
+	  : value_carrier<T>( std::move( v_arg ) )
+	  , od_node_simple_link()
+	  , od_node_1bit_markable_link_by_hazard_handler()
+	{
+	}
+
+	template <typename Arg1st, typename... RemainingArgs,
+	          typename RemoveCVArg1st                                                          = typename std::remove_reference<typename std::remove_const<Arg1st>::type>::type,
+	          typename std::enable_if<!std::is_same<RemoveCVArg1st, value_type>::value>::type* = nullptr>
+	od_node_type2( Arg1st&& arg1, RemainingArgs&&... args )
+	  : value_carrier<T>( std::forward<Arg1st>( arg1 ), std::forward<RemainingArgs>( args )... )
+	  , od_node_simple_link()
+	  , od_node_1bit_markable_link_by_hazard_handler()
+	{
+	}
+};
+
 }   // namespace internal
 }   // namespace concurrent
 }   // namespace alpha
