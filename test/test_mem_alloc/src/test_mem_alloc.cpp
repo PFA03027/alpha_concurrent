@@ -174,7 +174,7 @@ TEST_F( lfmemAllocInside, TestChunkHeaderMultiSlot )
 	EXPECT_EQ( nullptr, test_ptr3 );
 
 	EXPECT_FALSE( p_chms->recycle_mem_slot( test_ptr3 ) );
-#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
+#if defined( ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER ) && !defined( TEST_ENABLE_UBSANITIZER )
 	uintptr_t ui_test_ptr1 = reinterpret_cast<uintptr_t>( test_ptr1 ) + 1;
 	EXPECT_FALSE( p_chms->recycle_mem_slot( reinterpret_cast<void*>( ui_test_ptr1 ) ) );
 	{
@@ -259,7 +259,7 @@ TEST_F( lfmemAllocInside, TestChunkList_IllegalAddressFree )
 	EXPECT_NE( nullptr, test_ptr2 );
 	EXPECT_NE( nullptr, test_ptr3 );
 
-#ifdef ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
+#if defined( ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER ) && !defined( TEST_ENABLE_UBSANITIZER )
 	{
 		uintptr_t ui_test_ptr1 = reinterpret_cast<uintptr_t>( test_ptr1 ) + 1;
 		uintptr_t ui_test_ptr2 = reinterpret_cast<uintptr_t>( test_ptr2 ) + 1;

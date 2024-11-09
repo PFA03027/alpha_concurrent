@@ -27,7 +27,7 @@ elseif("${SANITIZER_TYPE}" EQUAL "9")
 elseif("${SANITIZER_TYPE}" EQUAL "10")
  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DTEST_ENABLE_THREADSANITIZER -O2 -fno-omit-frame-pointer -fsanitize=thread -DALCONCURRENT_CONF_USE_MALLOC_FREE_LF_ALGO_NODE_ALLOC")	# for test purpose. thread sanitizer needs -O1/-O2. Unfortunately this finds false positive.
 elseif("${SANITIZER_TYPE}" EQUAL "11")
- set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fsanitize=undefined -fno-sanitize-recover=all")	# for test purpose
+ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DTEST_ENABLE_UBSANITIZER -fno-omit-frame-pointer -fsanitize=undefined -fno-sanitize-recover=all")	# for test purpose
 else()
  # no sanitizer option
 endif()
