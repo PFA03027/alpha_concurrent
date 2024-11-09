@@ -31,9 +31,13 @@ namespace internal {
 template <typename T, typename VALUE_DELETER = deleter_nothing<T>>
 class x_fifo_list {
 public:
+	// static_assert( ( !std::is_class<T>::value ) ||
+	//                    ( std::is_class<T>::value &&
+	//                      std::is_default_constructible<T>::value && std::is_copy_constructible<T>::value && std::is_copy_assignable<T>::value ),
+	//                "T should be default constructible, move constructible and move assignable at least" );
 	static_assert( ( !std::is_class<T>::value ) ||
 	                   ( std::is_class<T>::value &&
-	                     std::is_default_constructible<T>::value && std::is_copy_constructible<T>::value && std::is_copy_assignable<T>::value ),
+	                     std::is_default_constructible<T>::value ),
 	               "T should be default constructible, move constructible and move assignable at least" );
 
 	using value_type = T;
@@ -62,6 +66,7 @@ public:
 		node_pool_t::push( lf_fifo_impl_.release_sentinel_node() );
 	}
 
+	template <bool IsCopyable = std::is_copy_assignable<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
 	void push( const T& v_arg )
 	{
 		node_pointer p_new_nd = node_pool_t::pop();
@@ -75,6 +80,34 @@ public:
 		lf_fifo_impl_.push_back( p_new_nd );
 	}
 
+	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+	void push( T&& v_arg )
+	{
+		node_pointer p_new_nd = node_pool_t::pop();
+		if ( p_new_nd == nullptr ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			allocated_node_count_++;
+#endif
+			p_new_nd = new node_type;
+		}
+		p_new_nd->set_value( std::move( v_arg ) );
+		lf_fifo_impl_.push_back( p_new_nd );
+	}
+
+	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+	std::tuple<bool, value_type> pop( void )
+	{
+		value_type   popped_value_storage;
+		node_pointer p_popped_node = lf_fifo_impl_.pop_front( &popped_value_storage );
+		if ( p_popped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
+
+		node_pool_t::push( p_popped_node );
+		return std::tuple<bool, value_type> { true, std::move( popped_value_storage ) };
+	}
+
+	template <bool IsMovable                                           = std::is_move_assignable<value_type>::value,
+	          bool IsCopyable                                          = std::is_copy_assignable<value_type>::value,
+	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
 	std::tuple<bool, value_type> pop( void )
 	{
 		value_type   popped_value_storage;
@@ -125,14 +158,27 @@ private:
 		}
 
 	private:
+		template <bool IsMovable = std::is_move_assignable<T>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+		void callback_to_pick_up_value_impl( x_fifo_list::node_type& node_stored_value, x_fifo_list::value_type& context_local_data )
+		{
+			context_local_data = std::move( node_stored_value ).get_value();
+		}
+		template <bool IsCopyable                                          = std::is_copy_assignable<T>::value,
+		          bool IsMovable                                           = std::is_move_assignable<T>::value,
+		          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
+		void callback_to_pick_up_value_impl( x_fifo_list::node_type& node_stored_value, x_fifo_list::value_type& context_local_data )
+		{
+			context_local_data = node_stored_value.get_value();
+		}
+
 		void callback_to_pick_up_value( od_lockfree_fifo::node_pointer p_node_stored_value, void* p_context_local_data ) override
 		{
 			x_fifo_list::node_type& node_stored_value = *( static_cast<x_fifo_list::node_pointer>( p_node_stored_value ) );   // od_lockfree_fifoに保管されているノードはnode_pointerであることを保証しているため、static_castを使用する。
 
 			x_fifo_list::value_type* p_storage_for_popped_value_ = reinterpret_cast<x_fifo_list::value_type*>( p_context_local_data );
-			*p_storage_for_popped_value_                         = node_stored_value.get_value();
+			callback_to_pick_up_value_impl( node_stored_value, *p_storage_for_popped_value_ );
 		}
-	};
+	};   // namespace internal
 
 	using node_pool_t = od_node_pool<node_type>;
 
@@ -141,7 +187,7 @@ private:
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	std::atomic<size_t> allocated_node_count_;
 #endif
-};
+};   // namespace concurrent
 
 }   // namespace internal
 
@@ -254,17 +300,6 @@ public:
 	{
 	}
 };
-// template <typename T, size_t N, typename DELETER>
-// class fifo_list<T[N], DELETER> : public internal::x_fifo_list<T*, DELETER> {
-// public:
-// 	using value_type = T[N];
-
-// 	fifo_list( void ) = default;
-// 	fifo_list( size_t reserve_size ) noexcept
-// 	  : fifo_list()
-// 	{
-// 	}
-// };
 
 }   // namespace concurrent
 }   // namespace alpha
