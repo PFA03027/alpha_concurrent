@@ -91,58 +91,8 @@ public:
 	}
 
 private:
-	class node_type : public alpha::concurrent::internal::od_node_simple_link, public alpha::concurrent::internal::od_node_link_by_hazard_handler {
-	public:
-		using value_type = T;
-
-		node_type( void ) noexcept( std::is_nothrow_default_constructible<value_type>::value )
-		  : od_node_simple_link()
-		  , od_node_link_by_hazard_handler()
-		  , v_ {}
-		{
-		}
-
-		template <bool IsCopyable = std::is_copy_constructible<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
-		explicit node_type( const value_type& v_arg ) noexcept( std::is_nothrow_copy_constructible<value_type>::value )
-		  : od_node_simple_link()
-		  , od_node_link_by_hazard_handler()
-		  , v_( v_arg )
-		{
-		}
-
-		template <bool IsMovable = std::is_move_constructible<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
-		explicit node_type( value_type&& v_arg ) noexcept( std::is_nothrow_move_constructible<value_type>::value )
-		  : od_node_simple_link()
-		  , od_node_link_by_hazard_handler()
-		  , v_( std::move( v_arg ) )
-		{
-		}
-
-		void set_value( const value_type& v_arg ) noexcept
-		{
-			// v_.store( v_arg, std::memory_order_release );
-			v_ = v_arg;
-		}
-
-		const value_type& get_value( void ) const& noexcept
-		{
-			return v_;
-		}
-		value_type& get_value( void ) & noexcept
-		{
-			return v_;
-		}
-		value_type get_value( void ) && noexcept
-		{
-			return std::move( v_ );
-		}
-
-	private:
-		// std::atomic<value_type> v_;
-		value_type v_;
-	};
-
-	using node_pointer = node_type*;
+	using node_type    = od_node_type1<T>;
+	using node_pointer = od_node_type1<T>*;
 
 	class node_fifo_lockfree_t : private od_lockfree_fifo {
 	public:
