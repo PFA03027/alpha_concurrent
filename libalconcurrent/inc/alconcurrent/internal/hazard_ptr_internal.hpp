@@ -38,7 +38,7 @@ extern std::atomic<size_t> call_count_hazard_ptr_get_;
 extern std::atomic<size_t> loop_count_in_hazard_ptr_get_;
 #endif
 
-constexpr std::memory_order hzrd_slot_memory_order_for_store = std::memory_order_acq_rel;
+constexpr std::memory_order hzrd_slot_memory_order_for_store = std::memory_order_seq_cst;
 
 class hzrd_slot_releaser {
 public:
