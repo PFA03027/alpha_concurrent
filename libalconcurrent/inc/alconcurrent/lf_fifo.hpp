@@ -53,7 +53,7 @@ public:
 	~x_fifo_list()
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-		internal::LogOutput( log_type::DUMP, "x_stack_list: allocated_node_count = %zu", allocated_node_count_.load() );
+		internal::LogOutput( log_type::DUMP, "x_fifo_list: allocated_node_count = %zu", allocated_node_count_.load() );
 #endif
 
 		VALUE_DELETER                deleter;

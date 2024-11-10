@@ -311,11 +311,7 @@ private:
 
 		size_t size( void ) const noexcept
 		{
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
 			return od_list_.size();
-#else
-			return 0;
-#endif
 		}
 
 	private:
