@@ -70,7 +70,7 @@ test: build-test
 	ctest -j ${JOBS} -v
 
 build-test:
-	$(MAKE) BUILDIMPLTARGET=build-test all
+	$(MAKE) BUILDIMPLTARGET=build-test SANITIZER_TYPE=1 all
 
 sample: build-sample
 	echo finish make sample

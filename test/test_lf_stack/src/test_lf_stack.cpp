@@ -366,17 +366,14 @@ TEST_F( lfStackTest, CanCal_With_Unique_ptr )
 {
 	// Arrange
 	using test_fifo_type3 = alpha::concurrent::stack_list<std::unique_ptr<int>>;
-	test_fifo_type3* p_test_obj;
-
-	std::cout << "unique_ptr test" << std::endl;
-	p_test_obj = new test_fifo_type3( 8 );
+	test_fifo_type3 test_obj;
 
 	std::unique_ptr<int> up_tv( new int );
 	*up_tv = 12;
 
 	// Act
-	p_test_obj->push( std::move( up_tv ) );
-	auto ret = p_test_obj->pop();
+	test_obj.push( std::move( up_tv ) );
+	auto ret = test_obj.pop();
 
 	// Assert
 	ASSERT_TRUE( std::get<0>( ret ) );
