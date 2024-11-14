@@ -56,6 +56,13 @@ CMAKE_CONFIGURE_OPTS += -DALCONCURRENT_BUILD_SHARED_LIBS=${ALCONCURRENT_BUILD_SH
 CPUS=$(shell grep cpu.cores /proc/cpuinfo | sort -u | sed 's/[^0-9]//g')
 JOBS?=$(shell expr ${CPUS} + ${CPUS} / 2)
 
+NINJA_PATH := $(shell whereis -b ninja | sed -e 's/ninja:\s*//g')
+ifeq ($(NINJA_PATH),)
+CMAKE_GENERATE_TARGET = Unix Makefiles
+else
+CMAKE_GENERATE_TARGET = Ninja
+endif
+
 all: configure-cmake
 	set -e; \
 	cd ${BUILD_DIR}; \
@@ -125,7 +132,7 @@ configure-cmake:
 	set -e; \
 	mkdir -p ${BUILD_DIR}; \
 	cd ${BUILD_DIR}; \
-	cmake ${CMAKE_CONFIGURE_OPTS} -G "Unix Makefiles" ${MAKEFILE_DIR}
+	cmake ${CMAKE_CONFIGURE_OPTS} -G "${CMAKE_GENERATE_TARGET}" ${MAKEFILE_DIR}
 
 build-profile:
 	$(MAKE) BUILDTARGET=gprof BUILDTYPE=${BUILDTYPE} build-test
