@@ -35,6 +35,16 @@ SANITIZER_TYPE?=
 # GoogleTest Option
 TEST_OPTS?=
 
+# Option tu use Ninja
+# NINJA_SELECTION=AUTO: check path of ninja and then if found it, select ninja as build tool for CMake
+# NINJA_SELECTION=NINJA: select ninja as build tool for CMake
+# NINJA_SELECTION=MAKE: select make as build tool for CMake
+# NINJA_SELECTION=*: other than AUTO or NINJA, select Unix make as build tool for CMake
+BUILD_TOOL_SELECTION ?= AUTO
+
+#############################################################################################
+#############################################################################################
+#############################################################################################
 ##### internal variable
 BUILDIMPLTARGET?=all
 BUILD_DIR?=build
@@ -56,13 +66,22 @@ CMAKE_CONFIGURE_OPTS += -DALCONCURRENT_BUILD_SHARED_LIBS=${ALCONCURRENT_BUILD_SH
 CPUS=$(shell grep cpu.cores /proc/cpuinfo | sort -u | sed 's/[^0-9]//g')
 JOBS?=$(shell expr ${CPUS} + ${CPUS} / 2)
 
+ifeq ($(BUILD_TOOL_SELECTION),AUTO)
 NINJA_PATH := $(shell whereis -b ninja | sed -e 's/ninja:\s*//g')
 ifeq ($(NINJA_PATH),)
 CMAKE_GENERATE_TARGET = Unix Makefiles
-else
+else	# NINJA_PATH
 CMAKE_GENERATE_TARGET = Ninja
-endif
+endif	# NINJA_PATH
+else	# BUILD_TOOL_SELECTION
+ifeq ($(BUILD_TOOL_SELECTION),NINJA)
+CMAKE_GENERATE_TARGET = Ninja
+else	# BUILD_TOOL_SELECTION
+CMAKE_GENERATE_TARGET = Unix Makefiles
+endif	# BUILD_TOOL_SELECTION
+endif	# BUILD_TOOL_SELECTION
 
+#############################################################################################
 all: configure-cmake
 	set -e; \
 	cd ${BUILD_DIR}; \
@@ -143,6 +162,7 @@ exec-profile: build-profile
 	ctest -j ${JOBS} -v
 
 
+#############################################################################################
 sanitizer.p_internal: $(SANITIZER_P_ALL_TARGETS)
 
 define SANITIZER_P_TEMPLATE
@@ -158,6 +178,7 @@ endef
 
 $(foreach pgm,$(SANITIZER_ALL_IDS),$(eval $(call SANITIZER_P_TEMPLATE,$(pgm))))
 
+#############################################################################################
 ifeq ($(strip $(TEST_EXECS)),)
 ## $(TEST_EXECS)が空の場合＝buildが実行されていない状況
 test.%: build-test
