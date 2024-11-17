@@ -40,7 +40,7 @@ od_lockfree_fifo::~od_lockfree_fifo()
 	// 以下のコードは一応メモリーリークを避けるための処理。
 	// ただし、deleteで破棄してよいかは状況次第。
 	// 本来は、release_sentinel_node()で、空っぽにしてから、破棄することがこのクラスを使う上での期待値
-	hazard_pointer hp_cur = hph_head_.get();
+	hazard_pointer hp_cur = hph_head_.get_to_verify_exchange();
 	if ( hp_cur != nullptr ) {
 		LogOutput( log_type::WARN, "there is no call of release_sentinel_node(). to avoid unexpected memory access, leak the remaining nodes." );
 	}

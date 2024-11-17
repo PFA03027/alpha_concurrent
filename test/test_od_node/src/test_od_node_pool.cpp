@@ -62,7 +62,7 @@ TEST( od_node_pool_class, CanPushPop_InHazard1 )
 	auto                                        p_tmp = new test_od_node_of_pool;
 	alpha::concurrent::hazard_ptr_handler<void> hph( p_tmp->get_pointer_of_hazard_check() );
 	{
-		auto hp_tmp = hph.get();
+		auto hp_tmp = hph.get_to_verify_exchange();
 		sut.push( p_tmp );
 
 		// Act
@@ -89,7 +89,7 @@ TEST( od_node_pool_class, CanPushPop_InHazard2 )
 	auto                                        p_tmp = new test_od_node_of_pool;
 	alpha::concurrent::hazard_ptr_handler<void> hph( p_tmp->get_pointer_of_hazard_check() );
 	{
-		auto hp_tmp = hph.get();
+		auto hp_tmp = hph.get_to_verify_exchange();
 		sut.push( p_tmp );
 		auto p_tmp2 = sut.pop();
 		EXPECT_EQ( p_tmp2, nullptr );
@@ -115,7 +115,7 @@ TEST( od_node_pool_class, CanPushPop_InHazard3 )
 	alpha::concurrent::hazard_ptr_handler<void> hph( p_tmp->get_pointer_of_hazard_check() );
 
 	{
-		auto hp_tmp = hph.get();
+		auto hp_tmp = hph.get_to_verify_exchange();
 		sut.push( p_tmp );
 		auto p_tmp3 = sut.pop();
 		ASSERT_EQ( p_tmp3, nullptr );
@@ -187,7 +187,7 @@ TEST( od_node_pool_class, CanCleanAsPossibleAs_InHazardPtr )
 	auto                                        p_tmp = new test_od_node_of_pool;
 	alpha::concurrent::hazard_ptr_handler<void> hph( p_tmp->get_pointer_of_hazard_check() );
 	{
-		auto hp_tmp = hph.get();
+		auto hp_tmp = hph.get_to_verify_exchange();
 		sut.push( p_tmp );
 
 		// Act

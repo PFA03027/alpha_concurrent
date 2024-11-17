@@ -98,11 +98,6 @@ public:
 		hph_next_.store( p_n );
 	}
 
-	hazard_pointer get_hazard_ptr_of_next( void )
-	{
-		return hph_next_.get();
-	}
-
 	hazard_ptr_handler_t& hazard_handler_of_next( void ) noexcept
 	{
 		return hph_next_;
@@ -136,7 +131,7 @@ public:
 	using hazard_ptr_handler_t = hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>;
 	using hazard_pointer       = typename hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>::hazard_pointer;
 
-	explicit od_node_1bit_markable_link_by_hazard_handler( od_node_1bit_markable_link_by_hazard_handler* p_next_arg = nullptr ) noexcept
+	explicit constexpr od_node_1bit_markable_link_by_hazard_handler( od_node_1bit_markable_link_by_hazard_handler* p_next_arg = nullptr ) noexcept
 	  : hph_next_( p_next_arg )
 	{
 	}
@@ -154,11 +149,6 @@ public:
 	void set_next( const std::tuple<od_node_1bit_markable_link_by_hazard_handler*, bool>& tp ) noexcept
 	{
 		hph_next_.store( tp );
-	}
-
-	std::tuple<hazard_pointer, bool> get_hazard_ptr_of_next( void )
-	{
-		return hph_next_.get();
 	}
 
 	hazard_ptr_handler_t& hazard_handler_of_next( void ) noexcept

@@ -778,30 +778,16 @@ public:
 		return *this;
 	}
 
-	hazard_pointer get( void )
-	{
-#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
-		internal::call_count_hazard_ptr_get_++;
-#endif
-
-#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
-		internal::loop_count_in_hazard_ptr_get_++;
-#endif
-		hazard_pointer hp_ans( ap_target_p_.load( std::memory_order_acquire ) );
-		while ( !ap_target_p_.compare_exchange_strong( hp_ans.p_, hp_ans.p_, std::memory_order_acq_rel, std::memory_order_acquire ) ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
-			internal::loop_count_in_hazard_ptr_get_++;
-#endif
-			hp_ans.reflect_from_p();
-		}
-
-		return hp_ans;
-	}
-
-	hazard_pointer get_to_verify_exchange( void )
-	{
-		return hazard_pointer( ap_target_p_.load( std::memory_order_acquire ) );
-	}
+	/**
+	 * @brief hpと自身のポインタの一致をチェックする
+	 *
+	 * hpと自身が保持するポインタが一致した場合、真を返す。
+	 * hpと自身が保持するポインタが不一致の場合、偽を返すとともに、自身が保持するポインタでhpを更新する。
+	 *
+	 * @param hp 検証対象のハザードポインタ
+	 * @return true hpと自身が保持するポインタが一致
+	 * @return false hpと自身が保持するポインタが不一致。かつ、自身が保持するポインタでhpを更新した。
+	 */
 	bool verify_exchange( hazard_pointer& hp )
 	{
 		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
@@ -812,25 +798,9 @@ public:
 		return ret;
 	}
 
-	void reuse( hazard_pointer& hp_reuse )
+	hazard_pointer get_to_verify_exchange( void )
 	{
-#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
-		internal::call_count_hazard_ptr_get_++;
-#endif
-
-		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
-		do {
-#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
-			internal::loop_count_in_hazard_ptr_get_++;
-#endif
-			hp_reuse.store( p_expect );
-			if ( p_expect == nullptr ) {
-				return;
-			}
-		} while ( !ap_target_p_.compare_exchange_strong( p_expect, p_expect, std::memory_order_acq_rel, std::memory_order_acquire ) );
-		// TODO: is there any Redundancy ? この方法に冗長性はないか？
-
-		return;
+		return hazard_pointer( ap_target_p_.load( std::memory_order_acquire ) );
 	}
 
 	void reuse_to_verify_exchange( hazard_pointer& hp_reuse ) const noexcept
@@ -1138,7 +1108,7 @@ public:
 		return *this;
 	}
 
-	std::tuple<hazard_pointer, bool> get( void )
+	std::tuple<hazard_pointer, bool> get_to_verify_exchange( void )
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 		internal::call_count_hazard_ptr_get_++;
@@ -1169,7 +1139,7 @@ public:
 		return std::tuple<hazard_pointer, bool> { std::move( ans_hp ), ans_b };
 	}
 
-	void reuse( std::tuple<hazard_pointer, bool>& hp_reuse )
+	void reuse_to_verify_exchange( std::tuple<hazard_pointer, bool>& hp_reuse )
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 		internal::call_count_hazard_ptr_get_++;
