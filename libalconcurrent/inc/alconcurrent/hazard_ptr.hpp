@@ -1108,63 +1108,36 @@ public:
 		return *this;
 	}
 
-	std::tuple<hazard_pointer, bool> get_to_verify_exchange( void )
+	bool verify_exchange( std::tuple<hazard_pointer, bool>& hp_w_mark )
 	{
-#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
-		internal::call_count_hazard_ptr_get_++;
-#endif
+		addr_markable addr_desired = zip_tuple_to_addr_markable( std::get<0>( hp_w_mark ).get(), std::get<1>( hp_w_mark ) );
+		addr_markable addr_expect  = a_target_addr_.load( std::memory_order_acquire );
 
-		hazard_pointer ans_hp;
-		bool           ans_b = false;
-
-		addr_markable addr_expect = a_target_addr_.load( std::memory_order_acquire );
-
-		do {
-#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
-			internal::loop_count_in_hazard_ptr_get_++;
-#endif
+		bool ret = ( addr_expect == addr_desired );
+		if ( !ret ) {
 			std::tuple<pointer, bool> pointer_w_mark_expect = unzip_addr_markable_to_tuple( addr_expect );
-			pointer                   p_expect              = std::get<0>( pointer_w_mark_expect );
-			ans_b                                           = std::get<1>( pointer_w_mark_expect );
-
-			ans_hp.store( p_expect );
-			if ( p_expect == nullptr ) {
-				ans_b = false;
-				break;
-			}
-
-		} while ( !a_target_addr_.compare_exchange_weak( addr_expect, addr_expect, std::memory_order_acq_rel, std::memory_order_acquire ) );
-		// TODO: is there any Redundancy ? この方法に冗長性はないか？
-
-		return std::tuple<hazard_pointer, bool> { std::move( ans_hp ), ans_b };
+			std::get<1>( hp_w_mark )                        = std::get<1>( pointer_w_mark_expect );
+			std::get<0>( hp_w_mark ).store( std::get<0>( pointer_w_mark_expect ) );
+		}
+		return ret;
 	}
 
-	void reuse_to_verify_exchange( std::tuple<hazard_pointer, bool>& hp_reuse )
+	std::tuple<hazard_pointer, bool> get_to_verify_exchange( void )
 	{
-#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
-		internal::call_count_hazard_ptr_get_++;
-#endif
+		addr_markable             addr_expect           = a_target_addr_.load( std::memory_order_acquire );
+		std::tuple<pointer, bool> pointer_w_mark_expect = unzip_addr_markable_to_tuple( addr_expect );
+		pointer                   p_expect              = std::get<0>( pointer_w_mark_expect );
+		bool                      ans_b                 = std::get<1>( pointer_w_mark_expect );
 
-		addr_markable addr_expect = a_target_addr_.load( std::memory_order_acquire );
+		return std::tuple<hazard_pointer, bool> { p_expect, ans_b };
+	}
 
-		do {
-#ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
-			internal::loop_count_in_hazard_ptr_get_++;
-#endif
-			std::tuple<pointer, bool> pointer_w_mark_expect = unzip_addr_markable_to_tuple( addr_expect );
-			pointer                   p_expect              = std::get<0>( pointer_w_mark_expect );
-			bool                      expect_mark           = std::get<1>( pointer_w_mark_expect );
-
-			if ( p_expect == nullptr ) {
-				std::get<0>( hp_reuse ).store( p_expect );
-				std::get<1>( hp_reuse ) = false;
-				return;
-			}
-			std::get<0>( hp_reuse ).store( p_expect );
-			std::get<1>( hp_reuse ) = expect_mark;
-		} while ( !a_target_addr_.compare_exchange_weak( addr_expect, addr_expect, std::memory_order_acq_rel, std::memory_order_acquire ) );
-		// TODO: is there any Redundancy ? この方法に冗長性はないか？
-
+	void reuse_to_verify_exchange( std::tuple<hazard_pointer, bool>& hp_w_mark_reuse )
+	{
+		addr_markable             addr_expect           = a_target_addr_.load( std::memory_order_acquire );
+		std::tuple<pointer, bool> pointer_w_mark_expect = unzip_addr_markable_to_tuple( addr_expect );
+		std::get<1>( hp_w_mark_reuse )                  = std::get<1>( pointer_w_mark_expect );
+		std::get<0>( hp_w_mark_reuse ).store( std::get<0>( pointer_w_mark_expect ) );
 		return;
 	}
 
@@ -1232,6 +1205,67 @@ public:
 		return ret;
 	}
 
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_strong を使用する。
+	 *
+	 * 現在の値と expected が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、expected に、desired を反映する。
+	 * そうでなければ failure メモリオーダーで expected を現在の値で置き換える。
+	 *
+	 * @param expected 自身が保持していると期待されるハザードポインタへの参照
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。expected_hzd_ptr は、desired で置き換えられている。
+	 * @return false CAS操作に失敗。自身が保持する現在のポインタでexpected_hzd_ptrを置き換えられている。
+	 */
+	bool compare_exchange_strong_to_verify_exchange1( std::tuple<hazard_pointer, bool>& expected,
+	                                                  const std::tuple<pointer, bool>&  desired,
+	                                                  std::memory_order                 success = std::memory_order_acq_rel,
+	                                                  std::memory_order                 failure = std::memory_order_acquire ) noexcept
+	{
+		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
+		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );
+		bool          ret           = a_target_addr_.compare_exchange_strong( addr_expected, addr_desired, success, failure );
+		if ( ret ) {
+			std::get<1>( expected ) = std::get<1>( desired );
+			std::get<0>( expected ).store( std::get<0>( desired ) );
+		} else {
+			auto updated_expected   = unzip_addr_markable_to_tuple( addr_expected );
+			std::get<1>( expected ) = std::get<1>( updated_expected );
+			std::get<0>( expected ).store( std::get<0>( updated_expected ) );
+		}
+		return ret;
+	}
+
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_strong を使用する。
+	 *
+	 * 現在の値と expected が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、
+	 * そうでなければ failure メモリオーダーで expected を現在の値で置き換える
+	 *
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照
+	 * @param desired CAS操作で置き換える新たなポインタ値
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。また、expected_hzd_ptrは呼び出し前の状態を維持している。
+	 * @return false CAS操作に失敗。自身が保持するあらなたポインタでexpected_hzd_ptrを置き換えられている。
+	 */
+	bool compare_exchange_strong_to_verify_exchange2( std::tuple<hazard_pointer, bool>& expected,
+	                                                  const std::tuple<pointer, bool>&  desired,
+	                                                  std::memory_order                 success = std::memory_order_acq_rel,
+	                                                  std::memory_order                 failure = std::memory_order_acquire ) noexcept
+	{
+		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
+		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );
+		bool          ret           = a_target_addr_.compare_exchange_strong( addr_expected, addr_desired, success, failure );
+		if ( !ret ) {
+			auto updated_expected   = unzip_addr_markable_to_tuple( addr_expected );
+			std::get<1>( expected ) = std::get<1>( updated_expected );
+			std::get<0>( expected ).store( std::get<0>( updated_expected ) );
+		}
+		return ret;
+	}
+
 private:
 	using addr_markable = std::uintptr_t;
 
@@ -1240,6 +1274,30 @@ private:
 		// reinterpret_castはconstexprの中では使えない。
 		addr_markable ans = reinterpret_cast<addr_markable>( std::get<0>( tp ) );
 		if ( std::get<1>( tp ) ) {
+			ans |= static_cast<addr_markable>( 1U );
+		} /*
+		else {
+		    ans &= ~(static_cast<addr_markable>(1U));
+		} */
+		return ans;
+	}
+	static addr_markable zip_tuple_to_addr_markable( const std::tuple<hazard_pointer, bool>& tp )
+	{
+		// reinterpret_castはconstexprの中では使えない。
+		addr_markable ans = reinterpret_cast<addr_markable>( std::get<0>( tp ).get() );
+		if ( std::get<1>( tp ) ) {
+			ans |= static_cast<addr_markable>( 1U );
+		} /*
+		else {
+		    ans &= ~(static_cast<addr_markable>(1U));
+		} */
+		return ans;
+	}
+	static addr_markable zip_tuple_to_addr_markable( pointer p, bool mark )
+	{
+		// reinterpret_castはconstexprの中では使えない。
+		addr_markable ans = reinterpret_cast<addr_markable>( p );
+		if ( mark ) {
 			ans |= static_cast<addr_markable>( 1U );
 		} /*
 		else {
