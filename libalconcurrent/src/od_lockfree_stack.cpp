@@ -31,13 +31,11 @@ od_lockfree_stack::od_lockfree_stack( od_lockfree_stack&& src ) noexcept
 }
 od_lockfree_stack::~od_lockfree_stack()
 {
-	// 以下のコードは一応メモリーリークを避けるための処理。
-	// ただし、deleteで破棄してよいかは状況次第
 	node_pointer p_cur = hph_head_.load();
 	hph_head_.store( nullptr );
 	while ( p_cur != nullptr ) {
 		node_pointer p_nxt = p_cur->next();
-		delete p_cur;
+		purge_node( p_cur );
 		p_cur = p_nxt;
 	}
 
@@ -112,6 +110,13 @@ size_t od_lockfree_stack::profile_info_count( void ) const
 #else
 	return 0;
 #endif
+}
+
+void od_lockfree_stack::purge_node( node_pointer p_nd ) noexcept
+{
+	// 以下のコードは一応メモリーリークを避けるための処理。
+	// ただし、deleteで破棄してよいかは状況次第
+	delete p_nd;
 }
 
 }   // namespace internal

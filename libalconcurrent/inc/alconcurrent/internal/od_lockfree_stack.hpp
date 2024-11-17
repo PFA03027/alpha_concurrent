@@ -36,10 +36,10 @@ public:
 	 * @brief move constructor
 	 *
 	 * @warning
-	 * This constructor is dengurous, because this api is not consider the concurrency.
+	 * This move constructor is NOT thread-safe, because this api is not consider the concurrency.
 	 */
 	od_lockfree_stack( od_lockfree_stack&& src ) noexcept;
-	~od_lockfree_stack();
+	virtual ~od_lockfree_stack();
 
 	od_lockfree_stack( const od_lockfree_stack& )            = delete;
 	od_lockfree_stack& operator=( const od_lockfree_stack& ) = delete;
@@ -69,6 +69,9 @@ public:
 	bool is_empty( void ) const;
 
 	size_t profile_info_count( void ) const;
+
+protected:
+	virtual void purge_node( node_pointer p_nd ) noexcept;
 
 private:
 	using hazard_ptr_handler_t = typename od_node_link_by_hazard_handler::hazard_ptr_handler_t;

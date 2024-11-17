@@ -37,12 +37,18 @@ od_lockfree_fifo::od_lockfree_fifo( od_lockfree_fifo&& src ) noexcept
 
 od_lockfree_fifo::~od_lockfree_fifo()
 {
-	// 以下のコードは一応メモリーリークを避けるための処理。
-	// ただし、deleteで破棄してよいかは状況次第。
 	// 本来は、release_sentinel_node()で、空っぽにしてから、破棄することがこのクラスを使う上での期待値
 	hazard_pointer hp_cur = hph_head_.get_to_verify_exchange();
 	if ( hp_cur != nullptr ) {
-		LogOutput( log_type::WARN, "there is no call of release_sentinel_node(). to avoid unexpected memory access, leak the remaining nodes." );
+		LogOutput( log_type::WARN, "there is no call of release_sentinel_node()." );
+
+		node_pointer p_cur = hph_head_.load();
+		hph_head_.store( nullptr );
+		while ( p_cur != nullptr ) {
+			node_pointer p_nxt = p_cur->next();
+			purge_node( p_cur );
+			p_cur = p_nxt;
+		}
 	}
 	hph_head_.store( nullptr );
 	hph_tail_.store( nullptr );
@@ -170,6 +176,13 @@ size_t od_lockfree_fifo::profile_info_count( void ) const
 #else
 	return 0;
 #endif
+}
+
+void od_lockfree_fifo::purge_node( node_pointer p_nd ) noexcept
+{
+	// 以下のコードは一応メモリーリークを避けるための処理。
+	// ただし、deleteで破棄してよいかは状況次第
+	delete p_nd;
 }
 
 }   // namespace internal
