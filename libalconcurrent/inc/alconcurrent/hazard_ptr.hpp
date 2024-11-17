@@ -449,29 +449,15 @@ public:
 	  : p_( src.p_ )
 	  , os_( std::move( src.os_ ) )
 	{
-#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
-		if ( os_ == nullptr ) {
-			internal::LogOutput( log_type::ERR, "slot of hazard pointer in hazard_ptr is nullptr" );
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-			std::terminate();
-#endif
-		}
-#endif
-		src.p_  = nullptr;
-		src.os_ = internal::hazard_ptr_mgr::AssignHazardPtrSlot( nullptr );
+		src.p_ = nullptr;
 	}
 	hazard_ptr& operator=( const hazard_ptr& src )
 	{
-#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
-		if ( os_ == nullptr ) {
-			internal::LogOutput( log_type::ERR, "slot of hazard pointer in hazard_ptr is nullptr" );
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-			std::terminate();
-#endif
-		}
-#endif
-
 		if ( this == &src ) return *this;
+
+		if ( os_ == nullptr ) {
+			os_ = internal::hazard_ptr_mgr::AssignHazardPtrSlot( nullptr );
+		}
 
 		p_ = src.p_;
 		os_->store( src.os_->load( std::memory_order_acquire ), internal::hzrd_slot_memory_order_for_store );
@@ -550,54 +536,6 @@ public:
 	}
 
 private:
-#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
-#else
-	constexpr
-#endif
-	hazard_ptr( T* p_arg, internal::hzrd_slot_ownership_t os_arg )
-	  : p_( p_arg )
-	  , os_( std::move( os_arg ) )
-	{
-		// 事前条件： os_argには、p_argが格納されていること。
-#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
-		static std::atomic<int> id_cnt( 1 );
-		int                     cur_id = id_cnt.fetch_add( 1 );
-		if ( os_ == nullptr ) {
-			internal::LogOutput( log_type::ERR, "slot of hazard pointer in hazard_ptr is nullptr, os_.get()=%p vs p_=%p", os_.get(), p_ );
-			bt_info cur_bt;
-			RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
-			cur_bt.dump_to_log( log_type::ERR, 'a', cur_id );
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-			throw std::logic_error( "slot of hazard pointer in hazard_ptr is nullptr" );
-#else
-#endif
-		}
-		if ( p_ == nullptr ) {
-			if ( os_->load( std::memory_order_acquire ) != reinterpret_cast<void*>( static_cast<std::uintptr_t>( 1U ) ) ) {
-				internal::LogOutput( log_type::ERR, "p_ is nullptr, but slot of hazard pointer in hazard_ptr is not 1U, os_.get()=%p vs p_=%p", os_.get(), p_ );
-				bt_info cur_bt;
-				RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
-				cur_bt.dump_to_log( log_type::ERR, 'b', cur_id );
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-				throw std::logic_error( "p_ is nullptr, but slot of hazard pointer in hazard_ptr is not 1U" );
-#else
-#endif
-			}
-		} else {
-			if ( os_->load( std::memory_order_acquire ) != reinterpret_cast<void*>( p_ ) ) {
-				internal::LogOutput( log_type::ERR, "slot of hazard pointer in hazard_ptr is not same to p_, os_.get()=%p vs p_=%p", os_.get(), p_ );
-				bt_info cur_bt;
-				RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
-				cur_bt.dump_to_log( log_type::ERR, 'c', cur_id );
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-				throw std::logic_error( "slot of hazard pointer in hazard_ptr is not same to p_" );
-#else
-#endif
-			}
-		}
-#endif
-	}
-
 	void reflect_from_p( void ) noexcept
 	{
 #if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
@@ -1159,20 +1097,17 @@ public:
 	using pointer        = T*;
 	using hazard_pointer = hazard_ptr<T>;
 
-	hazard_ptr_w_mark_handler( void ) noexcept
-	  : a_target_addr_()
+	constexpr hazard_ptr_w_mark_handler( void ) noexcept
+	  : a_target_addr_( static_cast<addr_markable>( 0U ) )
 	{
-		a_target_addr_.store( static_cast<addr_markable>( 0U ), std::memory_order_release );
 	}
-	explicit hazard_ptr_w_mark_handler( T* p_desired ) noexcept
-	  : a_target_addr_()
+	explicit constexpr hazard_ptr_w_mark_handler( T* p_desired ) noexcept
+	  : a_target_addr_( reinterpret_cast<addr_markable>( p_desired ) )
 	{
-		a_target_addr_.store( reinterpret_cast<addr_markable>( p_desired ), std::memory_order_release );
 	}
-	hazard_ptr_w_mark_handler( const hazard_ptr_w_mark_handler& src ) noexcept
-	  : a_target_addr_()
+	constexpr hazard_ptr_w_mark_handler( const hazard_ptr_w_mark_handler& src ) noexcept
+	  : a_target_addr_( src.a_target_addr_.load( std::memory_order_acquire ) )
 	{
-		a_target_addr_.store( src.a_target_addr_.load( std::memory_order_acquire ), std::memory_order_release );
 	}
 	hazard_ptr_w_mark_handler( hazard_ptr_w_mark_handler&& src ) noexcept
 	  : a_target_addr_()
@@ -1209,7 +1144,7 @@ public:
 		internal::call_count_hazard_ptr_get_++;
 #endif
 
-		hazard_pointer ans_hp( nullptr, internal::hazard_ptr_mgr::AssignHazardPtrSlot( nullptr ) );
+		hazard_pointer ans_hp;
 		bool           ans_b = false;
 
 		addr_markable addr_expect = a_target_addr_.load( std::memory_order_acquire );
