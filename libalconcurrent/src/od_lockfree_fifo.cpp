@@ -46,7 +46,7 @@ od_lockfree_fifo::~od_lockfree_fifo()
 		hph_head_.store( nullptr );
 		while ( p_cur != nullptr ) {
 			node_pointer p_nxt = p_cur->next();
-			purge_node( p_cur );
+			do_for_purged_node( p_cur );
 			p_cur = p_nxt;
 		}
 	}
@@ -138,9 +138,11 @@ od_lockfree_fifo::node_pointer od_lockfree_fifo::pop_front( void* p_context_loca
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			count_--;
 #endif
-			callback_to_pick_up_value( hp_head_next.get(), p_context_local_data );
 			// ここで、headの取り出しと所有権確保が完了
-			// ただし、headノードへのポインタがハザードポインタに登録されているかどうかをチェックしていないため、まだ参照している人がいるかもしれない。
+			// なお、headノードへのポインタがハザードポインタに登録されているかどうかをチェックしていないため、まだ参照している人がいるかもしれない。
+			// また、hp_head_nextから値を取り出す権利を獲得。かつ、hp_head_nextはハザードポインタとして登録済みのため、参照可能。
+			callback_to_pick_up_value( hp_head_next.get(), p_context_local_data );   // hp_head_nextから値を取り出す。
+
 			return hp_head_node.get();
 		}
 	}
@@ -178,10 +180,14 @@ size_t od_lockfree_fifo::profile_info_count( void ) const
 #endif
 }
 
-void od_lockfree_fifo::purge_node( node_pointer p_nd ) noexcept
+void od_lockfree_fifo::do_for_purged_node( node_pointer p_nd ) noexcept
 {
 	// 以下のコードは一応メモリーリークを避けるための処理。
-	// ただし、deleteで破棄してよいかは状況次第
+	// ただし、deleteで破棄してよいかは状況次第。
+	// 本来は、オーバーライドしてリサイクルしてもらうのが期待値。
+	// TODO: メモリリークのためとはいえ、せめてハザードポインタかどうかのチェックをした方が良いか？
+	// TODO: allocatorを呼び出せるようにしても良いかもしれない。
+	// TODO: 今は、デストラクタからしか呼ばれない。。。そうであれば、そもそも用意する必要ある？
 	delete p_nd;
 }
 

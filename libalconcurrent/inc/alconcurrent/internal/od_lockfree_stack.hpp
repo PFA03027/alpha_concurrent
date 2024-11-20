@@ -71,7 +71,7 @@ public:
 	size_t profile_info_count( void ) const;
 
 protected:
-	virtual void purge_node( node_pointer p_nd ) noexcept;
+	virtual void do_for_purged_node( node_pointer p_nd ) noexcept;
 
 private:
 	using hazard_ptr_handler_t = typename od_node_link_by_hazard_handler::hazard_ptr_handler_t;

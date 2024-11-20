@@ -35,7 +35,7 @@ od_lockfree_stack::~od_lockfree_stack()
 	hph_head_.store( nullptr );
 	while ( p_cur != nullptr ) {
 		node_pointer p_nxt = p_cur->next();
-		purge_node( p_cur );
+		do_for_purged_node( p_cur );
 		p_cur = p_nxt;
 	}
 
@@ -112,10 +112,14 @@ size_t od_lockfree_stack::profile_info_count( void ) const
 #endif
 }
 
-void od_lockfree_stack::purge_node( node_pointer p_nd ) noexcept
+void od_lockfree_stack::do_for_purged_node( node_pointer p_nd ) noexcept
 {
 	// 以下のコードは一応メモリーリークを避けるための処理。
-	// ただし、deleteで破棄してよいかは状況次第
+	// ただし、deleteで破棄してよいかは状況次第。
+	// 本来は、オーバーライドしてリサイクルしてもらうのが期待値。
+	// TODO: メモリリークのためとはいえ、せめてハザードポインタかどうかのチェックをした方が良いか？
+	// TODO: allocatorを呼び出せるようにしても良いかもしれない。
+	// TODO: 今は、デストラクタからしか呼ばれない。。。そうであれば、そもそも用意する必要ある？
 	delete p_nd;
 }
 
