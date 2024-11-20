@@ -63,7 +63,7 @@ void od_lockfree_stack::push_front( node_pointer p_nd ) noexcept
 #endif
 }
 
-od_lockfree_stack::node_pointer od_lockfree_stack::pop_front( void ) noexcept
+ALCC_INTERNAL_NODISCARD_ATTR od_lockfree_stack::node_pointer od_lockfree_stack::pop_front( void ) noexcept
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	pushpop_call_count_++;

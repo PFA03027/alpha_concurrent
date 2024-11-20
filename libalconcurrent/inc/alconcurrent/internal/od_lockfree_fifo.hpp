@@ -55,12 +55,13 @@ public:
 	 *
 	 * @return od_lockfree_fifo::node_pointer popされたノード。なお、このノードが保持している情報は、すでに無効情報となっている。
 	 */
-	od_lockfree_fifo::node_pointer pop_front( void* p_context_local_data ) noexcept;
+	ALCC_INTERNAL_NODISCARD_ATTR node_pointer pop_front( void* p_context_local_data ) noexcept;
 
 	/**
 	 * @brief pop_front()処理時に、popの見込みがある場合に、値が入っているノードを参照用に渡す。呼び出される側は必要に応じて、値をコピーする。
 	 *
 	 * @param p_node_stored_value 値が入っているノードへのポインタ
+	 * @param p_context_local_data pop_front()の引数と同じポインタ
 	 */
 	virtual void callback_to_pick_up_value( node_pointer p_node_stored_value, void* p_context_local_data );
 

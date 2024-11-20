@@ -98,7 +98,7 @@ void od_lockfree_fifo::push_back( node_pointer p_nd ) noexcept
 	return;
 }
 
-od_lockfree_fifo::node_pointer od_lockfree_fifo::pop_front( void* p_context_local_data ) noexcept
+ALCC_INTERNAL_NODISCARD_ATTR od_lockfree_fifo::node_pointer od_lockfree_fifo::pop_front( void* p_context_local_data ) noexcept
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 	pushpop_count_++;

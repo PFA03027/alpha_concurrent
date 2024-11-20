@@ -64,7 +64,7 @@ public:
 	 *
 	 * @return popped node_pointer. please see warning also.
 	 */
-	node_pointer pop_front( void ) noexcept;
+	ALCC_INTERNAL_NODISCARD_ATTR node_pointer pop_front( void ) noexcept;
 
 	bool is_empty( void ) const;
 
