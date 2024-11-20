@@ -56,6 +56,8 @@ TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile2 )
 
 	EXPECT_TRUE( ret );
 }
+#endif
+#if 0
 TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile3 )
 {
 	using TestType = std::size_t;
@@ -79,8 +81,6 @@ TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile3 )
 	// Assert
 	EXPECT_TRUE( ret );
 }
-#endif
-#if 0
 TEST_F( TestLF_2_HighLoad, TC_FIFO2_Profile1 )
 {
 	using TestType = std::size_t;

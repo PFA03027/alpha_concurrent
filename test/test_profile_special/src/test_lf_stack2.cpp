@@ -33,7 +33,7 @@
 constexpr size_t SUT_N    = 100;
 constexpr size_t THREAD_N = 20;
 
-#if 0
+#if 1
 TEST_F( TestLF_2_HighLoad, TC_STACK_Profile1 )
 {
 	using TestType = std::size_t;
@@ -47,8 +47,8 @@ TEST_F( TestLF_2_HighLoad, TC_STACK_Profile2 )
 	using TestType = std::size_t;
 	// using TestType = int;
 
-	std::cout << "--- stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
-	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( THREAD_N, 10 );
+	std::cout << "--- pre-cpu kicking stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::stack_list<TestType>, 2>( 2, 1 );
 }
 #endif
 #if 0
@@ -57,10 +57,18 @@ TEST_F( TestLF_2_HighLoad, TC_STACK_Profile3 )
 	using TestType = std::size_t;
 	// using TestType = int;
 
+	std::cout << "--- stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
+	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( THREAD_N, 10 );
+}
+TEST_F( TestLF_2_HighLoad, TC_STACK_Profile4 )
+{
+	using TestType = std::size_t;
+	// using TestType = int;
+
 	std::cout << "--- pre-cpu kicking obsolate_stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::obsolate_stack_list<TestType>, SUT_N>( THREAD_N, 1 );
 }
-TEST_F( TestLF_2_HighLoad, TC_STACK_Profile4 )
+TEST_F( TestLF_2_HighLoad, TC_STACK_Profile5 )
 {
 	using TestType = std::size_t;
 	// using TestType = int;
