@@ -495,13 +495,20 @@ public:
 		return *p_;
 	}
 
+	T* reset( pointer p_arg = nullptr ) noexcept
+	{
+		T* p_ans = p_;
+		store( p_arg );
+		return p_ans;
+	}
+
 	T* get() const noexcept
 	{
 		return p_;
 	}
 
 	template <typename CAST_T>
-	auto get_pointer_by_static_cast( void ) const -> typename std::conditional<std::is_const<T>::value, typename std::remove_const<CAST_T>::type*, CAST_T*>::type
+	auto get_pointer_by_static_cast( void ) const -> typename std::conditional<std::is_const<T>::value, typename std::add_const<CAST_T>::type*, CAST_T*>::type
 	{
 #ifdef ALCONCURRENT_CONF_REPLACE_STATIC_CAST_OF_ZDPTR_TO_DYNAMIC_CAST
 		return dynamic_cast<typename std::conditional<std::is_const<T>, typename std::remove_const<CAST_T>::type*, CAST_T*>::type>( p_ );
@@ -511,7 +518,7 @@ public:
 	}
 
 	template <typename CAST_T>
-	auto get_pointer_by_dynamic_cast( void ) const -> typename std::conditional<std::is_const<T>::value, typename std::remove_const<CAST_T>::type*, CAST_T*>::type
+	auto get_pointer_by_dynamic_cast( void ) const -> typename std::conditional<std::is_const<T>::value, typename std::add_const<CAST_T>::type*, CAST_T*>::type
 	{
 		return dynamic_cast<typename std::conditional<std::is_const<T>::value, typename std::remove_const<CAST_T>::type*, CAST_T*>::type>( p_ );
 	}
@@ -1060,12 +1067,65 @@ private:
 	std::atomic<pointer> ap_target_p_;
 };
 
+/**
+ * @brief 1bitのマーク付きハザードポインタハンドラ
+ *
+ * lock-free listのアルゴリズム上、1bitのマークのフラグが立った場合、ポインタのCASは行われないか、失敗判定とする必要がある。
+ * （CAS操作はマークが立っていないことが前提で、マークが立っている場合は必ず失敗させる必要がある）
+ * そのため、CAS系のI/Fのexpectのパラメータに1bitのマーク情報は必ずマークが立っていない。よって、1bitのマーク情報をCAS系のI/Fに用意する必要はない。
+ *
+ * 現時点のCAS系I/Fは、lock-free listの実装に必要なI/Fのみを用意する。
+ *
+ * @tparam T
+ */
 template <typename T>
 class hazard_ptr_w_mark_handler {
 public:
 	using element_type   = T;
 	using pointer        = T*;
 	using hazard_pointer = hazard_ptr<T>;
+
+	struct pointer_w_mark {
+		bool    mark_ = false;
+		pointer p_    = nullptr;
+	};
+	struct hazard_pointer_w_mark {
+		bool           mark_;
+		hazard_pointer hp_;   // std::memory_order_releaseを扱いやすくするために、mark_の後にアトミック変数関連の操作を持つhazard_pointerの変数を宣言する。
+
+		constexpr hazard_pointer_w_mark( void )
+		  : mark_( false )
+		  , hp_()
+		{
+		}
+		explicit constexpr hazard_pointer_w_mark( pointer p_arg )
+		  : mark_( false )
+		  , hp_( p_arg )
+		{
+		}
+		hazard_pointer_w_mark( const hazard_pointer_w_mark& )            = default;
+		hazard_pointer_w_mark( hazard_pointer_w_mark&& )                 = default;
+		hazard_pointer_w_mark& operator=( const hazard_pointer_w_mark& ) = default;
+		hazard_pointer_w_mark& operator=( hazard_pointer_w_mark&& )      = default;
+		~hazard_pointer_w_mark()                                         = default;
+
+		explicit hazard_pointer_w_mark( const pointer_w_mark& src )
+		  : mark_( src.mark_ )
+		  , hp_( src.p_ )
+		{
+		}
+		hazard_pointer_w_mark& operator=( const pointer_w_mark& src )
+		{
+			mark_ = src.mark_;
+			hp_.store( src.p_ );
+			return *this;
+		}
+		void swap( hazard_pointer_w_mark& src ) noexcept
+		{
+			std::swap( mark_, src.mark_ );
+			hp_.swap( src.hp_ );
+		}
+	};
 
 	constexpr hazard_ptr_w_mark_handler( void ) noexcept
 	  : a_target_addr_( static_cast<addr_markable>( 0U ) )
@@ -1108,97 +1168,96 @@ public:
 		return *this;
 	}
 
-	bool verify_exchange( std::tuple<hazard_pointer, bool>& hp_w_mark )
-	{
-		addr_markable addr_desired = zip_tuple_to_addr_markable( std::get<0>( hp_w_mark ).get(), std::get<1>( hp_w_mark ) );
-		addr_markable addr_expect  = a_target_addr_.load( std::memory_order_acquire );
-
-		bool ret = ( addr_expect == addr_desired );
-		if ( !ret ) {
-			std::tuple<pointer, bool> pointer_w_mark_expect = unzip_addr_markable_to_tuple( addr_expect );
-			std::get<1>( hp_w_mark )                        = std::get<1>( pointer_w_mark_expect );
-			std::get<0>( hp_w_mark ).store( std::get<0>( pointer_w_mark_expect ) );
-		}
-		return ret;
-	}
-
-	std::tuple<hazard_pointer, bool> get_to_verify_exchange( void )
-	{
-		addr_markable             addr_expect           = a_target_addr_.load( std::memory_order_acquire );
-		std::tuple<pointer, bool> pointer_w_mark_expect = unzip_addr_markable_to_tuple( addr_expect );
-		pointer                   p_expect              = std::get<0>( pointer_w_mark_expect );
-		bool                      ans_b                 = std::get<1>( pointer_w_mark_expect );
-
-		return std::tuple<hazard_pointer, bool> { p_expect, ans_b };
-	}
-
-	void reuse_to_verify_exchange( std::tuple<hazard_pointer, bool>& hp_w_mark_reuse )
-	{
-		addr_markable             addr_expect           = a_target_addr_.load( std::memory_order_acquire );
-		std::tuple<pointer, bool> pointer_w_mark_expect = unzip_addr_markable_to_tuple( addr_expect );
-		std::get<1>( hp_w_mark_reuse )                  = std::get<1>( pointer_w_mark_expect );
-		std::get<0>( hp_w_mark_reuse ).store( std::get<0>( pointer_w_mark_expect ) );
-		return;
-	}
-
-	std::tuple<pointer, bool> load( std::memory_order order = std::memory_order_acquire ) const noexcept
+	pointer_w_mark load( std::memory_order order = std::memory_order_acquire ) const noexcept
 	{
 		return unzip_addr_markable_to_tuple( a_target_addr_.load( order ) );
 	}
 
-	void store( const std::tuple<pointer, bool>& desired, std::memory_order order = std::memory_order_release ) noexcept
+	void store( const pointer_w_mark& desired, std::memory_order order = std::memory_order_release ) noexcept
 	{
 		a_target_addr_.store( zip_tuple_to_addr_markable( desired ), order );
 	}
-
-	bool compare_exchange_weak( std::tuple<pointer, bool>&       expected,
-	                            const std::tuple<pointer, bool>& desired,
-	                            std::memory_order                success = std::memory_order_acq_rel,
-	                            std::memory_order                failure = std::memory_order_acquire ) noexcept
+	void store( pointer p_desired, bool desired_mark, std::memory_order order = std::memory_order_release ) noexcept
 	{
-		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
-		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );
-		bool          ret           = a_target_addr_.compare_exchange_weak( addr_expected, addr_desired, success, failure );
+		a_target_addr_.store( zip_tuple_to_addr_markable( p_desired, desired_mark ), order );
+	}
+
+	bool is_marked( std::memory_order order = std::memory_order_acquire ) const noexcept
+	{
+		return load( order ).mark_;
+	}
+
+	bool verify_exchange( hazard_pointer_w_mark& hp_w_mark )
+	{
+		addr_markable addr_desired = zip_tuple_to_addr_markable( hp_w_mark );
+		addr_markable addr_expect  = a_target_addr_.load( std::memory_order_acquire );
+
+		bool ret = ( addr_expect == addr_desired );
 		if ( !ret ) {
-			expected = unzip_addr_markable_to_tuple( addr_expected );
+			hp_w_mark = unzip_addr_markable_to_tuple( addr_expect );
 		}
 		return ret;
 	}
 
-	bool compare_exchange_weak( std::tuple<pointer, bool>&       expected,
-	                            const std::tuple<pointer, bool>& desired,
-	                            std::memory_order                order = std::memory_order_seq_cst ) noexcept
+	hazard_pointer_w_mark get_to_verify_exchange( void )
 	{
-		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
-		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );
-		bool          ret           = a_target_addr_.compare_exchange_weak( addr_expected, addr_desired, order );
+		addr_markable addr_expect = a_target_addr_.load( std::memory_order_acquire );
+		return hazard_pointer_w_mark { unzip_addr_markable_to_tuple( addr_expect ) };
+	}
+
+	void reuse_to_verify_exchange( hazard_pointer_w_mark& hp_w_mark_reuse )
+	{
+		addr_markable addr_expect = a_target_addr_.load( std::memory_order_acquire );
+		hp_w_mark_reuse           = unzip_addr_markable_to_tuple( addr_expect );
+		return;
+	}
+
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_weak を使用する。
+	 *
+	 * 現在の値と expected が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、expected に、desired を反映する。
+	 * そうでなければ failure メモリオーダーで expected を現在の値で置き換える。
+	 *
+	 * @param expect 自身が保持していると期待されるポインタへの参照。CAS操作ではフラグ情報は参照されない(falseとして扱う)。
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。
+	 * @return false CAS操作に失敗。expected のポインタと、マーク情報は、自身が保持する現在の情報で置き換えられている。
+	 */
+	bool compare_exchange_weak_set_mark( pointer_w_mark&   expect,
+	                                     std::memory_order success = std::memory_order_acq_rel,
+	                                     std::memory_order failure = std::memory_order_acquire ) noexcept
+	{
+		addr_markable addr_expected = zip_tuple_to_addr_markable( expect.p_, false );
+		addr_markable addr_desired  = zip_tuple_to_addr_markable( expect.p_, true );
+
+		bool ret = a_target_addr_.compare_exchange_weak( addr_expected, addr_desired, success, failure );
 		if ( !ret ) {
-			expected = unzip_addr_markable_to_tuple( addr_expected );
+			expect = unzip_addr_markable_to_tuple( addr_expected );
 		}
 		return ret;
 	}
 
-	bool compare_exchange_strong( std::tuple<pointer, bool>&       expected,
-	                              const std::tuple<pointer, bool>& desired,
-	                              std::memory_order                success = std::memory_order_acq_rel,
-	                              std::memory_order                failure = std::memory_order_acquire ) noexcept
+	/**
+	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_strong を使用する。
+	 *
+	 * 現在の値と expected が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、expected に、desired を反映する。
+	 * そうでなければ failure メモリオーダーで expected を現在の値で置き換える。
+	 *
+	 * @param expect 自身が保持していると期待されるポインタへの参照。CAS操作ではフラグ情報は参照されない(falseとして扱う)。
+	 * @param success CAS操作成功時に使用するメモリオーダー
+	 * @param failure CAS操作失敗時に使用するメモリオーダー
+	 * @return true CAS操作に成功。
+	 * @return false CAS操作に失敗。expected のポインタと、マーク情報は、自身が保持する現在の情報で置き換えられている。
+	 */
+	bool compare_exchange_strong_set_mark( pointer_w_mark&   expected,
+	                                       std::memory_order success = std::memory_order_acq_rel,
+	                                       std::memory_order failure = std::memory_order_acquire ) noexcept
 	{
-		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
-		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );
-		bool          ret           = a_target_addr_.compare_exchange_strong( addr_expected, addr_desired, success, failure );
-		if ( !ret ) {
-			expected = unzip_addr_markable_to_tuple( addr_expected );
-		}
-		return ret;
-	}
+		addr_markable addr_expected = zip_tuple_to_addr_markable( expected.p_, false );
+		addr_markable addr_desired  = zip_tuple_to_addr_markable( expected.p_, true );
 
-	bool compare_exchange_strong( std::tuple<pointer, bool>&       expected,
-	                              const std::tuple<pointer, bool>& desired,
-	                              std::memory_order                order = std::memory_order_seq_cst ) noexcept
-	{
-		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
-		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );
-		bool          ret           = a_target_addr_.compare_exchange_strong( addr_expected, addr_desired, order );
+		bool ret = a_target_addr_.compare_exchange_strong( addr_expected, addr_desired, success, failure );
 		if ( !ret ) {
 			expected = unzip_addr_markable_to_tuple( addr_expected );
 		}
@@ -1211,28 +1270,26 @@ public:
 	 * 現在の値と expected が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、expected に、desired を反映する。
 	 * そうでなければ failure メモリオーダーで expected を現在の値で置き換える。
 	 *
-	 * @param expected 自身が保持していると期待されるハザードポインタへの参照
+	 * @param expected 自身が保持していると期待されるハザードポインタへの参照。CAS操作ではフラグ情報は参照されない(falseとして扱う)。
 	 * @param desired CAS操作で置き換える新たなポインタ値
 	 * @param success CAS操作成功時に使用するメモリオーダー
 	 * @param failure CAS操作失敗時に使用するメモリオーダー
-	 * @return true CAS操作に成功。expected_hzd_ptr は、desired で置き換えられている。
-	 * @return false CAS操作に失敗。自身が保持する現在のポインタでexpected_hzd_ptrを置き換えられている。
+	 * @return true CAS操作に成功。 expected は、desired で置き換えられている。boolは、falseがセットされる。
+	 * @return false CAS操作に失敗。expected のポインタと、マーク情報は、自身が保持する現在の情報で置き換えられている。
 	 */
-	bool compare_exchange_strong_to_verify_exchange1( std::tuple<hazard_pointer, bool>& expected,
-	                                                  const std::tuple<pointer, bool>&  desired,
-	                                                  std::memory_order                 success = std::memory_order_acq_rel,
-	                                                  std::memory_order                 failure = std::memory_order_acquire ) noexcept
+	bool compare_exchange_strong_to_verify_exchange1( hazard_pointer_w_mark& expected,
+	                                                  pointer                desired,
+	                                                  std::memory_order      success = std::memory_order_acq_rel,
+	                                                  std::memory_order      failure = std::memory_order_acquire ) noexcept
 	{
-		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
-		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );
+		addr_markable addr_expected = zip_tuple_to_addr_markable( expected.hp_.get(), false );
+		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired, false );
 		bool          ret           = a_target_addr_.compare_exchange_strong( addr_expected, addr_desired, success, failure );
 		if ( ret ) {
-			std::get<1>( expected ) = std::get<1>( desired );
-			std::get<0>( expected ).store( std::get<0>( desired ) );
+			expected.mark_ = false;
+			expected.hp_.store( desired );
 		} else {
-			auto updated_expected   = unzip_addr_markable_to_tuple( addr_expected );
-			std::get<1>( expected ) = std::get<1>( updated_expected );
-			std::get<0>( expected ).store( std::get<0>( updated_expected ) );
+			expected = unzip_addr_markable_to_tuple( addr_expected );
 		}
 		return ret;
 	}
@@ -1241,27 +1298,22 @@ public:
 	 * @brief CAS操作を実施する。CAS操作には、compare_exchange_strong を使用する。
 	 *
 	 * 現在の値と expected が等値である場合に、 success メモリオーダーで現在の値を desired で置き換え、
-	 * そうでなければ failure メモリオーダーで expected を現在の値で置き換える
 	 *
-	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照
+	 * @param expected_hzd_ptr 自身が保持していると期待されるハザードポインタへの参照。CAS操作ではフラグ情報は参照されない(falseとして扱う)。
 	 * @param desired CAS操作で置き換える新たなポインタ値
 	 * @param success CAS操作成功時に使用するメモリオーダー
-	 * @param failure CAS操作失敗時に使用するメモリオーダー
-	 * @return true CAS操作に成功。また、expected_hzd_ptrは呼び出し前の状態を維持している。
-	 * @return false CAS操作に失敗。自身が保持するあらなたポインタでexpected_hzd_ptrを置き換えられている。
+	 * @return true CAS操作に成功。また、 expected は呼び出し前の状態を維持している。
+	 * @return false CAS操作に失敗。expected のポインタと、マーク情報は、自身が保持する現在の情報で置き換えられている。
 	 */
-	bool compare_exchange_strong_to_verify_exchange2( std::tuple<hazard_pointer, bool>& expected,
-	                                                  const std::tuple<pointer, bool>&  desired,
-	                                                  std::memory_order                 success = std::memory_order_acq_rel,
-	                                                  std::memory_order                 failure = std::memory_order_acquire ) noexcept
+	bool compare_exchange_strong_to_verify_exchange2( hazard_pointer_w_mark& expected,
+	                                                  pointer                desired,
+	                                                  std::memory_order      success = std::memory_order_acq_rel ) noexcept
 	{
-		addr_markable addr_expected = zip_tuple_to_addr_markable( expected );
-		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired );
-		bool          ret           = a_target_addr_.compare_exchange_strong( addr_expected, addr_desired, success, failure );
+		addr_markable addr_expected = zip_tuple_to_addr_markable( expected.hp_.get(), false );
+		addr_markable addr_desired  = zip_tuple_to_addr_markable( desired, false );
+		bool          ret           = a_target_addr_.compare_exchange_strong( addr_expected, addr_desired, success, std::memory_order_acquire );
 		if ( !ret ) {
-			auto updated_expected   = unzip_addr_markable_to_tuple( addr_expected );
-			std::get<1>( expected ) = std::get<1>( updated_expected );
-			std::get<0>( expected ).store( std::get<0>( updated_expected ) );
+			expected = unzip_addr_markable_to_tuple( addr_expected );
 		}
 		return ret;
 	}
@@ -1269,11 +1321,11 @@ public:
 private:
 	using addr_markable = std::uintptr_t;
 
-	static addr_markable zip_tuple_to_addr_markable( const std::tuple<pointer, bool>& tp )
+	static constexpr addr_markable zip_tuple_to_addr_markable( const pointer_w_mark& tp )
 	{
 		// reinterpret_castはconstexprの中では使えない。
-		addr_markable ans = reinterpret_cast<addr_markable>( std::get<0>( tp ) );
-		if ( std::get<1>( tp ) ) {
+		addr_markable ans = reinterpret_cast<addr_markable>( tp.p_ );
+		if ( tp.mark_ ) {
 			ans |= static_cast<addr_markable>( 1U );
 		} /*
 		else {
@@ -1281,11 +1333,11 @@ private:
 		} */
 		return ans;
 	}
-	static addr_markable zip_tuple_to_addr_markable( const std::tuple<hazard_pointer, bool>& tp )
+	static constexpr addr_markable zip_tuple_to_addr_markable( const hazard_pointer_w_mark& tp )
 	{
 		// reinterpret_castはconstexprの中では使えない。
-		addr_markable ans = reinterpret_cast<addr_markable>( std::get<0>( tp ).get() );
-		if ( std::get<1>( tp ) ) {
+		addr_markable ans = reinterpret_cast<addr_markable>( tp.hp_.get() );
+		if ( tp.mark_ ) {
 			ans |= static_cast<addr_markable>( 1U );
 		} /*
 		else {
@@ -1293,7 +1345,7 @@ private:
 		} */
 		return ans;
 	}
-	static addr_markable zip_tuple_to_addr_markable( pointer p, bool mark )
+	static constexpr addr_markable zip_tuple_to_addr_markable( pointer p, bool mark )
 	{
 		// reinterpret_castはconstexprの中では使えない。
 		addr_markable ans = reinterpret_cast<addr_markable>( p );
@@ -1305,12 +1357,26 @@ private:
 		} */
 		return ans;
 	}
-	static std::tuple<pointer, bool> unzip_addr_markable_to_tuple( addr_markable addr )
+	static constexpr pointer_w_mark unzip_addr_markable_to_tuple( addr_markable addr )
 	{
 		// reinterpret_castはconstexprの中では使えない。
 		pointer p_ans = reinterpret_cast<pointer>( addr & ( ~( static_cast<addr_markable>( 1U ) ) ) );
 		bool    b_ans = ( ( addr & static_cast<addr_markable>( 1U ) ) == 0 ) ? false : true;
-		return std::tuple<pointer, bool> { p_ans, b_ans };
+		return pointer_w_mark { b_ans, p_ans };
+	}
+
+	static constexpr bool is_marked( addr_markable tut ) noexcept
+	{
+		return ( tut & static_cast<addr_markable>( 1U ) ) != 0;
+	}
+
+	static constexpr addr_markable set_mark( addr_markable tut ) noexcept
+	{
+		return tut | static_cast<addr_markable>( 1U );
+	}
+	static constexpr addr_markable unset_mark( addr_markable tut ) noexcept
+	{
+		return tut & ( ~static_cast<addr_markable>( 1U ) );
 	}
 
 	std::atomic<addr_markable> a_target_addr_;

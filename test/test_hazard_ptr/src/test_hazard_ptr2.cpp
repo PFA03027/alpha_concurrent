@@ -1105,8 +1105,8 @@ TEST_F( TestHazardPtrWMarkHandler, CallDefaultConstructor )
 
 	// Assert
 	auto hp2 = sut.get_to_verify_exchange();
-	EXPECT_EQ( std::get<0>( hp2 ), nullptr );
-	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_EQ( hp2.hp_, nullptr );
+	EXPECT_FALSE( hp2.mark_ );
 	EXPECT_FALSE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( nullptr ) );
 }
 
@@ -1120,8 +1120,8 @@ TEST_F( TestHazardPtrWMarkHandler, CallTransConstructor )
 
 	// Assert
 	auto hp2 = sut.get_to_verify_exchange();
-	EXPECT_EQ( std::get<0>( hp2 ), &dummy1 );
-	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_EQ( hp2.hp_, &dummy1 );
+	EXPECT_FALSE( hp2.mark_ );
 	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
 }
 
@@ -1132,16 +1132,16 @@ TEST_F( TestHazardPtrWMarkHandler, CallCopyConstructor )
 	alpha::concurrent::hazard_ptr_w_mark_handler<int> src( &dummy1 );
 
 	auto hp1 = src.get_to_verify_exchange();
-	EXPECT_EQ( std::get<0>( hp1 ), &dummy1 );
-	EXPECT_FALSE( std::get<1>( hp1 ) );
+	EXPECT_EQ( hp1.hp_, &dummy1 );
+	EXPECT_FALSE( hp1.mark_ );
 
 	// Act
 	alpha::concurrent::hazard_ptr_w_mark_handler<int> sut( src );
 
 	// Assert
 	auto hp2 = sut.get_to_verify_exchange();
-	EXPECT_EQ( std::get<0>( hp2 ), &dummy1 );
-	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_EQ( hp2.hp_, &dummy1 );
+	EXPECT_FALSE( hp2.mark_ );
 	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
 }
 
@@ -1152,19 +1152,19 @@ TEST_F( TestHazardPtrWMarkHandler, CallMoveConstructor )
 	alpha::concurrent::hazard_ptr_w_mark_handler<int> src( &dummy1 );
 
 	auto hp1 = src.get_to_verify_exchange();
-	EXPECT_EQ( std::get<0>( hp1 ), &dummy1 );
-	EXPECT_FALSE( std::get<1>( hp1 ) );
+	EXPECT_EQ( hp1.hp_, &dummy1 );
+	EXPECT_FALSE( hp1.mark_ );
 
 	// Act
 	alpha::concurrent::hazard_ptr_w_mark_handler<int> sut( std::move( src ) );
 
 	// Assert
 	hp1 = src.get_to_verify_exchange();
-	EXPECT_EQ( std::get<0>( hp1 ), nullptr );
-	EXPECT_FALSE( std::get<1>( hp1 ) );
+	EXPECT_EQ( hp1.hp_, nullptr );
+	EXPECT_FALSE( hp1.mark_ );
 	auto hp2 = sut.get_to_verify_exchange();
-	EXPECT_EQ( std::get<0>( hp2 ), &dummy1 );
-	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_EQ( hp2.hp_, &dummy1 );
+	EXPECT_FALSE( hp2.mark_ );
 	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
 }
 
@@ -1177,11 +1177,11 @@ TEST_F( TestHazardPtrWMarkHandler, CallCopyAssingment )
 	alpha::concurrent::hazard_ptr_w_mark_handler<int> sut( &dummy2 );
 
 	auto hp1 = src.get_to_verify_exchange();
-	EXPECT_EQ( std::get<0>( hp1 ), &dummy1 );
-	EXPECT_FALSE( std::get<1>( hp1 ) );
+	EXPECT_EQ( hp1.hp_, &dummy1 );
+	EXPECT_FALSE( hp1.mark_ );
 	auto hp2 = sut.get_to_verify_exchange();
-	EXPECT_EQ( std::get<0>( hp2 ), &dummy2 );
-	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_EQ( hp2.hp_, &dummy2 );
+	EXPECT_FALSE( hp2.mark_ );
 	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
 	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 ) );
 
@@ -1190,11 +1190,11 @@ TEST_F( TestHazardPtrWMarkHandler, CallCopyAssingment )
 
 	// Assert
 	hp1 = src.get_to_verify_exchange();
-	EXPECT_EQ( std::get<0>( hp1 ), &dummy1 );
-	EXPECT_FALSE( std::get<1>( hp1 ) );
+	EXPECT_EQ( hp1.hp_, &dummy1 );
+	EXPECT_FALSE( hp1.mark_ );
 	hp2 = sut.get_to_verify_exchange();
-	EXPECT_EQ( std::get<0>( hp2 ), &dummy1 );
-	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_EQ( hp2.hp_, &dummy1 );
+	EXPECT_FALSE( hp2.mark_ );
 	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
 	EXPECT_FALSE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 ) );
 }
@@ -1208,11 +1208,11 @@ TEST_F( TestHazardPtrWMarkHandler, CallMoveAssingment )
 	alpha::concurrent::hazard_ptr_w_mark_handler<int> sut( &dummy2 );
 
 	auto hp1 = src.get_to_verify_exchange();
-	EXPECT_EQ( std::get<0>( hp1 ), &dummy1 );
-	EXPECT_FALSE( std::get<1>( hp1 ) );
+	EXPECT_EQ( hp1.hp_, &dummy1 );
+	EXPECT_FALSE( hp1.mark_ );
 	auto hp2 = sut.get_to_verify_exchange();
-	EXPECT_EQ( std::get<0>( hp2 ), &dummy2 );
-	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_EQ( hp2.hp_, &dummy2 );
+	EXPECT_FALSE( hp2.mark_ );
 	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
 	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 ) );
 
@@ -1221,11 +1221,11 @@ TEST_F( TestHazardPtrWMarkHandler, CallMoveAssingment )
 
 	// Assert
 	hp1 = src.get_to_verify_exchange();
-	EXPECT_EQ( std::get<0>( hp1 ), nullptr );
-	EXPECT_FALSE( std::get<1>( hp1 ) );
+	EXPECT_EQ( hp1.hp_, nullptr );
+	EXPECT_FALSE( hp1.mark_ );
 	hp2 = sut.get_to_verify_exchange();
-	EXPECT_EQ( std::get<0>( hp2 ), &dummy1 );
-	EXPECT_FALSE( std::get<1>( hp2 ) );
+	EXPECT_EQ( hp2.hp_, &dummy1 );
+	EXPECT_FALSE( hp2.mark_ );
 	EXPECT_TRUE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy1 ) );
 	EXPECT_FALSE( alpha::concurrent::internal::hazard_ptr_mgr::CheckPtrIsHazardPtr( &dummy2 ) );
 }
@@ -1240,9 +1240,9 @@ TEST_F( TestHazardPtrWMarkHandler, Call_HazardPtr_get1 )
 	auto hp2 = sut.get_to_verify_exchange();
 
 	// Assert
-	ASSERT_EQ( std::get<0>( hp2 ), &dummy1 );
-	EXPECT_FALSE( std::get<1>( hp2 ) );
-	EXPECT_EQ( *( std::get<0>( hp2 ) ), 1 );
+	ASSERT_EQ( hp2.hp_, &dummy1 );
+	EXPECT_FALSE( hp2.mark_ );
+	EXPECT_EQ( *( hp2.hp_ ), 1 );
 }
 
 TEST_F( TestHazardPtrWMarkHandler, Call_HazardPtr_get1_and_assignment )
@@ -1252,12 +1252,12 @@ TEST_F( TestHazardPtrWMarkHandler, Call_HazardPtr_get1_and_assignment )
 	alpha::concurrent::hazard_ptr_w_mark_handler<int> sut( &dummy1 );
 
 	auto hp2 = sut.get_to_verify_exchange();
-	ASSERT_EQ( std::get<0>( hp2 ), &dummy1 );
-	EXPECT_FALSE( std::get<1>( hp2 ) );
-	EXPECT_EQ( *( std::get<0>( hp2 ) ), 1 );
+	ASSERT_EQ( hp2.hp_, &dummy1 );
+	EXPECT_FALSE( hp2.mark_ );
+	EXPECT_EQ( *( hp2.hp_ ), 1 );
 
 	// Act
-	*( std::get<0>( hp2 ) ) = 2;
+	*( hp2.hp_ ) = 2;
 
 	// Assert
 	EXPECT_EQ( dummy1, 2 );
@@ -1277,8 +1277,8 @@ TEST_F( TestHazardPtrWMarkHandler, Call_HazardPtr_get2 )
 	auto hp2 = sut.get_to_verify_exchange();
 
 	// Assert
-	auto hp20 = std::get<0>( hp2 );
-	bool hp21 = std::get<1>( hp2 );
+	auto hp20 = hp2.hp_;
+	bool hp21 = hp2.mark_;
 	ASSERT_EQ( hp20, &dummy1 );
 	EXPECT_FALSE( hp21 );
 	EXPECT_EQ( hp20->x, 1 );
@@ -1296,8 +1296,8 @@ TEST_F( TestHazardPtrWMarkHandler, Call_HazardPtr_get2_assignment )
 	alpha::concurrent::hazard_ptr_w_mark_handler<A> sut( &dummy1 );
 
 	auto hp2  = sut.get_to_verify_exchange();
-	auto hp20 = std::get<0>( hp2 );
-	bool hp21 = std::get<1>( hp2 );
+	auto hp20 = hp2.hp_;
+	bool hp21 = hp2.mark_;
 	ASSERT_EQ( hp20, &dummy1 );
 	EXPECT_FALSE( hp21 );
 	EXPECT_EQ( hp20->x, 1 );
@@ -1321,7 +1321,7 @@ TEST_F( TestHazardPtrWMarkHandler, Call_HazardPtr_get_for_nullptr )
 	auto hp2 = sut.get_to_verify_exchange();
 
 	// Assert
-	EXPECT_EQ( std::get<0>( hp2 ), nullptr );
+	EXPECT_EQ( hp2.hp_, nullptr );
 }
 
 /////////////////////////////////////////////////////////////////////////////////

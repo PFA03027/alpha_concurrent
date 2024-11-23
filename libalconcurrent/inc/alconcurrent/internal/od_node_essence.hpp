@@ -128,8 +128,10 @@ private:
  */
 class alignas( atomic_variable_align ) od_node_1bit_markable_link_by_hazard_handler {
 public:
-	using hazard_ptr_handler_t = hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>;
-	using hazard_pointer       = typename hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>::hazard_pointer;
+	using hazard_ptr_handler_t  = hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>;
+	using hazard_pointer        = typename hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>::hazard_pointer;
+	using hazard_pointer_w_mark = typename hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>::hazard_pointer_w_mark;
+	using pointer_w_mark        = typename hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>::pointer_w_mark;
 
 	explicit constexpr od_node_1bit_markable_link_by_hazard_handler( od_node_1bit_markable_link_by_hazard_handler* p_next_arg = nullptr ) noexcept
 	  : hph_next_( p_next_arg )
@@ -141,14 +143,29 @@ public:
 	od_node_1bit_markable_link_by_hazard_handler& operator=( od_node_1bit_markable_link_by_hazard_handler&& )      = default;
 	virtual ~od_node_1bit_markable_link_by_hazard_handler()                                                        = default;
 
-	std::tuple<od_node_1bit_markable_link_by_hazard_handler*, bool> next( void ) const noexcept
+	pointer_w_mark next( void ) const noexcept
 	{
 		return hph_next_.load();
 	}
 
-	void set_next( const std::tuple<od_node_1bit_markable_link_by_hazard_handler*, bool>& tp ) noexcept
+	void set_next( const pointer_w_mark& tp ) noexcept
 	{
 		hph_next_.store( tp );
+	}
+
+	bool is_marked( void ) const noexcept
+	{
+		return hph_next_.is_marked();
+	}
+
+	void set_mark( void ) noexcept
+	{
+		pointer_w_mark expect_p_w_m = hph_next_.load();
+		do {
+			if ( expect_p_w_m.mark_ ) {
+				break;
+			}
+		} while ( !hph_next_.compare_exchange_strong_set_mark( expect_p_w_m ) );
 	}
 
 	hazard_ptr_handler_t& hazard_handler_of_next( void ) noexcept
