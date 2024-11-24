@@ -21,7 +21,7 @@
 #include "alconcurrent/internal/od_node_essence.hpp"
 #include "alconcurrent/lf_fifo.hpp"
 
-using test_fifo_type = alpha::concurrent::internal::x_fifo_list<size_t>;
+using test_fifo_type = alpha::concurrent::internal::x_lockfree_fifo<size_t>;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 

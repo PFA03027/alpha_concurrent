@@ -29,7 +29,7 @@ namespace concurrent {
 namespace internal {
 
 template <typename T, typename VALUE_DELETER = deleter_nothing<T>>
-class x_fifo_list {
+class x_lockfree_fifo {
 public:
 	// static_assert( ( !std::is_class<T>::value ) ||
 	//                    ( std::is_class<T>::value &&
@@ -42,7 +42,7 @@ public:
 
 	using value_type = T;
 
-	constexpr x_fifo_list( void ) noexcept
+	constexpr x_lockfree_fifo( void ) noexcept
 	  : lf_fifo_impl_()
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	  , allocated_node_count_( 0 )
@@ -50,10 +50,10 @@ public:
 	{
 	}
 
-	~x_fifo_list()
+	~x_lockfree_fifo()
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-		internal::LogOutput( log_type::DUMP, "x_fifo_list: allocated_node_count = %zu", allocated_node_count_.load() );
+		internal::LogOutput( log_type::DUMP, "x_lockfree_fifo: allocated_node_count = %zu", allocated_node_count_.load() );
 #endif
 
 		VALUE_DELETER                deleter;
@@ -144,26 +144,26 @@ private:
 	class node_fifo_lockfree_t : private od_lockfree_fifo {
 	public:
 		node_fifo_lockfree_t( void )
-		  : od_lockfree_fifo( new x_fifo_list::node_type )
+		  : od_lockfree_fifo( new x_lockfree_fifo::node_type )
 		{
 		}
 
-		void push_back( x_fifo_list::node_pointer p_nd ) noexcept
+		void push_back( x_lockfree_fifo::node_pointer p_nd ) noexcept
 		{
 			od_lockfree_fifo::push_back( p_nd );
 		}
-		x_fifo_list::node_pointer pop_front( x_fifo_list::value_type* p_context_local_data ) noexcept
+		x_lockfree_fifo::node_pointer pop_front( x_lockfree_fifo::value_type* p_context_local_data ) noexcept
 		{
 			od_lockfree_fifo::node_pointer p_node = od_lockfree_fifo::pop_front( p_context_local_data );
 			if ( p_node == nullptr ) return nullptr;
-			return static_cast<x_fifo_list::node_pointer>( p_node );
+			return static_cast<x_lockfree_fifo::node_pointer>( p_node );
 		}
 
-		x_fifo_list::node_pointer release_sentinel_node( void ) noexcept
+		x_lockfree_fifo::node_pointer release_sentinel_node( void ) noexcept
 		{
 			od_lockfree_fifo::node_pointer p_node = od_lockfree_fifo::release_sentinel_node();
 			if ( p_node == nullptr ) return nullptr;
-			return static_cast<x_fifo_list::node_pointer>( p_node );
+			return static_cast<x_lockfree_fifo::node_pointer>( p_node );
 		}
 
 		bool is_empty( void ) const
@@ -173,23 +173,23 @@ private:
 
 	private:
 		template <bool IsMovable = std::is_move_assignable<T>::value, typename std::enable_if<IsMovable>::type* = nullptr>
-		void callback_to_pick_up_value_impl( x_fifo_list::node_type& node_stored_value, x_fifo_list::value_type& context_local_data )
+		void callback_to_pick_up_value_impl( x_lockfree_fifo::node_type& node_stored_value, x_lockfree_fifo::value_type& context_local_data )
 		{
 			context_local_data = std::move( node_stored_value ).get_value();
 		}
 		template <bool IsCopyable                                          = std::is_copy_assignable<T>::value,
 		          bool IsMovable                                           = std::is_move_assignable<T>::value,
 		          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
-		void callback_to_pick_up_value_impl( x_fifo_list::node_type& node_stored_value, x_fifo_list::value_type& context_local_data )
+		void callback_to_pick_up_value_impl( x_lockfree_fifo::node_type& node_stored_value, x_lockfree_fifo::value_type& context_local_data )
 		{
 			context_local_data = node_stored_value.get_value();
 		}
 
 		void callback_to_pick_up_value( od_lockfree_fifo::node_pointer p_node_stored_value, void* p_context_local_data ) override
 		{
-			x_fifo_list::node_type& node_stored_value = *( static_cast<x_fifo_list::node_pointer>( p_node_stored_value ) );   // od_lockfree_fifoに保管されているノードはnode_pointerであることを保証しているため、static_castを使用する。
+			x_lockfree_fifo::node_type& node_stored_value = *( static_cast<x_lockfree_fifo::node_pointer>( p_node_stored_value ) );   // od_lockfree_fifoに保管されているノードはnode_pointerであることを保証しているため、static_castを使用する。
 
-			x_fifo_list::value_type* p_storage_for_popped_value_ = reinterpret_cast<x_fifo_list::value_type*>( p_context_local_data );
+			x_lockfree_fifo::value_type* p_storage_for_popped_value_ = reinterpret_cast<x_lockfree_fifo::value_type*>( p_context_local_data );
 			callback_to_pick_up_value_impl( node_stored_value, *p_storage_for_popped_value_ );
 		}
 	};   // namespace internal
@@ -206,7 +206,7 @@ private:
 }   // namespace internal
 
 template <typename T, typename VALUE_DELETER = internal::deleter_nothing<T>>
-class fifo_list : public internal::x_fifo_list<T, VALUE_DELETER> {
+class fifo_list : public internal::x_lockfree_fifo<T, VALUE_DELETER> {
 public:
 	fifo_list( void ) = default;
 	fifo_list( size_t reserve_size ) noexcept
@@ -215,7 +215,7 @@ public:
 	}
 };
 template <>
-class fifo_list<void*> : public internal::x_fifo_list<void*, internal::deleter_nothing<void>> {
+class fifo_list<void*> : public internal::x_lockfree_fifo<void*, internal::deleter_nothing<void>> {
 public:
 	fifo_list( void ) = default;
 	fifo_list( size_t reserve_size ) noexcept
@@ -224,7 +224,7 @@ public:
 	}
 };
 template <typename T>
-class fifo_list<T*> : public internal::x_fifo_list<T*, std::default_delete<T>> {
+class fifo_list<T*> : public internal::x_lockfree_fifo<T*, std::default_delete<T>> {
 public:
 	fifo_list( void ) = default;
 	fifo_list( size_t reserve_size ) noexcept
@@ -233,7 +233,7 @@ public:
 	}
 };
 template <typename T>
-class fifo_list<T[]> : public internal::x_fifo_list<T*, std::default_delete<T[]>> {
+class fifo_list<T[]> : public internal::x_lockfree_fifo<T*, std::default_delete<T[]>> {
 public:
 	using value_type = T[];
 
@@ -244,7 +244,7 @@ public:
 	}
 };
 template <typename T, size_t N>
-class fifo_list<T[N]> : public internal::x_fifo_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>> {
+class fifo_list<T[N]> : public internal::x_lockfree_fifo<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>> {
 public:
 	using value_type = T[N];
 
@@ -263,7 +263,7 @@ public:
 			tmp[i] = cont_arg[i];
 		}
 
-		internal::x_fifo_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
+		internal::x_lockfree_fifo<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
 	}
 	void push(
 		value_type&& cont_arg   //!< [in]	a value to push this FIFO queue
@@ -274,7 +274,7 @@ public:
 			tmp[i] = std::move( cont_arg[i] );
 		}
 
-		internal::x_fifo_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
+		internal::x_lockfree_fifo<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
 	}
 
 	std::tuple<bool, value_type> pop( void )
@@ -282,7 +282,7 @@ public:
 		std::tuple<bool, value_type> ans;
 		std::get<0>( ans ) = false;
 
-		std::tuple<bool, std::array<T, N>> ret = internal::x_fifo_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::pop();
+		std::tuple<bool, std::array<T, N>> ret = internal::x_lockfree_fifo<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::pop();
 		if ( !std::get<0>( ret ) ) {
 			return ans;
 		}
@@ -295,7 +295,7 @@ public:
 	}
 };
 template <typename T, typename DELETER>
-class fifo_list<T*, DELETER> : public internal::x_fifo_list<T*, DELETER> {
+class fifo_list<T*, DELETER> : public internal::x_lockfree_fifo<T*, DELETER> {
 public:
 	fifo_list( void ) = default;
 	fifo_list( size_t reserve_size ) noexcept
@@ -304,7 +304,7 @@ public:
 	}
 };
 template <typename T, typename DELETER>
-class fifo_list<T[], DELETER> : public internal::x_fifo_list<T*, DELETER> {
+class fifo_list<T[], DELETER> : public internal::x_lockfree_fifo<T*, DELETER> {
 public:
 	using value_type = T[];
 
