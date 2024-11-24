@@ -30,7 +30,7 @@ ALCONCURRENT_BUILD_SHARED_LIBS?=OFF
 #
 # Please see normal.cmake for detail
 # 
-SANITIZER_TYPE?=1
+SANITIZER_TYPE?=
 
 # GoogleTest Option
 TEST_OPTS?=
@@ -87,31 +87,26 @@ all: configure-cmake
 	cd ${BUILD_DIR}; \
 	cmake --build . -j ${JOBS} -v --target ${BUILDIMPLTARGET}
 
-build:
-	mkdir -p ${BUILD_DIR}
+clean:
+	-rm -fr ${BUILD_DIR} build.*
 
-test: build-test
-	set -e; \
-	cd ${BUILD_DIR}; \
-	ctest -j ${JOBS} -v
+test:
+	$(MAKE) SANITIZER_TYPE=1 exec-test
 
-build-test:
-	$(MAKE) BUILDIMPLTARGET=build-test SANITIZER_TYPE=${SANITIZER_TYPE} all
+test-release:
+	$(MAKE) SANITIZER_TYPE= exec-test
+
+test-debug:
+	$(MAKE) BUILDTYPE=Debug exec-test
 
 sample: build-sample
 	echo finish make sample
 	build/sample/perf_stack/perf_stack
 	build/sample/perf_fifo/perf_fifo
 
-build-sample:
-	$(MAKE) BUILDIMPLTARGET=build-sample all
-
-clean:
-	-rm -fr ${BUILD_DIR} build.*
-
 coverage: clean
 	set -e; \
-	$(MAKE) BUILDTARGET=codecoverage BUILDTYPE=Debug test;  \
+	$(MAKE) BUILDTARGET=codecoverage BUILDTYPE=Debug exec-test;  \
 	cd ${BUILD_DIR}; \
 	find . -type f -name "*.gcda" | xargs -P${JOBS} -I@ gcov -l -b @; \
 	lcov --rc lcov_branch_coverage=1 -c -d . -o tmp.info; \
@@ -133,10 +128,7 @@ sanitizer.p:
 	$(MAKE) -j${JOBS} sanitizer.p_internal
 
 sanitizer.%.sanitizer: clean
-	$(MAKE) BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$* test
-
-build-test-sanitizer.%.sanitizer: clean
-	$(MAKE) BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$* build-test
+	$(MAKE) BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$* exec-test
 
 tidy-fix: configure-cmake
 	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build --fix
@@ -146,7 +138,25 @@ tidy-fix: configure-cmake
 tidy: configure-cmake
 	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build
 
+.PHONY: all clean test test-release test-debug sample coverage profile sanitizer sanitizer.p tidy-fix tidy
+
+
 ############################################################################
+
+exec-test: build-test
+	set -e; \
+	cd ${BUILD_DIR}; \
+	ctest -j ${JOBS} -v
+
+build-test:
+	$(MAKE) BUILDIMPLTARGET=build-test SANITIZER_TYPE=${SANITIZER_TYPE} all
+
+build-test-sanitizer.%.sanitizer: clean
+	$(MAKE) BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$* build-test
+
+build-sample:
+	$(MAKE) BUILDIMPLTARGET=build-sample all
+
 configure-cmake:
 	set -e; \
 	mkdir -p ${BUILD_DIR}; \
@@ -160,6 +170,9 @@ exec-profile: build-profile
 	set -e; \
 	cd ${BUILD_DIR}; \
 	ctest -j ${JOBS} -v
+
+build:
+	mkdir -p ${BUILD_DIR}
 
 
 #############################################################################################
@@ -216,4 +229,3 @@ sanitizer.p.test:
 	cmake --build . --target build-test; \
 	ctest -j $(shell expr ${JOBS} / 2) -v
 
-.PHONY: test sanitizer sanitizer.p configure-cmake
