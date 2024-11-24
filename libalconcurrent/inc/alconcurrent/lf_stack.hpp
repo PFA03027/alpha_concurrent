@@ -27,7 +27,7 @@ namespace concurrent {
 namespace internal {
 
 template <typename T, typename VALUE_DELETER = deleter_nothing<T>>
-class x_stack_list {
+class x_lockfree_stack {
 public:
 	static_assert( ( !std::is_class<T>::value ) ||
 	                   ( std::is_class<T>::value &&
@@ -36,7 +36,7 @@ public:
 
 	using value_type = T;
 
-	constexpr x_stack_list( void ) noexcept
+	constexpr x_lockfree_stack( void ) noexcept
 	  : lf_stack_impl_()
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	  , allocated_node_count_( 0 )
@@ -44,18 +44,18 @@ public:
 	{
 	}
 
-	x_stack_list( size_t reserve_size ) noexcept
-	  : x_stack_list()
+	x_lockfree_stack( size_t reserve_size ) noexcept
+	  : x_lockfree_stack()
 	{
 	}
-	~x_stack_list()
+	~x_lockfree_stack()
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		if ( node_pool_t::profile_info_count() != 0 ) {
 			internal::LogOutput( log_type::TEST, "%s", node_pool_t::profile_info_string().c_str() );
 			node_pool_t::clear_as_possible_as();
 		}
-		internal::LogOutput( log_type::DUMP, "x_stack_list: allocated_node_count = %zu", allocated_node_count_.load() );
+		internal::LogOutput( log_type::DUMP, "x_lockfree_stack: allocated_node_count = %zu", allocated_node_count_.load() );
 #endif
 
 		VALUE_DELETER                deleter;
@@ -156,7 +156,7 @@ private:
 }   // namespace internal
 
 template <typename T>
-class stack_list : public internal::x_stack_list<T> {
+class stack_list : public internal::x_lockfree_stack<T> {
 public:
 	stack_list( void ) = default;
 	stack_list( size_t reserve_size ) noexcept
@@ -165,7 +165,7 @@ public:
 	}
 };
 template <typename T>
-class stack_list<T*> : public internal::x_stack_list<T*, std::default_delete<T>> {
+class stack_list<T*> : public internal::x_lockfree_stack<T*, std::default_delete<T>> {
 public:
 	stack_list( void ) = default;
 	stack_list( size_t reserve_size ) noexcept
@@ -174,7 +174,7 @@ public:
 	}
 };
 template <typename T>
-class stack_list<T[]> : public internal::x_stack_list<T*, std::default_delete<T[]>> {
+class stack_list<T[]> : public internal::x_lockfree_stack<T*, std::default_delete<T[]>> {
 public:
 	using value_type = T[];
 
@@ -185,7 +185,7 @@ public:
 	}
 };
 template <typename T, size_t N>
-class stack_list<T[N]> : public internal::x_stack_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>> {
+class stack_list<T[N]> : public internal::x_lockfree_stack<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>> {
 public:
 	using value_type = T[N];
 
@@ -204,7 +204,7 @@ public:
 			tmp[i] = cont_arg[i];
 		}
 
-		internal::x_stack_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
+		internal::x_lockfree_stack<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
 	}
 	void push(
 		value_type&& cont_arg   //!< [in]	a value to push this FIFO queue
@@ -215,7 +215,7 @@ public:
 			tmp[i] = std::move( cont_arg[i] );
 		}
 
-		internal::x_stack_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
+		internal::x_lockfree_stack<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
 	}
 
 	std::tuple<bool, value_type> pop( void )
@@ -223,7 +223,7 @@ public:
 		std::tuple<bool, value_type> ans;
 		std::get<0>( ans ) = false;
 
-		std::tuple<bool, std::array<T, N>> ret = internal::x_stack_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::pop();
+		std::tuple<bool, std::array<T, N>> ret = internal::x_lockfree_stack<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::pop();
 		if ( !std::get<0>( ret ) ) {
 			return ans;
 		}
