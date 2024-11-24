@@ -30,7 +30,7 @@ ALCONCURRENT_BUILD_SHARED_LIBS?=OFF
 #
 # Please see normal.cmake for detail
 # 
-SANITIZER_TYPE?=
+SANITIZER_TYPE?=1
 
 # GoogleTest Option
 TEST_OPTS?=
@@ -96,7 +96,7 @@ test: build-test
 	ctest -j ${JOBS} -v
 
 build-test:
-	$(MAKE) BUILDIMPLTARGET=build-test SANITIZER_TYPE=1 all
+	$(MAKE) BUILDIMPLTARGET=build-test SANITIZER_TYPE=${SANITIZER_TYPE} all
 
 sample: build-sample
 	echo finish make sample
@@ -126,7 +126,7 @@ sanitizer:
 	set -e; \
 	for i in $(SANITIZER_ALL_IDS); do \
 		$(MAKE) sanitizer.$$i.sanitizer; \
-		echo $$i / 21 done; \
+		echo $$i / 11 done; \
 	done
 
 sanitizer.p:
