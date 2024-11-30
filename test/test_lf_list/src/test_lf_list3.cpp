@@ -377,11 +377,389 @@ TEST_F( Test_lockfree_list, ThreeElement_DoForEach )
 	sut_.insert( []( const int& v ) -> bool { return true; }, 3 );   // 先頭に挿入
 	EXPECT_EQ( sut_.get_size(), 3 );
 	int count = 0;
+	int val_array[3];
+	int idx = 0;
 
 	// Act
-	sut_.for_each( [&count]( const tut_list::value_type& v ) { count++; } );
+	sut_.for_each( [&count, &idx, &val_array]( const tut_list::value_type& v ) {
+		count++;
+		if ( idx < 3 ) {
+			val_array[idx] = v;
+			idx++;
+		}
+	} );
 
 	// Assert
 	EXPECT_EQ( count, 3 );
 	EXPECT_EQ( sut_.get_size(), 3 );
+	EXPECT_EQ( val_array[0], 3 );
+	EXPECT_EQ( val_array[1], 2 );
+	EXPECT_EQ( val_array[2], 1 );
+}
+
+////
+
+TEST_F( Test_lockfree_list, Empty_DoPushFront_ThenOneElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+
+	// Act
+	sut_.push_front( 1 );
+
+	// Assert
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontTwice_ThenTwoElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+
+	// Act
+	sut_.push_front( 2 );
+
+	// Assert
+	EXPECT_EQ( sut_.get_size(), 2 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontThree_ThenThreeElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+	sut_.push_front( 2 );
+
+	// Act
+	sut_.push_front( 3 );
+
+	// Assert
+	int count = 0;
+	int val_array[3];
+	int idx = 0;
+	sut_.for_each( [&count, &idx, &val_array]( const tut_list::value_type& v ) {
+		count++;
+		if ( idx < 3 ) {
+			val_array[idx] = v;
+			idx++;
+		}
+	} );
+	EXPECT_EQ( count, 3 );
+	EXPECT_EQ( sut_.get_size(), 3 );
+	EXPECT_EQ( val_array[0], 3 );
+	EXPECT_EQ( val_array[1], 2 );
+	EXPECT_EQ( val_array[2], 1 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPopFront_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+
+	// Act
+	auto ret = sut_.pop_front();
+
+	// Assert
+	EXPECT_FALSE( std::get<0>( ret ) );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontPopFront_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+
+	// Act
+	auto ret = sut_.pop_front();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret ) );
+	EXPECT_EQ( std::get<1>( ret ), 1 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontPopFrontTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+	sut_.pop_front();
+
+	// Act
+	auto ret = sut_.pop_front();
+
+	// Assert
+	EXPECT_FALSE( std::get<0>( ret ) );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopFront_ThenOneElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+	sut_.push_front( 2 );
+
+	// Act
+	auto ret = sut_.pop_front();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret ) );
+	EXPECT_EQ( std::get<1>( ret ), 2 );
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopFrontTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+	sut_.push_front( 2 );
+	auto ret1 = sut_.pop_front();
+
+	// Act
+	auto ret2 = sut_.pop_front();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret1 ) );
+	EXPECT_EQ( std::get<1>( ret1 ), 2 );
+	EXPECT_TRUE( std::get<0>( ret2 ) );
+	EXPECT_EQ( std::get<1>( ret2 ), 1 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+////
+
+TEST_F( Test_lockfree_list, Empty_DoPushBack_ThenOneElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+
+	// Act
+	sut_.push_back( 1 );
+
+	// Assert
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackTwice_ThenTwoElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+
+	// Act
+	sut_.push_back( 2 );
+
+	// Assert
+	EXPECT_EQ( sut_.get_size(), 2 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackThree_ThenThreeElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+	sut_.push_back( 2 );
+
+	// Act
+	sut_.push_back( 3 );
+
+	// Assert
+	int count = 0;
+	int val_array[3];
+	int idx = 0;
+	sut_.for_each( [&count, &idx, &val_array]( const tut_list::value_type& v ) {
+		count++;
+		if ( idx < 3 ) {
+			val_array[idx] = v;
+			idx++;
+		}
+	} );
+	EXPECT_EQ( count, 3 );
+	EXPECT_EQ( sut_.get_size(), 3 );
+	EXPECT_EQ( val_array[0], 1 );
+	EXPECT_EQ( val_array[1], 2 );
+	EXPECT_EQ( val_array[2], 3 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPopBack_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+
+	// Act
+	auto ret = sut_.pop_back();
+
+	// Assert
+	EXPECT_FALSE( std::get<0>( ret ) );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackPopBack_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+
+	// Act
+	auto ret = sut_.pop_back();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret ) );
+	EXPECT_EQ( std::get<1>( ret ), 1 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackPopBackTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+	sut_.pop_back();
+
+	// Act
+	auto ret = sut_.pop_back();
+
+	// Assert
+	EXPECT_FALSE( std::get<0>( ret ) );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopBack_ThenOneElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+	sut_.push_back( 2 );
+
+	// Act
+	auto ret = sut_.pop_back();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret ) );
+	EXPECT_EQ( std::get<1>( ret ), 2 );
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopBackTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+	sut_.push_back( 2 );
+	auto ret1 = sut_.pop_back();
+
+	// Act
+	auto ret2 = sut_.pop_back();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret1 ) );
+	EXPECT_EQ( std::get<1>( ret1 ), 2 );
+	EXPECT_TRUE( std::get<0>( ret2 ) );
+	EXPECT_EQ( std::get<1>( ret2 ), 1 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+////
+TEST_F( Test_lockfree_list, Empty_DoPushFrontPopBack_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+
+	// Act
+	auto ret = sut_.pop_back();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret ) );
+	EXPECT_EQ( std::get<1>( ret ), 1 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopBack_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+	sut_.push_front( 2 );
+
+	// Act
+	auto ret = sut_.pop_back();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret ) );
+	EXPECT_EQ( std::get<1>( ret ), 1 );
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopBackTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+	sut_.push_front( 2 );
+	auto ret1 = sut_.pop_back();
+
+	// Act
+	auto ret2 = sut_.pop_back();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret1 ) );
+	EXPECT_EQ( std::get<1>( ret1 ), 1 );
+	EXPECT_TRUE( std::get<0>( ret2 ) );
+	EXPECT_EQ( std::get<1>( ret2 ), 2 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackPopFront_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+
+	// Act
+	auto ret = sut_.pop_front();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret ) );
+	EXPECT_EQ( std::get<1>( ret ), 1 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopFront_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+	sut_.push_back( 2 );
+
+	// Act
+	auto ret = sut_.pop_front();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret ) );
+	EXPECT_EQ( std::get<1>( ret ), 1 );
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopFrontTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+	sut_.push_back( 2 );
+	auto ret1 = sut_.pop_front();
+
+	// Act
+	auto ret2 = sut_.pop_front();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret1 ) );
+	EXPECT_EQ( std::get<1>( ret1 ), 1 );
+	EXPECT_TRUE( std::get<0>( ret2 ) );
+	EXPECT_EQ( std::get<1>( ret2 ), 2 );
+	EXPECT_EQ( sut_.get_size(), 0 );
 }

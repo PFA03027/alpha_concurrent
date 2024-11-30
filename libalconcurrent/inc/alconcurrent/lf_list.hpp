@@ -566,6 +566,9 @@ public:
 		return std::get<0>( ret );
 	}
 #endif
+	template <bool IsMovable                                          = std::is_move_assignable<value_type>::value,
+	          bool IsCopyable                                         = std::is_copy_assignable<value_type>::value,
+	          typename std::enable_if<IsMovable || IsCopyable>::type* = nullptr>
 	std::tuple<bool, value_type> remove_one_if(
 		predicate_t&& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
 	)
@@ -622,7 +625,7 @@ public:
 		node_pointer p_new_node = alloc_node_impl();
 		p_new_node->set_value( std::move( cont_arg ) );
 
-		insert_impl( p_new_node, []( od_lockfree_list::node_pointer ) -> bool { return true; } );
+		insert_impl( p_new_node, []( const value_type& ) -> bool { return true; } );
 	}
 
 	/*!
@@ -637,7 +640,7 @@ public:
 	 */
 	std::tuple<bool, value_type> pop_front( void )
 	{
-		return remove_one_if( []( od_lockfree_list::node_pointer ) -> bool { return true; } );
+		return remove_one_if( []( const value_type& ) -> bool { return true; } );
 	}
 
 	/*!
@@ -651,7 +654,7 @@ public:
 		node_pointer p_new_node = alloc_node_impl();
 		p_new_node->set_value( cont_arg );
 
-		insert_impl( p_new_node, []( od_lockfree_list::node_pointer ) -> bool { return false; } );
+		insert_impl( p_new_node, []( const value_type& ) -> bool { return false; } );
 	}
 	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
 	void push_back(
@@ -661,7 +664,7 @@ public:
 		node_pointer p_new_node = alloc_node_impl();
 		p_new_node->set_value( std::move( cont_arg ) );
 
-		insert_impl( p_new_node, []( od_lockfree_list::node_pointer ) -> bool { return false; } );
+		insert_impl( p_new_node, []( const value_type& ) -> bool { return false; } );
 	}
 
 	/*!
@@ -800,6 +803,10 @@ private:
 		do {
 			ret = find_if_impl( pred );
 		} while ( !lf_list_impl_.insert_to_before_of_curr( p_in, ret.first, ret.second ) );
+	}
+	void insert_impl( node_pointer p_in, predicate_t&& pred )
+	{
+		insert_impl( p_in, pred );
 	}
 
 	std::tuple<bool, std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark>> remove_one_if_impl(
