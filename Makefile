@@ -146,7 +146,7 @@ tidy: configure-cmake
 exec-test: build-test
 	set -e; \
 	cd ${BUILD_DIR}; \
-	ctest -j ${JOBS} -v
+	setarch $(uname -m) -R ctest -j ${JOBS} -v
 
 build-test:
 	$(MAKE) BUILDIMPLTARGET=build-test SANITIZER_TYPE=${SANITIZER_TYPE} all
@@ -169,7 +169,7 @@ build-profile:
 exec-profile: build-profile
 	set -e; \
 	cd ${BUILD_DIR}; \
-	ctest -j ${JOBS} -v
+	setarch $(uname -m) -R ctest -j ${JOBS} -v
 
 build:
 	mkdir -p ${BUILD_DIR}
@@ -227,5 +227,5 @@ sanitizer.p.test:
 	set -e; \
 	cd ${BUILD_DIR}; \
 	cmake --build . --target build-test; \
-	ctest -j $(shell expr ${JOBS} / 2) -v
+	setarch $(uname -m) -R ctest -j $(shell expr ${JOBS} / 2) -v
 
