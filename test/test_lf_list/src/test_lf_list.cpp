@@ -22,7 +22,7 @@
 constexpr unsigned int   num_thread = 12;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 2000;
 
-using test_list = alpha::concurrent::lockfree_list<std::uintptr_t>;
+using test_list = alpha::concurrent::old_lockfree_list<std::uintptr_t>;
 
 pthread_barrier_t barrier;
 
@@ -412,7 +412,7 @@ TEST_F( lflistTest, TC4 )
 
 TEST_F( lflistTest, Pointer )
 {
-	using test_fifo_type3 = alpha::concurrent::lockfree_list<int*>;
+	using test_fifo_type3 = alpha::concurrent::old_lockfree_list<int*>;
 	test_fifo_type3* p_test_obj;
 
 	std::cout << "Pointer test#1" << std::endl;
@@ -456,7 +456,7 @@ private:
 
 TEST_F( lflistTest, Array )
 {
-	using test_fifo_type3 = alpha::concurrent::lockfree_list<array_test[]>;
+	using test_fifo_type3 = alpha::concurrent::old_lockfree_list<array_test[]>;
 	test_fifo_type3* p_test_obj;
 
 	std::cout << "Array array_test[] test#1" << std::endl;

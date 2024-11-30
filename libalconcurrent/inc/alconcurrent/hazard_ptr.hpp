@@ -1247,8 +1247,8 @@ public:
 	 * @param expect 自身が保持していると期待されるポインタへの参照。CAS操作ではフラグ情報は参照されない(falseとして扱う)。
 	 * @param success CAS操作成功時に使用するメモリオーダー
 	 * @param failure CAS操作失敗時に使用するメモリオーダー
-	 * @return true CAS操作に成功。
-	 * @return false CAS操作に失敗。expected のポインタと、マーク情報は、自身が保持する現在の情報で置き換えられている。
+	 * @return true CAS操作に成功し、マークの付与に成功。
+	 * @return false CAS操作に失敗、マークの付与に失敗。expected のポインタと、マーク情報は、自身が保持する現在の情報で置き換えられている。
 	 */
 	bool compare_exchange_strong_set_mark( pointer_w_mark&   expected,
 	                                       std::memory_order success = std::memory_order_acq_rel,

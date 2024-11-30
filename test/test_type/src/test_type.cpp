@@ -61,10 +61,10 @@ int main( void )
 	alpha::concurrent::stack_list<int*, false> c12;   // no move ownership
 	alpha::concurrent::stack_list<test_t>      d12;
 
-	alpha::concurrent::lockfree_list<int>         a13;
-	alpha::concurrent::lockfree_list<int*>        b13;   // move ownership
-	alpha::concurrent::lockfree_list<int*, false> c13;   // no move ownership
-	alpha::concurrent::lockfree_list<test_t>      d13;
+	alpha::concurrent::old_lockfree_list<int>         a13;
+	alpha::concurrent::old_lockfree_list<int*>        b13;   // move ownership
+	alpha::concurrent::old_lockfree_list<int*, false> c13;   // no move ownership
+	alpha::concurrent::old_lockfree_list<test_t>      d13;
 
 	static_assert( std::is_same<typename std::decay<char*>::type, char*>::value, "Oh ..." );
 	static_assert( std::is_same<typename std::decay<const char*>::type, const char*>::value, "Oh ..." );

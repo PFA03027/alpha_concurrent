@@ -103,12 +103,33 @@ public:
 	 * @brief	currのノードを削除する
 	 *
 	 * @retval	true	少なくとも削除マークの付与に成功。切り離しまで成功した場合、切り離したノードに対しdo_for_purged_node()が呼び出される。
-	 * @retval	false	少なくとも削除マークの付与に失敗。例えば、リストが空でcurrがsentinel_を指している場合。
+	 * @retval	false	削除マークの付与に失敗。すでに誰かが削除マークを付与していた場合、currがsentinel_を指している場合。
 	 */
 	bool remove(
 		const hazard_pointer_w_mark& prev,   //!< [in]	find_ifの戻り値の第１パラメータ
-		hazard_pointer_w_mark&       curr    //!< [in]	find_ifの戻り値の第２パラメータ。削除するノード
+		hazard_pointer_w_mark&&      curr    //!< [in]	find_ifの戻り値の第２パラメータ。削除するノード
 	);
+
+	/*!
+	 * @brief	currのノードに削除マークを付与する。
+	 *
+	 * 削除マークを付けるだけで、ノードの切り離しは行わない。ほかの処理で切り離されることとする。
+	 *
+	 * @retval	true	削除マークの付与に成功。
+	 * @retval	false	削除マークの付与に失敗。すでに誰かが削除マークを付与していた場合、currがsentinel_を指している場合。
+	 */
+	bool remove_mark(
+		hazard_pointer_w_mark& curr   //!< [in]	削除マークを付与するノード
+	);
+
+	/*!
+	 * @brief	最終ノードに削除マークを付与する。
+	 *
+	 * @return 1st element: 削除処理における削除マーク付与の成否
+	 * @retval	true	少なくとも削除マークの付与に成功。
+	 * @retval	false	削除マークの付与に失敗。すでに誰かが削除マークを付与していた場合、リストが空でノードが存在しない場合。
+	 */
+	std::tuple<bool, hazard_pointer_w_mark> remove_mark_tail( void );
 
 	/**
 	 * @brief リストを空にする
@@ -150,6 +171,8 @@ public:
 		find_predicate_t pred   //!< [in]	引数には、const node_pointerが渡される
 	);
 
+	std::pair<hazard_pointer_w_mark, hazard_pointer_w_mark> find_tail( void );
+
 	/*!
 	 * @brief	Applies the specified function to all elements.
 	 *
@@ -170,7 +193,7 @@ public:
 	 *
 	 * @return size_t
 	 */
-	size_t size( void ) noexcept;
+	size_t size( void ) const noexcept;
 
 	/*!
 	 * @brief	インスタンス内で保持している終端ノード（番兵ノード）かどうかを調べる。

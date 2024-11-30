@@ -143,6 +143,18 @@ std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_poin
 	return find_if_impl( pred, &sentinel_ );
 }
 
+std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::find_tail( void )
+{
+	return find_if_impl(
+		[this]( node_pointer p_nd ) -> bool {
+			pointer_w_mark tmp = p_nd->hazard_handler_of_next().load();
+			if ( tmp.mark_ ) return false;
+			if ( tmp.p_ == &sentinel_ ) return true;
+			return false;
+		},
+		&sentinel_ );
+}
+
 od_lockfree_list::for_each_func_t od_lockfree_list::for_each(
 	for_each_func_t&& f   //!< [in]	A function f is passed value_type& as an argument
 )
@@ -227,23 +239,49 @@ bool od_lockfree_list::insert_to_before_of_curr(
 
 bool od_lockfree_list::remove(
 	const hazard_pointer_w_mark& prev,   //!< [in]	find_ifの戻り値の第１パラメータ
-	hazard_pointer_w_mark&       curr    //!< [in]	find_ifの戻り値の第２パラメータ。削除するノード
+	hazard_pointer_w_mark&&      curr    //!< [in]	find_ifの戻り値の第２パラメータ。削除するノード
+)
+{
+	bool marking_ret = remove_mark( curr );
+
+	// ここを通過した時点で、削除ノードへの変更は完了。
+	// 以降の切り出し処理は失敗しても気にしない。失敗しても、find_ifでそのうち切り離されるため。
+
+	if ( marking_ret ) {
+		pointer_w_mark p_next_w_m = curr.hp_->hazard_handler_of_next().load();
+		if ( prev.hp_->hazard_handler_of_next().compare_exchange_strong_to_verify_exchange2( curr, p_next_w_m.p_ ) ) {
+			do_for_purged_node( curr.hp_.reset() );
+		}
+	}
+
+	return marking_ret;
+}
+
+bool od_lockfree_list::remove_mark(
+	hazard_pointer_w_mark& curr   //!< [in]	削除マークを付与するノード
 )
 {
 	if ( is_end_node( curr ) ) {
 		return false;
 	}
+	return curr.hp_->try_set_mark();
+}
 
-	curr.hp_->set_mark();
-	// ここを通過した時点で、削除ノードへの変更は完了。
-	// 以降の切り出し処理は失敗しても気にしない。失敗しても、find_ifでそのうち切り離されるため。
+std::tuple<bool, od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::remove_mark_tail( void )
+{
+	bool                                                                                        remove_ret = true;
+	std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> tail_hp_pair;
+	pointer_w_mark                                                                              to_sentinel;
+	do {
+		tail_hp_pair = find_tail();
+		if ( is_end_node( tail_hp_pair ) ) {
+			remove_ret = false;
+			break;
+		}
+		to_sentinel.p_ = &sentinel_;
+	} while ( !tail_hp_pair.second.hp_->try_set_mark( to_sentinel ) );
 
-	pointer_w_mark p_next_w_m = curr.hp_->hazard_handler_of_next().load();
-	if ( prev.hp_->hazard_handler_of_next().compare_exchange_strong_to_verify_exchange2( curr, p_next_w_m.p_ ) ) {
-		do_for_purged_node( curr.hp_.reset() );
-	}
-
-	return true;
+	return std::tuple<bool, od_lockfree_list::hazard_pointer_w_mark> { remove_ret, std::move( tail_hp_pair.second ) };
 }
 
 void od_lockfree_list::clear_impl( node_type& head_arg, node_type& sentinel_arg, od_lockfree_list* p_this_obj_to_purge, void ( od_lockfree_list::*p_purge_func )( node_pointer ) )
@@ -361,7 +399,7 @@ void od_lockfree_list::exchange_sentinel_connection( node_pointer p_sentinel_of_
 	}
 }
 
-size_t od_lockfree_list::size( void ) noexcept
+size_t od_lockfree_list::size( void ) const noexcept
 {
 	// Caution: この処理は、スレッドセーフではない。src側がほかのスレッドで削除/挿入されていた場合、数え上げがうまくいかない。
 	size_t                               count   = 0;

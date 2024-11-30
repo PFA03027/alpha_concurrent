@@ -22,6 +22,7 @@ template <typename T>
 class deleter_nothing {
 public:
 	constexpr void operator()( T& ) {}
+	constexpr void operator()( T&& ) {}
 };
 template <>
 class deleter_nothing<void> {
@@ -166,6 +167,37 @@ public:
 				break;
 			}
 		} while ( !hph_next_.compare_exchange_strong_set_mark( expect_p_w_m ) );
+	}
+
+	/**
+	 * @brief マークの付与を試みる。すでにマークが付与されている場合、失敗する。
+	 *
+	 * @return true マーク付与に失敗。
+	 * @return false マーク付与に失敗。すでにマークが付与されている。
+	 */
+	bool try_set_mark( void ) noexcept
+	{
+		pointer_w_mark expect_p_w_m = hph_next_.load();
+		do {
+			if ( expect_p_w_m.mark_ ) {
+				return false;
+			}
+		} while ( !hph_next_.compare_exchange_strong_set_mark( expect_p_w_m ) );
+		return true;
+	}
+
+	/**
+	 * @brief マークの付与を試みる。すでにマークが付与されている場合、失敗する。expect_p_w_m.p_が自身が保持する値と異なっている場合も、失敗する。
+	 *
+	 * @return true マーク付与に失敗。
+	 * @return false マーク付与に失敗。すでにマークが付与されている、あるいはexpect_p_w_m.p_が自身の値と異なっている。
+	 *
+	 * @post
+	 * 戻り値がfalseの場合、expect_p_w_mのポインタと、マーク情報は、自身が保持する現在の情報で置き換えられている。
+	 */
+	bool try_set_mark( pointer_w_mark& expect_p_w_m ) noexcept
+	{
+		return hph_next_.compare_exchange_strong_set_mark( expect_p_w_m );
 	}
 
 	hazard_ptr_handler_t& hazard_handler_of_next( void ) noexcept

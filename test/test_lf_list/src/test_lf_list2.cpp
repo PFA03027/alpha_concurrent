@@ -353,7 +353,7 @@ TEST_F( Test_od_lockfree_list, Empty_DoRemove_ThenEmpty )
 	EXPECT_EQ( sut_.size(), 0 );
 
 	// Act
-	sut_.remove( ret.first, ret.second );
+	sut_.remove( ret.first, std::move( ret.second ) );
 
 	// Assert
 	EXPECT_EQ( sut_.size(), 0 );
@@ -376,7 +376,7 @@ TEST_F( Test_od_lockfree_list, OneNode_DoRemoveFirstNode_ThenEmpty )
 	ret = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 
 	// Act
-	sut_.remove( ret.first, ret.second );
+	sut_.remove( ret.first, std::move( ret.second ) );
 
 	// Assert
 	EXPECT_EQ( sut_.size(), 0 );
