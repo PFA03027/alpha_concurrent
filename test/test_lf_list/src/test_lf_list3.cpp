@@ -11,6 +11,7 @@
 
 #include "gtest/gtest.h"
 
+#include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/lf_list.hpp"
 
 using tut_list = alpha::concurrent::lockfree_list<int>;

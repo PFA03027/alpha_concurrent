@@ -11,6 +11,7 @@
 
 #include "gtest/gtest.h"
 
+#include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/internal/od_lockfree_list.hpp"
 
 class tut_list : public alpha::concurrent::internal::od_lockfree_list {

@@ -20,7 +20,6 @@
 #include <mutex>
 #include <thread>
 
-#include "alconcurrent/internal/alloc_only_allocator.hpp"
 #include "alconcurrent/internal/cpp_std_configure.hpp"
 
 namespace alpha {

@@ -11,7 +11,7 @@
 
 #include "gtest/gtest.h"
 
-#include "alconcurrent/hazard_ptr.hpp"
+#include "hazard_ptr_old.hpp"
 
 class delete_test {
 public:

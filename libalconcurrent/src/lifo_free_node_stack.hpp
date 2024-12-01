@@ -15,7 +15,7 @@
 #include <mutex>
 #include <type_traits>
 
-#include "alconcurrent/hazard_ptr.hpp"
+#include "hazard_ptr_old.hpp"
 
 namespace alpha {
 namespace concurrent {

@@ -11,6 +11,7 @@
 
 #include "gtest/gtest.h"
 
+#include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/internal/od_simple_list.hpp"
 
 using namespace alpha::concurrent::internal;
