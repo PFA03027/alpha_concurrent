@@ -125,7 +125,7 @@ sanitizer:
 	done
 
 sanitizer.p:
-	$(MAKE) -j${JOBS} sanitizer.p_internal
+	$(MAKE) -j2 sanitizer.p_internal
 
 sanitizer.%.sanitizer: clean
 	$(MAKE) BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$* exec-test
