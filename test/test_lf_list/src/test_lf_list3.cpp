@@ -763,3 +763,122 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopFrontTwice_ThenEmpty )
 	EXPECT_EQ( std::get<1>( ret2 ), 2 );
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
+
+TEST_F( Test_lockfree_list, TC4_DoForEach )
+{
+	// Arrange
+	constexpr int loop_num = 2000;
+	int           expect   = 0;
+	if ( ( loop_num % 2 ) == 0 ) {
+		// 偶数の場合
+		expect = loop_num * ( loop_num / 2 ) + loop_num / 2;
+	} else {
+		// 奇数の場合
+		expect = loop_num * ( ( loop_num + 1 ) / 2 );
+	}
+
+	for ( int i = 0; i <= loop_num; i++ ) {
+		sut_.push_front( i );
+	}
+
+	// Act
+	tut_list::value_type sum = 0;
+	sut_.for_each( [&sum]( tut_list::value_type& ref_value ) {
+		sum += ref_value;
+	} );
+
+	EXPECT_EQ( sut_.get_size(), loop_num + 1 );
+	EXPECT_EQ( expect, sum ) << "Expect: " << expect << std::endl
+							 << "Sum:    " << sum << std::endl;
+
+	return;
+}
+
+TEST_F( Test_lockfree_list, NonOwnerPointer )
+{
+	using test_fifo_type3 = alpha::concurrent::lockfree_list<int*>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "Pointer test" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push_front( new int() );
+	auto ret = p_test_obj->pop_front();
+
+	ASSERT_TRUE( std::get<0>( ret ) );
+
+	delete std::get<1>( ret );
+	delete p_test_obj;
+
+	std::cout << "End Pointer test" << std::endl;
+}
+
+TEST_F( Test_lockfree_list, UniquePointer )
+{
+	using test_fifo_type3 = alpha::concurrent::lockfree_list<std::unique_ptr<int>>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "std::unique_ptr<int> test" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push_front( std::unique_ptr<int>( new int() ) );
+	auto ret = p_test_obj->pop_front();
+
+	ASSERT_TRUE( std::get<0>( ret ) );
+
+	delete p_test_obj;
+
+	std::cout << "End std::unique_ptr<int> test" << std::endl;
+}
+
+TEST_F( Test_lockfree_list, UniquePointer_Then_NoLeak )
+{
+	using test_fifo_type3 = alpha::concurrent::lockfree_list<std::unique_ptr<int>>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "std::unique_ptr<int> test" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push_front( std::unique_ptr<int>( new int() ) );
+
+	delete p_test_obj;
+
+	std::cout << "End std::unique_ptr<int> test" << std::endl;
+}
+
+class array_test {
+public:
+	array_test( void )
+	{
+		x = 1;
+		return;
+	}
+
+	~array_test()
+	{
+		printf( "called destructor of array_test\n" );
+		return;
+	}
+
+private:
+	int x;
+};
+
+TEST_F( Test_lockfree_list, NonOnwerArray )
+{
+	using test_fifo_type3 = alpha::concurrent::lockfree_list<array_test[]>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "Array array_test[]" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push_front( new array_test[2] );
+	auto ret = p_test_obj->pop_front();
+
+	ASSERT_TRUE( std::get<0>( ret ) );
+
+	delete[] std::get<1>( ret );
+	delete p_test_obj;
+
+	std::cout << "End Array array_test[] test" << std::endl;
+}

@@ -409,6 +409,10 @@ public:
 	  : lf_list_impl_()
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	  , allocated_node_count_( 0 )
+	  , call_count_push_front_( 0 )
+	  , call_count_pop_front_( 0 )
+	  , call_count_push_back_( 0 )
+	  , call_count_pop_back_( 0 )
 #endif
 	{
 	}
@@ -424,7 +428,9 @@ public:
 			internal::LogOutput( log_type::TEST, "%s", node_pool_t::profile_info_string().c_str() );
 			node_pool_t::clear_as_possible_as();
 		}
-		internal::LogOutput( log_type::DUMP, "x_lockfree_list: allocated_node_count = %zu", allocated_node_count_.load() );
+		internal::LogOutput( log_type::DUMP, "x_lockfree_list: allocated_node_count   = %zu", allocated_node_count_.load() );
+		internal::LogOutput( log_type::DUMP, "x_lockfree_list: call_count_push_front_ = %zu", call_count_push_front_.load() );
+		internal::LogOutput( log_type::DUMP, "x_lockfree_list: call_count_pop_back_   = %zu", call_count_pop_back_.load() );
 #endif
 
 		lf_list_impl_.clear();
@@ -456,7 +462,7 @@ public:
 		node_pointer p_new_node = alloc_node_impl();
 		p_new_node->set_value( std::move( cont_arg ) );
 
-		insert_impl( p_new_node, pred );
+		insert_to_before_of_curr_impl( p_new_node, pred );
 	}
 	template <bool IsCopyable = std::is_copy_assignable<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
 	void insert(
@@ -467,7 +473,7 @@ public:
 		node_pointer p_new_node = alloc_node_impl();
 		p_new_node->set_value( cont_arg );
 
-		insert_impl( p_new_node, pred );
+		insert_to_before_of_curr_impl( p_new_node, pred );
 	}
 	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
 	void insert(
@@ -478,7 +484,7 @@ public:
 		node_pointer p_new_node = alloc_node_impl();
 		p_new_node->set_value( std::move( cont_arg ) );
 
-		insert_impl( p_new_node, pred );
+		insert_to_before_of_curr_impl( p_new_node, pred );
 	}
 	template <bool IsCopyable = std::is_copy_assignable<value_type>::value, typename std::enable_if<IsCopyable>::type* = nullptr>
 	void insert(
@@ -489,7 +495,7 @@ public:
 		node_pointer p_new_node = alloc_node_impl();
 		p_new_node->set_value( cont_arg );
 
-		insert_impl( p_new_node, pred );
+		insert_to_before_of_curr_impl( p_new_node, pred );
 	}
 
 	/*!
@@ -615,7 +621,11 @@ public:
 		node_pointer p_new_node = alloc_node_impl();
 		p_new_node->set_value( cont_arg );
 
-		insert_impl( p_new_node, []( od_lockfree_list::node_pointer ) -> bool { return true; } );
+		insert_to_next_of_prev_impl( p_new_node, []( const value_type& ) -> bool { return true; } );
+
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		call_count_push_front_++;
+#endif
 	}
 	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
 	void push_front(
@@ -625,7 +635,11 @@ public:
 		node_pointer p_new_node = alloc_node_impl();
 		p_new_node->set_value( std::move( cont_arg ) );
 
-		insert_impl( p_new_node, []( const value_type& ) -> bool { return true; } );
+		insert_to_next_of_prev_impl( p_new_node, []( const value_type& ) -> bool { return true; } );
+
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		call_count_push_front_++;
+#endif
 	}
 
 	/*!
@@ -638,11 +652,46 @@ public:
 	 * @return	2nd return value. poped value, if 1st return value is true.
 	 *
 	 */
+#if 0
 	std::tuple<bool, value_type> pop_front( void )
 	{
 		return remove_one_if( []( const value_type& ) -> bool { return true; } );
 	}
+#else
+	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+	std::tuple<bool, value_type> pop_front( void )
+	{
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		call_count_pop_front_++;
+#endif
+		std::tuple<bool, od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_head();
+		std::tuple<bool, value_type>                              ans;
+		std::get<0>( ans ) = std::get<0>( ret );
+		if ( std::get<0>( ret ) ) {
+			node_pointer p     = static_cast<node_pointer>( std::get<1>( ret ).hp_.get() );
+			std::get<1>( ans ) = std::move( p->get_value() );
+		}
+		return ans;
+	}
+	template <bool IsMovable                                           = std::is_move_assignable<value_type>::value,
+	          bool IsCopyable                                          = std::is_copy_assignable<value_type>::value,
+	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
+	std::tuple<bool, value_type> pop_front( void )
+	{
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		call_count_pop_front_++;
+#endif
+		std::tuple<bool, od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_head();
+		std::tuple<bool, value_type>                              ans;
+		std::get<0>( ans ) = std::get<0>( ret );
+		if ( std::get<0>( ret ) ) {
+			node_pointer p     = static_cast<node_pointer>( std::get<1>( ret ).hp_.get() );
+			std::get<1>( ans ) = p->get_value();
+		}
+		return ans;
+	}
 
+#endif
 	/*!
 	 * @brief	append a value to the end of this list
 	 */
@@ -654,7 +703,11 @@ public:
 		node_pointer p_new_node = alloc_node_impl();
 		p_new_node->set_value( cont_arg );
 
-		insert_impl( p_new_node, []( const value_type& ) -> bool { return false; } );
+		insert_to_before_of_curr_impl( p_new_node, []( const value_type& ) -> bool { return false; } );
+
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		call_count_push_back_++;
+#endif
 	}
 	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
 	void push_back(
@@ -664,7 +717,11 @@ public:
 		node_pointer p_new_node = alloc_node_impl();
 		p_new_node->set_value( std::move( cont_arg ) );
 
-		insert_impl( p_new_node, []( const value_type& ) -> bool { return false; } );
+		insert_to_before_of_curr_impl( p_new_node, []( const value_type& ) -> bool { return false; } );
+
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		call_count_push_back_++;
+#endif
 	}
 
 	/*!
@@ -680,6 +737,9 @@ public:
 	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
 	std::tuple<bool, value_type> pop_back( void )
 	{
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		call_count_pop_back_++;
+#endif
 		std::tuple<bool, od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_tail();
 		std::tuple<bool, value_type>                              ans;
 		std::get<0>( ans ) = std::get<0>( ret );
@@ -694,6 +754,9 @@ public:
 	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
 	std::tuple<bool, value_type> pop_back( void )
 	{
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		call_count_pop_back_++;
+#endif
 		std::tuple<bool, od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_tail();
 		std::tuple<bool, value_type>                              ans;
 		std::get<0>( ans ) = std::get<0>( ret );
@@ -797,16 +860,27 @@ private:
 		return p_new_node;
 	}
 
-	void insert_impl( node_pointer p_in, predicate_t& pred )
+	void insert_to_next_of_prev_impl( node_pointer p_in, predicate_t& pred )
+	{
+		std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> ret;
+		do {
+			ret = find_if_impl( pred );
+		} while ( !lf_list_impl_.insert_to_next_of_prev( p_in, ret.first, ret.second ) );
+	}
+	void insert_to_next_of_prev_impl( node_pointer p_in, predicate_t&& pred )
+	{
+		insert_to_next_of_prev_impl( p_in, pred );
+	}
+	void insert_to_before_of_curr_impl( node_pointer p_in, predicate_t& pred )
 	{
 		std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> ret;
 		do {
 			ret = find_if_impl( pred );
 		} while ( !lf_list_impl_.insert_to_before_of_curr( p_in, ret.first, ret.second ) );
 	}
-	void insert_impl( node_pointer p_in, predicate_t&& pred )
+	void insert_to_before_of_curr_impl( node_pointer p_in, predicate_t&& pred )
 	{
-		insert_impl( p_in, pred );
+		insert_to_before_of_curr_impl( p_in, pred );
 	}
 
 	std::tuple<bool, std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark>> remove_one_if_impl(
@@ -830,11 +904,16 @@ private:
 
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	std::atomic<size_t> allocated_node_count_;
+	std::atomic<size_t> call_count_push_front_;
+	std::atomic<size_t> call_count_pop_front_;
+	std::atomic<size_t> call_count_push_back_;
+	std::atomic<size_t> call_count_pop_back_;
 #endif
 };
 
 }   // namespace internal
 
+#if 0
 template <typename T>
 class lockfree_list : public internal::x_lockfree_list<T> {
 public:
@@ -844,7 +923,80 @@ public:
 	{
 	}
 };
+#endif
 
+// aaaaaaaaaaaaaaaaaaaaaa
+template <typename T, typename VALUE_DELETER = internal::deleter_nothing<T>>
+class lockfree_list : public internal::x_lockfree_list<T, VALUE_DELETER> {
+public:
+	lockfree_list( void ) = default;
+	lockfree_list( size_t reserve_size ) noexcept
+	  : lockfree_list()
+	{
+	}
+};
+template <>
+class lockfree_list<void*> : public internal::x_lockfree_list<void*, internal::deleter_nothing<void>> {
+public:
+	lockfree_list( void ) = default;
+	lockfree_list( size_t reserve_size ) noexcept
+	  : lockfree_list()
+	{
+	}
+};
+template <typename T>
+class lockfree_list<T*> : public internal::x_lockfree_list<T*, internal::deleter_nothing<T*>> {
+public:
+	lockfree_list( void ) = default;
+	lockfree_list( size_t reserve_size ) noexcept
+	  : lockfree_list()
+	{
+	}
+};
+template <typename T>
+class lockfree_list<T[]> : public internal::x_lockfree_list<T*, internal::deleter_nothing<T*>> {
+public:
+	using value_type = T[];
+
+	lockfree_list( void ) = default;
+	lockfree_list( size_t reserve_size ) noexcept
+	  : lockfree_list()
+	{
+	}
+};
+template <typename T, size_t N>
+class lockfree_list<T[N]> : public internal::x_lockfree_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>> {
+public:
+	using value_type = T[N];
+
+	lockfree_list( void ) = default;
+	lockfree_list( size_t reserve_size ) noexcept
+	  : lockfree_list()
+	{
+	}
+};
+template <typename T, typename DELETER>
+class lockfree_list<T*, DELETER> : public internal::x_lockfree_list<T*, DELETER> {
+public:
+	lockfree_list( void ) = default;
+	lockfree_list( size_t reserve_size ) noexcept
+	  : lockfree_list()
+	{
+	}
+};
+template <typename T, typename DELETER>
+class lockfree_list<T[], DELETER> : public internal::x_lockfree_list<T*, DELETER> {
+public:
+	using value_type = T[];
+
+	lockfree_list( void ) = default;
+	lockfree_list( size_t reserve_size ) noexcept
+	  : lockfree_list()
+	{
+	}
+};
+
+#if 0
 /*!
  * @brief	semi-lock free list
  *
@@ -1334,6 +1486,7 @@ private:
 
 	hazard_ptr_storage_t hzrd_ptr_;
 };
+#endif
 
 }   // namespace concurrent
 }   // namespace alpha

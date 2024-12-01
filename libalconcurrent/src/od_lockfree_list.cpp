@@ -143,6 +143,15 @@ std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_poin
 	return find_if_impl( pred, &sentinel_ );
 }
 
+std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::find_head( void )
+{
+	return find_if_impl(
+		[this]( node_pointer p_nd ) -> bool {
+			return true;
+		},
+		&sentinel_ );
+}
+
 std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::find_tail( void )
 {
 	return find_if_impl(
@@ -232,9 +241,7 @@ bool od_lockfree_list::insert_to_before_of_curr(
 {
 	p_push_node->hazard_handler_of_next().store( curr.hp_.get(), false );
 
-	bool ans = prev.hp_->hazard_handler_of_next().compare_exchange_strong_to_verify_exchange2( curr, p_push_node );
-
-	return ans;
+	return prev.hp_->hazard_handler_of_next().compare_exchange_strong_to_verify_exchange2( curr, p_push_node );
 }
 
 bool od_lockfree_list::remove(
@@ -267,19 +274,81 @@ bool od_lockfree_list::remove_mark(
 	return curr.hp_->try_set_mark();
 }
 
+std::tuple<bool, od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::remove_mark_head( void )
+{
+	bool                                                                                        remove_ret = true;
+	std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> head_hp_pair;
+	while ( true ) {
+		head_hp_pair       = find_head();
+		bool first_is_head = is_head_node( head_hp_pair.first );
+		bool second_is_end = is_end_node( head_hp_pair.second );
+
+		if ( first_is_head && second_is_end ) {
+			// リストが空なので、最終ノードが存在しない。よって、ループを終了する。
+			remove_ret = false;
+			break;
+		} else if ( first_is_head ) {
+			if ( head_hp_pair.second.hp_->try_set_mark() ) {
+				// 先頭ノードの削除マークの付与に成功したので、ループを終了する。
+				break;
+			} else {
+				// 先頭ノードの削除マークの付与に失敗したので、最初からチェックしなおし。
+			}
+		} else {
+			// ここに来るべきではないが、やり直し
+		}
+	}
+
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
+	// if ( remove_ret && is_end_node( head_hp_pair.second ) ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+	// throw std::logic_error( "unexpected pointer change... This should be logic error" );
+#else
+	// internal::LogOutput( log_type::ERR, "unexpected pointer change... This should be logic error" );
+#endif
+	// }
+#endif
+
+	return std::tuple<bool, od_lockfree_list::hazard_pointer_w_mark> { remove_ret, std::move( head_hp_pair.second ) };
+}
+
 std::tuple<bool, od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::remove_mark_tail( void )
 {
 	bool                                                                                        remove_ret = true;
 	std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> tail_hp_pair;
 	pointer_w_mark                                                                              to_sentinel;
-	do {
-		tail_hp_pair = find_tail();
-		if ( is_end_node( tail_hp_pair ) ) {
+	while ( true ) {
+		tail_hp_pair       = find_tail();
+		bool first_is_head = is_head_node( tail_hp_pair.first );
+		bool second_is_end = is_end_node( tail_hp_pair.second );
+
+		if ( first_is_head && second_is_end ) {
+			// リストが空なので、最終ノードが存在しない。よって、ループを終了する。
 			remove_ret = false;
 			break;
+		} else if ( second_is_end ) {
+			// 検査中に、最終ノードに削除マークがついた。よって、最初からチェックしなおし。
+		} else {
+			to_sentinel.p_ = &sentinel_;
+
+			if ( tail_hp_pair.second.hp_->try_set_mark( to_sentinel ) ) {
+				// 最終ノードの削除マークの付与に成功したので、ループを終了する。
+				break;
+			} else {
+				// 最終ノードの削除マークの付与に失敗したので、最初からチェックしなおし。
+			}
 		}
-		to_sentinel.p_ = &sentinel_;
-	} while ( !tail_hp_pair.second.hp_->try_set_mark( to_sentinel ) );
+	}
+
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
+	if ( remove_ret && is_end_node( tail_hp_pair.second ) ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+		throw std::logic_error( "unexpected pointer change... This should be logic error" );
+#else
+		internal::LogOutput( log_type::ERR, "unexpected pointer change... This should be logic error" );
+#endif
+	}
+#endif
 
 	return std::tuple<bool, od_lockfree_list::hazard_pointer_w_mark> { remove_ret, std::move( tail_hp_pair.second ) };
 }
@@ -401,7 +470,7 @@ void od_lockfree_list::exchange_sentinel_connection( node_pointer p_sentinel_of_
 
 size_t od_lockfree_list::size( void ) const noexcept
 {
-	// Caution: この処理は、スレッドセーフではない。src側がほかのスレッドで削除/挿入されていた場合、数え上げがうまくいかない。
+	// FIXME: Caution: この処理は、スレッドセーフではない。ほかのスレッドで削除/挿入されていた場合、数え上げがうまくいかない。
 	size_t                               count   = 0;
 	hazard_ptr_handler_t::pointer_w_mark p_m_cur = head_.hazard_handler_of_next().load();
 	while ( ( p_m_cur.p_ != &sentinel_ ) && ( p_m_cur.p_ != nullptr ) ) {   // 繋ぎ変え処理との競合を考慮し、nullptrもチェックする。

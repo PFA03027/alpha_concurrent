@@ -123,6 +123,15 @@ public:
 	);
 
 	/*!
+	 * @brief	先頭ノードに削除マークを付与する。
+	 *
+	 * @return 1st element: 削除処理における削除マーク付与の成否
+	 * @retval	true	少なくとも削除マークの付与に成功。
+	 * @retval	false	削除マークの付与に失敗。すでに誰かが削除マークを付与していた場合、リストが空でノードが存在しない場合。
+	 */
+	std::tuple<bool, hazard_pointer_w_mark> remove_mark_head( void );
+
+	/*!
 	 * @brief	最終ノードに削除マークを付与する。
 	 *
 	 * @return 1st element: 削除処理における削除マーク付与の成否
@@ -171,6 +180,7 @@ public:
 		find_predicate_t pred   //!< [in]	引数には、const node_pointerが渡される
 	);
 
+	std::pair<hazard_pointer_w_mark, hazard_pointer_w_mark> find_head( void );
 	std::pair<hazard_pointer_w_mark, hazard_pointer_w_mark> find_tail( void );
 
 	/*!
