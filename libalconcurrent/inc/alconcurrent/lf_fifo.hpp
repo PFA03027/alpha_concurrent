@@ -17,11 +17,9 @@
 #include <tuple>
 
 #include "hazard_ptr.hpp"
-#include "internal/free_node_storage.hpp"
 #include "internal/od_lockfree_fifo.hpp"
 #include "internal/od_node_essence.hpp"
 #include "internal/od_node_pool.hpp"
-#include "internal/one_way_list_node.hpp"
 
 namespace alpha {
 namespace concurrent {

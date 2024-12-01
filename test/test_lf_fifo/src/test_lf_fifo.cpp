@@ -19,6 +19,7 @@
 #include "gtest/gtest.h"
 
 #include "alconcurrent/lf_fifo.hpp"
+#include "alconcurrent/lf_mem_alloc.hpp"
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
 constexpr int            num_thread = 1;   // Tested until 128.
@@ -37,9 +38,6 @@ protected:
 
 	void TearDown() override
 	{
-		auto statistics = alpha::concurrent::internal::node_of_list::get_statistics();
-		printf( "%s\n", statistics.print().c_str() );
-
 		printf( "number of keys of dynamic_tls_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
 		printf( "max number of keys of dynamic_tls_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
 	}

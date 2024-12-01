@@ -10,7 +10,6 @@
 #include <memory>
 #include <type_traits>
 
-#include "alconcurrent/internal/one_way_list_node.hpp"
 #include "alconcurrent/lf_fifo.hpp"
 #include "alconcurrent/lf_list.hpp"
 #include "alconcurrent/lf_mem_alloc_type.hpp"
@@ -23,38 +22,11 @@ struct test_t {
 
 int main( void )
 {
-	alpha::concurrent::internal::value_holder<int>                  a1;
-	alpha::concurrent::internal::value_holder<int*>                 a10;
-	alpha::concurrent::internal::value_holder<int*, true>           a100;
-	alpha::concurrent::internal::value_holder<int*, false>          a101;
-	alpha::concurrent::internal::value_holder<int[]>                a200;
-	alpha::concurrent::internal::value_holder<int[], true>          a210;
-	alpha::concurrent::internal::value_holder<int[], false>         a211;
-	alpha::concurrent::internal::value_holder<int[1]>               a22;
-	alpha::concurrent::internal::value_holder<std::unique_ptr<int>> a3;
-	alpha::concurrent::internal::one_way_list_node<int>             a4;
-	static_assert( std::is_base_of<
-					   alpha::concurrent::internal::value_holder<int>,
-					   alpha::concurrent::internal::one_way_list_node<int>>::value,
-	               "Oh no..." );
-	static_assert( std::is_base_of<
-					   alpha::concurrent::internal::value_holder<int*, false>,
-					   alpha::concurrent::internal::one_way_list_node<int*, false>>::value,
-	               "Oh no..." );
-	static_assert( std::is_base_of<
-					   alpha::concurrent::internal::value_holder<int*>,
-					   alpha::concurrent::internal::one_way_list_node<int*>>::value,
-	               "Oh no..." );
-	static_assert( std::is_base_of<
-					   alpha::concurrent::internal::value_holder<std::unique_ptr<int>>,
-					   alpha::concurrent::internal::one_way_list_node<std::unique_ptr<int>>>::value,
-	               "Oh no..." );
-	alpha::concurrent::internal::one_way_list_node<int*>       a5;
-	alpha::concurrent::internal::one_way_list_node<int, false> a6;
-	alpha::concurrent::fifo_list<int>                          a8;
-	alpha::concurrent::fifo_list<int*>                         b9;    // move ownership
-	alpha::concurrent::fifo_list<int*, false>                  c10;   // no move ownership
-	alpha::concurrent::fifo_list<test_t>                       d11;
+
+	alpha::concurrent::fifo_list<int>         a8;
+	alpha::concurrent::fifo_list<int*>        b9;    // move ownership
+	alpha::concurrent::fifo_list<int*, false> c10;   // no move ownership
+	alpha::concurrent::fifo_list<test_t>      d11;
 
 	alpha::concurrent::stack_list<int>         a12;
 	alpha::concurrent::stack_list<int*>        b12;   // move ownership
