@@ -29,7 +29,7 @@ std::atomic<bool> err_flag( false );
 
 constexpr int data_size = 128;
 
-pthread_barrier_t barrier;
+pthread_barrier_t global_shared_barrier;
 
 std::random_device        gen_seed;
 thread_local std::mt19937 engine( gen_seed() );
@@ -81,7 +81,7 @@ void* func_test_fifo_producer( void* data )
 {
 	test_fifo_type* p_test_obj = reinterpret_cast<test_fifo_type*>( data );
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		test_msg_obj* p_one_msg = new test_msg_obj();
@@ -98,7 +98,7 @@ void* func_test_fifo_consumer( void* data )
 
 	test_fifo_type* p_test_obj = reinterpret_cast<test_fifo_type*>( data );
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	while ( true ) {
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
@@ -150,7 +150,7 @@ TEST( MsgContent, TC1 )
 	unsigned int numof_pro = num_thread / 4;
 	unsigned int numof_con = num_thread;
 
-	pthread_barrier_init( &barrier, NULL, numof_pro + numof_con + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, numof_pro + numof_con + 1 );
 	pthread_t* producer_threads = new pthread_t[numof_pro];
 	pthread_t* consumer_threads = new pthread_t[numof_con];
 
@@ -165,7 +165,7 @@ TEST( MsgContent, TC1 )
 	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
 	std::cout << "!!!GO!!!" << std::endl;
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	for ( unsigned int i = 0; i < numof_pro; i++ ) {
 		uintptr_t e;

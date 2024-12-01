@@ -51,7 +51,7 @@ static alpha::concurrent::param_chunk_allocation param2[] = {
 
 std::atomic<bool> err_flag( false );
 
-static pthread_barrier_t barrier;
+static pthread_barrier_t global_shared_barrier;
 
 constexpr size_t       max_slot_size           = 1000;
 constexpr size_t       max_alloc_size          = 900;
@@ -124,7 +124,7 @@ void* func_test_fifo( void* p_data )
 	std::uniform_int_distribution<>       num_dist( 1, max_slot_size - 1 );
 	std::uniform_int_distribution<size_t> size_dist( 1, max_alloc_size );
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	for ( unsigned int i = 0; i < p_test_param->num_loop; i++ ) {
@@ -185,7 +185,7 @@ void* func_test_fifo_ggmem( void* p_data )
 	std::uniform_int_distribution<>       num_dist( 1, max_slot_size - 1 );
 	std::uniform_int_distribution<size_t> size_dist( 1, max_alloc_size );
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	for ( unsigned int i = 0; i < p_test_param->num_loop; i++ ) {
@@ -241,13 +241,13 @@ void load_test_lockfree_bw_mult_thread( unsigned int num_of_thd, alpha::concurre
 	tda.p_tmg      = p_tmg_arg;
 	tda.num_loop   = TEST_CONDITION_num_loop / num_of_thd;
 
-	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_create( &threads[i], NULL, func_test_fifo, &tda );
 	}
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 #ifdef DEBUG_LOG
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
@@ -291,13 +291,13 @@ void load_test_lockfree_bw_mult_thread_ggmem( unsigned int num_of_thd )
 	tda.p_tmg      = nullptr;
 	tda.num_loop   = TEST_CONDITION_num_loop / num_of_thd;
 
-	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_create( &threads[i], NULL, func_test_fifo_ggmem, &tda );
 	}
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 #ifdef DEBUG_LOG
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
@@ -350,13 +350,13 @@ void load_test_lockfree_bw_mult_thread_startstop( unsigned int num_of_thd, alpha
 #endif
 
 	for ( unsigned int j = 0; j < start_stop_reqeat; j++ ) {
-		pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+		pthread_barrier_init( &global_shared_barrier, NULL, num_of_thd + 1 );
 		pthread_t* threads = new pthread_t[num_of_thd];
 
 		for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 			pthread_create( &threads[i], NULL, func_test_fifo, &tda );
 		}
-		pthread_barrier_wait( &barrier );
+		pthread_barrier_wait( &global_shared_barrier );
 
 		for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 			pthread_join( threads[i], nullptr );

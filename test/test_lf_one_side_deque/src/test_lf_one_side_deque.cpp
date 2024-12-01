@@ -24,7 +24,7 @@ constexpr std::uintptr_t loop_num   = 10000;
 
 using test_list = alpha::concurrent::one_side_deque<std::uintptr_t>;
 
-pthread_barrier_t barrier;
+pthread_barrier_t global_shared_barrier;
 
 class lfOneSideDeqTest : public ::testing::Test {
 protected:
@@ -50,7 +50,7 @@ void* func_test_one_side_deque_front2front( void* data )
 {
 	test_list* p_test_obj = reinterpret_cast<test_list*>( data );
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	typename test_list::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
@@ -82,7 +82,7 @@ void* func_test_one_side_deque_back2front( void* data )
 {
 	test_list* p_test_obj = reinterpret_cast<test_list*>( data );
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	typename test_list::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
@@ -115,7 +115,7 @@ TEST_F( lfOneSideDeqTest, TC1 )
 {
 	test_list count_list;
 
-	pthread_barrier_init( &barrier, NULL, num_thread * 2 + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_thread * 2 + 1 );
 	pthread_t* threads = new pthread_t[num_thread * 2];
 
 	for ( int i = 0; i < num_thread; i++ ) {
@@ -128,7 +128,7 @@ TEST_F( lfOneSideDeqTest, TC1 )
 
 	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	uintptr_t sum = 0;
 	for ( int i = 0; i < num_thread * 2; i++ ) {

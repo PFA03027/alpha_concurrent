@@ -26,7 +26,7 @@ constexpr std::uintptr_t loop_num   = 10000;
 
 using test_fifo_type = alpha::concurrent::fifo_list<std::uintptr_t>;
 
-pthread_barrier_t barrier;
+pthread_barrier_t global_shared_barrier;
 
 class lffifoTest : public ::testing::Test {
 protected:
@@ -54,7 +54,7 @@ void* func_test_fifo( void* data )
 {
 	TEST_FIFO_TYPE* p_test_obj = reinterpret_cast<TEST_FIFO_TYPE*>( data );
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	typename TEST_FIFO_TYPE::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
@@ -135,7 +135,7 @@ void test_case3( void )
 	p_test_obj[0] = new TEST_FIFO_TYPE( num_thread );
 	p_test_obj[1] = new TEST_FIFO_TYPE( num_thread );
 
-	pthread_barrier_init( &barrier, NULL, num_thread + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_thread + 1 );
 	pthread_t* threads = new pthread_t[num_thread];
 
 	for ( int i = 0; i < num_thread; i++ ) {
@@ -146,7 +146,7 @@ void test_case3( void )
 	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
 	std::cout << "!!!GO!!!" << std::endl;
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 	auto [a1, a2] = func_test_fifo2<TEST_FIFO_TYPE>( p_test_obj );
@@ -211,7 +211,7 @@ void* func_test4_fifo( void* data )
 
 	TEST_FIFO_TYPE* p_test_obj = reinterpret_cast<TEST_FIFO_TYPE*>( data );
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	typename TEST_FIFO_TYPE::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
@@ -328,7 +328,7 @@ void test_case4( void )
 	p_test_obj[0] = new TEST_FIFO_TYPE( 8 );
 	p_test_obj[1] = new TEST_FIFO_TYPE( 8 );
 
-	pthread_barrier_init( &barrier, NULL, num_thread + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_thread + 1 );
 	pthread_t* threads = new pthread_t[num_thread];
 
 	for ( int i = 0; i < num_thread; i++ ) {
@@ -339,7 +339,7 @@ void test_case4( void )
 	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
 	std::cout << "!!!GO!!!" << std::endl;
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 #if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
 	auto [a1, a2] = func_test4_fifo2<TEST_FIFO_TYPE>( p_test_obj );
