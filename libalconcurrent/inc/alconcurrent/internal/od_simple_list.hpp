@@ -82,15 +82,23 @@ public:
 	 */
 	void clear( std::function<void( node_pointer )> pred );
 
-	size_t profile_info_count( void ) const;
-
 	size_t size( void ) const noexcept
 	{
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
-		return count_;
-#else
-		return 0;
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+		if ( count_ == 0 ) {
+			if ( p_head_ != nullptr ) {
+				throw std::runtime_error( "internal error: count is zero, but p_head_ is not nullptr. counting and/or internal status is unexpected" );
+			}
+			if ( p_tail_ != nullptr ) {
+				throw std::runtime_error( "internal error: count is zero, but p_tail_ is not nullptr. counting and/or internal status is unexpected" );
+			}
+		} else if ( count_ == 1 ) {
+			if ( p_head_ != p_tail_ ) {
+				throw std::runtime_error( "internal error: count is one, but p_head_ is not same to p_tail_. counting and/or internal status is unexpected" );
+			}
+		}
 #endif
+		return count_;
 	}
 
 private:
@@ -99,9 +107,7 @@ private:
 
 	node_pointer p_head_ = nullptr;
 	node_pointer p_tail_ = nullptr;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
-	size_t count_ = 0;
-#endif
+	size_t       count_  = 0;
 };
 
 /**

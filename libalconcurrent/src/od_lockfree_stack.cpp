@@ -10,6 +10,7 @@
  */
 
 #include "alconcurrent/internal/od_lockfree_stack.hpp"
+#include "alconcurrent/conf_logger.hpp"
 
 namespace alpha {
 namespace concurrent {

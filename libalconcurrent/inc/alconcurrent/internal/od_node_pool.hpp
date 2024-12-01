@@ -17,6 +17,7 @@
 #include <memory>
 #endif
 
+#include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/hazard_ptr.hpp"
 #include "alconcurrent/internal/od_simple_list.hpp"
 
@@ -62,19 +63,12 @@ public:
 		tl_od_node_list& tl_odn_list_no_in_hazard = get_tl_odn_list_no_in_hazard();
 
 		// スレッドローカルな変数に格納されているノードが少なかったら、スレッドローカルな変数に保存する。
-		// 少ないの判定を簡単にするために、判定が簡単な1以下で少ないと判定している。
+		// 「少ない」の判定を簡単にするために、判定が簡単な1以下で少ないと判定している。
 		// こうすることで、スレッドローカルなノードの再利用の機会が増え、新たなノードの割り当てによるメモリ消費を抑制できる。
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE_TMP
-		if ( tl_odn_list_no_in_hazard.size() < 100 ) {
-			tl_odn_list_no_in_hazard.push_back( p_nd );
-			return;
-		}
-#else
 		if ( !tl_odn_list_no_in_hazard.is_more_than_one() ) {
 			tl_odn_list_no_in_hazard.push_back( p_nd );
 			return;
 		}
-#endif
 
 		auto lk = g_odn_list_.try_lock();
 		if ( lk.owns_lock() ) {
@@ -90,25 +84,26 @@ public:
 	{
 		tl_od_node_list& tl_odn_list_no_in_hazard = get_tl_odn_list_no_in_hazard();
 
-		node_pointer p_ans = static_cast<node_pointer>( tl_odn_list_no_in_hazard.pop_front() );   // このクラスが保持するノードはnode_typeであることをpush関数が保証しているので、dynamic_cast<>は不要。
-		if ( p_ans != nullptr ) {
+		typename tl_od_node_list::node_pointer p_ans_baseclass_node = tl_odn_list_no_in_hazard.pop_front();
+		if ( p_ans_baseclass_node != nullptr ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			--node_count_total_;
 #endif
-			return p_ans;
+			return static_cast<node_pointer>( p_ans_baseclass_node );   // このクラスが保持するノードはnode_typeであることをpush関数が保証しているので、dynamic_cast<>は不要。
 		}
 
 		auto lk = g_odn_list_.try_lock();
 		if ( lk.owns_lock() ) {
-			p_ans = static_cast<node_pointer>( lk.ref().pop_front() );
-			if ( p_ans != nullptr ) {
+			p_ans_baseclass_node = lk.ref().pop_front();
+			if ( p_ans_baseclass_node != nullptr ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 				--node_count_total_;
 #endif
-				return p_ans;
+				return static_cast<node_pointer>( p_ans_baseclass_node );
 			}
 		}
 
+		node_pointer     p_ans                       = nullptr;
 		tl_od_node_list& tl_odn_list_still_in_hazard = get_tl_odn_list_still_in_hazard();
 		if ( tl_odn_list_still_in_hazard.is_empty() ) {
 			return nullptr;   // 使えるノードがなかった
@@ -131,11 +126,12 @@ public:
 				} );
 				tl_odn_list_still_in_hazard.merge_push_back( std::move( tt_n_list ) );
 			} );
-			p_ans = static_cast<node_pointer>( tmp_odn_list_.pop_front() );
+			p_ans_baseclass_node = tmp_odn_list_.pop_front();
 			tl_odn_list_no_in_hazard.merge_push_back( std::move( tmp_odn_list_ ) );
-			if ( p_ans == nullptr ) {
+			if ( p_ans_baseclass_node == nullptr ) {
 				return nullptr;   // 使えるノードがなかった
 			}
+			p_ans = static_cast<node_pointer>( p_ans_baseclass_node );
 		}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
@@ -149,14 +145,14 @@ public:
 		auto lk = g_odn_list_.try_lock();
 		if ( lk.owns_lock() ) {
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-			node_count_total_.fetch_sub( lk.ref().profile_info_count() );
+			node_count_total_.fetch_sub( lk.ref().size() );
 #endif
 			lk.ref().clear();
 		}
 
 		tl_od_node_list& tl_odn_list_no_in_hazard = get_tl_odn_list_no_in_hazard();
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-		node_count_total_.fetch_sub( tl_odn_list_no_in_hazard.profile_info_count() );
+		node_count_total_.fetch_sub( tl_odn_list_no_in_hazard.size() );
 #endif
 		tl_odn_list_no_in_hazard.clear();
 
@@ -172,7 +168,7 @@ public:
 			} );
 		}
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-		node_count_total_.fetch_sub( tmp_odn_list.profile_info_count() );
+		node_count_total_.fetch_sub( tmp_odn_list.size() );
 #endif
 
 		return;
@@ -195,7 +191,7 @@ public:
 		ans = "Free nodes:";
 		ans += "\ttotal: " + std::to_string( node_count_total_ );
 		ans += "\ttl_odn_list_: " + std::to_string( tl_od_node_list::profile_info_all_tl_count() );
-		ans += "\tg_odn_list_: " + std::to_string( g_odn_list_.lock().ref().profile_info_count() );
+		ans += "\tg_odn_list_: " + std::to_string( g_odn_list_.lock().ref().size() );
 #else
 		ans = "ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE is not enabled";
 #endif
@@ -229,8 +225,8 @@ private:
 		~tl_od_node_list()
 		{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-			internal::LogOutput( log_type::TEST, "mv thread local node %zu (%zu)", od_list_.profile_info_count(), node_count_in_tl_odn_list_.load() );
-			node_count_in_tl_odn_list_ -= od_list_.profile_info_count();
+			internal::LogOutput( log_type::TEST, "mv thread local node %zu (%zu)", od_list_.size(), node_count_in_tl_odn_list_.load() );
+			node_count_in_tl_odn_list_ -= od_list_.size();
 #endif
 			ref_g_odn_list_.lock().ref().merge_push_back( std::move( od_list_ ) );
 		}
@@ -261,7 +257,7 @@ private:
 		void merge_push_back( raw_list&& src ) noexcept
 		{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-			node_count_in_tl_odn_list_ += src.profile_info_count();
+			node_count_in_tl_odn_list_ += src.size();
 #endif
 			od_list_.merge_push_back( std::move( src ) );
 		}
@@ -282,7 +278,7 @@ private:
 		void clear( void )
 		{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-			node_count_in_tl_odn_list_ -= od_list_.profile_info_count();
+			node_count_in_tl_odn_list_ -= od_list_.size();
 #endif
 			od_list_.clear();
 		}
@@ -290,14 +286,9 @@ private:
 		raw_list move_to( void )
 		{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-			node_count_in_tl_odn_list_ -= od_list_.profile_info_count();
+			node_count_in_tl_odn_list_ -= od_list_.size();
 #endif
 			return std::move( od_list_ );
-		}
-
-		size_t profile_info_count( void )
-		{
-			return od_list_.profile_info_count();
 		}
 
 		static size_t profile_info_all_tl_count( void )
