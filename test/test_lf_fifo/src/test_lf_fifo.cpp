@@ -383,28 +383,34 @@ void test_case4( void )
 
 TEST_F( lffifoTest, Pointer1 )
 {
+	// Arrange
 	using test_fifo_type3 = alpha::concurrent::fifo_list<int*>;
 	test_fifo_type3* p_test_obj;
 
 	std::cout << "Pointer test#1" << std::endl;
 	p_test_obj = new test_fifo_type3( 8 );
 
+	// Act
 	p_test_obj->push( new int() );
 
+	// Assert
 	delete p_test_obj;
 }
 
 TEST_F( lffifoTest, Pointer2 )
 {
+	// Arrange
 	using test_fifo_type3 = alpha::concurrent::fifo_list<int*>;
 	test_fifo_type3* p_test_obj;
 
 	std::cout << "Pointer test#2" << std::endl;
 	p_test_obj = new test_fifo_type3( 8 );
 
+	// Act
 	p_test_obj->push( new int() );
 	auto ret = p_test_obj->pop();
 
+	// Assert
 	ASSERT_TRUE( std::get<0>( ret ) );
 
 	delete std::get<1>( ret );

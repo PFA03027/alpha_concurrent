@@ -22,24 +22,16 @@ class od_lockfree_fifo {
 public:
 	using node_pointer = od_node_link_by_hazard_handler*;
 
-	constexpr od_lockfree_fifo( node_pointer p_sentinel ) noexcept
-	  : hph_head_( p_sentinel )
-	  , hph_tail_( p_sentinel )
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-	  , count_( 0 )
-#endif
-#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-	  , pushpop_count_( 0 )
-	  , pushpop_loop_count_( 0 )
-#endif
-	{
-	}
+	od_lockfree_fifo( node_pointer p_sentinel ) noexcept;
 
 	/**
 	 * @brief move constructor
 	 *
 	 * @warning
 	 * This move constructor is NOT thread-safe, because this api is not consider the concurrency.
+	 *
+	 * @warning
+	 * src become invalid object. if you would like to reuse src, please call introduce_sentinel_node() with new sentinel node.
 	 */
 	od_lockfree_fifo( od_lockfree_fifo&& src ) noexcept;
 	virtual ~od_lockfree_fifo();
@@ -80,7 +72,15 @@ public:
 	 */
 	virtual void callback_to_pick_up_value( node_pointer p_node_stored_value, void* p_context_local_data );
 
-	node_pointer release_sentinel_node( void ) noexcept;
+	ALCC_INTERNAL_NODISCARD_ATTR node_pointer release_sentinel_node( void ) noexcept;
+
+	/**
+	 * @brief invalid状態のインスタンスに番兵ノードを追加し、利用可能状態に戻す。
+	 *
+	 * @param p_sentinel
+	 * @return node_pointer if node_pointer is nullptr, success. if node_pointer is not nullptr, fail and return value is same to p_sentinel
+	 */
+	ALCC_INTERNAL_NODISCARD_ATTR node_pointer introduce_sentinel_node( node_pointer p_sentinel ) noexcept;
 
 	bool is_empty( void ) const;
 

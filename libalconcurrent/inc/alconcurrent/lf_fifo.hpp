@@ -40,11 +40,13 @@ public:
 
 	using value_type = T;
 
-	constexpr x_lockfree_fifo( void ) noexcept
-	  : lf_fifo_impl_()
+	x_lockfree_fifo( void ) noexcept
+	  :
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-	  , allocated_node_count_( 0 )
+	  allocated_node_count_( 0 )
+	  ,
 #endif
+	  lf_fifo_impl_()
 	{
 	}
 
@@ -70,16 +72,7 @@ public:
 				  IsCopyConstructible && IsCopyAssignable>::type* = nullptr>
 	void push( const T& v_arg )
 	{
-		node_pointer p_new_nd = node_pool_t::pop();
-		if ( p_new_nd != nullptr ) {
-			p_new_nd->set_value( v_arg );
-		} else {
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-			allocated_node_count_++;
-#endif
-			p_new_nd = new node_type( v_arg );
-		}
-		lf_fifo_impl_.push_back( p_new_nd );
+		lf_fifo_impl_.push_back( allocate_node( v_arg ) );
 	}
 
 	template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
@@ -88,16 +81,27 @@ public:
 				  IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
 	void push( T&& v_arg )
 	{
-		node_pointer p_new_nd = node_pool_t::pop();
-		if ( p_new_nd != nullptr ) {
-			p_new_nd->set_value( std::move( v_arg ) );
-		} else {
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-			allocated_node_count_++;
-#endif
-			p_new_nd = new node_type( std::move( v_arg ) );
-		}
-		lf_fifo_impl_.push_back( p_new_nd );
+		lf_fifo_impl_.push_back( allocate_node( std::move( v_arg ) ) );
+	}
+
+	template <bool IsCopyConstructible = std::is_copy_constructible<value_type>::value,
+	          bool IsCopyAssignable    = std::is_copy_assignable<value_type>::value,
+	          typename std::enable_if<
+				  IsCopyConstructible && IsCopyAssignable>::type* = nullptr>
+	void push_head( const T& v_arg )
+	{
+		node_pointer p_old_sentinel = lf_fifo_impl_.push_front( allocate_node(), allocate_node( v_arg ) );
+		node_pool_t::push( p_old_sentinel );
+	}
+
+	template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
+	          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
+	          typename std::enable_if<
+				  IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
+	void push_head( T&& v_arg )
+	{
+		node_pointer p_old_sentinel = lf_fifo_impl_.push_front( allocate_node(), allocate_node( std::move( v_arg ) ) );
+		node_pool_t::push( p_old_sentinel );
 	}
 
 	template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
@@ -135,20 +139,69 @@ public:
 		return lf_fifo_impl_.is_empty();
 	}
 
+	static void clear_node_pool_as_possible_as( void )
+	{
+		node_pool_t::clear_as_possible_as();
+	}
+
 private:
 	using node_type    = od_node_type1<T>;
 	using node_pointer = od_node_type1<T>*;
 
+	static node_pointer allocate_node( void )
+	{
+		node_pointer p_new_nd = node_pool_t::pop();
+		if ( p_new_nd == nullptr ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			allocated_node_count_++;
+#endif
+			p_new_nd = new node_type;
+		}
+		return p_new_nd;
+	}
+	static node_pointer allocate_node( const T& v_arg )
+	{
+		node_pointer p_new_nd = node_pool_t::pop();
+		if ( p_new_nd != nullptr ) {
+			p_new_nd->set_value( v_arg );
+		} else {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			allocated_node_count_++;
+#endif
+			p_new_nd = new node_type( v_arg );
+		}
+		return p_new_nd;
+	}
+	static node_pointer allocate_node( T&& v_arg )
+	{
+		node_pointer p_new_nd = node_pool_t::pop();
+		if ( p_new_nd != nullptr ) {
+			p_new_nd->set_value( std::move( v_arg ) );
+		} else {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			allocated_node_count_++;
+#endif
+			p_new_nd = new node_type( std::move( v_arg ) );
+		}
+		return p_new_nd;
+	}
+
 	class node_fifo_lockfree_t : private od_lockfree_fifo {
 	public:
 		node_fifo_lockfree_t( void )
-		  : od_lockfree_fifo( new x_lockfree_fifo::node_type )
+		  : od_lockfree_fifo( x_lockfree_fifo::allocate_node() )
 		{
 		}
 
 		void push_back( x_lockfree_fifo::node_pointer p_nd ) noexcept
 		{
 			od_lockfree_fifo::push_back( p_nd );
+		}
+		x_lockfree_fifo::node_pointer push_front( x_lockfree_fifo::node_pointer p_sentinel, x_lockfree_fifo::node_pointer p_nd_w_value ) noexcept
+		{
+			od_lockfree_fifo::node_pointer p_old_sentinel = od_lockfree_fifo::push_front( p_sentinel, p_nd_w_value );
+			if ( p_old_sentinel == nullptr ) return nullptr;
+			return static_cast<x_lockfree_fifo::node_pointer>( p_old_sentinel );
 		}
 		x_lockfree_fifo::node_pointer pop_front( x_lockfree_fifo::value_type* p_context_local_data ) noexcept
 		{
@@ -194,11 +247,11 @@ private:
 
 	using node_pool_t = od_node_pool<node_type>;
 
-	node_fifo_lockfree_t lf_fifo_impl_;
-
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	std::atomic<size_t> allocated_node_count_;
 #endif
+	node_fifo_lockfree_t lf_fifo_impl_;
+
 };   // namespace concurrent
 
 }   // namespace internal

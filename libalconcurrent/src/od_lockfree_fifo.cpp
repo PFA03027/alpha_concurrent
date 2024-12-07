@@ -16,6 +16,22 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
+od_lockfree_fifo::od_lockfree_fifo( node_pointer p_sentinel ) noexcept
+  : hph_head_( p_sentinel )
+  , hph_tail_( p_sentinel )
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+  , count_( 0 )
+#endif
+#ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
+  , pushpop_count_( 0 )
+  , pushpop_loop_count_( 0 )
+#endif
+{
+	if ( p_sentinel != nullptr ) {
+		p_sentinel->set_next( nullptr );
+	}
+}
+
 od_lockfree_fifo::od_lockfree_fifo( od_lockfree_fifo&& src ) noexcept
   : hph_head_( std::move( src.hph_head_ ) )
   , hph_tail_( std::move( src.hph_tail_ ) )
@@ -183,6 +199,9 @@ ALCC_INTERNAL_NODISCARD_ATTR od_lockfree_fifo::node_pointer od_lockfree_fifo::pu
 			p_node_w_value->set_next( nullptr );
 			if ( hp_tail_node->hazard_handler_of_next().compare_exchange_strong( p_tail_next, p_node_w_value ) ) {
 				// push_backに成功した。使用しなかったp_node_new_sentinelを返す。
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+				count_++;
+#endif
 				return p_node_new_sentinel;
 			}
 
@@ -212,6 +231,9 @@ ALCC_INTERNAL_NODISCARD_ATTR od_lockfree_fifo::node_pointer od_lockfree_fifo::pu
 			// ここで、push_frontとしてのノードの挿入と、古いsentinelの取り出しと所有権確保が完了
 			// なお、headノードへのポインタがハザードポインタに登録されているかどうかをチェックしていないため、まだ参照している人がいるかもしれない。
 			// 古いsentinelを返す。
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			count_++;
+#endif
 			return hp_head_node.get();
 		}
 	}
@@ -221,7 +243,7 @@ void od_lockfree_fifo::callback_to_pick_up_value( node_pointer p_node_stored_val
 {
 }
 
-od_lockfree_fifo::node_pointer od_lockfree_fifo::release_sentinel_node( void ) noexcept
+ALCC_INTERNAL_NODISCARD_ATTR od_lockfree_fifo::node_pointer od_lockfree_fifo::release_sentinel_node( void ) noexcept
 {
 	if ( !is_empty() ) {
 		internal::LogOutput( log_type::ERR, "ERR: calling condition is not expected. Before calling release_sentinel_node, this instance should be empty. therefore, now leak all remaining nodes." );
@@ -236,6 +258,25 @@ od_lockfree_fifo::node_pointer od_lockfree_fifo::release_sentinel_node( void ) n
 	hph_tail_.store( nullptr );
 
 	return p_ans;
+}
+
+ALCC_INTERNAL_NODISCARD_ATTR od_lockfree_fifo::node_pointer od_lockfree_fifo::introduce_sentinel_node( node_pointer p_sentinel ) noexcept
+{
+	if ( !is_empty() ) {
+		internal::LogOutput( log_type::ERR, "ERR: instance is not empty and also sentinel node is there. Before calling introduce_sentinel_node, instance should be invalid." );
+		return p_sentinel;
+	}
+
+	if ( hph_head_.load() != nullptr ) {
+		internal::LogOutput( log_type::ERR, "ERR: sentinel node is there. Before calling introduce_sentinel_node, instance should be released sentinel node." );
+		return p_sentinel;
+	}
+
+	p_sentinel->set_next( nullptr );
+	hph_head_.store( p_sentinel );
+	hph_tail_.store( p_sentinel );
+
+	return nullptr;
 }
 
 bool od_lockfree_fifo::is_empty( void ) const

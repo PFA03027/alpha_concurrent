@@ -127,8 +127,8 @@ sanitizer:
 sanitizer.p:
 	$(MAKE) -j2 sanitizer.p_internal
 
-sanitizer.%.sanitizer: clean
-	$(MAKE) BUILDTARGET=normal BUILDTYPE=Debug SANITIZER_TYPE=$* exec-test
+sanitizer.%.sanitizer: build-test-sanitizer.%.sanitizer
+	$(MAKE)  exec-test
 
 tidy-fix: configure-cmake
 	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build --fix
