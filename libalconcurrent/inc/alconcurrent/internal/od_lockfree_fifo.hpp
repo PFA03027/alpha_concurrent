@@ -48,14 +48,29 @@ public:
 	od_lockfree_fifo& operator=( const od_lockfree_fifo& ) = delete;
 	od_lockfree_fifo& operator=( od_lockfree_fifo&& src )  = delete;
 
+	/**
+	 * @brief ノードをFIFOの最後にpushする
+	 *
+	 * @param p_nd pushするノードへのポインタ
+	 */
 	void push_back( node_pointer p_nd ) noexcept;
 
 	/**
-	 * @brief ノードをpopする
+	 * @brief ノードをFIFOの先頭からpopする
 	 *
-	 * @return od_lockfree_fifo::node_pointer popされたノード。なお、このノードが保持している情報は、すでに無効情報となっている。
+	 * @param p_context_local_data 仮想関数callback_to_pick_up_value()の第2引数として渡すポインタ
+	 * @return popされたノード。なお、このノードが保持している情報に対する参照権を持たない。そのため、中の情報を読み出してはならない。
 	 */
 	ALCC_INTERNAL_NODISCARD_ATTR node_pointer pop_front( void* p_context_local_data ) noexcept;
+
+	/**
+	 * @brief ノードをFIFOの先頭にpushする
+	 *
+	 * @param p_node_new_sentinel 新たな番兵ノードへのポインタ
+	 * @param p_node_w_value FIFOに挿入する情報を保持するノードへのポインタ
+	 * @return 不要となったsentinelノードへのポインタ。
+	 */
+	ALCC_INTERNAL_NODISCARD_ATTR node_pointer push_front( node_pointer p_node_new_sentinel, node_pointer p_node_w_value ) noexcept;
 
 	/**
 	 * @brief pop_front()処理時に、popの見込みがある場合に、値が入っているノードを参照用に渡す。呼び出される側は必要に応じて、値をコピーする。
@@ -67,15 +82,20 @@ public:
 
 	node_pointer release_sentinel_node( void ) noexcept;
 
-	bool is_empty( void ) const
-	{
-		// return hph_head_.get().get() == hph_tail_.get().get();
-		return hph_head_.load() == hph_tail_.load();
-	}
+	bool is_empty( void ) const;
 
 	size_t profile_info_count( void ) const;
 
 protected:
+	/**
+	 * @brief ノードを破棄する際に呼び出されるコールバック
+	 *
+	 * 引数p_ndで示されるノードの所有権は、この関数に渡されるため、リークが起きないように処理しなければならない。
+	 *
+	 * このクラスの実装はdelete式でノードを開放する実装となっている。派生クラスで必要な処理を実装すること。
+	 *
+	 * @param p_nd 破棄処理のために引き渡すノードへのポインタ
+	 */
 	virtual void do_for_purged_node( node_pointer p_nd ) noexcept;
 
 private:

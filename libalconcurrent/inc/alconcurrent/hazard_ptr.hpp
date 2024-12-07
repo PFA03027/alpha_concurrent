@@ -401,7 +401,7 @@ public:
 	 * @return true hpと自身が保持するポインタが一致
 	 * @return false hpと自身が保持するポインタが不一致。かつ、自身が保持するポインタでhpを更新した。
 	 */
-	bool verify_exchange( hazard_pointer& hp )
+	bool verify_exchange( hazard_pointer& hp ) const noexcept
 	{
 		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
 		bool    ret      = ( p_expect == hp );
@@ -411,7 +411,7 @@ public:
 		return ret;
 	}
 
-	hazard_pointer get_to_verify_exchange( void )
+	hazard_pointer get_to_verify_exchange( void ) const noexcept
 	{
 		return hazard_pointer( ap_target_p_.load( std::memory_order_acquire ) );
 	}

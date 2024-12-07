@@ -151,6 +151,72 @@ ALCC_INTERNAL_NODISCARD_ATTR od_lockfree_fifo::node_pointer od_lockfree_fifo::po
 	return nullptr;
 }
 
+ALCC_INTERNAL_NODISCARD_ATTR od_lockfree_fifo::node_pointer od_lockfree_fifo::push_front( node_pointer p_node_new_sentinel, node_pointer p_node_w_value ) noexcept
+{
+	if ( p_node_new_sentinel == nullptr ) return p_node_w_value;
+	if ( p_node_w_value == nullptr ) return p_node_new_sentinel;
+
+	p_node_new_sentinel->set_next( p_node_w_value );
+
+	hazard_pointer hp_head_node = hph_head_.get_to_verify_exchange();
+	hazard_pointer hp_head_next;
+	while ( true ) {
+		if ( !hph_head_.verify_exchange( hp_head_node ) ) {
+			continue;
+		}
+
+		hazard_pointer::pointer p_head_next = hp_head_node->hazard_handler_of_next().load();
+		if ( p_head_next == nullptr ) {
+			// 番兵ノードしかないので、FIFOキューは空。
+			// push_backしても結果は同じなので、push_backを試みる。
+			hazard_pointer hp_tail_node = hph_tail_.get_to_verify_exchange();   // od_node_link_by_hazard_handler::hazard_pointer
+			if ( !hph_tail_.verify_exchange( hp_tail_node ) ) {
+				continue;
+			}
+			hazard_pointer::pointer p_tail_next = hp_tail_node->hazard_handler_of_next().load();
+			if ( p_tail_next != nullptr ) {
+				// 別のスレッドがpush_backしたので、tailがまだ最後のノードを指していない。更新して、やり直す。
+				hph_tail_.compare_exchange_strong_to_verify_exchange2( hp_tail_node, p_tail_next );
+				continue;
+			}
+
+			p_node_w_value->set_next( nullptr );
+			if ( hp_tail_node->hazard_handler_of_next().compare_exchange_strong( p_tail_next, p_node_w_value ) ) {
+				// push_backに成功した。使用しなかったp_node_new_sentinelを返す。
+				return p_node_new_sentinel;
+			}
+
+			// ここに到着した場合、空のキューにpush_backを試みたが、失敗したを意味する。
+			// つまり、すでにだれかが、本当のpush_backかpush_front内のpush_backを成功させたことを意味する。
+			// よって、最初からやり直す。
+			continue;
+		}
+
+		hazard_pointer::pointer p_tail_node = hph_tail_.load();
+		if ( hp_head_node == p_tail_node ) {
+			// ここに来た場合、番兵ノードしかないように見えるが、Tailはまだ更新されていないので、tailを更新する。
+			hph_tail_.compare_exchange_strong( p_tail_node, p_head_next );
+			// CASに成功しても失敗しても、処理を続行する。
+			// たとえCASに失敗しても、(他スレッドによって)tailが更新されたことに変わりはないため。
+		}
+
+		hp_head_next.store( p_head_next );
+		if ( !hp_head_node->hazard_handler_of_next().verify_exchange( hp_head_next ) ) {
+			continue;
+		}
+
+		// ここに到達した時点で、hp_head_nodeとhp_head_nextがハザードポインタとして登録済みの状態。
+
+		p_node_w_value->set_next( p_head_next );
+		if ( hph_head_.compare_exchange_strong_to_verify_exchange2( hp_head_node, p_node_new_sentinel ) ) {
+			// ここで、push_frontとしてのノードの挿入と、古いsentinelの取り出しと所有権確保が完了
+			// なお、headノードへのポインタがハザードポインタに登録されているかどうかをチェックしていないため、まだ参照している人がいるかもしれない。
+			// 古いsentinelを返す。
+			return hp_head_node.get();
+		}
+	}
+}
+
 void od_lockfree_fifo::callback_to_pick_up_value( node_pointer p_node_stored_value, void* p_context_local_data )
 {
 }
@@ -170,6 +236,20 @@ od_lockfree_fifo::node_pointer od_lockfree_fifo::release_sentinel_node( void ) n
 	hph_tail_.store( nullptr );
 
 	return p_ans;
+}
+
+bool od_lockfree_fifo::is_empty( void ) const
+{
+	hazard_pointer hp_head_node = hph_head_.get_to_verify_exchange();
+	while ( !hph_head_.verify_exchange( hp_head_node ) ) {}
+
+	if ( hp_head_node == nullptr ) {
+		internal::LogOutput( log_type::ERR, "ERR: Sentinel node has been released already." );
+		return true;
+	}
+
+	hazard_pointer::pointer p_head_next = hp_head_node->hazard_handler_of_next().load();
+	return p_head_next == nullptr;
 }
 
 size_t od_lockfree_fifo::profile_info_count( void ) const
