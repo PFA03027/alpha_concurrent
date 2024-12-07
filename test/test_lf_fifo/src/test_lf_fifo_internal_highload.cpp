@@ -104,7 +104,7 @@ struct Nthread_push_pop_task_of_x_fifo_list {
 	}
 };
 
-class Test_od_lockfree_fifo_Highload3 : public ::testing::Test {
+class Test_x_lockfree_fifo_Highload3 : public ::testing::Test {
 protected:
 	void SetUp() override
 	{
@@ -126,7 +126,7 @@ protected:
 	test_fifo_type* p_sut_;
 };
 
-TEST_F( Test_od_lockfree_fifo_Highload3, NThread_1thread_PushPop )
+TEST_F( Test_x_lockfree_fifo_Highload3, NThread_1thread_PushPop )
 {
 	// Arrange
 	Nthread_push_pop_task_of_x_fifo_list sut_env( 1, *p_sut_ );
@@ -139,7 +139,7 @@ TEST_F( Test_od_lockfree_fifo_Highload3, NThread_1thread_PushPop )
 	EXPECT_TRUE( calc_ret );
 }
 
-TEST_F( Test_od_lockfree_fifo_Highload3, NThread_2threads_PushPop )
+TEST_F( Test_x_lockfree_fifo_Highload3, NThread_2threads_PushPop )
 {
 	// Arrange
 	Nthread_push_pop_task_of_x_fifo_list sut_env( 2, *p_sut_ );
@@ -152,7 +152,7 @@ TEST_F( Test_od_lockfree_fifo_Highload3, NThread_2threads_PushPop )
 	EXPECT_TRUE( calc_ret );
 }
 
-TEST_F( Test_od_lockfree_fifo_Highload3, NThread_32threads_PushPop )
+TEST_F( Test_x_lockfree_fifo_Highload3, NThread_32threads_PushPop )
 {
 	// Arrange
 	Nthread_push_pop_task_of_x_fifo_list sut_env( 32, *p_sut_ );

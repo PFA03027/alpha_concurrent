@@ -13,104 +13,120 @@
 
 #include "alconcurrent/lf_fifo.hpp"
 
-/**
- * @todo 以下のテストケースは、fifoの順序性評価を評価するテストケースであるため大事。
- * よって、od_lockfree_fifoクラスのテストケースに適合させる必要あり。
- *
- */
-#if 0
-TEST( Internal_New_FIFO, CanConstruct )
-{
-	// Arrenge
-	using sut_type      = alpha::concurrent::internal::node_fifo_lockfree_base<int>;
-	using sut_node_type = alpha::concurrent::internal::node_fifo_lockfree_base<int>::node_type;
+using test_fifo_type = alpha::concurrent::internal::x_lockfree_fifo<size_t>;
 
-	sut_node_type* p_sentinel = new sut_node_type( nullptr );
+class Test_x_lockfree_fifo : public ::testing::Test {
+protected:
+	void SetUp() override
+	{
+		alpha::concurrent::GetErrorWarningLogCountAndReset( nullptr, nullptr );
+
+		p_sut_ = new test_fifo_type;
+	}
+
+	void TearDown() override
+	{
+		delete p_sut_;
+
+		int cw, ce;
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
+		EXPECT_EQ( ce, 0 );
+		EXPECT_EQ( cw, 0 );
+	}
+
+	test_fifo_type* p_sut_;
+};
+
+TEST_F( Test_x_lockfree_fifo, PushValue_DoPopValue_Then_SameValue )
+{
+	// Arrange
+	p_sut_->push( 1 );
 
 	// Act
-	sut_type sut( p_sentinel );
+	auto ret = p_sut_->pop();
 
 	// Assert
-	EXPECT_TRUE( sut.is_empty() );
-
-	// Cleanup
-	delete sut.release_sentinel_node();
-}
-
-TEST( Internal_New_FIFO, CanPop_from_Empty_return_Nullptr )
-{
-	// Arrenge
-	using sut_type      = alpha::concurrent::internal::node_fifo_lockfree_base<int>;
-	using sut_node_type = alpha::concurrent::internal::node_fifo_lockfree_base<int>::node_type;
-
-	sut_node_type* p_sentinel = new sut_node_type( nullptr );
-	sut_type       sut( p_sentinel );
-
-	// Act
-	auto ret = sut.pop_front();
-
-	// Assert
-	EXPECT_EQ( std::get<0>( ret ), nullptr );
-
-	// Cleanup
-	delete sut.release_sentinel_node();
-}
-
-TEST( Internal_New_FIFO, CanPush_then_Pop_return_ValidNode_and_value )
-{
-	// Arrenge
-	using sut_type      = alpha::concurrent::internal::node_fifo_lockfree_base<int>;
-	using sut_node_type = alpha::concurrent::internal::node_fifo_lockfree_base<int>::node_type;
-
-	sut_node_type* p_sentinel = new sut_node_type( nullptr );
-	sut_type       sut( p_sentinel );
-	sut_node_type* p_node = new sut_node_type( nullptr );
-
-	// Act
-	sut.push_back( 1, p_node );
-
-	// Assert
-	EXPECT_FALSE( sut.is_empty() );
-	auto ret = sut.pop_front();
-	EXPECT_TRUE( sut.is_empty() );
-	EXPECT_NE( std::get<0>( ret ), nullptr );
+	EXPECT_TRUE( std::get<0>( ret ) );
 	EXPECT_EQ( std::get<1>( ret ), 1 );
-
-	// Cleanup
-	delete std::get<0>( ret );
-	delete sut.release_sentinel_node();
 }
 
-TEST( Internal_New_FIFO, CanPushPush_then_Pop_return_ValidNode_and_value )
+TEST_F( Test_x_lockfree_fifo, PushValueTwice_DoPopValueTwice_Then_OrderIsCorrect )
 {
-	// Arrenge
-	using sut_type      = alpha::concurrent::internal::node_fifo_lockfree_base<int>;
-	using sut_node_type = alpha::concurrent::internal::node_fifo_lockfree_base<int>::node_type;
-
-	sut_node_type* p_sentinel = new sut_node_type( nullptr );
-	sut_type       sut( p_sentinel );
-	sut_node_type* p_node = new sut_node_type( nullptr );
-	sut.push_back( 1, p_node );
-	p_node = new sut_node_type( nullptr );
+	// Arrange
+	p_sut_->push( 1 );
+	p_sut_->push( 2 );
 
 	// Act
-	sut.push_back( 2, p_node );
+	auto ret1 = p_sut_->pop();
+	auto ret2 = p_sut_->pop();
 
 	// Assert
-	EXPECT_FALSE( sut.is_empty() );
-	auto ret = sut.pop_front();
-	EXPECT_FALSE( sut.is_empty() );
-	EXPECT_NE( std::get<0>( ret ), nullptr );
-	EXPECT_EQ( std::get<1>( ret ), 1 );
-	delete std::get<0>( ret );
-
-	ret = sut.pop_front();
-	EXPECT_TRUE( sut.is_empty() );
-	EXPECT_NE( std::get<0>( ret ), nullptr );
-	EXPECT_EQ( std::get<1>( ret ), 2 );
-	delete std::get<0>( ret );
-
-	// Cleanup
-	delete sut.release_sentinel_node();
+	EXPECT_TRUE( std::get<0>( ret1 ) );
+	EXPECT_EQ( std::get<1>( ret1 ), 1 );
+	EXPECT_TRUE( std::get<0>( ret2 ) );
+	EXPECT_EQ( std::get<1>( ret2 ), 2 );
 }
-#endif
+
+TEST_F( Test_x_lockfree_fifo, PushHeadValue_DoPopValue_Then_SameValue )
+{
+	// Arrange
+	p_sut_->push_head( 1 );
+
+	// Act
+	auto ret = p_sut_->pop();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret ) );
+	EXPECT_EQ( std::get<1>( ret ), 1 );
+}
+
+TEST_F( Test_x_lockfree_fifo, PushHeadValueTwice_DoPopValueTwice_Then_OrderIsCorrect )
+{
+	// Arrange
+	p_sut_->push_head( 1 );
+	p_sut_->push_head( 2 );
+
+	// Act
+	auto ret1 = p_sut_->pop();
+	auto ret2 = p_sut_->pop();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret1 ) );
+	EXPECT_EQ( std::get<1>( ret1 ), 2 );
+	EXPECT_TRUE( std::get<0>( ret2 ) );
+	EXPECT_EQ( std::get<1>( ret2 ), 1 );
+}
+
+TEST_F( Test_x_lockfree_fifo, PushValuePushHeadValue_DoPopValueTwice_Then_OrderIsCorrect )
+{
+	// Arrange
+	p_sut_->push( 1 );
+	p_sut_->push_head( 2 );
+
+	// Act
+	auto ret1 = p_sut_->pop();
+	auto ret2 = p_sut_->pop();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret1 ) );
+	EXPECT_EQ( std::get<1>( ret1 ), 2 );
+	EXPECT_TRUE( std::get<0>( ret2 ) );
+	EXPECT_EQ( std::get<1>( ret2 ), 1 );
+}
+
+TEST_F( Test_x_lockfree_fifo, PushHeadValuePushValue_DoPopValueTwice_Then_OrderIsCorrect )
+{
+	// Arrange
+	p_sut_->push_head( 1 );
+	p_sut_->push( 2 );
+
+	// Act
+	auto ret1 = p_sut_->pop();
+	auto ret2 = p_sut_->pop();
+
+	// Assert
+	EXPECT_TRUE( std::get<0>( ret1 ) );
+	EXPECT_EQ( std::get<1>( ret1 ), 1 );
+	EXPECT_TRUE( std::get<0>( ret2 ) );
+	EXPECT_EQ( std::get<1>( ret2 ), 2 );
+}
