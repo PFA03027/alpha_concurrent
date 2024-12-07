@@ -34,7 +34,7 @@ struct Nthread_push_pop_task_of_x_fifo_list {
 	Nthread_push_pop_task_of_x_fifo_list( size_t nthreads, test_fifo_type& target_sut )
 	  : sut_( target_sut )
 	  , thread_num_( nthreads )
-	  , start_sync_latch_( static_cast<ptrdiff_t>( nthreads + 1 ) )
+	  , start_sync_latch_( static_cast<ptrdiff_t>( nthreads * 2 + 1 ) )
 	  , loop_flag_( true )
 	{
 	}
@@ -58,22 +58,51 @@ struct Nthread_push_pop_task_of_x_fifo_list {
 		return std::tuple<bool, size_t, size_t>( true, count, cur_val );
 	}
 
+	std::tuple<bool, size_t, size_t> pushheadpop_test( void )
+	{
+		size_t count = 0;
+		start_sync_latch_.arrive_and_wait();
+
+		size_t cur_val = 0;
+		while ( loop_flag_.load( std::memory_order_acquire ) ) {
+			count++;
+			sut_.push_head( cur_val );
+			auto [flag, v] = sut_.pop();
+			if ( !flag ) {
+				return std::tuple<bool, size_t, size_t>( false, 0, 0 );
+			}
+			cur_val = v + 1;
+		}
+
+		return std::tuple<bool, size_t, size_t>( true, count, cur_val );
+	}
+
 	std::tuple<bool, bool> test_task( size_t test_milliseconds )
 	{
 
-		struct thread_data {
-			std::thread                                   worker_;
-			std::future<std::tuple<bool, size_t, size_t>> ret_;
-		};
+		using result_future_t = std::future<std::tuple<bool, size_t, size_t>>;
 
-		std::vector<thread_data> tasks_and_threads( thread_num_ );
-		for ( auto& t : tasks_and_threads ) {
+		std::vector<result_future_t> tasks_result1( thread_num_ );
+		std::vector<result_future_t> tasks_result2( thread_num_ );
+		for ( auto& t : tasks_result1 ) {
 			std::packaged_task<std::tuple<bool, size_t, size_t>( void )> task(
 				[this]() {
 					return pushpop_test();
 				} );   // 非同期実行する関数を登録する
-			t.ret_    = task.get_future();
-			t.worker_ = std::thread( std::move( task ) );
+			t = task.get_future();
+
+			std::thread worker_( std::move( task ) );
+			worker_.detach();
+		}
+		for ( auto& t : tasks_result2 ) {
+			std::packaged_task<std::tuple<bool, size_t, size_t>( void )> task(
+				[this]() {
+					return pushheadpop_test();
+				} );   // 非同期実行する関数を登録する
+			t = task.get_future();
+
+			std::thread worker_( std::move( task ) );
+			worker_.detach();
 		}
 
 		start_sync_latch_.arrive_and_wait();
@@ -85,18 +114,19 @@ struct Nthread_push_pop_task_of_x_fifo_list {
 		bool   total_ret           = true;
 		size_t total_loop_count    = 0;
 		size_t total_accumlate_val = 0;
-		for ( auto& t : tasks_and_threads ) {
-			auto [ret, cur_loop_count, cur_accumlate_val] = t.ret_.get();
+		for ( auto& t : tasks_result1 ) {
+			auto [ret, cur_loop_count, cur_accumlate_val] = t.get();
 
 			total_ret = total_ret && ret;
 			total_loop_count += cur_loop_count;
 			total_accumlate_val += cur_accumlate_val;
 		}
+		for ( auto& t : tasks_result2 ) {
+			auto [ret, cur_loop_count, cur_accumlate_val] = t.get();
 
-		for ( auto& t : tasks_and_threads ) {
-			if ( t.worker_.joinable() ) {
-				t.worker_.join();
-			}
+			total_ret = total_ret && ret;
+			total_loop_count += cur_loop_count;
+			total_accumlate_val += cur_accumlate_val;
 		}
 
 		printf( "calc result: loop_count=%zu, accumlate value=%zu\n", total_loop_count, total_accumlate_val );
