@@ -21,10 +21,9 @@ endif()
 
 if(EXISTS "${PROJECT_SOURCE_DIR}/test/googletest/CMakeLists.txt")
     add_custom_target(build-test-type)
-    add_subdirectory(test_type)
-
     add_custom_target(build-test)
 
+    add_subdirectory(test_type)
     add_subdirectory(googletest)
     add_subdirectory(test_hazard_ptr)
     add_subdirectory(test_dynamic_tls)
