@@ -180,7 +180,7 @@ public:
 	{
 	}
 
-	template <typename U = T, std::enable_if<std::is_constructible<T, U>::value>::type* = nullptr>
+	template <typename U = T, std::enable_if<std::is_constructible<T, U>::value || std::is_constructible<T, U&>::value>::type* = nullptr>
 	constexpr return_optional( const return_optional<U>& src )
 	  : internal::OptionalBase<T>()
 	{
@@ -190,7 +190,7 @@ public:
 		}
 	}
 
-	template <typename U = T, std::enable_if<std::is_constructible<T, U>::value>::type* = nullptr>
+	template <typename U = T, std::enable_if<std::is_constructible<T, U&&>::value>::type* = nullptr>
 	constexpr return_optional( return_optional<U>&& src )
 	  : internal::OptionalBase<T>()
 	{
