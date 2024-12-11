@@ -48,11 +48,11 @@ struct Nthread_push_pop_task_of_x_fifo_list {
 		while ( loop_flag_.load( std::memory_order_acquire ) ) {
 			count++;
 			sut_.push( cur_val );
-			auto [flag, v] = sut_.pop();
-			if ( !flag ) {
+			auto ret = sut_.pop();
+			if ( !ret.has_value() ) {
 				return std::tuple<bool, size_t, size_t>( false, 0, 0 );
 			}
-			cur_val = v + 1;
+			cur_val = ret.value() + 1;
 		}
 
 		return std::tuple<bool, size_t, size_t>( true, count, cur_val );
@@ -67,11 +67,11 @@ struct Nthread_push_pop_task_of_x_fifo_list {
 		while ( loop_flag_.load( std::memory_order_acquire ) ) {
 			count++;
 			sut_.push_head( cur_val );
-			auto [flag, v] = sut_.pop();
-			if ( !flag ) {
+			auto ret = sut_.pop();
+			if ( !ret.has_value() ) {
 				return std::tuple<bool, size_t, size_t>( false, 0, 0 );
 			}
-			cur_val = v + 1;
+			cur_val = ret.value() + 1;
 		}
 
 		return std::tuple<bool, size_t, size_t>( true, count, cur_val );

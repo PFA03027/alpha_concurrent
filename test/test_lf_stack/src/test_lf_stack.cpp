@@ -53,21 +53,15 @@ void* func_test_fifo( void* data )
 	typename test_lifo_type::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		p_test_obj->push( v );
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = p_test_obj->pop();
-#else
-		auto local_ret = p_test_obj->pop();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		if ( !pop_flag ) {
+		auto ret = p_test_obj->pop();
+		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string( v ).c_str() );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 			printf( "fifo size count: %d\n", p_test_obj->get_size() );
 #endif
 			exit( 1 );
 		}
-		v = vv + 1;
+		v = ret.value() + 1;
 	}
 
 	return reinterpret_cast<void*>( v );
@@ -82,38 +76,26 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( test_lifo_type* p_test_obj[] )
 		p_test_obj[0]->push( v1 );
 		p_test_obj[1]->push( v2 );
 		{
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-			auto [pop_flag, vv] = p_test_obj[0]->pop();
-#else
-			auto local_ret = p_test_obj[0]->pop();
-			auto pop_flag  = std::get<0>( local_ret );
-			auto vv        = std::get<1>( local_ret );
-#endif
-			if ( !pop_flag ) {
+			auto ret = p_test_obj[0]->pop();
+			if ( !ret.has_value() ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v1 ).c_str() );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 				printf( "fifo size count idx 0: %d\n", p_test_obj[0]->get_size() );
 #endif
 				exit( 1 );
 			}
-			v1 = vv + 1;
+			v1 = ret.value() + 1;
 		}
 		{
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-			auto [pop_flag, vv] = p_test_obj[1]->pop();
-#else
-			auto local_ret = p_test_obj[1]->pop();
-			auto pop_flag  = std::get<0>( local_ret );
-			auto vv        = std::get<1>( local_ret );
-#endif
-			if ( !pop_flag ) {
+			auto ret = p_test_obj[1]->pop();
+			if ( !ret.has_value() ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v2 ).c_str() );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 				printf( "fifo size count idx 1: %d\n", p_test_obj[1]->get_size() );
 #endif
 				exit( 1 );
 			}
-			v2 = vv + 1;
+			v2 = ret.value() + 1;
 		}
 	}
 
@@ -194,21 +176,15 @@ void* func_test4_fifo( void* data )
 	typename test_lifo_type2::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		p_test_obj->push( v );
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = p_test_obj->pop();
-#else
-		auto local_ret = p_test_obj->pop();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		if ( !pop_flag ) {
+		auto ret = p_test_obj->pop();
+		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string( v ).c_str() );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 			printf( "fifo size count: %d\n", p_test_obj->get_size() );
 #endif
 			exit( 1 );
 		}
-		v = vv + 1;
+		v = ret.value() + 1;
 	}
 
 	return reinterpret_cast<void*>( v );
@@ -224,38 +200,26 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( test_lifo_type2* p_test_obj[]
 		p_test_obj[1]->push( v2 );
 
 		{
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-			auto [pop_flag, vv] = p_test_obj[0]->pop();
-#else
-			auto local_ret = p_test_obj[0]->pop();
-			auto pop_flag  = std::get<0>( local_ret );
-			auto vv        = std::get<1>( local_ret );
-#endif
-			if ( !pop_flag ) {
+			auto ret = p_test_obj[0]->pop();
+			if ( !ret.has_value() ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v1 ).c_str() );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 				printf( "fifo size count idx 0: %d\n", p_test_obj[0]->get_size() );
 #endif
 				exit( 1 );
 			}
-			v1 = vv + 1;
+			v1 = ret.value() + 1;
 		}
 		{
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-			auto [pop_flag, vv] = p_test_obj[1]->pop();
-#else
-			auto local_ret = p_test_obj[1]->pop();
-			auto pop_flag  = std::get<0>( local_ret );
-			auto vv        = std::get<1>( local_ret );
-#endif
-			if ( !pop_flag ) {
+			auto ret = p_test_obj[1]->pop();
+			if ( !ret.has_value() ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v2 ).c_str() );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 				printf( "fifo size count idx 1: %d\n", p_test_obj[1]->get_size() );
 #endif
 				exit( 1 );
 			}
-			v2 = vv + 1;
+			v2 = ret.value() + 1;
 		}
 	}
 
@@ -352,9 +316,9 @@ TEST_F( lfStackTest, Pointer2 )
 	p_test_obj->push( new int() );
 	auto ret = p_test_obj->pop();
 
-	ASSERT_TRUE( std::get<0>( ret ) );
+	ASSERT_TRUE( ret.has_value() );
 
-	delete std::get<1>( ret );
+	delete ret.value();
 	delete p_test_obj;
 
 	std::cout << "End Pointer test" << std::endl;
@@ -374,9 +338,9 @@ TEST_F( lfStackTest, CanCal_With_Unique_ptr )
 	auto ret = test_obj.pop();
 
 	// Assert
-	ASSERT_TRUE( std::get<0>( ret ) );
-	ASSERT_NE( std::get<1>( ret ), nullptr );
-	EXPECT_EQ( *( std::get<1>( ret ) ), 12 );
+	ASSERT_TRUE( ret.has_value() );
+	ASSERT_NE( ret.value(), nullptr );
+	EXPECT_EQ( *( ret.value() ), 12 );
 }
 
 class array_test {
@@ -421,9 +385,9 @@ TEST_F( lfStackTest, Array2 )
 	p_test_obj->push( new array_test[2] );
 	auto ret = p_test_obj->pop();
 
-	ASSERT_TRUE( std::get<0>( ret ) );
+	ASSERT_TRUE( ret.has_value() );
 
-	delete[] std::get<1>( ret );
+	delete[] ret.value();
 	delete p_test_obj;
 
 	std::cout << "Array array_test[] test" << std::endl;
@@ -454,9 +418,9 @@ TEST_F( lfStackTest, FixedArray2 )
 	array_test tmp_data[2];
 
 	p_test_obj->push( tmp_data );
-	auto ret = p_test_obj->pop();
+	auto ret = p_test_obj->pop( tmp_data );
 
-	ASSERT_TRUE( std::get<0>( ret ) );
+	ASSERT_TRUE( ret );
 
 	delete p_test_obj;
 

@@ -173,9 +173,9 @@ public:
 	{
 	}
 
-	template <bool IsCopyConstructible                                                   = std::is_copy_constructible<T>::value,
-	          bool IsTriviallyCopyConstructible                                          = std::is_trivially_copy_constructible<T>::value,
-	          std::enable_if<IsCopyConstructible && IsTriviallyCopyConstructible>::type* = nullptr>
+	template <bool IsCopyConstructible                                                            = std::is_copy_constructible<T>::value,
+	          bool IsTriviallyCopyConstructible                                                   = std::is_trivially_copy_constructible<T>::value,
+	          typename std::enable_if<IsCopyConstructible && IsTriviallyCopyConstructible>::type* = nullptr>
 	constexpr return_optional( const return_optional& src )
 	  : internal::OptionalBase<T>()
 	{
@@ -184,9 +184,9 @@ public:
 			init_ = true;
 		}
 	}
-	template <bool IsCopyConstructible                                                    = std::is_copy_constructible<T>::value,
-	          bool IsTriviallyCopyConstructible                                           = std::is_trivially_copy_constructible<T>::value,
-	          std::enable_if<IsCopyConstructible && !IsTriviallyCopyConstructible>::type* = nullptr>
+	template <bool IsCopyConstructible                                                             = std::is_copy_constructible<T>::value,
+	          bool IsTriviallyCopyConstructible                                                    = std::is_trivially_copy_constructible<T>::value,
+	          typename std::enable_if<IsCopyConstructible && !IsTriviallyCopyConstructible>::type* = nullptr>
 	return_optional( const return_optional& src )
 	  : internal::OptionalBase<T>()
 	{
@@ -196,9 +196,9 @@ public:
 		}
 	}
 
-	template <bool IsMoveConstructible                                                   = std::is_move_constructible<T>::value,
-	          bool IsTriviallyMoveConstructible                                          = std::is_trivially_move_constructible<T>::value,
-	          std::enable_if<IsMoveConstructible && IsTriviallyMoveConstructible>::type* = nullptr>
+	template <bool IsMoveConstructible                                                            = std::is_move_constructible<T>::value,
+	          bool IsTriviallyMoveConstructible                                                   = std::is_trivially_move_constructible<T>::value,
+	          typename std::enable_if<IsMoveConstructible && IsTriviallyMoveConstructible>::type* = nullptr>
 	constexpr return_optional( return_optional&& src ) noexcept( std::is_nothrow_move_constructible<T>::value )
 	  : internal::OptionalBase<T>()
 	{
@@ -208,9 +208,9 @@ public:
 		}
 	}
 
-	template <bool IsMoveConstructible                                                    = std::is_move_constructible<T>::value,
-	          bool IsTriviallyMoveConstructible                                           = std::is_trivially_move_constructible<T>::value,
-	          std::enable_if<IsMoveConstructible && !IsTriviallyMoveConstructible>::type* = nullptr>
+	template <bool IsMoveConstructible                                                             = std::is_move_constructible<T>::value,
+	          bool IsTriviallyMoveConstructible                                                    = std::is_trivially_move_constructible<T>::value,
+	          typename std::enable_if<IsMoveConstructible && !IsTriviallyMoveConstructible>::type* = nullptr>
 	return_optional( return_optional&& src ) noexcept( std::is_nothrow_move_constructible<T>::value )
 	  : internal::OptionalBase<T>()
 	{
@@ -221,32 +221,32 @@ public:
 	}
 
 	template <typename... Args,
-	          std::enable_if<std::is_constructible<T, Args...>::value>::type* = nullptr>
+	          typename std::enable_if<std::is_constructible<T, Args...>::value>::type* = nullptr>
 	constexpr explicit return_optional( return_in_place_t, Args&&... args )
 	  : internal::OptionalBase<T>( return_in_place, std::forward<Args>( args )... )
 	{
 	}
 	template <typename U, typename... Args,
-	          std::enable_if<std::is_constructible<T, std::initializer_list<U>&, Args...>::value>::type* = nullptr>
+	          typename std::enable_if<std::is_constructible<T, std::initializer_list<U>&, Args...>::value>::type* = nullptr>
 	constexpr explicit return_optional( return_in_place_t, std::initializer_list<U>& il, Args&&... args )
 	  : internal::OptionalBase<T>( return_in_place, il, std::forward<Args>( args )... )
 	{
 	}
 
-	template <typename U                                                                                             = T,
-	          std::enable_if<std::is_constructible<T, U>::value &&
-	                         !std::is_same<typename internal::remove_cvref<U>::type, return_in_place_t>::value &&
-	                         !std::is_same<typename internal::remove_cvref<U>::type, return_optional>::value>::type* = nullptr>
+	template <typename U                                                                                                      = T,
+	          typename std::enable_if<std::is_constructible<T, U>::value &&
+	                                  !std::is_same<typename internal::remove_cvref<U>::type, return_in_place_t>::value &&
+	                                  !std::is_same<typename internal::remove_cvref<U>::type, return_optional>::value>::type* = nullptr>
 	constexpr return_optional( U&& value )
 	  : internal::OptionalBase<T>( return_in_place, std::forward<U>( value ) )
 	{
 	}
 
 	template <typename U,
-	          bool IsConstructible                                                     = std::is_constructible<T, const U&>::value,
-	          bool TIsBool                                                             = std::is_same<typename internal::remove_cvref<T>::type, bool>::value,
-	          bool IsConvertible                                                       = std::is_convertible<return_optional<U>, T>::value,
-	          std::enable_if<IsConstructible && ( !TIsBool || !IsConvertible )>::type* = nullptr>
+	          bool IsConstructible                                                              = std::is_constructible<T, const U&>::value,
+	          bool TIsBool                                                                      = std::is_same<typename internal::remove_cvref<T>::type, bool>::value,
+	          bool IsConvertible                                                                = std::is_convertible<return_optional<U>, T>::value,
+	          typename std::enable_if<IsConstructible && ( !TIsBool || !IsConvertible )>::type* = nullptr>
 	constexpr return_optional( const return_optional<U>& src )
 	  : internal::OptionalBase<T>()
 	{
@@ -256,10 +256,10 @@ public:
 		}
 	}
 	template <typename U,
-	          bool IsConstructible                                                     = std::is_constructible<T, U>::value,
-	          bool TIsBool                                                             = std::is_same<typename internal::remove_cvref<T>::type, bool>::value,
-	          bool IsConvertible                                                       = std::is_convertible<return_optional<U>, T>::value,
-	          std::enable_if<IsConstructible && ( !TIsBool || !IsConvertible )>::type* = nullptr>
+	          bool IsConstructible                                                              = std::is_constructible<T, U>::value,
+	          bool TIsBool                                                                      = std::is_same<typename internal::remove_cvref<T>::type, bool>::value,
+	          bool IsConvertible                                                                = std::is_convertible<return_optional<U>, T>::value,
+	          typename std::enable_if<IsConstructible && ( !TIsBool || !IsConvertible )>::type* = nullptr>
 	constexpr return_optional( return_optional<U>&& src )
 	  : internal::OptionalBase<T>()
 	{
@@ -275,9 +275,9 @@ public:
 		return *this;
 	}
 
-	template <bool IsCopyConstructible                                       = std::is_copy_constructible<T>::value,
-	          bool IsCopyAssignable                                          = std::is_copy_assignable<T>::value,
-	          std::enable_if<IsCopyConstructible && IsCopyAssignable>::type* = nullptr>
+	template <bool IsCopyConstructible                                                = std::is_copy_constructible<T>::value,
+	          bool IsCopyAssignable                                                   = std::is_copy_assignable<T>::value,
+	          typename std::enable_if<IsCopyConstructible && IsCopyAssignable>::type* = nullptr>
 	return_optional& operator=( const return_optional& src )
 	{
 		if ( this == &src ) return *this;
@@ -296,14 +296,14 @@ public:
 
 		return *this;
 	}
-	template <bool IsCopyConstructible                                            = std::is_copy_constructible<T>::value,
-	          bool IsCopyAssignable                                               = std::is_copy_assignable<T>::value,
-	          std::enable_if<!( IsCopyConstructible && IsCopyAssignable )>::type* = nullptr>
+	template <bool IsCopyConstructible                                                     = std::is_copy_constructible<T>::value,
+	          bool IsCopyAssignable                                                        = std::is_copy_assignable<T>::value,
+	          typename std::enable_if<!( IsCopyConstructible && IsCopyAssignable )>::type* = nullptr>
 	return_optional& operator=( const return_optional& src ) = delete;
 
-	template <bool IsMoveConstructible                                       = std::is_move_constructible<T>::value,
-	          bool IsMoveAssignable                                          = std::is_move_assignable<T>::value,
-	          std::enable_if<IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
+	template <bool IsMoveConstructible                                                = std::is_move_constructible<T>::value,
+	          bool IsMoveAssignable                                                   = std::is_move_assignable<T>::value,
+	          typename std::enable_if<IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
 	return_optional& operator=( return_optional&& src ) noexcept( std::is_nothrow_move_constructible<T>::value && std::is_nothrow_move_assignable<T>::value )
 	{
 		if ( this == &src ) return *this;
@@ -322,16 +322,16 @@ public:
 
 		return *this;
 	}
-	template <bool IsMoveConstructible                                            = std::is_move_constructible<T>::value,
-	          bool IsMoveAssignable                                               = std::is_move_assignable<T>::value,
-	          std::enable_if<!( IsMoveConstructible && IsMoveAssignable )>::type* = nullptr>
+	template <bool IsMoveConstructible                                                     = std::is_move_constructible<T>::value,
+	          bool IsMoveAssignable                                                        = std::is_move_assignable<T>::value,
+	          typename std::enable_if<!( IsMoveConstructible && IsMoveAssignable )>::type* = nullptr>
 	return_optional& operator=( return_optional&& src ) = delete;
 
-	template <typename U                                              = T,
-	          std::enable_if<!std::is_same<typename internal::remove_cvref<U>::type, return_optional>::value &&
-	                         !( std::is_scalar<T>::value && std::is_same<T, typename std::decay<U>::type>::value ) &&
-	                         std::is_constructible<T, U>::value &&
-	                         std::is_assignable<T&, U>::value>::type* = nullptr>
+	template <typename U                                                       = T,
+	          typename std::enable_if<!std::is_same<typename internal::remove_cvref<U>::type, return_optional>::value &&
+	                                  !( std::is_scalar<T>::value && std::is_same<T, typename std::decay<U>::type>::value ) &&
+	                                  std::is_constructible<T, U>::value &&
+	                                  std::is_assignable<T&, U>::value>::type* = nullptr>
 	return_optional& operator=( U&& src )
 	{
 		if ( init_ ) {
@@ -345,13 +345,13 @@ public:
 	}
 
 	template <typename U,
-	          std::enable_if<std::is_constructible<T, const U&>::value &&
-	                         std::is_assignable<T&, const U&>::value &&
-	                         !std::is_convertible<T, return_optional<U>>::value &&
-	                         !std::is_assignable<T&, return_optional<U>&>::value &&
-	                         !std::is_assignable<T&, return_optional<U>&&>::value &&
-	                         !std::is_assignable<T&, const return_optional<U>&>::value &&
-	                         !std::is_assignable<T&, const return_optional<U>&&>::value>::type* = nullptr>
+	          typename std::enable_if<std::is_constructible<T, const U&>::value &&
+	                                  std::is_assignable<T&, const U&>::value &&
+	                                  !std::is_convertible<T, return_optional<U>>::value &&
+	                                  !std::is_assignable<T&, return_optional<U>&>::value &&
+	                                  !std::is_assignable<T&, return_optional<U>&&>::value &&
+	                                  !std::is_assignable<T&, const return_optional<U>&>::value &&
+	                                  !std::is_assignable<T&, const return_optional<U>&&>::value>::type* = nullptr>
 	return_optional& operator=( const return_optional<U>& src )
 	{
 		if ( this == &src ) return *this;
@@ -372,13 +372,13 @@ public:
 	}
 
 	template <typename U,
-	          std::enable_if<std::is_constructible<T, U>::value &&
-	                         std::is_assignable<T&, U>::value &&
-	                         !std::is_convertible<T, return_optional<U>>::value &&
-	                         !std::is_assignable<T&, return_optional<U>&>::value &&
-	                         !std::is_assignable<T&, return_optional<U>&&>::value &&
-	                         !std::is_assignable<T&, const return_optional<U>&>::value &&
-	                         !std::is_assignable<T&, const return_optional<U>&&>::value>::type* = nullptr>
+	          typename std::enable_if<std::is_constructible<T, U>::value &&
+	                                  std::is_assignable<T&, U>::value &&
+	                                  !std::is_convertible<T, return_optional<U>>::value &&
+	                                  !std::is_assignable<T&, return_optional<U>&>::value &&
+	                                  !std::is_assignable<T&, return_optional<U>&&>::value &&
+	                                  !std::is_assignable<T&, const return_optional<U>&>::value &&
+	                                  !std::is_assignable<T&, const return_optional<U>&&>::value>::type* = nullptr>
 	return_optional& operator=( return_optional<U>&& src )
 	{
 		if ( this == &src ) return *this;
@@ -398,7 +398,8 @@ public:
 		return *this;
 	}
 
-	template <class... Args, std::enable_if<std::is_constructible<T, Args...>::value>::type* = nullptr>
+	template <class... Args,
+	          typename std::enable_if<std::is_constructible<T, Args...>::value>::type* = nullptr>
 	constexpr T& emplace( Args&&... args )
 	{
 		reset();
@@ -410,7 +411,7 @@ public:
 	}
 
 	template <typename U, typename... Args,
-	          std::enable_if<std::is_constructible<T, std::initializer_list<U>&, Args...>::value>::type* = nullptr>
+	          typename std::enable_if<std::is_constructible<T, std::initializer_list<U>&, Args...>::value>::type* = nullptr>
 	constexpr T& emplace( std::initializer_list<U>& il, Args&&... args )
 	{
 		reset();
@@ -421,9 +422,9 @@ public:
 		return storage_.value_;
 	}
 
-	template <bool IsMoveConstructible                                  = std::is_move_constructible<T>::value,
-	          bool IsSwappable                                          = std::is_swappable<T>::value,
-	          std::enable_if<IsMoveConstructible && IsSwappable>::type* = nullptr>
+	template <bool IsMoveConstructible                                           = std::is_move_constructible<T>::value,
+	          bool IsSwappable                                                   = std::is_swappable<T>::value,
+	          typename std::enable_if<IsMoveConstructible && IsSwappable>::type* = nullptr>
 	constexpr void swap( return_optional& src ) noexcept( std::is_nothrow_swappable<T>::value && std::is_nothrow_move_constructible<T>::value )
 	{
 		if ( this == &src ) return;
@@ -520,12 +521,16 @@ public:
 		return storage_.value_;
 	}   // (4)
 
-	template <class U, std::enable_if<std::is_convertible<U, T>::value>::type* = nullptr>
+	template <class U                                                  = T,
+	          typename std::enable_if<std::is_convertible<U, T>::value &&
+	                                  !std::is_array<U>::value>::type* = nullptr>
 	constexpr T value_or( U&& v ) const&
 	{
 		return has_value() ? value() : static_cast<T>( std::forward<U>( v ) );
 	}   // (1)
-	template <class U, std::enable_if<std::is_convertible<U, T>::value>::type* = nullptr>
+	template <class U                                                  = T,
+	          typename std::enable_if<std::is_convertible<U, T>::value &&
+	                                  !std::is_array<U>::value>::type* = nullptr>
 	constexpr T value_or( U&& v ) &&
 	{
 		return has_value() ? value() : static_cast<T>( std::forward<U>( v ) );

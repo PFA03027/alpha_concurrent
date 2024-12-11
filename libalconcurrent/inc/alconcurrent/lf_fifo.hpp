@@ -20,6 +20,7 @@
 #include "internal/od_lockfree_fifo.hpp"
 #include "internal/od_node_essence.hpp"
 #include "internal/od_node_pool.hpp"
+#include "internal/return_optional.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -56,10 +57,10 @@ public:
 		internal::LogOutput( log_type::DUMP, "x_lockfree_fifo: allocated_node_count = %zu", allocated_node_count_.load() );
 #endif
 
-		VALUE_DELETER                deleter;
-		std::tuple<bool, value_type> tmp = pop();
-		while ( std::get<0>( tmp ) ) {
-			deleter( std::get<1>( tmp ) );
+		VALUE_DELETER deleter;
+		auto          tmp = pop();
+		while ( tmp.has_value() ) {
+			deleter( tmp.value() );
 			tmp = pop();
 		}
 
@@ -108,14 +109,14 @@ public:
 	          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
 	          typename std::enable_if<
 				  IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
-	std::tuple<bool, value_type> pop( void )
+	return_optional<value_type> pop( void )
 	{
 		value_type   popped_value_storage;
 		node_pointer p_popped_node = lf_fifo_impl_.pop_front( &popped_value_storage );
-		if ( p_popped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
+		if ( p_popped_node == nullptr ) return return_nullopt;
 
 		node_pool_t::push( p_popped_node );
-		return std::tuple<bool, value_type> { true, std::move( popped_value_storage ) };
+		return return_optional<value_type> { std::move( popped_value_storage ) };
 	}
 
 	template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
@@ -124,14 +125,14 @@ public:
 	          bool IsCopyAssignable    = std::is_copy_assignable<value_type>::value,
 	          typename std::enable_if<
 				  !( IsMoveConstructible && IsMoveAssignable ) && ( IsCopyConstructible && IsCopyAssignable )>::type* = nullptr>
-	std::tuple<bool, value_type> pop( void )
+	return_optional<value_type> pop( void )
 	{
 		value_type   popped_value_storage;
 		node_pointer p_popped_node = lf_fifo_impl_.pop_front( &popped_value_storage );
-		if ( p_popped_node == nullptr ) return std::tuple<bool, value_type> { false, value_type {} };
+		if ( p_popped_node == nullptr ) return return_nullopt;
 
 		node_pool_t::push( p_popped_node );
-		return std::tuple<bool, value_type> { true, popped_value_storage };
+		return return_optional<value_type> { popped_value_storage };
 	}
 
 	bool is_empty( void ) const
@@ -328,21 +329,17 @@ public:
 		internal::x_lockfree_fifo<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
 	}
 
-	std::tuple<bool, value_type> pop( void )
+	bool pop( value_type& a )
 	{
-		std::tuple<bool, value_type> ans;
-		std::get<0>( ans ) = false;
-
-		std::tuple<bool, std::array<T, N>> ret = internal::x_lockfree_fifo<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::pop();
-		if ( !std::get<0>( ret ) ) {
-			return ans;
+		return_optional<std::array<T, N>> ret = internal::x_lockfree_fifo<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::pop();
+		if ( !ret.has_value() ) {
+			return false;
 		}
 
-		std::get<0>( ans ) = true;
 		for ( size_t i = 0; i < N; i++ ) {
-			std::get<1>( ans )[i] = std::move( std::get<1>( ret )[i] );
+			a[i] = std::move( ret.value()[i] );
 		}
-		return ans;
+		return true;
 	}
 };
 template <typename T, typename DELETER>

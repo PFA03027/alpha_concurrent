@@ -75,9 +75,9 @@ TEST_F( lffifoTest, Pointer2 )
 	auto ret = p_test_obj->pop();
 
 	// Assert
-	ASSERT_TRUE( std::get<0>( ret ) );
+	ASSERT_TRUE( ret.has_value() );
 
-	delete std::get<1>( ret );
+	delete ret.value();
 	delete p_test_obj;
 }
 
@@ -95,9 +95,9 @@ TEST_F( lffifoTest, CanCal_With_Unique_ptr )
 	auto ret = test_obj.pop();
 
 	// Assert
-	ASSERT_TRUE( std::get<0>( ret ) );
-	ASSERT_NE( std::get<1>( ret ), nullptr );
-	EXPECT_EQ( *( std::get<1>( ret ) ), 12 );
+	ASSERT_TRUE( ret.has_value() );
+	ASSERT_NE( ret.value(), nullptr );
+	EXPECT_EQ( *( ret.value() ), 12 );
 }
 
 class array_test {
@@ -143,9 +143,9 @@ TEST_F( lffifoTest, Array2 )
 	p_test_obj->push( new array_test[2] );
 	auto ret = p_test_obj->pop();
 
-	ASSERT_TRUE( std::get<0>( ret ) );
+	ASSERT_TRUE( ret.has_value() );
 
-	delete[] std::get<1>( ret );
+	delete[] ret.value();
 	delete p_test_obj;
 }
 
@@ -179,11 +179,11 @@ TEST_F( lffifoTest, FixedArray2 )
 	p_test_obj = new test_fifo_type3( 8 );
 
 	p_test_obj->push( tmp_data );
-	auto ret = p_test_obj->pop();
 
-	ASSERT_TRUE( std::get<0>( ret ) );
+	array_test vt[2];
+	auto       ret = p_test_obj->pop( vt );
 
-	auto vt = std::get<1>( ret );
+	ASSERT_TRUE( ret );
 
 	EXPECT_EQ( 2, vt[0].x );
 	EXPECT_EQ( 3, vt[1].x );

@@ -135,24 +135,16 @@ void* func_test_fifo( void* p_data )
 			p_test_obj->push( p_tmp_alloc_to_push );
 
 			// std::this_thread::sleep_for( std::chrono::milliseconds( num_sleep( engine ) ) );
-
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-			auto [pop_flag, p_tmp_alloc] = p_test_obj->pop();
-#else
-			auto local_ret   = p_test_obj->pop();
-			auto pop_flag    = std::get<0>( local_ret );
-			auto p_tmp_alloc = std::get<1>( local_ret );
-#endif
-			if ( !pop_flag ) {
+			void* p_tmp_alloc;
+			auto  ret = p_test_obj->pop();
+			if ( !ret.has_value() ) {
 				printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 				printf( "fifo size count: %d\n", p_test_obj->get_size() );
 #endif
 
 				auto local_ret = p_test_obj->pop();
-				pop_flag       = std::get<0>( local_ret );
-				p_tmp_alloc    = std::get<1>( local_ret );
-				if ( !pop_flag ) {
+				if ( !local_ret.has_value() ) {
 					printf( "Bugggggggyyyy, then Bugggggggyyyy func_test_fifo()!!!\n" );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 					printf( "fifo size count: %d\n", p_test_obj->get_size() );
@@ -160,7 +152,11 @@ void* func_test_fifo( void* p_data )
 
 					err_flag.store( true );
 					return nullptr;
+				} else {
+					p_tmp_alloc = local_ret.value();
 				}
+			} else {
+				p_tmp_alloc = ret.value();
 			}
 
 			p_tmg->deallocate( p_tmp_alloc );
@@ -196,24 +192,16 @@ void* func_test_fifo_ggmem( void* p_data )
 			p_test_obj->push( p_tmp_alloc_to_push );
 
 			// std::this_thread::sleep_for( std::chrono::milliseconds( num_sleep( engine ) ) );
-
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-			auto [pop_flag, p_tmp_alloc] = p_test_obj->pop();
-#else
-			auto local_ret   = p_test_obj->pop();
-			auto pop_flag    = std::get<0>( local_ret );
-			auto p_tmp_alloc = std::get<1>( local_ret );
-#endif
-			if ( !pop_flag ) {
+			void* p_tmp_alloc;
+			auto  ret = p_test_obj->pop();
+			if ( !ret.has_value() ) {
 				printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 				printf( "fifo size count: %d\n", p_test_obj->get_size() );
 #endif
 
 				auto local_ret = p_test_obj->pop();
-				pop_flag       = std::get<0>( local_ret );
-				p_tmp_alloc    = std::get<1>( local_ret );
-				if ( !pop_flag ) {
+				if ( !local_ret.has_value() ) {
 					printf( "Bugggggggyyyy, then Bugggggggyyyy func_test_fifo()!!!\n" );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 					printf( "fifo size count: %d\n", p_test_obj->get_size() );
@@ -221,7 +209,11 @@ void* func_test_fifo_ggmem( void* p_data )
 
 					err_flag.store( true );
 					return nullptr;
+				} else {
+					p_tmp_alloc = local_ret.value();
 				}
+			} else {
+				p_tmp_alloc = ret.value();
 			}
 
 			alpha::concurrent::gmem_deallocate( p_tmp_alloc );
@@ -461,15 +453,8 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 				fifo.push( p_tmp_alloc_to_push );
 
 				// std::this_thread::sleep_for( std::chrono::milliseconds( num_sleep( engine ) ) );
-
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-				auto [pop_flag, p_tmp_alloc] = fifo.pop();
-#else
-				auto local_ret   = fifo.pop();
-				auto pop_flag    = std::get<0>( local_ret );
-				auto p_tmp_alloc = std::get<1>( local_ret );
-#endif
-				if ( !pop_flag ) {
+				auto ret = fifo.pop();
+				if ( !ret.has_value() ) {
 					printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 					printf( "fifo size count: %d\n", fifo.get_size() );
@@ -478,7 +463,7 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 					break;
 				}
 
-				alpha::concurrent::gmem_deallocate( p_tmp_alloc );
+				alpha::concurrent::gmem_deallocate( ret.value() );
 			}
 
 			{
@@ -500,14 +485,8 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 			}
 
 			for ( int i = 0; i < num_loop; i++ ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-				auto [pop_flag, p_tmp_alloc] = fifo.pop();
-#else
-				auto local_ret   = fifo.pop();
-				auto pop_flag    = std::get<0>( local_ret );
-				auto p_tmp_alloc = std::get<1>( local_ret );
-#endif
-				if ( !pop_flag ) {
+				auto ret = fifo.pop();
+				if ( !ret.has_value() ) {
 					printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 					printf( "fifo size count: %d\n", fifo.get_size() );
@@ -516,7 +495,7 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 					break;
 				}
 
-				alpha::concurrent::gmem_deallocate( p_tmp_alloc );
+				alpha::concurrent::gmem_deallocate( ret.value() );
 			}
 
 			{

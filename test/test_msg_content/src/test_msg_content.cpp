@@ -101,18 +101,12 @@ void* func_test_fifo_consumer( void* data )
 	pthread_barrier_wait( &global_shared_barrier );
 
 	while ( true ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, p_one_msg] = p_test_obj->pop();
-#else
-		auto local_ret = p_test_obj->pop();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto p_one_msg = std::get<1>( local_ret );
-#endif
-		if ( !pop_flag ) {
+		auto ret = p_test_obj->pop();
+		if ( !ret.has_value() ) {
 			std::this_thread::sleep_for( std::chrono::milliseconds( 1 + dist( engine ) ) );   // backoff handling
 			continue;
 		}
-		if ( p_one_msg == nullptr ) {
+		if ( ret.value() == nullptr ) {
 			printf( "Bugggggggyyyy  func_test_fifo_consumer()!!! nullptr!!\n" );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 			printf( "fifo size count: %d\n", p_test_obj->get_size() );
@@ -120,7 +114,7 @@ void* func_test_fifo_consumer( void* data )
 			err_flag.store( true );
 			break;
 		}
-		if ( !p_one_msg->chk_crc() ) {
+		if ( !ret.value()->chk_crc() ) {
 			printf( "Bugggggggyyyy  func_test_fifo_consumer()!!! CRC NG!!\n" );
 #ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 			printf( "fifo size count: %d\n", p_test_obj->get_size() );
@@ -129,8 +123,8 @@ void* func_test_fifo_consumer( void* data )
 			break;
 		}
 
-		bool end_ret = p_one_msg->is_end();
-		delete p_one_msg;
+		bool end_ret = ret.value()->is_end();
+		delete ret.value();
 		if ( end_ret ) {
 			break;
 		}

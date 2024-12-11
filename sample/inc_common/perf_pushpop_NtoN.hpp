@@ -28,11 +28,12 @@ void one_cycle_pushpop(
 	std::size_t&             count )
 {
 	for ( size_t i = 0; i < N; i++ ) {
-		auto [sf, pop_value] = sut[cur_access_idxs_pop[i]].pop();
-		if ( !sf ) {
+		auto ret = sut[cur_access_idxs_pop[i]].pop();
+		if ( !ret.has_value() ) {
 			std::cout << "SUT has bug!!!" << std::endl;
 			abort();
 		}
+		auto pop_value = ret.value();
 		pop_value += 1;
 		sut[cur_access_idxs_push[i]].push( pop_value );
 
@@ -68,12 +69,12 @@ std::tuple<std::size_t, typename FIFOType::value_type> worker_task_pushpop_NtoN(
 	}
 	size_t pop_value_sum = 0;
 	for ( size_t i = 0; i < N; i++ ) {
-		auto [sf, pop_value] = sut[cur_access_idxs_pop[i]].pop();
-		if ( !sf ) {
+		auto ret = sut[cur_access_idxs_pop[i]].pop();
+		if ( !ret.has_value() ) {
 			std::cout << "SUT has bug in completion phase!!!" << std::endl;
 			abort();
 		}
-		pop_value_sum += pop_value;
+		pop_value_sum += ret.value();
 	}
 
 	return { count, pop_value_sum };

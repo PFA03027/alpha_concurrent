@@ -46,8 +46,8 @@ TEST_F( Test_x_lockfree_fifo, PushValue_DoPopValue_Then_SameValue )
 	auto ret = p_sut_->pop();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret ) );
-	EXPECT_EQ( std::get<1>( ret ), 1 );
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 1 );
 }
 
 TEST_F( Test_x_lockfree_fifo, PushValueTwice_DoPopValueTwice_Then_OrderIsCorrect )
@@ -61,10 +61,10 @@ TEST_F( Test_x_lockfree_fifo, PushValueTwice_DoPopValueTwice_Then_OrderIsCorrect
 	auto ret2 = p_sut_->pop();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret1 ) );
-	EXPECT_EQ( std::get<1>( ret1 ), 1 );
-	EXPECT_TRUE( std::get<0>( ret2 ) );
-	EXPECT_EQ( std::get<1>( ret2 ), 2 );
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 1 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 2 );
 }
 
 TEST_F( Test_x_lockfree_fifo, PushHeadValue_DoPopValue_Then_SameValue )
@@ -76,8 +76,8 @@ TEST_F( Test_x_lockfree_fifo, PushHeadValue_DoPopValue_Then_SameValue )
 	auto ret = p_sut_->pop();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret ) );
-	EXPECT_EQ( std::get<1>( ret ), 1 );
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 1 );
 }
 
 TEST_F( Test_x_lockfree_fifo, PushHeadValueTwice_DoPopValueTwice_Then_OrderIsCorrect )
@@ -91,10 +91,10 @@ TEST_F( Test_x_lockfree_fifo, PushHeadValueTwice_DoPopValueTwice_Then_OrderIsCor
 	auto ret2 = p_sut_->pop();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret1 ) );
-	EXPECT_EQ( std::get<1>( ret1 ), 2 );
-	EXPECT_TRUE( std::get<0>( ret2 ) );
-	EXPECT_EQ( std::get<1>( ret2 ), 1 );
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 2 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 1 );
 }
 
 TEST_F( Test_x_lockfree_fifo, PushValuePushHeadValue_DoPopValueTwice_Then_OrderIsCorrect )
@@ -108,10 +108,10 @@ TEST_F( Test_x_lockfree_fifo, PushValuePushHeadValue_DoPopValueTwice_Then_OrderI
 	auto ret2 = p_sut_->pop();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret1 ) );
-	EXPECT_EQ( std::get<1>( ret1 ), 2 );
-	EXPECT_TRUE( std::get<0>( ret2 ) );
-	EXPECT_EQ( std::get<1>( ret2 ), 1 );
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 2 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 1 );
 }
 
 TEST_F( Test_x_lockfree_fifo, PushHeadValuePushValue_DoPopValueTwice_Then_OrderIsCorrect )
@@ -125,8 +125,8 @@ TEST_F( Test_x_lockfree_fifo, PushHeadValuePushValue_DoPopValueTwice_Then_OrderI
 	auto ret2 = p_sut_->pop();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret1 ) );
-	EXPECT_EQ( std::get<1>( ret1 ), 1 );
-	EXPECT_TRUE( std::get<0>( ret2 ) );
-	EXPECT_EQ( std::get<1>( ret2 ), 2 );
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 1 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 2 );
 }

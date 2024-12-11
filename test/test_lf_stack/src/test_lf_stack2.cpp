@@ -42,7 +42,7 @@ TEST( LFSTACK_2, CallPopFromEmpty )
 	auto ret = sut.pop();
 
 	// Assert
-	EXPECT_FALSE( std::get<0>( ret ) );
+	EXPECT_FALSE( ret.has_value() );
 }
 
 TEST( LFSTACK_2, CallPushPopOne )
@@ -55,8 +55,8 @@ TEST( LFSTACK_2, CallPushPopOne )
 	auto ret = sut.pop();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret ) );
-	EXPECT_EQ( std::get<1>( ret ), 1 );
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 1 );
 }
 
 TEST( LFSTACK_2, CallPushPopTwo )
@@ -71,10 +71,10 @@ TEST( LFSTACK_2, CallPushPopTwo )
 	auto ret2 = sut.pop();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret1 ) );
-	EXPECT_EQ( std::get<1>( ret1 ), 2 );
-	EXPECT_TRUE( std::get<0>( ret2 ) );
-	EXPECT_EQ( std::get<1>( ret2 ), 1 );
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 2 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 1 );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -96,18 +96,12 @@ long func_test_stack_list( alpha::concurrent::stack_list<long>* p_test_obj )
 	typename alpha::concurrent::stack_list<long>::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
 		p_test_obj->push( v );
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = p_test_obj->pop();
-#else
-		auto local_ret = p_test_obj->pop();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		if ( !pop_flag ) {
+		auto ret = p_test_obj->pop();
+		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string( v ).c_str() );
 			exit( 1 );
 		}
-		v = vv + 1;
+		v = ret.value() + 1;
 	}
 
 	return v;
