@@ -20,7 +20,12 @@
 #include <optional>
 #endif
 
+#if __has_include( <compare>)
+#include <compare>
+#endif
+
 #include <exception>
+#include <initializer_list>
 #include <type_traits>
 
 #include "cpp_std_configure.hpp"
@@ -168,20 +173,21 @@ public:
 	{
 	}
 
-	template <typename... Args>
-	constexpr return_optional( return_in_place_t, Args&&... args )
-	  : internal::OptionalBase<T>( return_in_place, std::forward<Args>( args )... )
+	template <bool IsCopyConstructible                                                   = std::is_copy_constructible<T>::value,
+	          bool IsTriviallyCopyConstructible                                          = std::is_trivially_copy_constructible<T>::value,
+	          std::enable_if<IsCopyConstructible && IsTriviallyCopyConstructible>::type* = nullptr>
+	constexpr return_optional( const return_optional& src )
+	  : internal::OptionalBase<T>()
 	{
+		if ( src.init_ ) {
+			new ( &( storage_.value_ ) ) T( src.storage_.value_ );
+			init_ = true;
+		}
 	}
-
-	template <typename U = T, std::enable_if<std::is_constructible<T, U>::value>::type* = nullptr>
-	constexpr return_optional( U&& value )
-	  : internal::OptionalBase<T>( return_in_place, std::forward<U>( value ) )
-	{
-	}
-
-	template <typename U = T, std::enable_if<std::is_constructible<T, U>::value || std::is_constructible<T, U&>::value>::type* = nullptr>
-	constexpr return_optional( const return_optional<U>& src )
+	template <bool IsCopyConstructible                                                    = std::is_copy_constructible<T>::value,
+	          bool IsTriviallyCopyConstructible                                           = std::is_trivially_copy_constructible<T>::value,
+	          std::enable_if<IsCopyConstructible && !IsTriviallyCopyConstructible>::type* = nullptr>
+	return_optional( const return_optional& src )
 	  : internal::OptionalBase<T>()
 	{
 		if ( src.init_ ) {
@@ -190,7 +196,70 @@ public:
 		}
 	}
 
-	template <typename U = T, std::enable_if<std::is_constructible<T, U&&>::value>::type* = nullptr>
+	template <bool IsMoveConstructible                                                   = std::is_move_constructible<T>::value,
+	          bool IsTriviallyMoveConstructible                                          = std::is_trivially_move_constructible<T>::value,
+	          std::enable_if<IsMoveConstructible && IsTriviallyMoveConstructible>::type* = nullptr>
+	constexpr return_optional( return_optional&& src ) noexcept( std::is_nothrow_move_constructible<T>::value )
+	  : internal::OptionalBase<T>()
+	{
+		if ( src.init_ ) {
+			new ( &( storage_.value_ ) ) T( std::move( src.storage_.value_ ) );
+			init_ = true;
+		}
+	}
+
+	template <bool IsMoveConstructible                                                    = std::is_move_constructible<T>::value,
+	          bool IsTriviallyMoveConstructible                                           = std::is_trivially_move_constructible<T>::value,
+	          std::enable_if<IsMoveConstructible && !IsTriviallyMoveConstructible>::type* = nullptr>
+	return_optional( return_optional&& src ) noexcept( std::is_nothrow_move_constructible<T>::value )
+	  : internal::OptionalBase<T>()
+	{
+		if ( src.init_ ) {
+			new ( &( storage_.value_ ) ) T( std::move( src.storage_.value_ ) );
+			init_ = true;
+		}
+	}
+
+	template <typename... Args,
+	          std::enable_if<std::is_constructible<T, Args...>::value>::type* = nullptr>
+	constexpr explicit return_optional( return_in_place_t, Args&&... args )
+	  : internal::OptionalBase<T>( return_in_place, std::forward<Args>( args )... )
+	{
+	}
+	template <typename U, typename... Args,
+	          std::enable_if<std::is_constructible<T, std::initializer_list<U>&, Args...>::value>::type* = nullptr>
+	constexpr explicit return_optional( return_in_place_t, std::initializer_list<U>& il, Args&&... args )
+	  : internal::OptionalBase<T>( return_in_place, il, std::forward<Args>( args )... )
+	{
+	}
+
+	template <typename U                                                                                             = T,
+	          std::enable_if<std::is_constructible<T, U>::value &&
+	                         !std::is_same<typename internal::remove_cvref<U>::type, return_in_place_t>::value &&
+	                         !std::is_same<typename internal::remove_cvref<U>::type, return_optional>::value>::type* = nullptr>
+	constexpr return_optional( U&& value )
+	  : internal::OptionalBase<T>( return_in_place, std::forward<U>( value ) )
+	{
+	}
+
+	template <typename U,
+	          bool IsConstructible                                                     = std::is_constructible<T, const U&>::value,
+	          bool TIsBool                                                             = std::is_same<typename internal::remove_cvref<T>::type, bool>::value,
+	          bool IsConvertible                                                       = std::is_convertible<return_optional<U>, T>::value,
+	          std::enable_if<IsConstructible && ( !TIsBool || !IsConvertible )>::type* = nullptr>
+	constexpr return_optional( const return_optional<U>& src )
+	  : internal::OptionalBase<T>()
+	{
+		if ( src.init_ ) {
+			new ( &( storage_.value_ ) ) T( src.storage_.value_ );
+			init_ = true;
+		}
+	}
+	template <typename U,
+	          bool IsConstructible                                                     = std::is_constructible<T, U>::value,
+	          bool TIsBool                                                             = std::is_same<typename internal::remove_cvref<T>::type, bool>::value,
+	          bool IsConvertible                                                       = std::is_convertible<return_optional<U>, T>::value,
+	          std::enable_if<IsConstructible && ( !TIsBool || !IsConvertible )>::type* = nullptr>
 	constexpr return_optional( return_optional<U>&& src )
 	  : internal::OptionalBase<T>()
 	{
@@ -206,7 +275,9 @@ public:
 		return *this;
 	}
 
-	template <bool IsCopyConstructible = std::is_copy_constructible<T>::value, bool IsCopyAssignable = std::is_copy_assignable<T>::value, std::enable_if<IsCopyConstructible && IsCopyAssignable>::type* = nullptr>
+	template <bool IsCopyConstructible                                       = std::is_copy_constructible<T>::value,
+	          bool IsCopyAssignable                                          = std::is_copy_assignable<T>::value,
+	          std::enable_if<IsCopyConstructible && IsCopyAssignable>::type* = nullptr>
 	return_optional& operator=( const return_optional& src )
 	{
 		if ( this == &src ) return *this;
@@ -225,9 +296,15 @@ public:
 
 		return *this;
 	}
+	template <bool IsCopyConstructible                                            = std::is_copy_constructible<T>::value,
+	          bool IsCopyAssignable                                               = std::is_copy_assignable<T>::value,
+	          std::enable_if<!( IsCopyConstructible && IsCopyAssignable )>::type* = nullptr>
+	return_optional& operator=( const return_optional& src ) = delete;
 
-	template <bool IsMoveConstructible = std::is_move_constructible<T>::value, bool IsMoveAssignable = std::is_move_assignable<T>::value, std::enable_if<IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
-	return_optional& operator=( return_optional&& src )
+	template <bool IsMoveConstructible                                       = std::is_move_constructible<T>::value,
+	          bool IsMoveAssignable                                          = std::is_move_assignable<T>::value,
+	          std::enable_if<IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
+	return_optional& operator=( return_optional&& src ) noexcept( std::is_nothrow_move_constructible<T>::value && std::is_nothrow_move_assignable<T>::value )
 	{
 		if ( this == &src ) return *this;
 
@@ -245,8 +322,16 @@ public:
 
 		return *this;
 	}
+	template <bool IsMoveConstructible                                            = std::is_move_constructible<T>::value,
+	          bool IsMoveAssignable                                               = std::is_move_assignable<T>::value,
+	          std::enable_if<!( IsMoveConstructible && IsMoveAssignable )>::type* = nullptr>
+	return_optional& operator=( return_optional&& src ) = delete;
 
-	template <typename U = T, std::enable_if<std::is_convertible<U, T>::value>::type* = nullptr>
+	template <typename U                                              = T,
+	          std::enable_if<!std::is_same<typename internal::remove_cvref<U>::type, return_optional>::value &&
+	                         !( std::is_scalar<T>::value && std::is_same<T, typename std::decay<U>::type>::value ) &&
+	                         std::is_constructible<T, U>::value &&
+	                         std::is_assignable<T&, U>::value>::type* = nullptr>
 	return_optional& operator=( U&& src )
 	{
 		if ( init_ ) {
@@ -259,7 +344,14 @@ public:
 		return *this;
 	}
 
-	template <typename U, std::enable_if<std::is_convertible<U, T>::value && !std::is_same<U, T>::value>::type* = nullptr>
+	template <typename U,
+	          std::enable_if<std::is_constructible<T, const U&>::value &&
+	                         std::is_assignable<T&, const U&>::value &&
+	                         !std::is_convertible<T, return_optional<U>>::value &&
+	                         !std::is_assignable<T&, return_optional<U>&>::value &&
+	                         !std::is_assignable<T&, return_optional<U>&&>::value &&
+	                         !std::is_assignable<T&, const return_optional<U>&>::value &&
+	                         !std::is_assignable<T&, const return_optional<U>&&>::value>::type* = nullptr>
 	return_optional& operator=( const return_optional<U>& src )
 	{
 		if ( this == &src ) return *this;
@@ -279,7 +371,14 @@ public:
 		return *this;
 	}
 
-	template <typename U, std::enable_if<std::is_convertible<U, T>::value && !std::is_same<U, T>::value>::type* = nullptr>
+	template <typename U,
+	          std::enable_if<std::is_constructible<T, U>::value &&
+	                         std::is_assignable<T&, U>::value &&
+	                         !std::is_convertible<T, return_optional<U>>::value &&
+	                         !std::is_assignable<T&, return_optional<U>&>::value &&
+	                         !std::is_assignable<T&, return_optional<U>&&>::value &&
+	                         !std::is_assignable<T&, const return_optional<U>&>::value &&
+	                         !std::is_assignable<T&, const return_optional<U>&&>::value>::type* = nullptr>
 	return_optional& operator=( return_optional<U>&& src )
 	{
 		if ( this == &src ) return *this;
@@ -310,7 +409,22 @@ public:
 		return storage_.value_;
 	}
 
-	constexpr void swap( return_optional& src ) noexcept( std::is_nothrow_swappable<T>::value && std::is_nothrow_constructible<T>::value )
+	template <typename U, typename... Args,
+	          std::enable_if<std::is_constructible<T, std::initializer_list<U>&, Args...>::value>::type* = nullptr>
+	constexpr T& emplace( std::initializer_list<U>& il, Args&&... args )
+	{
+		reset();
+
+		new ( &( storage_.value_ ) ) T( il, std::forward<Args>( args )... );
+		init_ = true;
+
+		return storage_.value_;
+	}
+
+	template <bool IsMoveConstructible                                  = std::is_move_constructible<T>::value,
+	          bool IsSwappable                                          = std::is_swappable<T>::value,
+	          std::enable_if<IsMoveConstructible && IsSwappable>::type* = nullptr>
+	constexpr void swap( return_optional& src ) noexcept( std::is_nothrow_swappable<T>::value && std::is_nothrow_move_constructible<T>::value )
 	{
 		if ( this == &src ) return;
 
@@ -421,6 +535,147 @@ private:
 	using internal::OptionalBase<T>::init_;
 	using internal::OptionalBase<T>::storage_;
 };
+
+template <typename T, typename U>
+constexpr bool operator==( const return_optional<T>& x, const return_optional<U>& y )
+{
+	if ( x.has_value() != y.has_value() ) return false;
+	if ( !x.has_value() ) return true;
+
+	return *x == *y;
+}
+template <typename T, typename U>
+constexpr bool operator!=( const return_optional<T>& x, const return_optional<U>& y )
+{
+	if ( x.has_value() != y.has_value() ) return true;
+	if ( !x.has_value() ) return false;
+
+	return *x != *y;
+}
+template <typename T, typename U>
+constexpr bool operator<( const return_optional<T>& x, const return_optional<U>& y )
+{
+	if ( !y.has_value() ) return false;
+	if ( !x.has_value() ) return true;
+
+	return *x < *y;
+}
+template <typename T, typename U>
+constexpr bool operator>( const return_optional<T>& x, const return_optional<U>& y )
+{
+	if ( !x.has_value() ) return false;
+	if ( !y.has_value() ) return true;
+
+	return *x > *y;
+}
+template <typename T, typename U>
+constexpr bool operator<=( const return_optional<T>& x, const return_optional<U>& y )
+{
+	if ( !x.has_value() ) return true;
+	if ( !y.has_value() ) return false;
+
+	return *x <= *y;
+}
+template <typename T, typename U>
+constexpr bool operator>=( const return_optional<T>& x, const return_optional<U>& y )
+{
+	if ( !y.has_value() ) return true;
+	if ( !x.has_value() ) return false;
+
+	return *x >= *y;
+}
+
+#if __cpp_lib_three_way_comparison >= 201907L
+template <class T, std::three_way_comparable_with<T> U>
+constexpr std::compare_three_way_result_t<T, U> operator<=>( const return_optional<T>& x, const return_optional<U>& y )
+{
+	if ( x.has_value() && y.has_value() ) return *x <=> *y;
+	return x.has_value() <=> y.has_value();
+}
+#endif
+
+template <class T>
+constexpr bool operator==( const return_optional<T>& x, return_nullopt_t ) noexcept
+{
+	return !( x.has_value() );
+}
+#if __cpp_lib_three_way_comparison >= 201907L
+template <class T>
+constexpr std::strong_ordering operator<=>( const return_optional<T>& x, return_nullopt_t ) noexcept
+{
+	return x.has_value() <=> false;
+}
+#endif
+
+// 22.5.8, comparison with T
+template <class T, class U>
+constexpr bool operator==( const return_optional<T>& x, const U& v )
+{
+	return x.has_value() ? *x == v : false;
+}
+template <class T, class U>
+constexpr bool operator==( const T& v, const return_optional<U>& x )
+{
+	return x.has_value() ? v == *x : false;
+}
+template <class T, class U>
+constexpr bool operator!=( const return_optional<T>& x, const U& v )
+{
+	return x.has_value() ? *x != v : true;
+}
+template <class T, class U>
+constexpr bool operator!=( const T& v, const return_optional<U>& x )
+{
+	return x.has_value() ? v == *x : true;
+}
+template <class T, class U>
+constexpr bool operator<( const return_optional<T>& x, const U& v )
+{
+	return x.has_value() ? *x < v : true;
+}
+template <class T, class U>
+constexpr bool operator<( const T& v, const return_optional<U>& x )
+{
+	return x.has_value() ? v < *x : false;
+}
+template <class T, class U>
+constexpr bool operator>( const return_optional<T>& x, const U& v )
+{
+	return x.has_value() ? *x > v : false;
+}
+template <class T, class U>
+constexpr bool operator>( const T& v, const return_optional<U>& x )
+{
+	return x.has_value() ? v > *x : true;
+}
+template <class T, class U>
+constexpr bool operator<=( const return_optional<T>& x, const U& v )
+{
+	return x.has_value() ? *x <= v : true;
+}
+template <class T, class U>
+constexpr bool operator<=( const T& v, const return_optional<U>& x )
+{
+	return x.has_value() ? v <= *x : false;
+}
+template <class T, class U>
+constexpr bool operator>=( const return_optional<T>& x, const U& v )
+{
+	return x.has_value() ? *x >= v : false;
+}
+template <class T, class U>
+constexpr bool operator>=( const T& v, const return_optional<U>& x )
+{
+	return x.has_value() ? v >= *x : true;
+}
+#if __cpp_lib_three_way_comparison >= 201907L
+template <class T, class U, class V>
+	requires( !std::is_base_of<return_optional<V>, U>::value ) && std::three_way_comparable_with<T, U>
+constexpr std::compare_three_way_result_t<T, U> operator<=>( const return_optional<T>& x, const U& v )
+{
+	return x.has_value() ? *x <=> v : std::strong_ordering::less;
+}
+#endif
 
 #endif
 

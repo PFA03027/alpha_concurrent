@@ -327,3 +327,50 @@ TEST( TestType_ReturnOptional_WithMoveOnlyType, NotHaveValue_DoMoveAssignment_Th
 	ASSERT_NO_THROW( sut.value() );
 	EXPECT_EQ( sut.value().get(), p_data );
 }
+
+TEST( TestType_ReturnOptional_WithMoveOnlyType, ConvertibleType_DoMoveConstruct_Then_HasValue )
+{
+	// Arrange
+	int*                                                     p_data = new int( 1 );
+	alpha::concurrent::return_optional<std::unique_ptr<int>> data { std::unique_ptr<int>( p_data ) };
+
+	// Act
+	alpha::concurrent::return_optional<std::shared_ptr<int>> sut { std::move( data ) };
+
+	// Assert
+	EXPECT_TRUE( data.has_value() );
+	ASSERT_NO_THROW( data.value() );
+	EXPECT_EQ( data.value().get(), nullptr );
+
+	EXPECT_TRUE( sut.has_value() );
+	ASSERT_NO_THROW( sut.value() );
+	EXPECT_EQ( sut.value().get(), p_data );
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST( TestType_ReturnOptional, HasValue_DoCmpEQ_Then_True )
+{
+	// Arrange
+	int                                     data = 1;
+	alpha::concurrent::return_optional<int> sut( 1 );
+
+	// Act
+	bool ret = ( sut == data );
+
+	// Assert
+	EXPECT_TRUE( ret );
+}
+
+TEST( TestType_ReturnOptional, HasValue_DoCmpGE_Then_True )
+{
+	// Arrange
+	int                                     data = 0;
+	alpha::concurrent::return_optional<int> sut( 1 );
+
+	// Act
+	bool ret = ( sut <= data );
+
+	// Assert
+	EXPECT_FALSE( ret );
+}
