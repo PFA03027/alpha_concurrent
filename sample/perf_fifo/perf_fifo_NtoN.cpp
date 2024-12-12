@@ -53,11 +53,11 @@ public:
 			abort();
 		}
 	}
-	std::tuple<bool, value_type> pop( void )
+	alpha::concurrent::return_optional<value_type> pop( void )
 	{
 		std::lock_guard<std::mutex> lk( mtx_ );
 		if ( push_idx == pop_idx ) {
-			return std::tuple<bool, value_type> { false, 0 };
+			return alpha::concurrent::return_nullopt;
 		}
 
 		value_type ans = vec_[pop_idx];
@@ -65,7 +65,7 @@ public:
 		if ( pop_idx >= ReserveSize ) {
 			pop_idx = 0;
 		}
-		return std::tuple<bool, value_type> { true, ans };
+		return alpha::concurrent::return_optional<value_type> { ans };
 	}
 
 private:
@@ -89,16 +89,16 @@ public:
 		std::lock_guard<std::mutex> lk( mtx_ );
 		l_.emplace_back( x );
 	}
-	std::tuple<bool, value_type> pop( void )
+	alpha::concurrent::return_optional<value_type> pop( void )
 	{
 		std::lock_guard<std::mutex> lk( mtx_ );
 		if ( l_.size() <= 0 ) {
-			return std::tuple<bool, value_type> { false, 0 };
+			return alpha::concurrent::return_nullopt;
 		}
 
 		value_type ans = l_.front();
 		l_.pop_front();
-		return std::tuple<bool, value_type> { true, ans };
+		return alpha::concurrent::return_optional<value_type> { ans };
 	}
 
 private:

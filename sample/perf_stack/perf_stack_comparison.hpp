@@ -21,6 +21,8 @@
 #include <new>
 #include <vector>
 
+#include "alconcurrent/internal/return_optional.hpp"
+
 // ===========================================================
 constexpr std::size_t ReserveSize = 10000;
 
@@ -46,16 +48,16 @@ public:
 		vec_[head_idx_] = x;
 		head_idx_++;
 	}
-	std::tuple<bool, value_type> pop( void )
+	alpha::concurrent::return_optional<value_type> pop( void )
 	{
 		std::lock_guard<std::mutex> lk( mtx_ );
 		if ( head_idx_ <= 0 ) {
-			return std::tuple<bool, value_type> { false, 0 };
+			return alpha::concurrent::return_nullopt;
 		}
 		head_idx_--;
 
 		value_type ans = vec_[head_idx_];
-		return std::tuple<bool, value_type> { true, ans };
+		return alpha::concurrent::return_optional<value_type> { ans };
 	}
 
 private:
@@ -78,16 +80,16 @@ public:
 		std::lock_guard<std::mutex> lk( mtx_ );
 		l_.emplace_back( x );
 	}
-	std::tuple<bool, value_type> pop( void )
+	alpha::concurrent::return_optional<value_type> pop( void )
 	{
 		std::lock_guard<std::mutex> lk( mtx_ );
 		if ( l_.size() <= 0 ) {
-			return std::tuple<bool, value_type> { false, 0 };
+			return alpha::concurrent::return_nullopt;
 		}
 
 		value_type ans = l_.back();
 		l_.pop_back();
-		return std::tuple<bool, value_type> { true, ans };
+		return alpha::concurrent::return_optional<value_type> { ans };
 	}
 
 private:
