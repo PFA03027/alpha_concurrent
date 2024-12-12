@@ -19,6 +19,7 @@
 #include "hazard_ptr.hpp"
 #include "internal/od_lockfree_list.hpp"
 #include "internal/od_node_pool.hpp"
+#include "internal/return_optional.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -166,51 +167,34 @@ public:
 	 * @brief	remove a first node that pred return true from this list
 	 */
 	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
-	std::tuple<bool, value_type> remove_one_if(
-		predicate_t& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
-	)
-	{
-		auto                         ret = remove_one_if_impl( pred );
-		std::tuple<bool, value_type> ans;
-		std::get<0>( ans ) = std::get<0>( ret );
-		if ( std::get<0>( ret ) ) {
-			node_pointer p     = static_cast<node_pointer>( std::get<1>( ret ).second.hp_.get() );
-			std::get<1>( ans ) = std::move( p->get_value() );
-		}
-		return ans;
-	}
-	template <bool IsMovable                                           = std::is_move_assignable<value_type>::value,
-	          bool IsCopyable                                          = std::is_copy_assignable<value_type>::value,
-	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
-	std::tuple<bool, value_type> remove_one_if(
-		predicate_t& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
-	)
-	{
-		auto                         ret = remove_one_if_impl( pred );
-		std::tuple<bool, value_type> ans;
-		std::get<0>( ans ) = std::get<0>( ret );
-		if ( std::get<0>( ret ) ) {
-			node_pointer p     = static_cast<node_pointer>( std::get<1>( ret ).second.hp_.get() );
-			std::get<1>( ans ) = p->get_value();
-		}
-		return ans;
-	}
-#if 0
-	template <bool IsMovable                                            = std::is_move_assignable<value_type>::value,
-	          bool IsCopyable                                           = std::is_copy_assignable<value_type>::value,
-	          typename std::enable_if<!IsMovable && !IsCopyable>::type* = nullptr>
-	bool remove_one_if(
+	return_optional<value_type> remove_one_if(
 		predicate_t& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
 	)
 	{
 		auto ret = remove_one_if_impl( pred );
-		return std::get<0>( ret );
+		if ( !ret.has_value() ) return return_nullopt;
+
+		node_pointer p = static_cast<node_pointer>( ret.value().second.hp_.get() );
+		return return_optional<value_type> { std::move( p->get_value() ) };
 	}
-#endif
+	template <bool IsMovable                                           = std::is_move_assignable<value_type>::value,
+	          bool IsCopyable                                          = std::is_copy_assignable<value_type>::value,
+	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
+	return_optional<value_type> remove_one_if(
+		predicate_t& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
+	)
+	{
+		auto ret = remove_one_if_impl( pred );
+		if ( !ret.has_value() ) return return_nullopt;
+
+		node_pointer p = static_cast<node_pointer>( ret.value().second.hp_.get() );
+		return return_optional<value_type> { p->get_value() };
+	}
+
 	template <bool IsMovable                                          = std::is_move_assignable<value_type>::value,
 	          bool IsCopyable                                         = std::is_copy_assignable<value_type>::value,
 	          typename std::enable_if<IsMovable || IsCopyable>::type* = nullptr>
-	std::tuple<bool, value_type> remove_one_if(
+	return_optional<value_type> remove_one_if(
 		predicate_t&& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
 	)
 	{
@@ -287,46 +271,35 @@ public:
 	 * @return	2nd return value. poped value, if 1st return value is true.
 	 *
 	 */
-#if 0
-	std::tuple<bool, value_type> pop_front( void )
-	{
-		return remove_one_if( []( const value_type& ) -> bool { return true; } );
-	}
-#else
 	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
-	std::tuple<bool, value_type> pop_front( void )
+	return_optional<value_type> pop_front( void )
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		call_count_pop_front_++;
 #endif
-		std::tuple<bool, od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_head();
-		std::tuple<bool, value_type>                              ans;
-		std::get<0>( ans ) = std::get<0>( ret );
-		if ( std::get<0>( ret ) ) {
-			node_pointer p     = static_cast<node_pointer>( std::get<1>( ret ).hp_.get() );
-			std::get<1>( ans ) = std::move( p->get_value() );
-		}
-		return ans;
+		return_optional<od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_head();
+		if ( !ret.has_value() ) return return_nullopt;
+		if ( ret.value().hp_.get() == nullptr ) return return_nullopt;
+
+		node_pointer p = static_cast<node_pointer>( ret.value().hp_.get() );
+		return return_optional<value_type> { std::move( p->get_value() ) };
 	}
 	template <bool IsMovable                                           = std::is_move_assignable<value_type>::value,
 	          bool IsCopyable                                          = std::is_copy_assignable<value_type>::value,
 	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
-	std::tuple<bool, value_type> pop_front( void )
+	return_optional<value_type> pop_front( void )
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		call_count_pop_front_++;
 #endif
-		std::tuple<bool, od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_head();
-		std::tuple<bool, value_type>                              ans;
-		std::get<0>( ans ) = std::get<0>( ret );
-		if ( std::get<0>( ret ) ) {
-			node_pointer p     = static_cast<node_pointer>( std::get<1>( ret ).hp_.get() );
-			std::get<1>( ans ) = p->get_value();
-		}
-		return ans;
+		return_optional<od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_head();
+		if ( !ret.has_value() ) return return_nullopt;
+		if ( ret.value().hp_.get() == nullptr ) return return_nullopt;
+
+		node_pointer p = static_cast<node_pointer>( ret.value().hp_.get() );
+		return return_optional<value_type> { p->get_value() };
 	}
 
-#endif
 	/*!
 	 * @brief	append a value to the end of this list
 	 */
@@ -370,36 +343,32 @@ public:
 	 *
 	 */
 	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
-	std::tuple<bool, value_type> pop_back( void )
+	return_optional<value_type> pop_back( void )
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		call_count_pop_back_++;
 #endif
-		std::tuple<bool, od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_tail();
-		std::tuple<bool, value_type>                              ans;
-		std::get<0>( ans ) = std::get<0>( ret );
-		if ( std::get<0>( ret ) ) {
-			node_pointer p     = static_cast<node_pointer>( std::get<1>( ret ).hp_.get() );
-			std::get<1>( ans ) = std::move( p->get_value() );
-		}
-		return ans;
+		return_optional<od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_tail();
+		if ( !ret.has_value() ) return return_nullopt;
+		if ( ret.value().hp_.get() == nullptr ) return return_nullopt;
+
+		node_pointer p = static_cast<node_pointer>( ret.value().hp_.get() );
+		return return_optional<value_type> { std::move( p->get_value() ) };
 	}
 	template <bool IsMovable                                           = std::is_move_assignable<value_type>::value,
 	          bool IsCopyable                                          = std::is_copy_assignable<value_type>::value,
 	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
-	std::tuple<bool, value_type> pop_back( void )
+	return_optional<value_type> pop_back( void )
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		call_count_pop_back_++;
 #endif
-		std::tuple<bool, od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_tail();
-		std::tuple<bool, value_type>                              ans;
-		std::get<0>( ans ) = std::get<0>( ret );
-		if ( std::get<0>( ret ) ) {
-			node_pointer p     = static_cast<node_pointer>( std::get<1>( ret ).hp_.get() );
-			std::get<1>( ans ) = p->get_value();
-		}
-		return ans;
+		return_optional<od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_tail();
+		if ( !ret.has_value() ) return return_nullopt;
+		if ( ret.value().hp_.get() == nullptr ) return return_nullopt;
+
+		node_pointer p = static_cast<node_pointer>( ret.value().hp_.get() );
+		return return_optional<value_type> { p->get_value() };
 	}
 
 	/*!
@@ -518,21 +487,19 @@ private:
 		insert_to_before_of_curr_impl( p_in, pred );
 	}
 
-	std::tuple<bool, std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark>> remove_one_if_impl(
+	return_optional<std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark>> remove_one_if_impl(
 		predicate_t& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
 	)
 	{
-		bool                                                                                        ret_of_find = true;
 		std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> ret;
 		do {
 			ret = find_if_impl( pred );
 			if ( lf_list_impl_.is_end_node( ret ) ) {
-				ret_of_find = false;
-				break;
+				return return_nullopt;
 			}
 		} while ( !lf_list_impl_.remove_mark( ret.second ) );
 
-		return std::tuple<bool, std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark>> { ret_of_find, std::move( ret ) };
+		return return_optional<std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark>> { std::move( ret ) };
 	}
 
 	node_list_lockfree_t lf_list_impl_;

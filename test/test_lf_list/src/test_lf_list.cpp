@@ -112,7 +112,7 @@ TEST_F( Test_lockfree_list, Empty_DoRemoveOneIf_ThenEmpty )
 	auto ret = sut_.remove_one_if( []( const tut_list::value_type& v ) -> bool { return v == 0; } );
 
 	// Assert
-	EXPECT_FALSE( std::get<0>( ret ) );
+	ASSERT_FALSE( ret.has_value() );
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
 
@@ -126,7 +126,7 @@ TEST_F( Test_lockfree_list, OneElement_DoRemoveOneIf_ThenEmpty )
 	auto ret = sut_.remove_one_if( []( const tut_list::value_type& v ) -> bool { return v == 1; } );
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret ) );
+	ASSERT_TRUE( ret.has_value() );
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
 
@@ -141,7 +141,7 @@ TEST_F( Test_lockfree_list, TwoElement_DoRemoveOneIfFromHead_ThenOneElement )
 	auto ret = sut_.remove_one_if( []( const tut_list::value_type& v ) -> bool { return v == 2; } );
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret ) );
+	ASSERT_TRUE( ret.has_value() );
 	EXPECT_EQ( sut_.get_size(), 1 );
 }
 
@@ -156,7 +156,7 @@ TEST_F( Test_lockfree_list, TwoElement_DoRemoveOneIfFromTail_ThenOneElement )
 	auto ret = sut_.remove_one_if( []( const tut_list::value_type& v ) -> bool { return v == 1; } );
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret ) );
+	ASSERT_TRUE( ret.has_value() );
 	EXPECT_EQ( sut_.get_size(), 1 );
 }
 
@@ -172,7 +172,7 @@ TEST_F( Test_lockfree_list, ThreeElement_DoRemoveOneIfFromMid_ThenTwoElement )
 	auto ret = sut_.remove_one_if( []( const tut_list::value_type& v ) -> bool { return v == 2; } );
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret ) );
+	ASSERT_TRUE( ret.has_value() );
 	EXPECT_EQ( sut_.get_size(), 2 );
 }
 
@@ -462,7 +462,7 @@ TEST_F( Test_lockfree_list, Empty_DoPopFront_ThenEmpty )
 	auto ret = sut_.pop_front();
 
 	// Assert
-	EXPECT_FALSE( std::get<0>( ret ) );
+	EXPECT_FALSE( ret.has_value() );
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
 
@@ -476,8 +476,8 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontPopFront_ThenEmpty )
 	auto ret = sut_.pop_front();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret ) );
-	EXPECT_EQ( std::get<1>( ret ), 1 );
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 1 );
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
 
@@ -492,7 +492,7 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontPopFrontTwice_ThenEmpty )
 	auto ret = sut_.pop_front();
 
 	// Assert
-	EXPECT_FALSE( std::get<0>( ret ) );
+	EXPECT_FALSE( ret.has_value() );
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
 
@@ -507,8 +507,8 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopFront_ThenOneElement )
 	auto ret = sut_.pop_front();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret ) );
-	EXPECT_EQ( std::get<1>( ret ), 2 );
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 2 );
 	EXPECT_EQ( sut_.get_size(), 1 );
 }
 
@@ -524,10 +524,10 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopFrontTwice_ThenEmpty )
 	auto ret2 = sut_.pop_front();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret1 ) );
-	EXPECT_EQ( std::get<1>( ret1 ), 2 );
-	EXPECT_TRUE( std::get<0>( ret2 ) );
-	EXPECT_EQ( std::get<1>( ret2 ), 1 );
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 2 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 1 );
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
 
@@ -595,7 +595,7 @@ TEST_F( Test_lockfree_list, Empty_DoPopBack_ThenEmpty )
 	auto ret = sut_.pop_back();
 
 	// Assert
-	EXPECT_FALSE( std::get<0>( ret ) );
+	EXPECT_FALSE( ret.has_value() );
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
 
@@ -609,8 +609,8 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackPopBack_ThenEmpty )
 	auto ret = sut_.pop_back();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret ) );
-	EXPECT_EQ( std::get<1>( ret ), 1 );
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 1 );
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
 
@@ -625,7 +625,7 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackPopBackTwice_ThenEmpty )
 	auto ret = sut_.pop_back();
 
 	// Assert
-	EXPECT_FALSE( std::get<0>( ret ) );
+	EXPECT_FALSE( ret.has_value() );
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
 
@@ -640,8 +640,8 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopBack_ThenOneElement )
 	auto ret = sut_.pop_back();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret ) );
-	EXPECT_EQ( std::get<1>( ret ), 2 );
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 2 );
 	EXPECT_EQ( sut_.get_size(), 1 );
 }
 
@@ -657,10 +657,10 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopBackTwice_ThenEmpty )
 	auto ret2 = sut_.pop_back();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret1 ) );
-	EXPECT_EQ( std::get<1>( ret1 ), 2 );
-	EXPECT_TRUE( std::get<0>( ret2 ) );
-	EXPECT_EQ( std::get<1>( ret2 ), 1 );
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 2 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 1 );
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
 
@@ -675,8 +675,8 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontPopBack_ThenEmpty )
 	auto ret = sut_.pop_back();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret ) );
-	EXPECT_EQ( std::get<1>( ret ), 1 );
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 1 );
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
 
@@ -691,8 +691,8 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopBack_ThenEmpty )
 	auto ret = sut_.pop_back();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret ) );
-	EXPECT_EQ( std::get<1>( ret ), 1 );
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 1 );
 	EXPECT_EQ( sut_.get_size(), 1 );
 }
 
@@ -708,10 +708,10 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopBackTwice_ThenEmpty )
 	auto ret2 = sut_.pop_back();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret1 ) );
-	EXPECT_EQ( std::get<1>( ret1 ), 1 );
-	EXPECT_TRUE( std::get<0>( ret2 ) );
-	EXPECT_EQ( std::get<1>( ret2 ), 2 );
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 1 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 2 );
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
 
@@ -725,8 +725,8 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackPopFront_ThenEmpty )
 	auto ret = sut_.pop_front();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret ) );
-	EXPECT_EQ( std::get<1>( ret ), 1 );
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 1 );
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
 
@@ -741,8 +741,8 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopFront_ThenEmpty )
 	auto ret = sut_.pop_front();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret ) );
-	EXPECT_EQ( std::get<1>( ret ), 1 );
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 1 );
 	EXPECT_EQ( sut_.get_size(), 1 );
 }
 
@@ -758,10 +758,10 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopFrontTwice_ThenEmpty )
 	auto ret2 = sut_.pop_front();
 
 	// Assert
-	EXPECT_TRUE( std::get<0>( ret1 ) );
-	EXPECT_EQ( std::get<1>( ret1 ), 1 );
-	EXPECT_TRUE( std::get<0>( ret2 ) );
-	EXPECT_EQ( std::get<1>( ret2 ), 2 );
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 1 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 2 );
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
 
@@ -806,9 +806,9 @@ TEST_F( Test_lockfree_list, NonOwnerPointer )
 	p_test_obj->push_front( new int() );
 	auto ret = p_test_obj->pop_front();
 
-	ASSERT_TRUE( std::get<0>( ret ) );
+	ASSERT_TRUE( ret.has_value() );
 
-	delete std::get<1>( ret );
+	delete ret.value();
 	delete p_test_obj;
 
 	std::cout << "End Pointer test" << std::endl;
@@ -825,7 +825,7 @@ TEST_F( Test_lockfree_list, UniquePointer )
 	p_test_obj->push_front( std::unique_ptr<int>( new int() ) );
 	auto ret = p_test_obj->pop_front();
 
-	ASSERT_TRUE( std::get<0>( ret ) );
+	ASSERT_TRUE( ret.has_value() );
 
 	delete p_test_obj;
 
@@ -876,9 +876,9 @@ TEST_F( Test_lockfree_list, NonOnwerArray )
 	p_test_obj->push_front( new array_test[2] );
 	auto ret = p_test_obj->pop_front();
 
-	ASSERT_TRUE( std::get<0>( ret ) );
+	ASSERT_TRUE( ret.has_value() );
 
-	delete[] std::get<1>( ret );
+	delete[] ret.value();
 	delete p_test_obj;
 
 	std::cout << "End Array array_test[] test" << std::endl;

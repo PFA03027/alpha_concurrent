@@ -13,6 +13,7 @@
 #define ALCONCURRENT_INC_INTERNAL_OD_LOCKFREE_LIST_HPP_
 
 #include "alconcurrent/internal/od_node_essence.hpp"
+#include "alconcurrent/internal/return_optional.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -129,7 +130,7 @@ public:
 	 * @retval	true	少なくとも削除マークの付与に成功。
 	 * @retval	false	削除マークの付与に失敗。すでに誰かが削除マークを付与していた場合、リストが空でノードが存在しない場合。
 	 */
-	std::tuple<bool, hazard_pointer_w_mark> remove_mark_head( void );
+	return_optional<hazard_pointer_w_mark> remove_mark_head( void );
 
 	/*!
 	 * @brief	最終ノードに削除マークを付与する。
@@ -138,7 +139,7 @@ public:
 	 * @retval	true	少なくとも削除マークの付与に成功。
 	 * @retval	false	削除マークの付与に失敗。すでに誰かが削除マークを付与していた場合、リストが空でノードが存在しない場合。
 	 */
-	std::tuple<bool, hazard_pointer_w_mark> remove_mark_tail( void );
+	return_optional<hazard_pointer_w_mark> remove_mark_tail( void );
 
 	/**
 	 * @brief リストを空にする

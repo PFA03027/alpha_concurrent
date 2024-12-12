@@ -51,19 +51,13 @@ typename test_list::value_type func_test_list_front2front( test_list* p_test_obj
 	typename test_list::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num_arg; i++ ) {
 		p_test_obj->push_front( v );
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = p_test_obj->pop_front();
-#else
-		auto local_ret = p_test_obj->pop_back();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		if ( !pop_flag ) {
+		auto ret = p_test_obj->pop_front();
+		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_list_front2front()!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %zu\n", p_test_obj->get_size() );
 			break;
 		}
-		v = vv + 1;
+		v = ret.value() + 1;
 	}
 
 	return v;
@@ -79,19 +73,13 @@ typename test_list::value_type func_test_list_back2back( test_list* p_test_obj, 
 	typename test_list::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num_arg; i++ ) {
 		p_test_obj->push_back( v );
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = p_test_obj->pop_back();
-#else
-		auto local_ret = p_test_obj->pop_back();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		if ( !pop_flag ) {
+		auto ret = p_test_obj->pop_back();
+		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_list_back2back()!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %zu\n", p_test_obj->get_size() );
 			break;
 		}
-		v = vv + 1;
+		v = ret.value() + 1;
 	}
 
 	return v;
@@ -108,19 +96,13 @@ typename test_list::value_type func_test_list_front2back( test_list* p_test_obj,
 	typename test_list::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num_arg; i++ ) {
 		p_test_obj->push_front( v );
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = p_test_obj->pop_back();
-#else
-		auto local_ret = p_test_obj->pop_back();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		if ( !pop_flag ) {
+		auto ret = p_test_obj->pop_back();
+		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_list_front2back()!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %zu\n", p_test_obj->get_size() );
 			break;
 		}
-		v = vv + 1;
+		v = ret.value() + 1;
 	}
 
 	return v;
@@ -136,20 +118,14 @@ typename test_list::value_type func_test_list_back2front( test_list* p_test_obj,
 	typename test_list::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num_arg; i++ ) {
 		p_test_obj->push_back( v );
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = p_test_obj->pop_front();
-#else
-		auto local_ret = p_test_obj->pop_front();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		if ( !pop_flag ) {
+		auto ret = p_test_obj->pop_front();
+		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_list_back2front() by pop_front!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %zu\n", p_test_obj->get_size() );
 			break;
 		}
 
-		v = vv + 1;
+		v = ret.value() + 1;
 	}
 
 	return v;
@@ -164,25 +140,19 @@ typename test_list::value_type func_test_list_pop_front( test_list* p_test_obj, 
 
 	typename test_list::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num_arg; i++ ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = p_test_obj->pop_front();
-#else
-		auto local_ret = p_test_obj->pop_front();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		if ( !pop_flag ) {
+		auto ret = p_test_obj->pop_front();
+		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_list_pop_front() by pop_back!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %zu\n", p_test_obj->get_size() );
 			break;
 		}
-		if ( ( vv <= 0 ) || ( vv > ( num_thread * loop_num ) ) ) {
-			printf( "Bugggggggyyyy read by func_test_list_pop_front()!!!  %s\n", std::to_string( vv ).c_str() );
+		if ( ( ret.value() <= 0 ) || ( ret.value() > ( num_thread * loop_num ) ) ) {
+			printf( "Bugggggggyyyy read by func_test_list_pop_front()!!!  %s\n", std::to_string( ret.value() ).c_str() );
 			printf( "list size count: %zu\n", p_test_obj->get_size() );
 			break;
 		}
 
-		v += vv;
+		v += ret.value();
 	}
 
 	return v;
@@ -197,25 +167,19 @@ typename test_list::value_type func_test_list_pop_back( test_list* p_test_obj, p
 
 	typename test_list::value_type v = 0;
 	for ( std::uintptr_t i = 0; i < loop_num_arg; i++ ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = p_test_obj->pop_back();
-#else
-		auto local_ret = p_test_obj->pop_front();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		if ( !pop_flag ) {
+		auto ret = p_test_obj->pop_back();
+		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_list_pop_back() by pop_back!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %zu\n", p_test_obj->get_size() );
 			break;
 		}
-		if ( ( vv <= 0 ) || ( vv > ( num_thread * loop_num ) ) ) {
-			printf( "Bugggggggyyyy read by func_test_list_pop_back()!!!  %s\n", std::to_string( vv ).c_str() );
+		if ( ( ret.value() <= 0 ) || ( ret.value() > ( num_thread * loop_num ) ) ) {
+			printf( "Bugggggggyyyy read by func_test_list_pop_back()!!!  %s\n", std::to_string( ret.value() ).c_str() );
 			printf( "list size count: %zu\n", p_test_obj->get_size() );
 			break;
 		}
 
-		v += vv;
+		v += ret.value();
 	}
 
 	return v;
@@ -305,14 +269,8 @@ TEST_F( lflistHighLoadTest, TC0_1_ManyElements_DoPopBack_Then_Empty )
 	EXPECT_EQ( count_list.get_size(), 0 );
 
 	if ( count_list.get_size() > 0 ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = count_list.pop_back();
-#else
-		auto local_ret = count_list.pop_back();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		std::cout << "remained value:    " << vv << std::endl;
+		auto ret = count_list.pop_back();
+		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
 
 	return;
@@ -370,14 +328,8 @@ TEST_F( lflistHighLoadTest, TC0_2_ManyElements_DoPopFront_Then_Empty )
 	EXPECT_EQ( count_list.get_size(), 0 );
 
 	if ( count_list.get_size() > 0 ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = count_list.pop_back();
-#else
-		auto local_ret = count_list.pop_back();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		std::cout << "remained value:    " << vv << std::endl;
+		auto ret = count_list.pop_back();
+		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
 
 	return;
@@ -424,19 +376,13 @@ TEST_F( lflistHighLoadTest, TC0_3_Empty_DoPushFront_Then_ManyElements )
 
 	uintptr_t sum = 0;
 	for ( size_t i = 0; i < tmp_num_thread * loop_num; i++ ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = count_list.pop_front();
-#else
-		auto local_ret = p_test_obj->pop_front();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		if ( !pop_flag ) {
+		auto ret = count_list.pop_front();
+		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  TC0_2_Empty_DoPushFront_Then_ManyElements() by pop_back!!!  %s\n", std::to_string( i ).c_str() );
 			printf( "list size count: %zu\n", count_list.get_size() );
 			break;
 		}
-		sum += vv;
+		sum += ret.value();
 	}
 
 	end_time_point = std::chrono::steady_clock::now();
@@ -454,14 +400,8 @@ TEST_F( lflistHighLoadTest, TC0_3_Empty_DoPushFront_Then_ManyElements )
 	EXPECT_EQ( count_list.get_size(), 0 );
 
 	if ( count_list.get_size() > 0 ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = count_list.pop_back();
-#else
-		auto local_ret = count_list.pop_back();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		std::cout << "remained value:    " << vv << std::endl;
+		auto ret = count_list.pop_back();
+		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
 
 	return;
@@ -501,19 +441,13 @@ TEST_F( lflistHighLoadTest, TC0_4_Empty_DoPushBack_Then_ManyElements )
 
 	uintptr_t sum = 0;
 	for ( size_t i = 0; i < tmp_num_thread * loop_num; i++ ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = count_list.pop_front();
-#else
-		auto local_ret = p_test_obj->pop_front();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		if ( !pop_flag ) {
+		auto ret = count_list.pop_front();
+		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  TC0_2_Empty_DoPushFront_Then_ManyElements() by pop_back!!!  %s\n", std::to_string( i ).c_str() );
 			printf( "list size count: %zu\n", count_list.get_size() );
 			break;
 		}
-		sum += vv;
+		sum += ret.value();
 	}
 
 	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
@@ -530,14 +464,8 @@ TEST_F( lflistHighLoadTest, TC0_4_Empty_DoPushBack_Then_ManyElements )
 	EXPECT_EQ( count_list.get_size(), 0 );
 
 	if ( count_list.get_size() > 0 ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = count_list.pop_back();
-#else
-		auto local_ret = count_list.pop_back();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		std::cout << "remained value:    " << vv << std::endl;
+		auto ret = count_list.pop_back();
+		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
 
 	return;
@@ -589,14 +517,8 @@ TEST_F( lflistHighLoadTest, TC1_1_Empty_DoManyPushFrontPopFront_Then_Empty )
 	EXPECT_EQ( count_list.get_size(), 0 );
 
 	if ( count_list.get_size() > 0 ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = count_list.pop_back();
-#else
-		auto local_ret = count_list.pop_back();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		std::cout << "remained value:    " << vv << std::endl;
+		auto ret = count_list.pop_back();
+		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
 
 	return;
@@ -648,14 +570,8 @@ TEST_F( lflistHighLoadTest, TC1_2_Empty_DoManyPushBackPopBack_Then_Empty )
 	EXPECT_EQ( count_list.get_size(), 0 );
 
 	if ( count_list.get_size() > 0 ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = count_list.pop_back();
-#else
-		auto local_ret = count_list.pop_back();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		std::cout << "remained value:    " << vv << std::endl;
+		auto ret = count_list.pop_back();
+		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
 
 	return;
@@ -707,14 +623,8 @@ TEST_F( lflistHighLoadTest, TC1_3_Empty_DoManyPushFrontPopBack_Then_Empty )
 	EXPECT_EQ( count_list.get_size(), 0 );
 
 	if ( count_list.get_size() > 0 ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = count_list.pop_back();
-#else
-		auto local_ret = count_list.pop_back();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		std::cout << "remained value:    " << vv << std::endl;
+		auto ret = count_list.pop_back();
+		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
 
 	return;
@@ -823,14 +733,8 @@ TEST_F( lflistHighLoadTest, TC1_5_Empty_DoManyCrossPushPopFrontPushPopBack_Then_
 	EXPECT_EQ( count_list.get_size(), 0 );
 
 	if ( count_list.get_size() > 0 ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = count_list.pop_back();
-#else
-		auto local_ret = count_list.pop_back();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		std::cout << "remained value:    " << vv << std::endl;
+		auto ret = count_list.pop_back();
+		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
 
 	return;
@@ -894,14 +798,8 @@ TEST_F( lflistHighLoadTest, TC1_6_Empty_DoManyCrossPushFrontBackPopFrontBack_The
 	EXPECT_EQ( count_list.get_size(), 0 );
 
 	if ( count_list.get_size() > 0 ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = count_list.pop_back();
-#else
-		auto local_ret = count_list.pop_back();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		std::cout << "remained value:    " << vv << std::endl;
+		auto ret = count_list.pop_back();
+		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
 
 	return;
@@ -956,8 +854,10 @@ std::pair<typename test_list::value_type, typename test_list::value_type> func_t
 					[target_val]( std::add_const<typename test_list::value_type>::type& chk ) -> bool {
 						return target_val == chk;
 					} );
-				pop_flag = std::get<0>( local_ret );
-				vv       = std::get<1>( local_ret );
+				pop_flag = local_ret.has_value();
+				if ( pop_flag ) {
+					vv = local_ret.value();
+				}
 				k++;
 			} while ( !pop_flag && ( k < 10 ) );
 
