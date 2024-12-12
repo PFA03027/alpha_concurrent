@@ -33,8 +33,7 @@
 namespace alpha {
 namespace concurrent {
 
-// #if __cpp_lib_optional >= 201606
-#if 0
+#if ( __cpp_lib_optional >= 201606 ) && !defined( ALCONCURRENT_CONF_FORCE_USE_ORIG_RETURN_OPTIONAL )
 
 using return_nullopt_t                           = std::nullopt_t;
 inline constexpr return_nullopt_t return_nullopt = std::nullopt;
