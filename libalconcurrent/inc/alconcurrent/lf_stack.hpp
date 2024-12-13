@@ -25,7 +25,7 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
-template <typename T, typename VALUE_DELETER = deleter_nothing<T>>
+template <typename T>
 class x_lockfree_stack {
 public:
 	static_assert( ( !std::is_class<T>::value ) ||
@@ -57,10 +57,8 @@ public:
 		internal::LogOutput( log_type::DUMP, "x_lockfree_stack: allocated_node_count = %zu", allocated_node_count_.load() );
 #endif
 
-		VALUE_DELETER deleter;
-		auto          tmp = pop();
+		auto tmp = pop();
 		while ( tmp.has_value() ) {
-			deleter( tmp.value() );
 			tmp = pop();
 		}
 	}
@@ -170,16 +168,7 @@ public:
 	}
 };
 template <typename T>
-class stack_list<T*> : public internal::x_lockfree_stack<T*, std::default_delete<T>> {
-public:
-	stack_list( void ) = default;
-	stack_list( size_t reserve_size ) noexcept
-	  : stack_list()
-	{
-	}
-};
-template <typename T>
-class stack_list<T[]> : public internal::x_lockfree_stack<T*, std::default_delete<T[]>> {
+class stack_list<T[]> : public internal::x_lockfree_stack<T*> {
 public:
 	using value_type = T[];
 
@@ -190,7 +179,7 @@ public:
 	}
 };
 template <typename T, size_t N>
-class stack_list<T[N]> : public internal::x_lockfree_stack<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>> {
+class stack_list<T[N]> : public internal::x_lockfree_stack<std::array<T, N>> {
 public:
 	using value_type = T[N];
 
@@ -209,7 +198,7 @@ public:
 			tmp[i] = cont_arg[i];
 		}
 
-		internal::x_lockfree_stack<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
+		internal::x_lockfree_stack<std::array<T, N>>::push( std::move( tmp ) );
 	}
 	void push(
 		value_type&& cont_arg   //!< [in]	a value to push this FIFO queue
@@ -220,12 +209,12 @@ public:
 			tmp[i] = std::move( cont_arg[i] );
 		}
 
-		internal::x_lockfree_stack<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
+		internal::x_lockfree_stack<std::array<T, N>>::push( std::move( tmp ) );
 	}
 
 	bool pop( value_type& a )
 	{
-		return_optional<std::array<T, N>> ret = internal::x_lockfree_stack<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::pop();
+		return_optional<std::array<T, N>> ret = internal::x_lockfree_stack<std::array<T, N>>::pop();
 		if ( !ret.has_value() ) {
 			return false;
 		}
