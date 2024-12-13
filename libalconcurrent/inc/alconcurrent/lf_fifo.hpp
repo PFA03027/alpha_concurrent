@@ -27,7 +27,7 @@ namespace concurrent {
 
 namespace internal {
 
-template <typename T, typename VALUE_DELETER = deleter_nothing<T>>
+template <typename T>
 class x_lockfree_fifo {
 public:
 	// static_assert( ( !std::is_class<T>::value ) ||
@@ -57,10 +57,8 @@ public:
 		internal::LogOutput( log_type::DUMP, "x_lockfree_fifo: allocated_node_count = %zu", allocated_node_count_.load() );
 #endif
 
-		VALUE_DELETER deleter;
-		auto          tmp = pop();
+		auto tmp = pop();
 		while ( tmp.has_value() ) {
-			deleter( tmp.value() );
 			tmp = pop();
 		}
 
@@ -257,17 +255,8 @@ private:
 
 }   // namespace internal
 
-template <typename T, typename VALUE_DELETER = internal::deleter_nothing<T>>
-class fifo_list : public internal::x_lockfree_fifo<T, VALUE_DELETER> {
-public:
-	fifo_list( void ) = default;
-	fifo_list( size_t reserve_size ) noexcept
-	  : fifo_list()
-	{
-	}
-};
-template <>
-class fifo_list<void*> : public internal::x_lockfree_fifo<void*, internal::deleter_nothing<void>> {
+template <typename T>
+class fifo_list : public internal::x_lockfree_fifo<T> {
 public:
 	fifo_list( void ) = default;
 	fifo_list( size_t reserve_size ) noexcept
@@ -276,16 +265,7 @@ public:
 	}
 };
 template <typename T>
-class fifo_list<T*> : public internal::x_lockfree_fifo<T*, std::default_delete<T>> {
-public:
-	fifo_list( void ) = default;
-	fifo_list( size_t reserve_size ) noexcept
-	  : fifo_list()
-	{
-	}
-};
-template <typename T>
-class fifo_list<T[]> : public internal::x_lockfree_fifo<T*, std::default_delete<T[]>> {
+class fifo_list<T[]> : public internal::x_lockfree_fifo<T*> {
 public:
 	using value_type = T[];
 
@@ -296,7 +276,7 @@ public:
 	}
 };
 template <typename T, size_t N>
-class fifo_list<T[N]> : public internal::x_lockfree_fifo<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>> {
+class fifo_list<T[N]> : public internal::x_lockfree_fifo<std::array<T, N>> {
 public:
 	using value_type = T[N];
 
@@ -315,7 +295,7 @@ public:
 			tmp[i] = cont_arg[i];
 		}
 
-		internal::x_lockfree_fifo<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
+		internal::x_lockfree_fifo<std::array<T, N>>::push( std::move( tmp ) );
 	}
 	void push(
 		value_type&& cont_arg   //!< [in]	a value to push this FIFO queue
@@ -326,12 +306,12 @@ public:
 			tmp[i] = std::move( cont_arg[i] );
 		}
 
-		internal::x_lockfree_fifo<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::push( std::move( tmp ) );
+		internal::x_lockfree_fifo<std::array<T, N>>::push( std::move( tmp ) );
 	}
 
 	bool pop( value_type& a )
 	{
-		return_optional<std::array<T, N>> ret = internal::x_lockfree_fifo<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>>::pop();
+		return_optional<std::array<T, N>> ret = internal::x_lockfree_fifo<std::array<T, N>>::pop();
 		if ( !ret.has_value() ) {
 			return false;
 		}
@@ -340,26 +320,6 @@ public:
 			a[i] = std::move( ret.value()[i] );
 		}
 		return true;
-	}
-};
-template <typename T, typename DELETER>
-class fifo_list<T*, DELETER> : public internal::x_lockfree_fifo<T*, DELETER> {
-public:
-	fifo_list( void ) = default;
-	fifo_list( size_t reserve_size ) noexcept
-	  : fifo_list()
-	{
-	}
-};
-template <typename T, typename DELETER>
-class fifo_list<T[], DELETER> : public internal::x_lockfree_fifo<T*, DELETER> {
-public:
-	using value_type = T[];
-
-	fifo_list( void ) = default;
-	fifo_list( size_t reserve_size ) noexcept
-	  : fifo_list()
-	{
 	}
 };
 

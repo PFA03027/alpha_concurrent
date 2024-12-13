@@ -52,13 +52,15 @@ TEST_F( lffifoTest, Pointer1 )
 	test_fifo_type3* p_test_obj;
 
 	std::cout << "Pointer test#1" << std::endl;
-	p_test_obj = new test_fifo_type3( 8 );
+	p_test_obj  = new test_fifo_type3( 8 );
+	int* p_data = new int();
 
 	// Act
-	p_test_obj->push( new int() );
+	p_test_obj->push( p_data );
 
 	// Assert
 	delete p_test_obj;
+	delete p_data;
 }
 
 TEST_F( lffifoTest, Pointer2 )
@@ -121,15 +123,20 @@ private:
 
 TEST_F( lffifoTest, Array1 )
 {
+	// Arrange
 	using test_fifo_type3 = alpha::concurrent::fifo_list<array_test[]>;
 	test_fifo_type3* p_test_obj;
 
 	std::cout << "Array array_test[] test#1" << std::endl;
-	p_test_obj = new test_fifo_type3( 8 );
+	p_test_obj         = new test_fifo_type3( 8 );
+	array_test* p_data = new array_test[2];
 
-	p_test_obj->push( new array_test[2] );
+	// Act
+	p_test_obj->push( p_data );
 
+	// Assert
 	delete p_test_obj;
+	delete[] p_data;
 }
 
 TEST_F( lffifoTest, Array2 )
