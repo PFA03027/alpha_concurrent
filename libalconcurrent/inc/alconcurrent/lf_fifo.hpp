@@ -34,10 +34,10 @@ public:
 	//                    ( std::is_class<T>::value &&
 	//                      std::is_default_constructible<T>::value && std::is_copy_constructible<T>::value && std::is_copy_assignable<T>::value ),
 	//                "T should be default constructible, move constructible and move assignable at least" );
-	static_assert( ( !std::is_class<T>::value ) ||
-	                   ( std::is_class<T>::value &&
-	                     std::is_default_constructible<T>::value ),
-	               "T should be default constructible, move constructible and move assignable at least" );
+	// static_assert( ( !std::is_class<T>::value ) ||
+	//                    ( std::is_class<T>::value &&
+	//                      std::is_default_constructible<T>::value ),
+	//                "T should be default constructible, move constructible and move assignable at least" );
 
 	using value_type = T;
 

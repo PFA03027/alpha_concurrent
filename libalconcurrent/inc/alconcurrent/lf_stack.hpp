@@ -28,10 +28,10 @@ namespace internal {
 template <typename T>
 class x_lockfree_stack {
 public:
-	static_assert( ( !std::is_class<T>::value ) ||
-	                   ( std::is_class<T>::value &&
-	                     std::is_default_constructible<T>::value && std::is_move_constructible<T>::value && std::is_move_assignable<T>::value ),
-	               "T should be default constructible, move constructible and move assignable at least" );
+	// static_assert( ( !std::is_class<T>::value ) ||
+	//                    ( std::is_class<T>::value &&
+	//                      std::is_default_constructible<T>::value && std::is_move_constructible<T>::value && std::is_move_assignable<T>::value ),
+	//                "T should be default constructible, move constructible and move assignable at least" );
 
 	using value_type = T;
 

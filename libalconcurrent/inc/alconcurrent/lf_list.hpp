@@ -32,10 +32,10 @@ namespace internal {
 template <typename T>
 class x_lockfree_list {
 public:
-	static_assert( ( !std::is_class<T>::value ) ||
-	                   ( std::is_class<T>::value &&
-	                     std::is_default_constructible<T>::value ),
-	               "T should be default constructible, move constructible and move assignable at least" );
+	// static_assert( ( !std::is_class<T>::value ) ||
+	//                    ( std::is_class<T>::value &&
+	//                      std::is_default_constructible<T>::value ),
+	//                "T should be default constructible, move constructible and move assignable at least" );
 
 	using value_type      = T;
 	using predicate_t     = std::function<bool( const value_type& )>;   //!< find_if関数で使用する述語関数を保持するfunction型

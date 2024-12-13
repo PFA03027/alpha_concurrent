@@ -13,6 +13,7 @@
 #define ALCONCURRENT_INC_INTERNAL_OD_NODE_ESSENCE_HPP_
 
 #include "alconcurrent/hazard_ptr.hpp"
+#include "alconcurrent/internal/alcc_optional.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -224,7 +225,6 @@ public:
 	using reference_type       = T&;
 	using const_reference_type = const T&;
 
-	template <bool IsDefaultConstructible = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructible>::type* = nullptr>
 	value_carrier( void ) noexcept( std::is_nothrow_default_constructible<value_type>::value )
 	  : v_ {}
 	{
@@ -242,11 +242,9 @@ public:
 	{
 	}
 
-	template <typename Arg1st, typename... RemainingArgs,
-	          typename RemoveCVArg1st                                                          = typename std::remove_reference<typename std::remove_const<Arg1st>::type>::type,
-	          typename std::enable_if<!std::is_same<RemoveCVArg1st, value_type>::value>::type* = nullptr>
-	value_carrier( Arg1st&& arg1, RemainingArgs&&... args )
-	  : v_( std::forward<Arg1st>( arg1 ), std::forward<RemainingArgs>( args )... )
+	template <typename... Args, typename std::enable_if<std::is_constructible<T, Args...>::value>::type* = nullptr>
+	value_carrier( alcc_in_place_t, Args&&... args )
+	  : v_( alcc_in_place, std::forward<Args>( args )... )
 	{
 	}
 
@@ -262,20 +260,26 @@ public:
 		v_ = std::move( v_arg );
 	}
 
+	template <typename... Args>
+	void emplace_value( Args&&... args )
+	{
+		v_.emplace( std::forward<Args>( args )... );
+	}
+
 	reference_type get_value( void ) &
 	{
-		return v_;
+		return v_.value();
 	}
 
 	const_reference_type get_value( void ) const&
 	{
-		return v_;
+		return v_.value();
 	}
 
 	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
 	value_type get_value( void ) &&
 	{
-		return std::move( v_ );
+		return std::move( v_.value() );
 	}
 
 	template <bool IsCopyable                                          = std::is_copy_assignable<value_type>::value,
@@ -283,11 +287,16 @@ public:
 	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
 	value_type get_value( void ) const&&
 	{
-		return v_;
+		return v_.value();
+	}
+
+	void reset_value( void )
+	{
+		v_.reset();
 	}
 
 private:
-	value_type v_;
+	alcc_optional<value_type> v_;
 };
 
 /**
@@ -302,7 +311,6 @@ public:
 	using reference_type       = T&;
 	using const_reference_type = const T&;
 
-	template <bool IsDefaultConstructible = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructible>::type* = nullptr>
 	od_node_type1( void ) noexcept( std::is_nothrow_default_constructible<value_type>::value )
 	  : value_carrier<T>()
 	  , od_node_simple_link()
@@ -349,7 +357,6 @@ public:
 	using reference_type       = T&;
 	using const_reference_type = const T&;
 
-	template <bool IsDefaultConstructible = std::is_default_constructible<value_type>::value, typename std::enable_if<IsDefaultConstructible>::type* = nullptr>
 	od_node_type2( void ) noexcept( std::is_nothrow_default_constructible<value_type>::value )
 	  : value_carrier<T>()
 	  , od_node_simple_link()
