@@ -29,7 +29,7 @@ namespace internal {
 /*!
  * @brief	ロックフリー方式用の単方向型リスト
  */
-template <typename T, typename VALUE_DELETER = deleter_nothing<T>>
+template <typename T>
 class x_lockfree_list {
 public:
 	static_assert( ( !std::is_class<T>::value ) ||
@@ -404,40 +404,13 @@ private:
 	using node_pool_t = od_node_pool<node_type>;
 	class node_list_lockfree_t : public od_lockfree_list {
 	protected:
-		template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
-		          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
-		          typename std::enable_if<
-					  IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
-		void do_for_purged_node_impl( x_lockfree_list::node_pointer p_nd )
-		{
-			// TがMove可能である場合に選択されるAPI実装
-			deleter_( std::move( p_nd->get_value() ) );
-			x_lockfree_list::node_pool_t::push( p_nd );
-		}
-
-		template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
-		          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
-		          bool IsCopyConstructible = std::is_copy_constructible<value_type>::value,
-		          bool IsCopyAssignable    = std::is_copy_assignable<value_type>::value,
-		          typename std::enable_if<
-					  !( IsMoveConstructible && IsMoveAssignable ) && ( IsCopyConstructible && IsCopyAssignable )>::type* = nullptr>
-		void do_for_purged_node_impl( x_lockfree_list::node_pointer p_nd )
-		{
-			// TがMove不可能であるが、Copy可能である場合に選択されるAPI実装
-			deleter_( p_nd->get_value() );
-			x_lockfree_list::node_pool_t::push( p_nd );
-		}
-
 		void do_for_purged_node( od_lockfree_list::node_pointer p_nd ) override
 		{
 			if ( p_nd == nullptr ) return;
 
 			// このリストに投入されているノードの型はx_lockfree_list::node_typeであることを保証しているので、static_castで対応する。
-			do_for_purged_node_impl( static_cast<x_lockfree_list::node_pointer>( p_nd ) );
+			x_lockfree_list::node_pool_t::push( static_cast<x_lockfree_list::node_pointer>( p_nd ) );
 		}
-
-	private:
-		VALUE_DELETER deleter_;
 	};
 
 	std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> find_if_impl(
@@ -515,17 +488,8 @@ private:
 
 }   // namespace internal
 
-template <typename T, typename VALUE_DELETER = internal::deleter_nothing<T>>
-class lockfree_list : public internal::x_lockfree_list<T, VALUE_DELETER> {
-public:
-	lockfree_list( void ) = default;
-	lockfree_list( size_t reserve_size ) noexcept
-	  : lockfree_list()
-	{
-	}
-};
-template <>
-class lockfree_list<void*> : public internal::x_lockfree_list<void*, internal::deleter_nothing<void>> {
+template <typename T>
+class lockfree_list : public internal::x_lockfree_list<T> {
 public:
 	lockfree_list( void ) = default;
 	lockfree_list( size_t reserve_size ) noexcept
@@ -534,16 +498,7 @@ public:
 	}
 };
 template <typename T>
-class lockfree_list<T*> : public internal::x_lockfree_list<T*, internal::deleter_nothing<T*>> {
-public:
-	lockfree_list( void ) = default;
-	lockfree_list( size_t reserve_size ) noexcept
-	  : lockfree_list()
-	{
-	}
-};
-template <typename T>
-class lockfree_list<T[]> : public internal::x_lockfree_list<T*, internal::deleter_nothing<T*>> {
+class lockfree_list<T[]> : public internal::x_lockfree_list<T*> {
 public:
 	using value_type = T[];
 
@@ -554,29 +509,9 @@ public:
 	}
 };
 template <typename T, size_t N>
-class lockfree_list<T[N]> : public internal::x_lockfree_list<std::array<T, N>, internal::deleter_nothing<std::array<T, N>>> {
+class lockfree_list<T[N]> : public internal::x_lockfree_list<std::array<T, N>> {
 public:
 	using value_type = T[N];
-
-	lockfree_list( void ) = default;
-	lockfree_list( size_t reserve_size ) noexcept
-	  : lockfree_list()
-	{
-	}
-};
-template <typename T, typename DELETER>
-class lockfree_list<T*, DELETER> : public internal::x_lockfree_list<T*, DELETER> {
-public:
-	lockfree_list( void ) = default;
-	lockfree_list( size_t reserve_size ) noexcept
-	  : lockfree_list()
-	{
-	}
-};
-template <typename T, typename DELETER>
-class lockfree_list<T[], DELETER> : public internal::x_lockfree_list<T*, DELETER> {
-public:
-	using value_type = T[];
 
 	lockfree_list( void ) = default;
 	lockfree_list( size_t reserve_size ) noexcept
