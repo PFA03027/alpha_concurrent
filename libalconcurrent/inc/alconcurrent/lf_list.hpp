@@ -167,34 +167,34 @@ public:
 	 * @brief	remove a first node that pred return true from this list
 	 */
 	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
-	return_optional<value_type> remove_one_if(
+	alcc_optional<value_type> remove_one_if(
 		predicate_t& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
 	)
 	{
 		auto ret = remove_one_if_impl( pred );
-		if ( !ret.has_value() ) return return_nullopt;
+		if ( !ret.has_value() ) return alcc_nullopt;
 
 		node_pointer p = static_cast<node_pointer>( ret.value().second.hp_.get() );
-		return return_optional<value_type> { std::move( p->get_value() ) };
+		return alcc_optional<value_type> { std::move( p->get_value() ) };
 	}
 	template <bool IsMovable                                           = std::is_move_assignable<value_type>::value,
 	          bool IsCopyable                                          = std::is_copy_assignable<value_type>::value,
 	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
-	return_optional<value_type> remove_one_if(
+	alcc_optional<value_type> remove_one_if(
 		predicate_t& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
 	)
 	{
 		auto ret = remove_one_if_impl( pred );
-		if ( !ret.has_value() ) return return_nullopt;
+		if ( !ret.has_value() ) return alcc_nullopt;
 
 		node_pointer p = static_cast<node_pointer>( ret.value().second.hp_.get() );
-		return return_optional<value_type> { p->get_value() };
+		return alcc_optional<value_type> { p->get_value() };
 	}
 
 	template <bool IsMovable                                          = std::is_move_assignable<value_type>::value,
 	          bool IsCopyable                                         = std::is_copy_assignable<value_type>::value,
 	          typename std::enable_if<IsMovable || IsCopyable>::type* = nullptr>
-	return_optional<value_type> remove_one_if(
+	alcc_optional<value_type> remove_one_if(
 		predicate_t&& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
 	)
 	{
@@ -272,32 +272,32 @@ public:
 	 *
 	 */
 	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
-	return_optional<value_type> pop_front( void )
+	alcc_optional<value_type> pop_front( void )
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		call_count_pop_front_++;
 #endif
-		return_optional<od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_head();
-		if ( !ret.has_value() ) return return_nullopt;
-		if ( ret.value().hp_.get() == nullptr ) return return_nullopt;
+		alcc_optional<od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_head();
+		if ( !ret.has_value() ) return alcc_nullopt;
+		if ( ret.value().hp_.get() == nullptr ) return alcc_nullopt;
 
 		node_pointer p = static_cast<node_pointer>( ret.value().hp_.get() );
-		return return_optional<value_type> { std::move( p->get_value() ) };
+		return alcc_optional<value_type> { std::move( p->get_value() ) };
 	}
 	template <bool IsMovable                                           = std::is_move_assignable<value_type>::value,
 	          bool IsCopyable                                          = std::is_copy_assignable<value_type>::value,
 	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
-	return_optional<value_type> pop_front( void )
+	alcc_optional<value_type> pop_front( void )
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		call_count_pop_front_++;
 #endif
-		return_optional<od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_head();
-		if ( !ret.has_value() ) return return_nullopt;
-		if ( ret.value().hp_.get() == nullptr ) return return_nullopt;
+		alcc_optional<od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_head();
+		if ( !ret.has_value() ) return alcc_nullopt;
+		if ( ret.value().hp_.get() == nullptr ) return alcc_nullopt;
 
 		node_pointer p = static_cast<node_pointer>( ret.value().hp_.get() );
-		return return_optional<value_type> { p->get_value() };
+		return alcc_optional<value_type> { p->get_value() };
 	}
 
 	/*!
@@ -343,32 +343,32 @@ public:
 	 *
 	 */
 	template <bool IsMovable = std::is_move_assignable<value_type>::value, typename std::enable_if<IsMovable>::type* = nullptr>
-	return_optional<value_type> pop_back( void )
+	alcc_optional<value_type> pop_back( void )
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		call_count_pop_back_++;
 #endif
-		return_optional<od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_tail();
-		if ( !ret.has_value() ) return return_nullopt;
-		if ( ret.value().hp_.get() == nullptr ) return return_nullopt;
+		alcc_optional<od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_tail();
+		if ( !ret.has_value() ) return alcc_nullopt;
+		if ( ret.value().hp_.get() == nullptr ) return alcc_nullopt;
 
 		node_pointer p = static_cast<node_pointer>( ret.value().hp_.get() );
-		return return_optional<value_type> { std::move( p->get_value() ) };
+		return alcc_optional<value_type> { std::move( p->get_value() ) };
 	}
 	template <bool IsMovable                                           = std::is_move_assignable<value_type>::value,
 	          bool IsCopyable                                          = std::is_copy_assignable<value_type>::value,
 	          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
-	return_optional<value_type> pop_back( void )
+	alcc_optional<value_type> pop_back( void )
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		call_count_pop_back_++;
 #endif
-		return_optional<od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_tail();
-		if ( !ret.has_value() ) return return_nullopt;
-		if ( ret.value().hp_.get() == nullptr ) return return_nullopt;
+		alcc_optional<od_lockfree_list::hazard_pointer_w_mark> ret = lf_list_impl_.remove_mark_tail();
+		if ( !ret.has_value() ) return alcc_nullopt;
+		if ( ret.value().hp_.get() == nullptr ) return alcc_nullopt;
 
 		node_pointer p = static_cast<node_pointer>( ret.value().hp_.get() );
-		return return_optional<value_type> { p->get_value() };
+		return alcc_optional<value_type> { p->get_value() };
 	}
 
 	/*!
@@ -460,7 +460,7 @@ private:
 		insert_to_before_of_curr_impl( p_in, pred );
 	}
 
-	return_optional<std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark>> remove_one_if_impl(
+	alcc_optional<std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark>> remove_one_if_impl(
 		predicate_t& pred   //!< [in]	A predicate function to specify the deletion target. const value_type& is passed as an argument
 	)
 	{
@@ -468,11 +468,11 @@ private:
 		do {
 			ret = find_if_impl( pred );
 			if ( lf_list_impl_.is_end_node( ret ) ) {
-				return return_nullopt;
+				return alcc_nullopt;
 			}
 		} while ( !lf_list_impl_.remove_mark( ret.second ) );
 
-		return return_optional<std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark>> { std::move( ret ) };
+		return alcc_optional<std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark>> { std::move( ret ) };
 	}
 
 	node_list_lockfree_t lf_list_impl_;

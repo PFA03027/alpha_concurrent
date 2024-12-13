@@ -274,7 +274,7 @@ bool od_lockfree_list::remove_mark(
 	return curr.hp_->try_set_mark();
 }
 
-return_optional<od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::remove_mark_head( void )
+alcc_optional<od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::remove_mark_head( void )
 {
 	bool                                                                                        remove_ret = true;
 	std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> head_hp_pair;
@@ -310,13 +310,13 @@ return_optional<od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::remov
 #endif
 
 	if ( remove_ret ) {
-		return return_optional<od_lockfree_list::hazard_pointer_w_mark> { std::move( head_hp_pair.second ) };
+		return alcc_optional<od_lockfree_list::hazard_pointer_w_mark> { std::move( head_hp_pair.second ) };
 	}
 
-	return return_nullopt;
+	return alcc_nullopt;
 }
 
-return_optional<od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::remove_mark_tail( void )
+alcc_optional<od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::remove_mark_tail( void )
 {
 	bool                                                                                        remove_ret = true;
 	std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> tail_hp_pair;
@@ -355,10 +355,10 @@ return_optional<od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::remov
 #endif
 
 	if ( remove_ret ) {
-		return return_optional<od_lockfree_list::hazard_pointer_w_mark> { std::move( tail_hp_pair.second ) };
+		return alcc_optional<od_lockfree_list::hazard_pointer_w_mark> { std::move( tail_hp_pair.second ) };
 	}
 
-	return return_nullopt;
+	return alcc_nullopt;
 }
 
 void od_lockfree_list::clear_impl( node_type& head_arg, node_type& sentinel_arg, od_lockfree_list* p_this_obj_to_purge, void ( od_lockfree_list::*p_purge_func )( node_pointer ) )

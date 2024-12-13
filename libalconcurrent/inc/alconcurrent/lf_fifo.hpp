@@ -107,14 +107,14 @@ public:
 	          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
 	          typename std::enable_if<
 				  IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
-	return_optional<value_type> pop( void )
+	alcc_optional<value_type> pop( void )
 	{
 		value_type   popped_value_storage;
 		node_pointer p_popped_node = lf_fifo_impl_.pop_front( &popped_value_storage );
-		if ( p_popped_node == nullptr ) return return_nullopt;
+		if ( p_popped_node == nullptr ) return alcc_nullopt;
 
 		node_pool_t::push( p_popped_node );
-		return return_optional<value_type> { std::move( popped_value_storage ) };
+		return alcc_optional<value_type> { std::move( popped_value_storage ) };
 	}
 
 	template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
@@ -123,14 +123,14 @@ public:
 	          bool IsCopyAssignable    = std::is_copy_assignable<value_type>::value,
 	          typename std::enable_if<
 				  !( IsMoveConstructible && IsMoveAssignable ) && ( IsCopyConstructible && IsCopyAssignable )>::type* = nullptr>
-	return_optional<value_type> pop( void )
+	alcc_optional<value_type> pop( void )
 	{
 		value_type   popped_value_storage;
 		node_pointer p_popped_node = lf_fifo_impl_.pop_front( &popped_value_storage );
-		if ( p_popped_node == nullptr ) return return_nullopt;
+		if ( p_popped_node == nullptr ) return alcc_nullopt;
 
 		node_pool_t::push( p_popped_node );
-		return return_optional<value_type> { popped_value_storage };
+		return alcc_optional<value_type> { popped_value_storage };
 	}
 
 	bool is_empty( void ) const
@@ -311,7 +311,7 @@ public:
 
 	bool pop( value_type& a )
 	{
-		return_optional<std::array<T, N>> ret = internal::x_lockfree_fifo<std::array<T, N>>::pop();
+		alcc_optional<std::array<T, N>> ret = internal::x_lockfree_fifo<std::array<T, N>>::pop();
 		if ( !ret.has_value() ) {
 			return false;
 		}

@@ -103,14 +103,14 @@ public:
 	          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
 	          typename std::enable_if<
 				  IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
-	return_optional<value_type> pop( void )
+	alcc_optional<value_type> pop( void )
 	{
 		// TがMove可能である場合に選択されるAPI実装
 		auto p_poped_node_orig = lf_stack_impl_.pop_front();
-		if ( p_poped_node_orig == nullptr ) return return_nullopt;
+		if ( p_poped_node_orig == nullptr ) return alcc_nullopt;
 
-		node_pointer                p_poped_node = static_cast<node_pointer>( p_poped_node_orig );   // このクラスが保持するノードは、すべてnode_pointerであることをpush関数で保証しているので、dynamic_castは不要。
-		return_optional<value_type> ans { std::move( p_poped_node->get_value() ) };
+		node_pointer              p_poped_node = static_cast<node_pointer>( p_poped_node_orig );   // このクラスが保持するノードは、すべてnode_pointerであることをpush関数で保証しているので、dynamic_castは不要。
+		alcc_optional<value_type> ans { std::move( p_poped_node->get_value() ) };
 
 		node_pool_t::push( p_poped_node );
 
@@ -123,14 +123,14 @@ public:
 	          bool IsCopyAssignable    = std::is_copy_assignable<value_type>::value,
 	          typename std::enable_if<
 				  !( IsMoveConstructible && IsMoveAssignable ) && ( IsCopyConstructible && IsCopyAssignable )>::type* = nullptr>
-	return_optional<value_type> pop( void )
+	alcc_optional<value_type> pop( void )
 	{
 		// TがMove不可能であるが、Copy可能である場合に選択されるAPI実装
 		auto p_poped_node_orig = lf_stack_impl_.pop_front();
-		if ( p_poped_node_orig == nullptr ) return return_nullopt;
+		if ( p_poped_node_orig == nullptr ) return alcc_nullopt;
 
-		node_pointer                p_poped_node = static_cast<node_pointer>( p_poped_node_orig );   // このクラスが保持するノードは、すべてnode_pointerであることをpush関数で保証しているので、dynamic_castは不要。
-		return_optional<value_type> ans { p_poped_node->get_value() };
+		node_pointer              p_poped_node = static_cast<node_pointer>( p_poped_node_orig );   // このクラスが保持するノードは、すべてnode_pointerであることをpush関数で保証しているので、dynamic_castは不要。
+		alcc_optional<value_type> ans { p_poped_node->get_value() };
 
 		node_pool_t::push( p_poped_node );
 
@@ -214,7 +214,7 @@ public:
 
 	bool pop( value_type& a )
 	{
-		return_optional<std::array<T, N>> ret = internal::x_lockfree_stack<std::array<T, N>>::pop();
+		alcc_optional<std::array<T, N>> ret = internal::x_lockfree_stack<std::array<T, N>>::pop();
 		if ( !ret.has_value() ) {
 			return false;
 		}

@@ -53,11 +53,11 @@ public:
 			abort();
 		}
 	}
-	alpha::concurrent::return_optional<value_type> pop( void )
+	alpha::concurrent::alcc_optional<value_type> pop( void )
 	{
 		std::lock_guard<std::mutex> lk( mtx_ );
 		if ( push_idx == pop_idx ) {
-			return alpha::concurrent::return_nullopt;
+			return alpha::concurrent::alcc_nullopt;
 		}
 
 		value_type ans = vec_[pop_idx];
@@ -65,7 +65,7 @@ public:
 		if ( pop_idx >= ReserveSize ) {
 			pop_idx = 0;
 		}
-		return alpha::concurrent::return_optional<value_type> { ans };
+		return alpha::concurrent::alcc_optional<value_type> { ans };
 	}
 
 private:
@@ -89,16 +89,16 @@ public:
 		std::lock_guard<std::mutex> lk( mtx_ );
 		l_.emplace_back( x );
 	}
-	alpha::concurrent::return_optional<value_type> pop( void )
+	alpha::concurrent::alcc_optional<value_type> pop( void )
 	{
 		std::lock_guard<std::mutex> lk( mtx_ );
 		if ( l_.size() <= 0 ) {
-			return alpha::concurrent::return_nullopt;
+			return alpha::concurrent::alcc_nullopt;
 		}
 
 		value_type ans = l_.front();
 		l_.pop_front();
-		return alpha::concurrent::return_optional<value_type> { ans };
+		return alpha::concurrent::alcc_optional<value_type> { ans };
 	}
 
 private:

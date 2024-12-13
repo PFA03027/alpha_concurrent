@@ -1,5 +1,5 @@
 /**
- * @file return_optional.hpp
+ * @file alcc_optional.hpp
  * @author Teruaki Ata (PFA03027@nifty.com)
  * @brief
  * @version 0.1
@@ -35,28 +35,28 @@ namespace concurrent {
 
 #if ( __cpp_lib_optional >= 201606 ) && !defined( ALCONCURRENT_CONF_FORCE_USE_ORIG_RETURN_OPTIONAL )
 
-using return_nullopt_t                           = std::nullopt_t;
-inline constexpr return_nullopt_t return_nullopt = std::nullopt;
-using return_in_place_t                          = std::in_place_t;
-inline constexpr return_in_place_t return_in_place;
+using alcc_nullopt_t                           = std::nullopt_t;
+inline constexpr alcc_nullopt_t alcc_nullopt = std::nullopt;
+using alcc_in_place_t                          = std::in_place_t;
+inline constexpr alcc_in_place_t alcc_in_place;
 
 template <typename T>
-using return_optional = std::optional<T>;
+using alcc_optional = std::optional<T>;
 
-using bad_return_optional_access = std::bad_optional_access;
+using bad_alcc_optional_access = std::bad_optional_access;
 
 #else
 
-struct return_nullopt_t {};
-inline constexpr return_nullopt_t return_nullopt;
+struct alcc_nullopt_t {};
+inline constexpr alcc_nullopt_t alcc_nullopt;
 
-struct return_in_place_t {
-	explicit return_in_place_t() = default;
+struct alcc_in_place_t {
+	explicit alcc_in_place_t() = default;
 };
 
-inline constexpr return_in_place_t return_in_place {};
+inline constexpr alcc_in_place_t alcc_in_place {};
 
-class bad_return_optional_access : public std::exception {};
+class bad_alcc_optional_access : public std::exception {};
 
 namespace internal {
 
@@ -76,7 +76,7 @@ union storage_t {
 	}
 
 	template <typename... Args>
-	constexpr storage_t( return_in_place_t, Args&&... args )
+	constexpr storage_t( alcc_in_place_t, Args&&... args )
 	  : value_( std::forward<Args>( args )... )
 	{
 	}
@@ -95,7 +95,7 @@ union constexpr_storage_t {
 	}
 
 	template <typename... Args>
-	constexpr constexpr_storage_t( return_in_place_t, Args&&... args )
+	constexpr constexpr_storage_t( alcc_in_place_t, Args&&... args )
 	  : value_( std::forward<Args>( args )... )
 	{
 	}
@@ -114,9 +114,9 @@ struct optional_base {
 	{
 	}
 	template <typename... Args>
-	constexpr optional_base( return_in_place_t, Args&&... args )
+	constexpr optional_base( alcc_in_place_t, Args&&... args )
 	  : init_( true )
-	  , storage_( return_in_place, std::forward<Args>( args )... )
+	  , storage_( alcc_in_place, std::forward<Args>( args )... )
 	{
 	}
 
@@ -139,9 +139,9 @@ struct constexpr_optional_base {
 	{
 	}
 	template <typename... Args>
-	constexpr constexpr_optional_base( return_in_place_t, Args&&... args )
+	constexpr constexpr_optional_base( alcc_in_place_t, Args&&... args )
 	  : init_( true )
-	  , storage_( return_in_place, std::forward<Args>( args )... )
+	  , storage_( alcc_in_place, std::forward<Args>( args )... )
 	{
 	}
 
@@ -154,28 +154,28 @@ using OptionalBase = std::conditional_t<std::is_trivially_destructible<T>::value
 }   // namespace internal
 
 template <typename T>
-class return_optional;
+class alcc_optional;
 
 template <typename T>
-class return_optional : private internal::OptionalBase<T> {
+class alcc_optional : private internal::OptionalBase<T> {
 public:
 	template <typename U>
-	friend class return_optional;
+	friend class alcc_optional;
 
-	constexpr return_optional( void ) noexcept
+	constexpr alcc_optional( void ) noexcept
 	  : internal::OptionalBase<T>()
 	{
 	}
 
-	constexpr return_optional( return_nullopt_t ) noexcept
-	  : return_optional()
+	constexpr alcc_optional( alcc_nullopt_t ) noexcept
+	  : alcc_optional()
 	{
 	}
 
 	template <bool IsCopyConstructible                                                            = std::is_copy_constructible<T>::value,
 	          bool IsTriviallyCopyConstructible                                                   = std::is_trivially_copy_constructible<T>::value,
 	          typename std::enable_if<IsCopyConstructible && IsTriviallyCopyConstructible>::type* = nullptr>
-	constexpr return_optional( const return_optional& src )
+	constexpr alcc_optional( const alcc_optional& src )
 	  : internal::OptionalBase<T>()
 	{
 		if ( src.init_ ) {
@@ -186,7 +186,7 @@ public:
 	template <bool IsCopyConstructible                                                             = std::is_copy_constructible<T>::value,
 	          bool IsTriviallyCopyConstructible                                                    = std::is_trivially_copy_constructible<T>::value,
 	          typename std::enable_if<IsCopyConstructible && !IsTriviallyCopyConstructible>::type* = nullptr>
-	return_optional( const return_optional& src )
+	alcc_optional( const alcc_optional& src )
 	  : internal::OptionalBase<T>()
 	{
 		if ( src.init_ ) {
@@ -198,7 +198,7 @@ public:
 	template <bool IsMoveConstructible                                                            = std::is_move_constructible<T>::value,
 	          bool IsTriviallyMoveConstructible                                                   = std::is_trivially_move_constructible<T>::value,
 	          typename std::enable_if<IsMoveConstructible && IsTriviallyMoveConstructible>::type* = nullptr>
-	constexpr return_optional( return_optional&& src ) noexcept( std::is_nothrow_move_constructible<T>::value )
+	constexpr alcc_optional( alcc_optional&& src ) noexcept( std::is_nothrow_move_constructible<T>::value )
 	  : internal::OptionalBase<T>()
 	{
 		if ( src.init_ ) {
@@ -210,7 +210,7 @@ public:
 	template <bool IsMoveConstructible                                                             = std::is_move_constructible<T>::value,
 	          bool IsTriviallyMoveConstructible                                                    = std::is_trivially_move_constructible<T>::value,
 	          typename std::enable_if<IsMoveConstructible && !IsTriviallyMoveConstructible>::type* = nullptr>
-	return_optional( return_optional&& src ) noexcept( std::is_nothrow_move_constructible<T>::value )
+	alcc_optional( alcc_optional&& src ) noexcept( std::is_nothrow_move_constructible<T>::value )
 	  : internal::OptionalBase<T>()
 	{
 		if ( src.init_ ) {
@@ -221,32 +221,32 @@ public:
 
 	template <typename... Args,
 	          typename std::enable_if<std::is_constructible<T, Args...>::value>::type* = nullptr>
-	constexpr explicit return_optional( return_in_place_t, Args&&... args )
-	  : internal::OptionalBase<T>( return_in_place, std::forward<Args>( args )... )
+	constexpr explicit alcc_optional( alcc_in_place_t, Args&&... args )
+	  : internal::OptionalBase<T>( alcc_in_place, std::forward<Args>( args )... )
 	{
 	}
 	template <typename U, typename... Args,
 	          typename std::enable_if<std::is_constructible<T, std::initializer_list<U>&, Args...>::value>::type* = nullptr>
-	constexpr explicit return_optional( return_in_place_t, std::initializer_list<U>& il, Args&&... args )
-	  : internal::OptionalBase<T>( return_in_place, il, std::forward<Args>( args )... )
+	constexpr explicit alcc_optional( alcc_in_place_t, std::initializer_list<U>& il, Args&&... args )
+	  : internal::OptionalBase<T>( alcc_in_place, il, std::forward<Args>( args )... )
 	{
 	}
 
 	template <typename U                                                                                                      = T,
 	          typename std::enable_if<std::is_constructible<T, U>::value &&
-	                                  !std::is_same<typename internal::remove_cvref<U>::type, return_in_place_t>::value &&
-	                                  !std::is_same<typename internal::remove_cvref<U>::type, return_optional>::value>::type* = nullptr>
-	constexpr return_optional( U&& value )
-	  : internal::OptionalBase<T>( return_in_place, std::forward<U>( value ) )
+	                                  !std::is_same<typename internal::remove_cvref<U>::type, alcc_in_place_t>::value &&
+	                                  !std::is_same<typename internal::remove_cvref<U>::type, alcc_optional>::value>::type* = nullptr>
+	constexpr alcc_optional( U&& value )
+	  : internal::OptionalBase<T>( alcc_in_place, std::forward<U>( value ) )
 	{
 	}
 
 	template <typename U,
 	          bool IsConstructible                                                              = std::is_constructible<T, const U&>::value,
 	          bool TIsBool                                                                      = std::is_same<typename internal::remove_cvref<T>::type, bool>::value,
-	          bool IsConvertible                                                                = std::is_convertible<return_optional<U>, T>::value,
+	          bool IsConvertible                                                                = std::is_convertible<alcc_optional<U>, T>::value,
 	          typename std::enable_if<IsConstructible && ( !TIsBool || !IsConvertible )>::type* = nullptr>
-	constexpr return_optional( const return_optional<U>& src )
+	constexpr alcc_optional( const alcc_optional<U>& src )
 	  : internal::OptionalBase<T>()
 	{
 		if ( src.init_ ) {
@@ -257,9 +257,9 @@ public:
 	template <typename U,
 	          bool IsConstructible                                                              = std::is_constructible<T, U>::value,
 	          bool TIsBool                                                                      = std::is_same<typename internal::remove_cvref<T>::type, bool>::value,
-	          bool IsConvertible                                                                = std::is_convertible<return_optional<U>, T>::value,
+	          bool IsConvertible                                                                = std::is_convertible<alcc_optional<U>, T>::value,
 	          typename std::enable_if<IsConstructible && ( !TIsBool || !IsConvertible )>::type* = nullptr>
-	constexpr return_optional( return_optional<U>&& src )
+	constexpr alcc_optional( alcc_optional<U>&& src )
 	  : internal::OptionalBase<T>()
 	{
 		if ( src.init_ ) {
@@ -268,7 +268,7 @@ public:
 		}
 	}
 
-	return_optional& operator=( return_nullopt_t )
+	alcc_optional& operator=( alcc_nullopt_t )
 	{
 		reset();
 		return *this;
@@ -277,7 +277,7 @@ public:
 	template <bool IsCopyConstructible                                                = std::is_copy_constructible<T>::value,
 	          bool IsCopyAssignable                                                   = std::is_copy_assignable<T>::value,
 	          typename std::enable_if<IsCopyConstructible && IsCopyAssignable>::type* = nullptr>
-	return_optional& operator=( const return_optional& src )
+	alcc_optional& operator=( const alcc_optional& src )
 	{
 		if ( this == &src ) return *this;
 
@@ -298,12 +298,12 @@ public:
 	template <bool IsCopyConstructible                                                     = std::is_copy_constructible<T>::value,
 	          bool IsCopyAssignable                                                        = std::is_copy_assignable<T>::value,
 	          typename std::enable_if<!( IsCopyConstructible && IsCopyAssignable )>::type* = nullptr>
-	return_optional& operator=( const return_optional& src ) = delete;
+	alcc_optional& operator=( const alcc_optional& src ) = delete;
 
 	template <bool IsMoveConstructible                                                = std::is_move_constructible<T>::value,
 	          bool IsMoveAssignable                                                   = std::is_move_assignable<T>::value,
 	          typename std::enable_if<IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
-	return_optional& operator=( return_optional&& src ) noexcept( std::is_nothrow_move_constructible<T>::value && std::is_nothrow_move_assignable<T>::value )
+	alcc_optional& operator=( alcc_optional&& src ) noexcept( std::is_nothrow_move_constructible<T>::value && std::is_nothrow_move_assignable<T>::value )
 	{
 		if ( this == &src ) return *this;
 
@@ -324,14 +324,14 @@ public:
 	template <bool IsMoveConstructible                                                     = std::is_move_constructible<T>::value,
 	          bool IsMoveAssignable                                                        = std::is_move_assignable<T>::value,
 	          typename std::enable_if<!( IsMoveConstructible && IsMoveAssignable )>::type* = nullptr>
-	return_optional& operator=( return_optional&& src ) = delete;
+	alcc_optional& operator=( alcc_optional&& src ) = delete;
 
 	template <typename U                                                       = T,
-	          typename std::enable_if<!std::is_same<typename internal::remove_cvref<U>::type, return_optional>::value &&
+	          typename std::enable_if<!std::is_same<typename internal::remove_cvref<U>::type, alcc_optional>::value &&
 	                                  !( std::is_scalar<T>::value && std::is_same<T, typename std::decay<U>::type>::value ) &&
 	                                  std::is_constructible<T, U>::value &&
 	                                  std::is_assignable<T&, U>::value>::type* = nullptr>
-	return_optional& operator=( U&& src )
+	alcc_optional& operator=( U&& src )
 	{
 		if ( init_ ) {
 			storage_.value_ = std::forward<U>( src );
@@ -346,12 +346,12 @@ public:
 	template <typename U,
 	          typename std::enable_if<std::is_constructible<T, const U&>::value &&
 	                                  std::is_assignable<T&, const U&>::value &&
-	                                  !std::is_convertible<T, return_optional<U>>::value &&
-	                                  !std::is_assignable<T&, return_optional<U>&>::value &&
-	                                  !std::is_assignable<T&, return_optional<U>&&>::value &&
-	                                  !std::is_assignable<T&, const return_optional<U>&>::value &&
-	                                  !std::is_assignable<T&, const return_optional<U>&&>::value>::type* = nullptr>
-	return_optional& operator=( const return_optional<U>& src )
+	                                  !std::is_convertible<T, alcc_optional<U>>::value &&
+	                                  !std::is_assignable<T&, alcc_optional<U>&>::value &&
+	                                  !std::is_assignable<T&, alcc_optional<U>&&>::value &&
+	                                  !std::is_assignable<T&, const alcc_optional<U>&>::value &&
+	                                  !std::is_assignable<T&, const alcc_optional<U>&&>::value>::type* = nullptr>
+	alcc_optional& operator=( const alcc_optional<U>& src )
 	{
 		if ( this == &src ) return *this;
 
@@ -373,12 +373,12 @@ public:
 	template <typename U,
 	          typename std::enable_if<std::is_constructible<T, U>::value &&
 	                                  std::is_assignable<T&, U>::value &&
-	                                  !std::is_convertible<T, return_optional<U>>::value &&
-	                                  !std::is_assignable<T&, return_optional<U>&>::value &&
-	                                  !std::is_assignable<T&, return_optional<U>&&>::value &&
-	                                  !std::is_assignable<T&, const return_optional<U>&>::value &&
-	                                  !std::is_assignable<T&, const return_optional<U>&&>::value>::type* = nullptr>
-	return_optional& operator=( return_optional<U>&& src )
+	                                  !std::is_convertible<T, alcc_optional<U>>::value &&
+	                                  !std::is_assignable<T&, alcc_optional<U>&>::value &&
+	                                  !std::is_assignable<T&, alcc_optional<U>&&>::value &&
+	                                  !std::is_assignable<T&, const alcc_optional<U>&>::value &&
+	                                  !std::is_assignable<T&, const alcc_optional<U>&&>::value>::type* = nullptr>
+	alcc_optional& operator=( alcc_optional<U>&& src )
 	{
 		if ( this == &src ) return *this;
 
@@ -424,7 +424,7 @@ public:
 	template <bool IsMoveConstructible                                           = std::is_move_constructible<T>::value,
 	          bool IsSwappable                                                   = std::is_swappable<T>::value,
 	          typename std::enable_if<IsMoveConstructible && IsSwappable>::type* = nullptr>
-	constexpr void swap( return_optional& src ) noexcept( std::is_nothrow_swappable<T>::value && std::is_nothrow_move_constructible<T>::value )
+	constexpr void swap( alcc_optional& src ) noexcept( std::is_nothrow_swappable<T>::value && std::is_nothrow_move_constructible<T>::value )
 	{
 		if ( this == &src ) return;
 
@@ -490,7 +490,7 @@ public:
 	constexpr const T& value() const&
 	{
 		if ( !init_ ) {
-			throw bad_return_optional_access();
+			throw bad_alcc_optional_access();
 		}
 
 		return storage_.value_;
@@ -498,7 +498,7 @@ public:
 	constexpr T& value() &
 	{
 		if ( !init_ ) {
-			throw bad_return_optional_access();
+			throw bad_alcc_optional_access();
 		}
 
 		return storage_.value_;
@@ -506,7 +506,7 @@ public:
 	constexpr T&& value() &&
 	{
 		if ( !init_ ) {
-			throw bad_return_optional_access();
+			throw bad_alcc_optional_access();
 		}
 
 		return storage_.value_;
@@ -514,7 +514,7 @@ public:
 	constexpr const T&& value() const&&
 	{
 		if ( !init_ ) {
-			throw bad_return_optional_access();
+			throw bad_alcc_optional_access();
 		}
 
 		return storage_.value_;
@@ -541,7 +541,7 @@ private:
 };
 
 template <typename T, typename U>
-constexpr bool operator==( const return_optional<T>& x, const return_optional<U>& y )
+constexpr bool operator==( const alcc_optional<T>& x, const alcc_optional<U>& y )
 {
 	if ( x.has_value() != y.has_value() ) return false;
 	if ( !x.has_value() ) return true;
@@ -549,7 +549,7 @@ constexpr bool operator==( const return_optional<T>& x, const return_optional<U>
 	return *x == *y;
 }
 template <typename T, typename U>
-constexpr bool operator!=( const return_optional<T>& x, const return_optional<U>& y )
+constexpr bool operator!=( const alcc_optional<T>& x, const alcc_optional<U>& y )
 {
 	if ( x.has_value() != y.has_value() ) return true;
 	if ( !x.has_value() ) return false;
@@ -557,7 +557,7 @@ constexpr bool operator!=( const return_optional<T>& x, const return_optional<U>
 	return *x != *y;
 }
 template <typename T, typename U>
-constexpr bool operator<( const return_optional<T>& x, const return_optional<U>& y )
+constexpr bool operator<( const alcc_optional<T>& x, const alcc_optional<U>& y )
 {
 	if ( !y.has_value() ) return false;
 	if ( !x.has_value() ) return true;
@@ -565,7 +565,7 @@ constexpr bool operator<( const return_optional<T>& x, const return_optional<U>&
 	return *x < *y;
 }
 template <typename T, typename U>
-constexpr bool operator>( const return_optional<T>& x, const return_optional<U>& y )
+constexpr bool operator>( const alcc_optional<T>& x, const alcc_optional<U>& y )
 {
 	if ( !x.has_value() ) return false;
 	if ( !y.has_value() ) return true;
@@ -573,7 +573,7 @@ constexpr bool operator>( const return_optional<T>& x, const return_optional<U>&
 	return *x > *y;
 }
 template <typename T, typename U>
-constexpr bool operator<=( const return_optional<T>& x, const return_optional<U>& y )
+constexpr bool operator<=( const alcc_optional<T>& x, const alcc_optional<U>& y )
 {
 	if ( !x.has_value() ) return true;
 	if ( !y.has_value() ) return false;
@@ -581,7 +581,7 @@ constexpr bool operator<=( const return_optional<T>& x, const return_optional<U>
 	return *x <= *y;
 }
 template <typename T, typename U>
-constexpr bool operator>=( const return_optional<T>& x, const return_optional<U>& y )
+constexpr bool operator>=( const alcc_optional<T>& x, const alcc_optional<U>& y )
 {
 	if ( !y.has_value() ) return true;
 	if ( !x.has_value() ) return false;
@@ -591,7 +591,7 @@ constexpr bool operator>=( const return_optional<T>& x, const return_optional<U>
 
 #if __cpp_lib_three_way_comparison >= 201907L
 template <class T, std::three_way_comparable_with<T> U>
-constexpr std::compare_three_way_result_t<T, U> operator<=>( const return_optional<T>& x, const return_optional<U>& y )
+constexpr std::compare_three_way_result_t<T, U> operator<=>( const alcc_optional<T>& x, const alcc_optional<U>& y )
 {
 	if ( x.has_value() && y.has_value() ) return *x <=> *y;
 	return x.has_value() <=> y.has_value();
@@ -599,13 +599,13 @@ constexpr std::compare_three_way_result_t<T, U> operator<=>( const return_option
 #endif
 
 template <class T>
-constexpr bool operator==( const return_optional<T>& x, return_nullopt_t ) noexcept
+constexpr bool operator==( const alcc_optional<T>& x, alcc_nullopt_t ) noexcept
 {
 	return !( x.has_value() );
 }
 #if __cpp_lib_three_way_comparison >= 201907L
 template <class T>
-constexpr std::strong_ordering operator<=>( const return_optional<T>& x, return_nullopt_t ) noexcept
+constexpr std::strong_ordering operator<=>( const alcc_optional<T>& x, alcc_nullopt_t ) noexcept
 {
 	return x.has_value() <=> false;
 }
@@ -613,69 +613,69 @@ constexpr std::strong_ordering operator<=>( const return_optional<T>& x, return_
 
 // 22.5.8, comparison with T
 template <class T, class U>
-constexpr bool operator==( const return_optional<T>& x, const U& v )
+constexpr bool operator==( const alcc_optional<T>& x, const U& v )
 {
 	return x.has_value() ? *x == v : false;
 }
 template <class T, class U>
-constexpr bool operator==( const T& v, const return_optional<U>& x )
+constexpr bool operator==( const T& v, const alcc_optional<U>& x )
 {
 	return x.has_value() ? v == *x : false;
 }
 template <class T, class U>
-constexpr bool operator!=( const return_optional<T>& x, const U& v )
+constexpr bool operator!=( const alcc_optional<T>& x, const U& v )
 {
 	return x.has_value() ? *x != v : true;
 }
 template <class T, class U>
-constexpr bool operator!=( const T& v, const return_optional<U>& x )
+constexpr bool operator!=( const T& v, const alcc_optional<U>& x )
 {
 	return x.has_value() ? v == *x : true;
 }
 template <class T, class U>
-constexpr bool operator<( const return_optional<T>& x, const U& v )
+constexpr bool operator<( const alcc_optional<T>& x, const U& v )
 {
 	return x.has_value() ? *x < v : true;
 }
 template <class T, class U>
-constexpr bool operator<( const T& v, const return_optional<U>& x )
+constexpr bool operator<( const T& v, const alcc_optional<U>& x )
 {
 	return x.has_value() ? v < *x : false;
 }
 template <class T, class U>
-constexpr bool operator>( const return_optional<T>& x, const U& v )
+constexpr bool operator>( const alcc_optional<T>& x, const U& v )
 {
 	return x.has_value() ? *x > v : false;
 }
 template <class T, class U>
-constexpr bool operator>( const T& v, const return_optional<U>& x )
+constexpr bool operator>( const T& v, const alcc_optional<U>& x )
 {
 	return x.has_value() ? v > *x : true;
 }
 template <class T, class U>
-constexpr bool operator<=( const return_optional<T>& x, const U& v )
+constexpr bool operator<=( const alcc_optional<T>& x, const U& v )
 {
 	return x.has_value() ? *x <= v : true;
 }
 template <class T, class U>
-constexpr bool operator<=( const T& v, const return_optional<U>& x )
+constexpr bool operator<=( const T& v, const alcc_optional<U>& x )
 {
 	return x.has_value() ? v <= *x : false;
 }
 template <class T, class U>
-constexpr bool operator>=( const return_optional<T>& x, const U& v )
+constexpr bool operator>=( const alcc_optional<T>& x, const U& v )
 {
 	return x.has_value() ? *x >= v : false;
 }
 template <class T, class U>
-constexpr bool operator>=( const T& v, const return_optional<U>& x )
+constexpr bool operator>=( const T& v, const alcc_optional<U>& x )
 {
 	return x.has_value() ? v >= *x : true;
 }
 #if __cpp_lib_three_way_comparison >= 201907L
 template <class T, class U, class V>
-	requires( !std::is_base_of<return_optional<V>, U>::value ) && std::three_way_comparable_with<T, U>
-constexpr std::compare_three_way_result_t<T, U> operator<=>( const return_optional<T>& x, const U& v )
+	requires( !std::is_base_of<alcc_optional<V>, U>::value ) && std::three_way_comparable_with<T, U>
+constexpr std::compare_three_way_result_t<T, U> operator<=>( const alcc_optional<T>& x, const U& v )
 {
 	return x.has_value() ? *x <=> v : std::strong_ordering::less;
 }

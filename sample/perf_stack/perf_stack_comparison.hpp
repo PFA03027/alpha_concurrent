@@ -48,16 +48,16 @@ public:
 		vec_[head_idx_] = x;
 		head_idx_++;
 	}
-	alpha::concurrent::return_optional<value_type> pop( void )
+	alpha::concurrent::alcc_optional<value_type> pop( void )
 	{
 		std::lock_guard<std::mutex> lk( mtx_ );
 		if ( head_idx_ <= 0 ) {
-			return alpha::concurrent::return_nullopt;
+			return alpha::concurrent::alcc_nullopt;
 		}
 		head_idx_--;
 
 		value_type ans = vec_[head_idx_];
-		return alpha::concurrent::return_optional<value_type> { ans };
+		return alpha::concurrent::alcc_optional<value_type> { ans };
 	}
 
 private:
@@ -80,16 +80,16 @@ public:
 		std::lock_guard<std::mutex> lk( mtx_ );
 		l_.emplace_back( x );
 	}
-	alpha::concurrent::return_optional<value_type> pop( void )
+	alpha::concurrent::alcc_optional<value_type> pop( void )
 	{
 		std::lock_guard<std::mutex> lk( mtx_ );
 		if ( l_.size() <= 0 ) {
-			return alpha::concurrent::return_nullopt;
+			return alpha::concurrent::alcc_nullopt;
 		}
 
 		value_type ans = l_.back();
 		l_.pop_back();
-		return alpha::concurrent::return_optional<value_type> { ans };
+		return alpha::concurrent::alcc_optional<value_type> { ans };
 	}
 
 private:
