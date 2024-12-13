@@ -17,9 +17,9 @@
 #include <tuple>
 
 #include "hazard_ptr.hpp"
+#include "internal/alcc_optional.hpp"
 #include "internal/od_lockfree_stack.hpp"
 #include "internal/od_node_pool.hpp"
-#include "internal/return_optional.hpp"
 
 namespace alpha {
 namespace concurrent {

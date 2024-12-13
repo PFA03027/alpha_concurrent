@@ -13,7 +13,7 @@
 
 #include "gtest/gtest.h"
 
-#include "alconcurrent/internal/return_optional.hpp"
+#include "alconcurrent/internal/alcc_optional.hpp"
 
 TEST( TestType_ReturnOptional_WithTrivialType, DoDefaultConstruct_Then_NotHasValue )
 {
