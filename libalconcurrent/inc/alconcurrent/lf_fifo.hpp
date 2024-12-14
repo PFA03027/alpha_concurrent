@@ -17,10 +17,10 @@
 #include <tuple>
 
 #include "hazard_ptr.hpp"
+#include "internal/alcc_optional.hpp"
 #include "internal/od_lockfree_fifo.hpp"
 #include "internal/od_node_essence.hpp"
 #include "internal/od_node_pool.hpp"
-#include "internal/alcc_optional.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -30,14 +30,11 @@ namespace internal {
 template <typename T>
 class x_lockfree_fifo {
 public:
-	// static_assert( ( !std::is_class<T>::value ) ||
-	//                    ( std::is_class<T>::value &&
-	//                      std::is_default_constructible<T>::value && std::is_copy_constructible<T>::value && std::is_copy_assignable<T>::value ),
-	//                "T should be default constructible, move constructible and move assignable at least" );
-	// static_assert( ( !std::is_class<T>::value ) ||
-	//                    ( std::is_class<T>::value &&
-	//                      std::is_default_constructible<T>::value ),
-	//                "T should be default constructible, move constructible and move assignable at least" );
+	static_assert( ( !std::is_class<T>::value ) ||
+	                   ( std::is_class<T>::value &&
+	                     ( ( std::is_copy_constructible<T>::value && std::is_copy_assignable<T>::value ) ||
+	                       ( std::is_move_constructible<T>::value && std::is_move_assignable<T>::value ) ) ),
+	               "T should be copy constructible and copy assignable, or, move constructible and move assignable" );
 
 	using value_type = T;
 

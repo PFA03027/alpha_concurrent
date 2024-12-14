@@ -28,10 +28,11 @@ namespace internal {
 template <typename T>
 class x_lockfree_stack {
 public:
-	// static_assert( ( !std::is_class<T>::value ) ||
-	//                    ( std::is_class<T>::value &&
-	//                      std::is_default_constructible<T>::value && std::is_move_constructible<T>::value && std::is_move_assignable<T>::value ),
-	//                "T should be default constructible, move constructible and move assignable at least" );
+	static_assert( ( !std::is_class<T>::value ) ||
+	                   ( std::is_class<T>::value &&
+	                     ( ( std::is_copy_constructible<T>::value && std::is_copy_assignable<T>::value ) ||
+	                       ( std::is_move_constructible<T>::value && std::is_move_assignable<T>::value ) ) ),
+	               "T should be copy constructible and copy assignable, or, move constructible and move assignable" );
 
 	using value_type = T;
 
@@ -95,6 +96,21 @@ public:
 			allocated_node_count_++;
 #endif
 			p_new_nd = new node_type( std::move( v_arg ) );
+		}
+		lf_stack_impl_.push_front( p_new_nd );
+	}
+
+	template <typename... Args>
+	void emplace( Args&&... args )
+	{
+		node_pointer p_new_nd = node_pool_t::pop();
+		if ( p_new_nd != nullptr ) {
+			p_new_nd->emplace_value( std::forward<Args>( args )... );
+		} else {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			allocated_node_count_++;
+#endif
+			p_new_nd = new node_type( alcc_in_place, std::forward<Args>( args )... );
 		}
 		lf_stack_impl_.push_front( p_new_nd );
 	}

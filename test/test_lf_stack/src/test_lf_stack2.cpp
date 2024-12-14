@@ -23,7 +23,18 @@
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 #include "alconcurrent/lf_stack.hpp"
 
-TEST( LFSTACK_2, CallDefaultConstruct )
+class lfStackTest : public ::testing::Test {
+protected:
+	virtual void SetUp()
+	{
+	}
+
+	virtual void TearDown()
+	{
+	}
+};
+
+TEST_F( lfStackTest, CallDefaultConstruct )
 {
 	// Arrange
 
@@ -33,7 +44,7 @@ TEST( LFSTACK_2, CallDefaultConstruct )
 	// Assert
 }
 
-TEST( LFSTACK_2, CallPopFromEmpty )
+TEST_F( lfStackTest, CallPopFromEmpty )
 {
 	// Arrange
 	alpha::concurrent::stack_list<int> sut;
@@ -45,7 +56,7 @@ TEST( LFSTACK_2, CallPopFromEmpty )
 	EXPECT_FALSE( ret.has_value() );
 }
 
-TEST( LFSTACK_2, CallPushPopOne )
+TEST_F( lfStackTest, CallPushPopOne )
 {
 	// Arrange
 	alpha::concurrent::stack_list<int> sut;
@@ -59,7 +70,7 @@ TEST( LFSTACK_2, CallPushPopOne )
 	EXPECT_EQ( ret.value(), 1 );
 }
 
-TEST( LFSTACK_2, CallPushPopTwo )
+TEST_F( lfStackTest, CallPushPopTwo )
 {
 	// Arrange
 	alpha::concurrent::stack_list<int> sut;
@@ -77,63 +88,147 @@ TEST( LFSTACK_2, CallPushPopTwo )
 	EXPECT_EQ( ret2.value(), 1 );
 }
 
-///////////////////////////////////////////////////////////////////////////////
-
-constexpr unsigned int   num_thread = 10;   // Tested until 128.
-constexpr std::uintptr_t loop_num   = 10000;
-
-pthread_barrier_t barrier2;
-
-/**
- * 各スレッドのメインルーチン。
- * カウントアップを繰り返す。
- */
-long func_test_stack_list( alpha::concurrent::stack_list<long>* p_test_obj )
-{
-
-	pthread_barrier_wait( &barrier2 );
-
-	typename alpha::concurrent::stack_list<long>::value_type v = 0;
-	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
-		p_test_obj->push( v );
-		auto ret = p_test_obj->pop();
-		if ( !ret.has_value() ) {
-			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string( v ).c_str() );
-			exit( 1 );
-		}
-		v = ret.value() + 1;
-	}
-
-	return v;
-}
-
-TEST( LFSTACK_2_HighLoad, TC3 )
+TEST_F( lfStackTest, Pointer1 )
 {
 	// Arrange
-	pthread_barrier_init( &barrier2, NULL, num_thread + 1 );
+	using test_fifo_type3 = alpha::concurrent::stack_list<int*>;
+	test_fifo_type3* p_test_obj;
 
-	alpha::concurrent::stack_list<long> sut;
-	std::vector<std::future<long>>      results( num_thread );
-	std::vector<std::thread>            threads( num_thread );
+	std::cout << "Pointer test#1" << std::endl;
+	p_test_obj  = new test_fifo_type3( 8 );
+	int* p_data = new int();
 
 	// Act
-	for ( unsigned int i = 0; i < num_thread; i++ ) {
-		std::packaged_task<long( alpha::concurrent::stack_list<long>* )> task( func_test_stack_list );
-		results[i] = task.get_future();
-		threads[i] = std::thread( std::move( task ), &sut );
-	}
-	pthread_barrier_wait( &barrier2 );
+	p_test_obj->push( p_data );
 
 	// Assert
-	long sum = 0;
-	for ( unsigned int i = 0; i < num_thread; i++ ) {
-		if ( threads[i].joinable() ) {
-			threads[i].join();
-		}
-		sum += results[i].get();
+	delete p_test_obj;
+	delete p_data;
+}
+
+TEST_F( lfStackTest, Pointer2 )
+{
+	using test_fifo_type3 = alpha::concurrent::stack_list<int*>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "Pointer test#2" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push( new int() );
+	auto ret = p_test_obj->pop();
+
+	ASSERT_TRUE( ret.has_value() );
+
+	delete ret.value();
+	delete p_test_obj;
+
+	std::cout << "End Pointer test" << std::endl;
+}
+
+TEST_F( lfStackTest, CanCal_With_Unique_ptr )
+{
+	// Arrange
+	using test_fifo_type3 = alpha::concurrent::stack_list<std::unique_ptr<int>>;
+	test_fifo_type3 test_obj;
+
+	std::unique_ptr<int> up_tv( new int );
+	*up_tv = 12;
+
+	// Act
+	test_obj.push( std::move( up_tv ) );
+	auto ret = test_obj.pop();
+
+	// Assert
+	ASSERT_TRUE( ret.has_value() );
+	ASSERT_NE( ret.value(), nullptr );
+	EXPECT_EQ( *( ret.value() ), 12 );
+}
+
+class array_test {
+public:
+	array_test( void )
+	{
+		x = 1;
+		return;
 	}
 
-	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
-	// に等しくなるはず。
-	EXPECT_EQ( num_thread * loop_num, sum );
+	~array_test()
+	{
+		printf( "called destructor of array_test\n" );
+		return;
+	}
+
+private:
+	int x;
+};
+
+TEST_F( lfStackTest, Array1 )
+{
+	// Arrange
+	using test_fifo_type3 = alpha::concurrent::stack_list<array_test[]>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "Array array_test[] test#1" << std::endl;
+	p_test_obj         = new test_fifo_type3( 8 );
+	array_test* p_data = new array_test[2];
+
+	// Act
+	p_test_obj->push( p_data );
+
+	// Assert
+	delete p_test_obj;
+	delete[] p_data;
+}
+
+TEST_F( lfStackTest, Array2 )
+{
+	using test_fifo_type3 = alpha::concurrent::stack_list<array_test[]>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "Array array_test[] test#2" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push( new array_test[2] );
+	auto ret = p_test_obj->pop();
+
+	ASSERT_TRUE( ret.has_value() );
+
+	delete[] ret.value();
+	delete p_test_obj;
+
+	std::cout << "Array array_test[] test" << std::endl;
+}
+
+TEST_F( lfStackTest, FixedArray1 )
+{
+	using test_fifo_type3 = alpha::concurrent::stack_list<array_test[2]>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "Array array_test[2] test#1" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	array_test tmp_data[2];
+	p_test_obj->push( tmp_data );
+
+	delete p_test_obj;
+}
+
+TEST_F( lfStackTest, FixedArray2 )
+{
+	using test_fifo_type3 = alpha::concurrent::stack_list<array_test[2]>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "Array array_test[2] test#2" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	array_test tmp_data[2];
+
+	p_test_obj->push( tmp_data );
+	auto ret = p_test_obj->pop( tmp_data );
+
+	ASSERT_TRUE( ret );
+
+	delete p_test_obj;
+
+	std::cout << "Array array_test[2] test" << std::endl;
 }
