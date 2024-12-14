@@ -17,8 +17,6 @@
 #include <mutex>
 #include <type_traits>
 
-#include "alconcurrent/dynamic_tls.hpp"
-
 #include "lf_mem_alloc_basic_allocator.hpp"
 #include "lf_mem_alloc_slot.hpp"
 #include "lifo_free_node_stack.hpp"

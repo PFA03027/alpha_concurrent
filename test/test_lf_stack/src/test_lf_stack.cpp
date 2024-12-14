@@ -35,8 +35,6 @@ protected:
 
 	virtual void TearDown()
 	{
-		printf( "number of keys of dynamic_tls_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
-		printf( "max number of keys of dynamic_tls_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
 	}
 };
 
