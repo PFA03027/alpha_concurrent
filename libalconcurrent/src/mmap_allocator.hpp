@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef MMAP_ALLOCATOR_HPP_
-#define MMAP_ALLOCATOR_HPP_
+#ifndef ALCONCCURRENT_SRC_MMAP_ALLOCATOR_HPP_
+#define ALCONCCURRENT_SRC_MMAP_ALLOCATOR_HPP_
 
 #include <cstdlib>
 #include <limits>
@@ -27,7 +27,7 @@ namespace internal {
  */
 struct allocate_result {
 	void*  p_allocated_addr_;   //!< allocated memory address. if nullptr, fail to allocate
-	size_t allocated_size_;     //!< allocated memory size. if 0, fail to allocate
+	size_t allocated_size_;     //!< allocated memory size. if fail to allocate, value is 0. (CATION: 0 does NOT means to fail allocation)
 };
 
 /**
@@ -37,7 +37,7 @@ struct allocate_result {
  * @param align_size alignment size of the allocated memorry address
  * @return allocate_result
  */
-allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size );
+allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size ) noexcept;
 
 /**
  * @brief deallocate memory by munmap()
@@ -47,14 +47,14 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size );
  * @retval 0 success
  * @retval -1 fail. please also check errno
  */
-int deallocate_by_munmap( void* p_allocated_addr, size_t allocated_size );
+int deallocate_by_munmap( void* p_allocated_addr, size_t allocated_size ) noexcept;
 
 struct alloc_mmap_status {
 	size_t active_size_;
 	size_t max_size_;
 };
 
-alloc_mmap_status get_alloc_mmap_status( void );
+alloc_mmap_status get_alloc_mmap_status( void ) noexcept;
 
 void print_of_mmap_allocator( void );
 

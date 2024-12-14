@@ -11,7 +11,7 @@
                 "$gcc"
             ],
             "group": {
-                "kind": "build",
+                "kind": "build"
             }
         },
         {
@@ -22,8 +22,7 @@
                 "$gcc"
             ],
             "group": {
-                "kind": "build",
-                "isDefault": true
+                "kind": "build"
             }
         },
         {
@@ -34,7 +33,7 @@
                 "$gcc"
             ],
             "group": {
-                "kind": "build",
+                "kind": "build"
             }
         },
         {
@@ -49,6 +48,51 @@
             }
         },
         {
+            "label": "make test with -g",
+            "type": "shell",
+            "command": "make BUILDTYPE=Debug test",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "debug make build-sample",
+            "type": "shell",
+            "command": "make build-sample BUILDTYPE=Debug",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build"
+            }
+        },
+        {
+            "label": "debug make build-sample-sanitizer",
+            "type": "shell",
+            "command": "make build-sample BUILDTYPE=Debug SANITIZER_TYPE=2",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build"
+            }
+        },
+        {
+            "label": "make build-profile",
+            "type": "shell",
+            "command": "make build-profile",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build"
+            }
+        },
+        {
             "label": "make all and exec test",
             "type": "shell",
             "command": "bash make_linux.sh test",
@@ -56,7 +100,7 @@
                 "$gcc"
             ],
             "group": {
-                "kind": "build",
+                "kind": "build"
             }
         },
         {
@@ -70,7 +114,15 @@
         {
             "label": "build with a sanitizer",
             "type": "shell",
-            "command": "bash make_linux_sanitizer_build.sh 6",
+            "command": "make build-test-sanitizer.6.sanitizer",
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "build with a sanitizer 8",
+            "type": "shell",
+            "command": "make build-test-sanitizer.8.sanitizer",
             "problemMatcher": [
                 "$gcc"
             ]

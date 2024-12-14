@@ -8,428 +8,343 @@
  * Copyright (C) 2020 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#ifndef SRC_LF_FIFO_HPP_
-#define SRC_LF_FIFO_HPP_
+#ifndef ALCONCCURRENT_INC_LF_FIFO_HPP_
+#define ALCONCCURRENT_INC_LF_FIFO_HPP_
 
+#include <array>
 #include <atomic>
 #include <memory>
 #include <tuple>
 
 #include "hazard_ptr.hpp"
-#include "internal/free_node_storage.hpp"
-#include "internal/one_way_list_node.hpp"
+#include "internal/alcc_optional.hpp"
+#include "internal/od_lockfree_fifo.hpp"
+#include "internal/od_node_essence.hpp"
+#include "internal/od_node_pool.hpp"
 
 namespace alpha {
 namespace concurrent {
 
 namespace internal {
 
-/*!
- * @brief	リスト型のFIFOキューの基本要素となるFIFOキュークラス
- *
- * Tは、copy assignableでなければならい。
- *
- * @note
- * https://www.slideshare.net/kumagi/lock-free-safe?next_slideshow=1 @n
- * 明記はされていないが、必ずノードが１つ残る構造。
- *
- * キューに登録された値そのものは、head_.nextが指すノードに存在する。
- */
-template <typename T, bool HAS_OWNERSHIP = true>
-class fifo_nd_list {
+template <typename T>
+class x_lockfree_fifo {
 public:
-	static constexpr int hzrd_max_slot_ = 5;
-	using node_type                     = one_way_list_node<T, HAS_OWNERSHIP>;
-	using input_type                    = typename node_type::input_type;
-	using value_type                    = typename node_type::value_type;
-	using ticket_type                   = typename node_type::ticket_type;
-	using node_pointer                  = node_type*;
-	using hazard_ptr_storage            = hazard_ptr<node_type, hzrd_max_slot_>;
+	static_assert( ( !std::is_class<T>::value ) ||
+	                   ( std::is_class<T>::value &&
+	                     ( ( std::is_copy_constructible<T>::value && std::is_copy_assignable<T>::value ) ||
+	                       ( std::is_move_constructible<T>::value && std::is_move_assignable<T>::value ) ) ),
+	               "T should be copy constructible and copy assignable, or, move constructible and move assignable" );
 
-	fifo_nd_list( void )
-	  : head_( nullptr )
-	  , tail_( nullptr )
-	  , size_count_( 0 )
+	using value_type = T;
+
+	x_lockfree_fifo( void ) noexcept
+	  :
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	  allocated_node_count_( 0 )
+	  ,
+#endif
+	  lf_fifo_impl_()
 	{
-		node_pointer p_initial_node = new node_type();
-		head_.store( p_initial_node, std::memory_order_release );
-		tail_.store( p_initial_node, std::memory_order_release );
-
-		return;
 	}
 
-	~fifo_nd_list()
+	~x_lockfree_fifo()
 	{
-		node_pointer p_cur = head_.load( std::memory_order_acquire );
-		head_.store( nullptr, std::memory_order_release );
-		tail_.store( nullptr, std::memory_order_release );
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		internal::LogOutput( log_type::DUMP, "x_lockfree_fifo: allocated_node_count = %zu", allocated_node_count_.load() );
+#endif
 
-		if ( p_cur != nullptr ) {
-			// 先頭ノードは番兵のため、nullptrであることはありえないが、チェックする。
-			// ノード自体は、フリーノードストレージに戻すことが基本だが、デストラクタの場合は、戻さない仕様で割り切る。
-
-			// 先頭ノードは番兵ノードで、既にリソースは取り出し済み。よって、デストラクタ時点でリソースの所有権喪失が確定される。
-			p_cur->release_ownership();
-			do {
-				// リソースの所有権が保持されている２番目のノード以降の破棄を行う。ノードのデストラクタで所有中のリソースは破棄される。
-				node_pointer const p_nxt = p_cur->get_next();
-				delete p_cur;
-				p_cur = p_nxt;
-			} while ( p_cur != nullptr );
+		auto tmp = pop();
+		while ( tmp.has_value() ) {
+			tmp = pop();
 		}
 
-		return;
+		node_pool_t::push( lf_fifo_impl_.release_sentinel_node() );
 	}
 
-	/*!
-	 * @brief	FIFOキューへノードをPushする。
-	 *
-	 * @warning
-	 * 引数の管理ノードは、事前にcheck_hazard_list()を使用してハザードポインタに登録されていないことを確認していること。
-	 */
-	void push( node_pointer const p_push_node )
+	template <bool IsCopyConstructible = std::is_copy_constructible<value_type>::value,
+	          bool IsCopyAssignable    = std::is_copy_assignable<value_type>::value,
+	          typename std::enable_if<
+				  IsCopyConstructible && IsCopyAssignable>::type* = nullptr>
+	void push( const T& v_arg )
 	{
-		p_push_node->set_next( nullptr );
-
-		scoped_hazard_ref scoped_ref_lst( hzrd_ptr_, (int)hazard_ptr_idx::PUSH_FUNC_LAST );
-		scoped_hazard_ref scoped_ref_nxt( scoped_ref_lst, (int)hazard_ptr_idx::PUSH_FUNC_NEXT );
-
-		while ( true ) {
-			node_pointer p_cur_last = tail_.load( std::memory_order_acquire );
-			scoped_ref_lst.regist_ptr_as_hazard_ptr( p_cur_last );
-			if ( p_cur_last != tail_.load( std::memory_order_acquire ) ) continue;
-
-			node_pointer p_cur_next = p_cur_last->get_next();
-			scoped_ref_nxt.regist_ptr_as_hazard_ptr( p_cur_next );
-			if ( p_cur_next != p_cur_last->get_next() ) continue;
-
-			if ( p_cur_next == nullptr ) {
-				if ( p_cur_last->next_CAS( &p_cur_next, p_push_node ) ) {
-					tail_.compare_exchange_weak( p_cur_last, p_push_node );
-					size_count_++;
-					return;   // 追加完了
-				}
-			} else {
-				// tail_を更新する。
-				// ここで、プリエンプションして、tail_がA->B->A'となった時、p_cur_lastが期待値とは異なるが、
-				// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
-				tail_.compare_exchange_weak( p_cur_last, p_cur_next );
-			}
-		}
-		return;
+		lf_fifo_impl_.push_back( allocate_node( v_arg ) );
 	}
 
-	/*!
-	 * @brief	FIFOキューからポインタを取り出す。
-	 *
-	 * 返り値の管理ノードに保管されている。
-	 *
-	 * @return	1st: 取り出された管理ノードへのポインタ。nullptrの場合、FIFOキューが空だったことを示す。管理対象ポインタは、
-	 * @return	2nd: 取り出された管理ノードへのポインタが有効の場合、FIFOから取り出された値
-	 *
-	 * @warning
-	 * 管理ノードは、使用中の可能性がある。ハザードポインタに登録されていないことの確認が完了するまで、管理ノードの破棄や、APIを呼び出しで、値を変更してはならない。
-	 */
-	std::tuple<node_pointer, value_type> pop( void )
+	template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
+	          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
+	          typename std::enable_if<
+				  IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
+	void push( T&& v_arg )
 	{
-		scoped_hazard_ref scoped_ref_first( hzrd_ptr_, (int)hazard_ptr_idx::POP_FUNC_FIRST );
-		scoped_hazard_ref scoped_ref_last( scoped_ref_first, (int)hazard_ptr_idx::POP_FUNC_LAST );
-		scoped_hazard_ref scoped_ref_next( scoped_ref_first, (int)hazard_ptr_idx::POP_FUNC_NEXT );
-
-		while ( true ) {
-			node_pointer p_cur_first = head_.load( std::memory_order_acquire );
-			node_pointer p_cur_last  = tail_.load( std::memory_order_acquire );
-
-			scoped_ref_first.regist_ptr_as_hazard_ptr( p_cur_first );
-			if ( p_cur_first != head_.load( std::memory_order_acquire ) ) continue;
-
-			scoped_ref_last.regist_ptr_as_hazard_ptr( p_cur_last );
-			if ( p_cur_last != tail_.load( std::memory_order_acquire ) ) continue;
-
-			node_pointer p_cur_next = p_cur_first->get_next();
-			scoped_ref_next.regist_ptr_as_hazard_ptr( p_cur_next );
-			if ( p_cur_next != p_cur_first->get_next() ) continue;
-
-			if ( p_cur_first == p_cur_last ) {
-				if ( p_cur_next == nullptr ) {
-					// 番兵ノードしかないので、FIFOキューは空。
-					return std::tuple<node_pointer, value_type>( nullptr, value_type() );
-				} else {
-					// 番兵ノードしかないように見えるが、Tailがまだ更新されていないだけ。
-					// tailを更新して、pop処理をし直す。
-					// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
-					// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
-					tail_.compare_exchange_weak( p_cur_last, p_cur_next );
-				}
-			} else {
-				if ( p_cur_next == nullptr ) {
-					// headが他のスレッドでpopされた。
-					continue;
-				}
-				ticket_type ans_2nd_ticket = p_cur_next->get_ticket();   // 値の取り出しに使用するチケットを得る。
-				// ここで、プリエンプションして、head_がA->B->A'となった時、p_cur_nextが期待値とは異なるが、
-				// ハザードポインタにA相当を確保しているので、A'は現れない。よって、このようなABA問題は起きない。
-				if ( head_.compare_exchange_weak( p_cur_first, p_cur_next ) ) {
-					size_count_--;
-					// ここで、firstの取り出しと所有権確保が完了
-					// ただし、ハザードポインタをチェックしていないため、まだ参照している人がいるかもしれない。
-					value_type ans_2nd = p_cur_next->exchange_ticket_and_move_value( ans_2nd_ticket );   // firstが取り出せたので、nextから値を取り出すための権利を取得。チケットを使って、値を取り出す。
-					p_cur_first->release_ownership();                                                    // 値を取り出した結果として、firstが管理する情報の所有権ロストが確定したため、それを書き込む。
-					return std::tuple<node_pointer, value_type>( p_cur_first, ans_2nd );
-				}
-			}
-		}
-		return std::tuple<node_pointer, value_type>( nullptr, value_type() );
+		lf_fifo_impl_.push_back( allocate_node( std::move( v_arg ) ) );
 	}
 
-	/*!
-	 * @brief	Check whether a pointer is in this hazard list
-	 *
-	 * @retval	true	p_chk_ptr is in this hazard list.
-	 * @retval	false	p_chk_ptr is not in this hazard list.
-	 */
-	bool check_hazard_list( node_pointer const p_chk_node )
+	template <typename... Args>
+	void emplace( Args&&... args )
 	{
-		return hzrd_ptr_.check_ptr_in_hazard_list( p_chk_node );
+		lf_fifo_impl_.push_back( allocate_node_emplace( std::forward<Args>( args )... ) );
 	}
 
-	int get_size( void ) const
+	template <bool IsCopyConstructible = std::is_copy_constructible<value_type>::value,
+	          bool IsCopyAssignable    = std::is_copy_assignable<value_type>::value,
+	          typename std::enable_if<
+				  IsCopyConstructible && IsCopyAssignable>::type* = nullptr>
+	void push_head( const T& v_arg )
 	{
-		return size_count_.load( std::memory_order_acquire );
+		node_pointer p_old_sentinel = lf_fifo_impl_.push_front( allocate_node(), allocate_node( v_arg ) );
+		node_pool_t::push( p_old_sentinel );
+	}
+
+	template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
+	          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
+	          typename std::enable_if<
+				  IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
+	void push_head( T&& v_arg )
+	{
+		node_pointer p_old_sentinel = lf_fifo_impl_.push_front( allocate_node(), allocate_node( std::move( v_arg ) ) );
+		node_pool_t::push( p_old_sentinel );
+	}
+
+	template <typename... Args>
+	void emplace_head( Args&&... args )
+	{
+		node_pointer p_old_sentinel = lf_fifo_impl_.push_front( allocate_node(), allocate_node_emplace( std::forward<Args>( args )... ) );
+		node_pool_t::push( p_old_sentinel );
+	}
+
+	template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
+	          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
+	          typename std::enable_if<
+				  IsMoveConstructible && IsMoveAssignable>::type* = nullptr>
+	alcc_optional<value_type> pop( void )
+	{
+		value_type   popped_value_storage;
+		node_pointer p_popped_node = lf_fifo_impl_.pop_front( &popped_value_storage );
+		if ( p_popped_node == nullptr ) return alcc_nullopt;
+
+		node_pool_t::push( p_popped_node );
+		return alcc_optional<value_type> { std::move( popped_value_storage ) };
+	}
+
+	template <bool IsMoveConstructible = std::is_move_constructible<value_type>::value,
+	          bool IsMoveAssignable    = std::is_move_assignable<value_type>::value,
+	          bool IsCopyConstructible = std::is_copy_constructible<value_type>::value,
+	          bool IsCopyAssignable    = std::is_copy_assignable<value_type>::value,
+	          typename std::enable_if<
+				  !( IsMoveConstructible && IsMoveAssignable ) && ( IsCopyConstructible && IsCopyAssignable )>::type* = nullptr>
+	alcc_optional<value_type> pop( void )
+	{
+		value_type   popped_value_storage;
+		node_pointer p_popped_node = lf_fifo_impl_.pop_front( &popped_value_storage );
+		if ( p_popped_node == nullptr ) return alcc_nullopt;
+
+		node_pool_t::push( p_popped_node );
+		return alcc_optional<value_type> { popped_value_storage };
+	}
+
+	bool is_empty( void ) const
+	{
+		return lf_fifo_impl_.is_empty();
+	}
+
+	static void clear_node_pool_as_possible_as( void )
+	{
+		node_pool_t::clear_as_possible_as();
 	}
 
 private:
-	fifo_nd_list( const fifo_nd_list& )           = delete;
-	fifo_nd_list( fifo_nd_list&& )                = delete;
-	fifo_nd_list operator=( const fifo_nd_list& ) = delete;
-	fifo_nd_list operator=( fifo_nd_list&& )      = delete;
+	using node_type    = od_node_type1<T>;
+	using node_pointer = od_node_type1<T>*;
 
-	using scoped_hazard_ref = hazard_ptr_scoped_ref<node_type, hzrd_max_slot_>;
+	static node_pointer allocate_node( void )
+	{
+		node_pointer p_new_nd = node_pool_t::pop();
+		if ( p_new_nd == nullptr ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			allocated_node_count_++;
+#endif
+			p_new_nd = new node_type;
+		}
+		return p_new_nd;
+	}
+	static node_pointer allocate_node( const T& v_arg )
+	{
+		node_pointer p_new_nd = node_pool_t::pop();
+		if ( p_new_nd != nullptr ) {
+			p_new_nd->set_value( v_arg );
+		} else {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			allocated_node_count_++;
+#endif
+			p_new_nd = new node_type( v_arg );
+		}
+		return p_new_nd;
+	}
+	static node_pointer allocate_node( T&& v_arg )
+	{
+		node_pointer p_new_nd = node_pool_t::pop();
+		if ( p_new_nd != nullptr ) {
+			p_new_nd->set_value( std::move( v_arg ) );
+		} else {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			allocated_node_count_++;
+#endif
+			p_new_nd = new node_type( std::move( v_arg ) );
+		}
+		return p_new_nd;
+	}
+	template <typename... Args>
+	static node_pointer allocate_node_emplace( Args&&... args )
+	{
+		node_pointer p_new_nd = node_pool_t::pop();
+		if ( p_new_nd != nullptr ) {
+			p_new_nd->emplace_value( std::forward<Args>( args )... );
+		} else {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			allocated_node_count_++;
+#endif
+			p_new_nd = new node_type( alcc_in_place, std::forward<Args>( args )... );
+		}
+		return p_new_nd;
+	}
 
-	enum class hazard_ptr_idx : int {
-		PUSH_FUNC_LAST = 0,
-		PUSH_FUNC_NEXT = 1,
-		POP_FUNC_FIRST = 2,
-		POP_FUNC_LAST  = 3,
-		POP_FUNC_NEXT  = 4
-	};
+	class node_fifo_lockfree_t : private od_lockfree_fifo {
+	public:
+		node_fifo_lockfree_t( void )
+		  : od_lockfree_fifo( x_lockfree_fifo::allocate_node() )
+		{
+		}
 
-	std::atomic<node_pointer> head_;
-	std::atomic<node_pointer> tail_;
-	std::atomic<int>          size_count_;
+		void push_back( x_lockfree_fifo::node_pointer p_nd ) noexcept
+		{
+			od_lockfree_fifo::push_back( p_nd );
+		}
+		x_lockfree_fifo::node_pointer push_front( x_lockfree_fifo::node_pointer p_sentinel, x_lockfree_fifo::node_pointer p_nd_w_value ) noexcept
+		{
+			od_lockfree_fifo::node_pointer p_old_sentinel = od_lockfree_fifo::push_front( p_sentinel, p_nd_w_value );
+			if ( p_old_sentinel == nullptr ) return nullptr;
+			return static_cast<x_lockfree_fifo::node_pointer>( p_old_sentinel );
+		}
+		x_lockfree_fifo::node_pointer pop_front( x_lockfree_fifo::value_type* p_context_local_data ) noexcept
+		{
+			od_lockfree_fifo::node_pointer p_node = od_lockfree_fifo::pop_front( p_context_local_data );
+			if ( p_node == nullptr ) return nullptr;
+			return static_cast<x_lockfree_fifo::node_pointer>( p_node );
+		}
 
-	hazard_ptr_storage hzrd_ptr_;
-};
+		x_lockfree_fifo::node_pointer release_sentinel_node( void ) noexcept
+		{
+			od_lockfree_fifo::node_pointer p_node = od_lockfree_fifo::release_sentinel_node();
+			if ( p_node == nullptr ) return nullptr;
+			return static_cast<x_lockfree_fifo::node_pointer>( p_node );
+		}
+
+		bool is_empty( void ) const
+		{
+			return od_lockfree_fifo::is_empty();
+		}
+
+	private:
+		template <bool IsMovable = std::is_move_assignable<T>::value, typename std::enable_if<IsMovable>::type* = nullptr>
+		void callback_to_pick_up_value_impl( x_lockfree_fifo::node_type& node_stored_value, x_lockfree_fifo::value_type& context_local_data )
+		{
+			context_local_data = std::move( node_stored_value ).get_value();
+		}
+		template <bool IsCopyable                                          = std::is_copy_assignable<T>::value,
+		          bool IsMovable                                           = std::is_move_assignable<T>::value,
+		          typename std::enable_if<!IsMovable && IsCopyable>::type* = nullptr>
+		void callback_to_pick_up_value_impl( x_lockfree_fifo::node_type& node_stored_value, x_lockfree_fifo::value_type& context_local_data )
+		{
+			context_local_data = node_stored_value.get_value();
+		}
+
+		void callback_to_pick_up_value( od_lockfree_fifo::node_pointer p_node_stored_value, void* p_context_local_data ) override
+		{
+			x_lockfree_fifo::node_type& node_stored_value = *( static_cast<x_lockfree_fifo::node_pointer>( p_node_stored_value ) );   // od_lockfree_fifoに保管されているノードはnode_pointerであることを保証しているため、static_castを使用する。
+
+			x_lockfree_fifo::value_type* p_storage_for_popped_value_ = reinterpret_cast<x_lockfree_fifo::value_type*>( p_context_local_data );
+			callback_to_pick_up_value_impl( node_stored_value, *p_storage_for_popped_value_ );
+		}
+	};   // namespace internal
+
+	using node_pool_t = od_node_pool<node_type>;
+
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	std::atomic<size_t> allocated_node_count_;
+#endif
+	node_fifo_lockfree_t lf_fifo_impl_;
+
+};   // namespace concurrent
 
 }   // namespace internal
 
-/*!
- * @brief	semi-lock free FIFO type queue
- *
- * In case that template parameter ALLOW_TO_ALLOCATE is true, @n
- * In case of no avialable free node that carries a value, new node is allocated from heap internally. @n
- * In this case, this queue may be locked. And push() may trigger this behavior. @n
- * On the other hand, used free node will be recycled without a memory allocation. In this case, push() is lock free.
- *
- * To reduce lock behavior, pre-allocated nodes are effective. @n
- * get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
- *
- * In case that template parameter ALLOW_TO_ALLOCATE is false, @n
- * In case of no avialable free node, push() member function will return false. In this case, it fails to push a value @n
- * User side has a role to recover this condition by User side itself, e.g. backoff approach.
- *
- * If T is pointer, HAS_OWNERSHIP impacts to free of resource. @n
- * If HAS_OWNERSHIP is true, this class free a pointer resource by delete when a this class instance destructed.
- * If HAS_OWNERSHIP is false, this class does not handle a pointer resource when a this class instance destructed.
- *
- * @note
- * To resolve ABA issue, this FIFO queue uses hazard pointer approach.
- */
-template <typename T, bool ALLOW_TO_ALLOCATE = true, bool HAS_OWNERSHIP = true>
-class fifo_list {
+template <typename T>
+class fifo_list : public internal::x_lockfree_fifo<T> {
 public:
-	using fifo_type  = internal::fifo_nd_list<T, HAS_OWNERSHIP>;
-	using input_type = typename fifo_type::input_type;
-	using value_type = typename fifo_type::value_type;
+	fifo_list( void ) = default;
+	fifo_list( size_t reserve_size ) noexcept
+	  : fifo_list()
+	{
+	}
+};
+template <typename T>
+class fifo_list<T[]> : public internal::x_lockfree_fifo<T*> {
+public:
+	using value_type = T[];
 
-	/*!
-	 * @brief	Constructor
-	 *
-	 * In case that ALLOW_TO_ALLOCATE is false, argument pre_alloc_nodes must be equal or than 1.
-	 * This value should be at least the number of CPUs.
-	 * Also, it is recommended to double the number of threads to access.
-	 */
-	fifo_list(
-		unsigned int pre_alloc_nodes = 1   //!< [in]	number of pre-allocated internal free node
+	fifo_list( void ) = default;
+	fifo_list( size_t reserve_size ) noexcept
+	  : fifo_list()
+	{
+	}
+};
+template <typename T, size_t N>
+class fifo_list<T[N]> : public internal::x_lockfree_fifo<std::array<T, N>> {
+public:
+	using value_type = T[N];
+
+	fifo_list( void ) = default;
+	fifo_list( size_t reserve_size ) noexcept
+	  : fifo_list()
+	{
+	}
+
+	void push(
+		const value_type& cont_arg   //!< [in]	a value to push this FIFO queue
 	)
 	{
-		if ( !ALLOW_TO_ALLOCATE && ( pre_alloc_nodes < 1 ) ) {
-			internal::LogOutput( log_type::WARN, "Warning: in case that ALLOW_TO_ALLOCATE is false, argument pre_alloc_nodes must be equal or greater than 1, now %d. Therefore it will be modified to 1. This value should be at least the number of CPUs. Also, it is recommended to double the number of threads to access.", pre_alloc_nodes );
-			pre_alloc_nodes = 1;
+		std::array<T, N> tmp;
+		for ( size_t i = 0; i < N; i++ ) {
+			tmp[i] = cont_arg[i];
 		}
 
-		free_nd_.init_and_pre_allocate<fifo_node_type>( pre_alloc_nodes );
-		return;
+		internal::x_lockfree_fifo<std::array<T, N>>::push( std::move( tmp ) );
+	}
+	void push(
+		value_type&& cont_arg   //!< [in]	a value to push this FIFO queue
+	)
+	{
+		std::array<T, N> tmp;
+		for ( size_t i = 0; i < N; i++ ) {
+			tmp[i] = std::move( cont_arg[i] );
+		}
+
+		internal::x_lockfree_fifo<std::array<T, N>>::push( std::move( tmp ) );
 	}
 
-	/*!
-	 * @brief	Push a value to this FIFO queue
-	 *
-	 * cont_arg will copy to FIFO queue.
-	 *
-	 * @note
-	 * In case that template parameter ALLOW_TO_ALLOCATE is true, this I/F is valid.
-	 */
-	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
-	auto push(
-		const input_type& cont_arg   //!< [in]	a value to push this FIFO queue
-		) -> typename std::enable_if<BOOL_VALUE, void>::type
+	bool pop( value_type& a )
 	{
-		push_common( cont_arg );
-		return;
-	}
-	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
-	auto push(
-		input_type&& cont_arg   //!< [in]	a value to push this FIFO queue
-		) -> typename std::enable_if<BOOL_VALUE, void>::type
-	{
-		push_common( std::move( cont_arg ) );
-		return;
-	}
-
-	/*!
-	 * @brief	Push a value to this FIFO queue
-	 *
-	 * cont_arg will copy to FIFO queue.
-	 *
-	 * @return	success or fail to push
-	 * @retval	true	success to push copy value of cont_arg to FIFO
-	 * @retval	false	fail to push cont_arg value to FIFO
-	 *
-	 * @note
-	 * @li	In case that template parameter ALLOW_TO_ALLOCATE is false, this I/F is valid.
-	 * @li	In case that return value is false, User side has a role to recover this condition by User side itself, e.g. backoff approach.
-	 */
-	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
-	auto push(
-		const input_type& cont_arg   //!< [in]	a value to push this FIFO queue
-		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
-	{
-		return push_common( cont_arg );
-	}
-	template <bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
-	auto push(
-		input_type&& cont_arg   //!< [in]	a value to push this FIFO queue
-		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
-	{
-		return push_common( std::move( cont_arg ) );
-	}
-
-	/*!
-	 * @brief	Pop a value from this FIFO queue
-	 *
-	 * @return	1st element: true=success to pop a value, false=no value to pop
-	 * @return	2nd element: a value that is pop. In case that 1st element is true, 2nd element is valid.
-	 */
-	std::tuple<bool, value_type> pop( void )
-	{
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [p_poped_node, ans_value] = fifo_.pop();
-#else
-		auto local_ret    = fifo_.pop();
-		auto p_poped_node = std::get<0>( local_ret );
-		auto ans_value    = std::get<1>( local_ret );
-#endif
-
-		std::atomic_thread_fence( std::memory_order_acquire );
-
-		if ( p_poped_node == nullptr ) return std::tuple<bool, value_type>( false, std::move( ans_value ) );
-
-		free_nd_.recycle( (free_node_pointer)p_poped_node );
-
-		return std::tuple<bool, value_type>( true, std::move( ans_value ) );
-	}
-
-	/*!
-	 * @brief	number of the queued values in FIFO
-	 *
-	 * @warning
-	 * This FIFO will be access by several thread concurrently. So, true number of this FIFO queue may be changed when caller uses the returned value.
-	 */
-	int get_size( void ) const
-	{
-		return fifo_.get_size();
-	}
-
-	/*!
-	 * @brief	get the total number of the allocated internal nodes
-	 *
-	 * @warning
-	 * This FIFO will be access by several thread concurrently. So, true number of this FIFO queue may be changed when caller uses the returned value.
-	 */
-	int get_allocated_num( void )
-	{
-		return free_nd_.get_allocated_num();
-	}
-
-private:
-	fifo_list( const fifo_list& )            = delete;
-	fifo_list( fifo_list&& )                 = delete;
-	fifo_list& operator=( const fifo_list& ) = delete;
-	fifo_list& operator=( fifo_list&& )      = delete;
-
-	using free_nd_storage_type = internal::free_nd_storage;
-	using free_node_type       = typename free_nd_storage_type::node_type;
-	using free_node_pointer    = typename free_nd_storage_type::node_pointer;
-	using fifo_node_type       = typename fifo_type::node_type;
-	using fifo_node_pointer    = typename fifo_type::node_pointer;
-
-	template <typename TRANSFER_T, bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
-	auto push_common(
-		TRANSFER_T cont_arg   //!< [in]	a value to push this FIFO queue
-		) -> typename std::enable_if<BOOL_VALUE, void>::type
-	{
-		std::atomic_thread_fence( std::memory_order_release );
-
-		fifo_node_pointer p_new_node = free_nd_.allocate<fifo_node_type>(
-			true,
-			[this]( fifo_node_pointer p_chk_node ) {
-				return !( this->fifo_.check_hazard_list( p_chk_node ) );
-				//				return false;
-			} );
-
-		p_new_node->set_value( std::forward<TRANSFER_T>( cont_arg ) );
-
-		fifo_.push( p_new_node );
-		return;
-	}
-
-	template <typename TRANSFER_T, bool BOOL_VALUE = ALLOW_TO_ALLOCATE>
-	auto push_common(
-		TRANSFER_T cont_arg   //!< [in]	a value to push this FIFO queue
-		) -> typename std::enable_if<!BOOL_VALUE, bool>::type
-	{
-		std::atomic_thread_fence( std::memory_order_release );
-
-		fifo_node_pointer p_new_node = free_nd_.allocate<fifo_node_type>(
-			false,
-			[this]( fifo_node_pointer p_chk_node ) {
-				return !( this->fifo_.check_hazard_list( p_chk_node ) );
-				//				return false;
-			} );
-
-		if ( p_new_node != nullptr ) {
-			p_new_node->set_value( std::forward<TRANSFER_T>( cont_arg ) );
-
-			fifo_.push( p_new_node );
-			return true;
-		} else {
+		alcc_optional<std::array<T, N>> ret = internal::x_lockfree_fifo<std::array<T, N>>::pop();
+		if ( !ret.has_value() ) {
 			return false;
 		}
-	}
 
-	fifo_type            fifo_;
-	free_nd_storage_type free_nd_;
+		for ( size_t i = 0; i < N; i++ ) {
+			a[i] = std::move( ret.value()[i] );
+		}
+		return true;
+	}
 };
 
 }   // namespace concurrent

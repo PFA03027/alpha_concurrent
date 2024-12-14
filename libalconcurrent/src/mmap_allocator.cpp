@@ -48,7 +48,7 @@ struct alloc_params {
 	size_t page_aligned_request_overfit_alloc_size_;
 };
 
-inline alloc_params calc_cur_system_alloc_params( size_t req_alloc_size, size_t align_size )
+inline alloc_params calc_cur_system_alloc_params( size_t req_alloc_size, size_t align_size ) noexcept
 {
 	if ( align_size < sizeof( uintptr_t ) ) {
 		align_size = sizeof( uintptr_t );   // 最低のアライメントをポインタサイズに制約する
@@ -67,7 +67,7 @@ inline alloc_params calc_cur_system_alloc_params( size_t req_alloc_size, size_t 
 	return alloc_params { min_aligne_size, cur_real_alloc_size, overfit_size };
 }
 
-allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size )
+allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size ) noexcept
 {
 	if ( req_alloc_size > conf_max_mmap_alloc_size ) {
 		// too big allocation request
@@ -142,7 +142,7 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size )
 	return allocate_result { p_alloc_expected, page_aligned_params.page_aligned_real_alloc_size_ };
 }
 
-int deallocate_by_munmap( void* p_allocated_addr, size_t allocated_size )
+int deallocate_by_munmap( void* p_allocated_addr, size_t allocated_size ) noexcept
 {
 	cur_total_allocation_size.fetch_sub( allocated_size, std::memory_order_acq_rel );
 #ifdef ALCONCURRENT_CONF_ENABLE_MALLOC_INSTEAD_OF_MMAP
@@ -153,7 +153,7 @@ int deallocate_by_munmap( void* p_allocated_addr, size_t allocated_size )
 #endif
 }
 
-alloc_mmap_status get_alloc_mmap_status( void )
+alloc_mmap_status get_alloc_mmap_status( void ) noexcept
 {
 	return alloc_mmap_status {
 		cur_total_allocation_size.load( std::memory_order_acquire ),
@@ -168,17 +168,17 @@ void print_of_mmap_allocator( void )
 
 	printf( "page_size               = %16zu = 0x%016zx\n", page_size, page_size );
 	printf( "current allocation size = %16zu = 0x%016zx %.2fG %.2fM %.0fK\n", cur_size, cur_size,
-	        (double)cur_size / (double)( 1024 * 1024 * 1024 ),
-	        (double)cur_size / (double)( 1024 * 1024 ),
-	        (double)cur_size / (double)( 1024 )
+	        static_cast<double>( cur_size ) / static_cast<double>( 1024 * 1024 * 1024 ),
+	        static_cast<double>( cur_size ) / static_cast<double>( 1024 * 1024 ),
+	        static_cast<double>( cur_size ) / static_cast<double>( 1024 )
 	        //
 	);
 	printf( "max allocation size     = %16zu = 0x%016zx %.2fG %.2fM %.0fK\n",
 	        cur_max,
 	        cur_max,
-	        (double)cur_max / (double)( 1024 * 1024 * 1024 ),
-	        (double)cur_max / (double)( 1024 * 1024 ),
-	        (double)cur_max / (double)( 1024 )
+	        static_cast<double>( cur_max ) / static_cast<double>( 1024 * 1024 * 1024 ),
+	        static_cast<double>( cur_max ) / static_cast<double>( 1024 * 1024 ),
+	        static_cast<double>( cur_max ) / static_cast<double>( 1024 )
 	        //
 	);
 }

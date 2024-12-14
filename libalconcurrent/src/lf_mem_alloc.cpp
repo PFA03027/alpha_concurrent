@@ -18,15 +18,15 @@
 #include <vector>
 
 #include "alconcurrent/conf_logger.hpp"
-#include "alconcurrent/internal/lf_mem_alloc_internal.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
 
-#include "mmap_allocator.hpp"
-#include "utility.hpp"
+#include "alconcurrent/internal/lf_mem_alloc_internal.hpp"
 
 #include "lf_mem_alloc_basic_allocator.hpp"
 #include "lf_mem_alloc_slot.hpp"
 #include "lf_mem_alloc_slot_array.hpp"
+#include "mmap_allocator.hpp"
+#include "utility.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -789,13 +789,12 @@ void general_mem_allocator_impl_deallocate(
 	internal::slot_chk_result chk_ret = internal::chunk_header_multi_slot::get_chunk( p_mem );
 
 	if ( chk_ret.correct_ ) {
-#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION )
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
 		if ( chk_ret.p_chms_ == nullptr ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_EXCEPTION
-			std::string errlog = "return value of get_chunk() is unexpected";
-			throw std::logic_error( errlog );
-#else
 			internal::LogOutput( log_type::ERR, "return value of get_chunk() is unexpected" );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+			std::terminate();
+#else
 			return;
 #endif
 		}
@@ -862,46 +861,43 @@ general_mem_allocator::general_mem_allocator(
 	return;
 }
 
-std::string chunk_statistics::print( void ) const
+chunk_statistics::print_string_t chunk_statistics::print( void ) const noexcept
 {
-	char buf[CONF_LOGGER_INTERNAL_BUFF_SIZE];
-	snprintf( buf, CONF_LOGGER_INTERNAL_BUFF_SIZE - 1,
-	          "chunk conf{.size=%d, .num=%d}, chunk_num: %d, valid chunk_num: %d"
-	          ", total_slot=%d, free_slot=%d, consum cnt=%d, max consum cnt=%d"
+	return print_string_t(
+		"chunk conf{.size=%d, .num=%d}, chunk_num: %d, valid chunk_num: %d"
+		", total_slot=%d, free_slot=%d, consum cnt=%d, max consum cnt=%d"
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-	          ", alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_colli=%d, dealloc_colli=%d"
+		", alloc cnt=%d, alloc err=%d, dealloc cnt=%d, dealloc err=%d, alloc_colli=%d, dealloc_colli=%d"
 #endif
-	          ,
-	          (int)alloc_conf_.size_of_one_piece_,
-	          (int)alloc_conf_.num_of_pieces_,
-	          (int)chunk_num_,
-	          (int)valid_chunk_num_,
-	          (int)total_slot_cnt_,
-	          (int)free_slot_cnt_,
-	          (int)consum_cnt_,
-	          (int)max_consum_cnt_
+		,
+		(int)alloc_conf_.size_of_one_piece_,
+		(int)alloc_conf_.num_of_pieces_,
+		(int)chunk_num_,
+		(int)valid_chunk_num_,
+		(int)total_slot_cnt_,
+		(int)free_slot_cnt_,
+		(int)consum_cnt_,
+		(int)max_consum_cnt_
 #ifdef ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
-	          ,
-	          (int)alloc_req_cnt_,
-	          (int)error_alloc_req_cnt_,
-	          (int)dealloc_req_cnt_,
-	          (int)error_dealloc_req_cnt_,
-	          (int)alloc_collision_cnt_,
-	          (int)dealloc_collision_cnt_
+		,
+		(int)alloc_req_cnt_,
+		(int)error_alloc_req_cnt_,
+		(int)dealloc_req_cnt_,
+		(int)error_dealloc_req_cnt_,
+		(int)alloc_collision_cnt_,
+		(int)dealloc_collision_cnt_
 #endif
 	);
-
-	return std::string( buf );
 }
 
 std::string general_mem_allocator_statistics::print( void ) const
 {
 	std::string ans;
 	for ( auto&& e : ch_st_ ) {
-		ans += e.print();
+		ans += e.print().c_str();
 		ans += "\n";
 	};
-	ans += al_st_.print();
+	ans += al_st_.print().c_str();
 	return ans;
 }
 

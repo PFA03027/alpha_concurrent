@@ -1,398 +1,813 @@
-//============================================================================
-// Name        : test_lf_list.cpp
-// Author      : Teruaki Ata
-// Version     :
-// Copyright   : Your copyright notice
-// Description : Hello World in C, Ansi-style
-//============================================================================
-
-#include <pthread.h>
-
-#include <chrono>
-#include <cstdint>
-#include <iostream>
-#include <random>
-#include <thread>
+/**
+ * @file test_lf_list2.cpp
+ * @author Teruaki Ata (PFA03027@nifty.com)
+ * @brief
+ * @version 0.1
+ * @date 2024-11-23
+ *
+ * @copyright Copyright (c) 2024, Teruaki Ata (PFA03027@nifty.com)
+ *
+ */
 
 #include "gtest/gtest.h"
 
+#include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/lf_list.hpp"
-#include "alconcurrent/lf_mem_alloc_type.hpp"
 
-constexpr unsigned int   num_thread = 12;   // Tested until 128.
-constexpr std::uintptr_t loop_num   = 2000;
+using tut_list = alpha::concurrent::lockfree_list<int>;
 
-using test_list = alpha::concurrent::lockfree_list<std::uintptr_t>;
+TEST( Test_lockfree_list_Construct, DoConstruct_ThenDestruct )
+{
+	// Arrenge
 
-pthread_barrier_t barrier;
+	// Act
+	ASSERT_NO_THROW( { tut_list sut; } );
 
-class lflistTest : public ::testing::Test {
+	// Assert
+}
+
+// ==================================================================================
+class Test_lockfree_list : public ::testing::Test {
 protected:
-	virtual void SetUp()
+	void SetUp() override
 	{
-		alpha::concurrent::gmem_prune();
+		alpha::concurrent::GetErrorWarningLogCountAndReset( nullptr, nullptr );
 	}
 
-	virtual void TearDown()
+	void TearDown() override
 	{
-		auto statistics = alpha::concurrent::internal::node_of_list::get_statistics();
-		printf( "%s\n", statistics.print().c_str() );
-
-		printf( "number of keys of dynamic_tls_key_create(),     %d\n", alpha::concurrent::internal::get_num_of_tls_key() );
-		printf( "max number of keys of dynamic_tls_key_create(), %d\n", alpha::concurrent::internal::get_max_num_of_tls_key() );
+		int cw, ce;
+		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
+		EXPECT_EQ( ce, 0 );
+		EXPECT_EQ( cw, 0 );
 	}
+
+	tut_list sut_;
 };
 
-/**
- * 各スレッドの先頭から追加して、最後から取り出すことで、カウントアップを繰り返す。
- */
-void* func_test_list_front2back( void* data )
+TEST_F( Test_lockfree_list, Empty_DoFindIf )
 {
-	test_list* p_test_obj = reinterpret_cast<test_list*>( data );
+	// Arrenge
+	int count = 0;
 
-	pthread_barrier_wait( &barrier );
+	// Act
+	sut_.find_if( [&count]( const tut_list::value_type& ) -> bool { count++; return false; } );
 
-	typename test_list::value_type v = 0;
-	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
-		if ( !p_test_obj->push_front( v ) ) {
-			printf( "Bugggggggyyyy  func_test_list_front2back()!!!  %s\n", std::to_string( v ).c_str() );
-			printf( "list size count: %d\n", p_test_obj->get_size() );
-			exit( 1 );
-		}
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = p_test_obj->pop_back();
-#else
-		auto local_ret = p_test_obj->pop_back();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		if ( !pop_flag ) {
-			printf( "Bugggggggyyyy  func_test_list_front2back()!!!  %s\n", std::to_string( v ).c_str() );
-			printf( "list size count: %d\n", p_test_obj->get_size() );
-			exit( 1 );
-		}
-		v = vv + 1;
-	}
-
-	return reinterpret_cast<void*>( v );
+	// Assert
+	EXPECT_EQ( count, 0 );
 }
 
-/**
- * 各スレッドの最後から追加して、先頭から取り出すことで、カウントアップを繰り返す。
- */
-void* func_test_list_back2front( void* data )
+TEST_F( Test_lockfree_list, Empty_DoInsertToHead_ThenOneElement )
 {
-	test_list* p_test_obj = reinterpret_cast<test_list*>( data );
+	// Arrenge
+	int count = 0;
 
-	pthread_barrier_wait( &barrier );
+	// Act
+	sut_.insert(
+		[&count]( const int& v ) -> bool {
+			count++;
+			return true;
+		},
+		1 );
 
-	typename test_list::value_type v = 0;
-	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
-		if ( !p_test_obj->push_back( v ) ) {
-			printf( "Bugggggggyyyy  func_test_list_back2front() by push_back!!!  %s\n", std::to_string( v ).c_str() );
-			printf( "list size count: %d\n", p_test_obj->get_size() );
-			exit( 1 );
-		}
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-		auto [pop_flag, vv] = p_test_obj->pop_front();
-#else
-		auto local_ret = p_test_obj->pop_front();
-		auto pop_flag  = std::get<0>( local_ret );
-		auto vv        = std::get<1>( local_ret );
-#endif
-		if ( !pop_flag ) {
-			printf( "Bugggggggyyyy  func_test_list_back2front() by pop_front!!!  %s\n", std::to_string( v ).c_str() );
-			printf( "list size count: %d\n", p_test_obj->get_size() );
-			exit( 1 );
-		}
-		v = vv + 1;
-	}
+	// Assert
+	EXPECT_EQ( count, 0 );
 
-	return reinterpret_cast<void*>( v );
+	count     = 0;
+	int value = 0;
+	sut_.find_if( [&count, &value]( const tut_list::value_type& v ) -> bool { count++; value = v; return false; } );
+	EXPECT_EQ( count, 1 );
+	EXPECT_EQ( value, 1 );
 }
 
-TEST_F( lflistTest, TC1 )
+TEST_F( Test_lockfree_list, Empty_DoInsertToTail_ThenOneElement )
 {
-	test_list count_list;
+	// Arrenge
+	int count = 0;
 
-	pthread_barrier_init( &barrier, NULL, num_thread * 2 + 1 );
-	pthread_t* threads = new pthread_t[num_thread * 2];
+	// Act
+	sut_.insert(
+		[&count]( const int& v ) -> bool {
+			count++;
+			return false;
+		},
+		1 );
 
-	for ( unsigned int i = 0; i < num_thread; i++ ) {
-		pthread_create( &threads[i], NULL, func_test_list_front2back, reinterpret_cast<void*>( &count_list ) );
-		// pthread_create( &threads[i], NULL, func_test_list_back2front, reinterpret_cast<void*>( &count_list ) );
-	}
+	// Assert
+	EXPECT_EQ( count, 0 );
 
-	for ( unsigned int i = 0; i < num_thread; i++ ) {
-		// pthread_create( &threads[num_thread + i], NULL, func_test_list_front2back, reinterpret_cast<void*>( &count_list ) );
-		pthread_create( &threads[num_thread + i], NULL, func_test_list_back2front, reinterpret_cast<void*>( &count_list ) );
-	}
-
-	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
-	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-	pthread_barrier_wait( &barrier );
-
-	uintptr_t sum = 0;
-	for ( unsigned int i = 0; i < num_thread * 2; i++ ) {
-		uintptr_t e;
-		pthread_join( threads[i], reinterpret_cast<void**>( &e ) );
-		std::cout << "Thread " << i << ": last dequeued = " << e << std::endl;
-		sum += e;
-	}
-
-	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
-
-	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
-	std::cout << "thread is " << num_thread << "  Exec time: " << diff.count() << " msec" << std::endl;
-
-	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
-	// に等しくなるはず。
-	std::cout << "Expect: " << std::to_string( num_thread * 2 * loop_num ) << std::endl;
-	std::cout << "Sum:    " << sum << std::endl;
-
-	EXPECT_EQ( num_thread * 2 * loop_num, sum );
-
-	delete[] threads;
-
-	std::cout << "Allocated nodes:    " << count_list.get_allocated_num() << std::endl;
-
-	return;
+	count     = 0;
+	int value = 0;
+	sut_.find_if( [&count, &value]( const tut_list::value_type& v ) -> bool { count++; value = v; return false; } );
+	EXPECT_EQ( count, 1 );
+	EXPECT_EQ( value, 1 );
 }
 
-constexpr typename test_list::value_type target_value = 1;
-constexpr typename test_list::value_type target_min   = target_value - 1;
-constexpr typename test_list::value_type target_max   = target_value + 1;
-
-/**
- * 各スレッドの先頭から追加して、最後から取り出すことで、カウントアップを繰り返す。
- */
-void* func_test_list_insert_remove( void* data )
+TEST_F( Test_lockfree_list, Empty_DoRemoveOneIf_ThenEmpty )
 {
-	test_list* p_test_obj = reinterpret_cast<test_list*>( data );
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
 
-	test_list::predicate_t search_insert_pos = []( const test_list::value_type& a ) -> bool {
-		return ( a > target_value );
-	};
+	// Act
+	auto ret = sut_.remove_one_if( []( const tut_list::value_type& v ) -> bool { return v == 0; } );
 
-	test_list::predicate_t search_remove_data = []( const test_list::value_type& a ) -> bool {
-		return ( a == target_value );
-	};
+	// Assert
+	ASSERT_FALSE( ret.has_value() );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
 
-	std::random_device seed_gen;
-	std::mt19937       engine( seed_gen() );
+TEST_F( Test_lockfree_list, OneElement_DoRemoveOneIf_ThenEmpty )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );
+	EXPECT_EQ( sut_.get_size(), 1 );
 
-	// 0以上9以下の値を等確率で発生させる
-	std::uniform_int_distribution<> dist( 0, 9 );
+	// Act
+	auto ret = sut_.remove_one_if( []( const tut_list::value_type& v ) -> bool { return v == 1; } );
 
-	pthread_barrier_wait( &barrier );
+	// Assert
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
 
-	typename test_list::value_type v = 0;
-	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
-		while ( true ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-			auto [ins_chk_ret, ins_allc_ret] = p_test_obj->insert( target_value, search_insert_pos );
-#else
-			auto local_ret    = p_test_obj->insert( target_value, search_insert_pos );
-			auto ins_chk_ret  = std::get<0>( local_ret );
-			auto ins_allc_ret = std::get<1>( local_ret );
-#endif
-			if ( ins_chk_ret ) break;
-			if ( ins_allc_ret ) {
-				// フリーノードストレージからの管理ノードアロケーションに成功しながらも、挿入位置を見つけられなかったことを示す。
-				// テスト条件として、これは起きてはならないため、エラー終了する。
-				printf( "Bugggggggyyyy  func_test_list_insert_remove()!!!  %s\n", std::to_string( i ).c_str() );
-				printf( "list size count: %d\n", p_test_obj->get_size() );
-				return reinterpret_cast<void*>( 0 );
-			} else {
-				// バックオフ処理を行って次の機会を狙う
-				std::this_thread::sleep_for( std::chrono::milliseconds( 1 + dist( engine ) ) );   // backoff handling
-			}
+TEST_F( Test_lockfree_list, TwoElement_DoRemoveOneIfFromHead_ThenOneElement )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
+	EXPECT_EQ( sut_.get_size(), 2 );
+
+	// Act
+	auto ret = sut_.remove_one_if( []( const tut_list::value_type& v ) -> bool { return v == 2; } );
+
+	// Assert
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, TwoElement_DoRemoveOneIfFromTail_ThenOneElement )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
+	EXPECT_EQ( sut_.get_size(), 2 );
+
+	// Act
+	auto ret = sut_.remove_one_if( []( const tut_list::value_type& v ) -> bool { return v == 1; } );
+
+	// Assert
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, ThreeElement_DoRemoveOneIfFromMid_ThenTwoElement )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 3 );   // 先頭に挿入
+	EXPECT_EQ( sut_.get_size(), 3 );
+
+	// Act
+	auto ret = sut_.remove_one_if( []( const tut_list::value_type& v ) -> bool { return v == 2; } );
+
+	// Assert
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( sut_.get_size(), 2 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoRemoveAllIf_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+
+	// Act
+	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return true; } );
+
+	// Assert
+	EXPECT_EQ( ret, 0 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, OneElement_DoRemoveAllIf_ThenEmpty )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );
+	EXPECT_EQ( sut_.get_size(), 1 );
+
+	// Act
+	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return true; } );
+
+	// Assert
+	EXPECT_EQ( ret, 1 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, OneElement_DoRemoveAllIf_ThenOneElement )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );
+	EXPECT_EQ( sut_.get_size(), 1 );
+
+	// Act
+	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return false; } );
+
+	// Assert
+	EXPECT_EQ( ret, 0 );
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, TwoElement_DoRemoveAllIfFromHead_ThenOneElement )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
+	EXPECT_EQ( sut_.get_size(), 2 );
+
+	// Act
+	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return v == 2; } );
+
+	// Assert
+	EXPECT_EQ( ret, 1 );
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, TwoElement_DoRemoveAllIfFromTail_ThenOneElement )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
+	EXPECT_EQ( sut_.get_size(), 2 );
+
+	// Act
+	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return v == 1; } );
+
+	// Assert
+	EXPECT_EQ( ret, 1 );
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, TwoElement_DoRemoveAllIf_ThenEmpty )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
+	EXPECT_EQ( sut_.get_size(), 2 );
+
+	// Act
+	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return true; } );
+
+	// Assert
+	EXPECT_EQ( ret, 2 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, TwoElement_DoRemoveAllIf_ThenTwoElement )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
+	EXPECT_EQ( sut_.get_size(), 2 );
+
+	// Act
+	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return false; } );
+
+	// Assert
+	EXPECT_EQ( ret, 0 );
+	EXPECT_EQ( sut_.get_size(), 2 );
+}
+
+TEST_F( Test_lockfree_list, ThreeElement_DoRemoveAllIfFromMid_ThenTwoElement )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 3 );   // 先頭に挿入
+	EXPECT_EQ( sut_.get_size(), 3 );
+
+	// Act
+	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return v == 2; } );
+
+	// Assert
+	EXPECT_EQ( ret, 1 );
+	EXPECT_EQ( sut_.get_size(), 2 );
+}
+
+TEST_F( Test_lockfree_list, ThreeElement_DoRemoveAllIf_ThenEmpty )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 3 );   // 先頭に挿入
+	EXPECT_EQ( sut_.get_size(), 3 );
+
+	// Act
+	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return true; } );
+
+	// Assert
+	EXPECT_EQ( ret, 3 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, ThreeElement_DoRemoveAllIf_ThenThreeElement )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 3 );   // 先頭に挿入
+	EXPECT_EQ( sut_.get_size(), 3 );
+
+	// Act
+	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return false; } );
+
+	// Assert
+	EXPECT_EQ( ret, 0 );
+	EXPECT_EQ( sut_.get_size(), 3 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoForEach )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	int count = 0;
+
+	// Act
+	sut_.for_each( [&count]( const tut_list::value_type& v ) { count++; } );
+
+	// Assert
+	EXPECT_EQ( count, 0 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, OneElement_DoForEach )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
+	EXPECT_EQ( sut_.get_size(), 1 );
+	int count = 0;
+
+	// Act
+	sut_.for_each( [&count]( const tut_list::value_type& v ) { count++; } );
+
+	// Assert
+	EXPECT_EQ( count, 1 );
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, TwoElement_DoForEach )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
+	EXPECT_EQ( sut_.get_size(), 2 );
+	int count = 0;
+
+	// Act
+	sut_.for_each( [&count]( const tut_list::value_type& v ) { count++; } );
+
+	// Assert
+	EXPECT_EQ( count, 2 );
+	EXPECT_EQ( sut_.get_size(), 2 );
+}
+
+TEST_F( Test_lockfree_list, ThreeElement_DoForEach )
+{
+	// Arrenge
+	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
+	sut_.insert( []( const int& v ) -> bool { return true; }, 3 );   // 先頭に挿入
+	EXPECT_EQ( sut_.get_size(), 3 );
+	int count = 0;
+	int val_array[3];
+	int idx = 0;
+
+	// Act
+	sut_.for_each( [&count, &idx, &val_array]( const tut_list::value_type& v ) {
+		count++;
+		if ( idx < 3 ) {
+			val_array[idx] = v;
+			idx++;
 		}
-
-		if ( p_test_obj->remove_one_if( search_remove_data ) ) {
-			v++;
-		}
-	}
-
-	return reinterpret_cast<void*>( v );
-}
-
-TEST_F( lflistTest, TC2 )
-{
-	test_list count_list;
-
-	count_list.push_back( target_min );
-	count_list.push_back( target_max );
-
-	pthread_barrier_init( &barrier, NULL, num_thread + 1 );
-	pthread_t* threads = new pthread_t[num_thread];
-
-	for ( unsigned int i = 0; i < num_thread; i++ ) {
-		pthread_create( &threads[i], NULL, func_test_list_insert_remove, reinterpret_cast<void*>( &count_list ) );
-	}
-
-	std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
-	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-	pthread_barrier_wait( &barrier );
-
-	uintptr_t sum = 0;
-	for ( unsigned int i = 0; i < num_thread; i++ ) {
-		uintptr_t e;
-		pthread_join( threads[i], reinterpret_cast<void**>( &e ) );
-		std::cout << "Thread " << i << ": last dequeued = " << e << std::endl;
-		sum += e;
-	}
-
-	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
-
-	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
-	std::cout << "thread is " << num_thread << "  Exec time: " << diff.count() << " msec" << std::endl;
-
-	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
-	// に等しくなるはず。
-	std::cout << "Expect: " << std::to_string( num_thread * loop_num ) << std::endl;
-	std::cout << "Sum:    " << sum << std::endl;
-
-	EXPECT_EQ( num_thread * loop_num, sum );
-
-	delete[] threads;
-
-	std::cout << "nodes:              " << count_list.get_size() << std::endl;
-	std::cout << "Allocated nodes:    " << count_list.get_allocated_num() << std::endl;
-
-	return;
-}
-
-struct data_tc {
-	test_list*            p_test_obj;
-	test_list::value_type tc_data;
-};
-
-/**
- * 各スレッドの先頭から追加して、最後から取り出すことで、カウントアップを繰り返す。
- */
-void* func_test_list_push( void* data )
-{
-	data_tc*   p_tc       = reinterpret_cast<data_tc*>( data );
-	test_list* p_test_obj = p_tc->p_test_obj;
-
-	printf( "func_test_list_push()!!! -> %s\n", std::to_string( p_tc->tc_data ).c_str() );
-
-	pthread_barrier_wait( &barrier );
-
-	typename test_list::value_type v = 0;
-	for ( std::uintptr_t i = 0; i < loop_num; i++ ) {
-		if ( !p_test_obj->push_front( p_tc->tc_data ) ) {
-			printf( "Bugggggggyyyy  func_test_list_push()!!!  %s\n", std::to_string( v ).c_str() );
-			printf( "list size count: %d\n", p_test_obj->get_size() );
-			return reinterpret_cast<void*>( v );
-		}
-		v++;
-		if ( ( i % 100 ) == 0 ) {
-			std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );   // backoff handling
-		}
-	}
-
-	return reinterpret_cast<void*>( v );
-}
-
-/**
- * 各スレッドの先頭から追加して、最後から取り出すことで、カウントアップを繰り返す。
- */
-void* func_test_list_remove_all( void* data )
-{
-	data_tc*   p_tc       = reinterpret_cast<data_tc*>( data );
-	test_list* p_test_obj = p_tc->p_test_obj;
-
-	test_list::predicate_t search_remove_data = [p_tc]( const test_list::value_type& a ) -> bool {
-		return ( p_tc->tc_data == a );
-	};
-
-	printf( "func_test_list_remove_all()!!! -> %s\n", std::to_string( p_tc->tc_data ).c_str() );
-
-	pthread_barrier_wait( &barrier );
-
-	typename test_list::value_type v = 0;
-	while ( v < loop_num ) {
-		test_list::value_type v_tmp = p_test_obj->remove_all_if( search_remove_data );
-		v += v_tmp;
-		if ( v_tmp == 0 ) {
-			std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );   // backoff handling
-		}
-	}
-
-	return reinterpret_cast<void*>( v );
-}
-
-TEST_F( lflistTest, TC3 )
-{
-	test_list count_list;
-
-	pthread_barrier_init( &barrier, NULL, num_thread * 2 + 1 );
-	pthread_t* threads       = new pthread_t[num_thread * 2];
-	data_tc*   test_data_set = new data_tc[num_thread];
-
-	for ( unsigned int i = 0; i < num_thread; i++ ) {
-		test_data_set[i].p_test_obj = &count_list;
-		test_data_set[i].tc_data    = i;
-	}
-
-	for ( unsigned int i = 0; i < num_thread; i++ ) {
-		pthread_create( &threads[i], NULL, func_test_list_push, reinterpret_cast<void*>( &( test_data_set[i] ) ) );
-	}
-
-	for ( unsigned int i = 0; i < num_thread; i++ ) {
-		pthread_create( &threads[num_thread + i], NULL, func_test_list_remove_all, reinterpret_cast<void*>( &( test_data_set[i] ) ) );
-	}
-
-	// std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
-	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-	pthread_barrier_wait( &barrier );
-
-	uintptr_t sum = 0;
-	for ( unsigned int i = 0; i < num_thread * 2; i++ ) {
-		uintptr_t e;
-		pthread_join( threads[i], reinterpret_cast<void**>( &e ) );
-		std::cout << "Thread " << i << ": last dequeued = " << e << std::endl;
-		sum += e;
-	}
-
-	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
-
-	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
-	std::cout << "thread is " << num_thread << "  Exec time: " << diff.count() << " msec" << std::endl;
-
-	// 各スレッドが最後にdequeueした値の合計は num_thread * num_loop
-	// に等しくなるはず。
-	std::cout << "Expect: " << std::to_string( num_thread * 2 * loop_num ) << std::endl;
-	std::cout << "Sum:    " << sum << std::endl;
-	EXPECT_EQ( num_thread * 2 * loop_num, sum );
-
-	delete[] threads;
-	delete[] test_data_set;
-
-	std::cout << "nodes:              " << count_list.get_size() << std::endl;
-	std::cout << "Allocated nodes:    " << count_list.get_allocated_num() << std::endl;
-
-	return;
-}
-
-TEST_F( lflistTest, TC4 )
-{
-	test_list count_list;
-
-	for ( std::uintptr_t i = 0; i <= loop_num; i++ ) {
-		ASSERT_TRUE( count_list.push_front( i ) );
-		//			printf( "Bugggggggyyyy  func_test_list_push()!!!  %llu\n", i );
-		//			printf( "list size count: %d\n", count_list.get_size() );
-	}
-
-	std::uintptr_t sum = 0;
-	count_list.for_each( [&sum]( test_list::value_type& ref_value ) {
-		sum += ref_value;
 	} );
 
-	std::uintptr_t expect = 0;
+	// Assert
+	EXPECT_EQ( count, 3 );
+	EXPECT_EQ( sut_.get_size(), 3 );
+	EXPECT_EQ( val_array[0], 3 );
+	EXPECT_EQ( val_array[1], 2 );
+	EXPECT_EQ( val_array[2], 1 );
+}
+
+////
+
+TEST_F( Test_lockfree_list, Empty_DoPushFront_ThenOneElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+
+	// Act
+	sut_.push_front( 1 );
+
+	// Assert
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontTwice_ThenTwoElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+
+	// Act
+	sut_.push_front( 2 );
+
+	// Assert
+	EXPECT_EQ( sut_.get_size(), 2 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontThree_ThenThreeElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+	sut_.push_front( 2 );
+
+	// Act
+	sut_.push_front( 3 );
+
+	// Assert
+	int count = 0;
+	int val_array[3];
+	int idx = 0;
+	sut_.for_each( [&count, &idx, &val_array]( const tut_list::value_type& v ) {
+		count++;
+		if ( idx < 3 ) {
+			val_array[idx] = v;
+			idx++;
+		}
+	} );
+	EXPECT_EQ( count, 3 );
+	EXPECT_EQ( sut_.get_size(), 3 );
+	EXPECT_EQ( val_array[0], 3 );
+	EXPECT_EQ( val_array[1], 2 );
+	EXPECT_EQ( val_array[2], 1 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPopFront_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+
+	// Act
+	auto ret = sut_.pop_front();
+
+	// Assert
+	EXPECT_FALSE( ret.has_value() );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontPopFront_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+
+	// Act
+	auto ret = sut_.pop_front();
+
+	// Assert
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 1 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontPopFrontTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+	sut_.pop_front();
+
+	// Act
+	auto ret = sut_.pop_front();
+
+	// Assert
+	EXPECT_FALSE( ret.has_value() );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopFront_ThenOneElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+	sut_.push_front( 2 );
+
+	// Act
+	auto ret = sut_.pop_front();
+
+	// Assert
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 2 );
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopFrontTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+	sut_.push_front( 2 );
+	auto ret1 = sut_.pop_front();
+
+	// Act
+	auto ret2 = sut_.pop_front();
+
+	// Assert
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 2 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 1 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+////
+
+TEST_F( Test_lockfree_list, Empty_DoPushBack_ThenOneElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+
+	// Act
+	sut_.push_back( 1 );
+
+	// Assert
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackTwice_ThenTwoElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+
+	// Act
+	sut_.push_back( 2 );
+
+	// Assert
+	EXPECT_EQ( sut_.get_size(), 2 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackThree_ThenThreeElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+	sut_.push_back( 2 );
+
+	// Act
+	sut_.push_back( 3 );
+
+	// Assert
+	int count = 0;
+	int val_array[3];
+	int idx = 0;
+	sut_.for_each( [&count, &idx, &val_array]( const tut_list::value_type& v ) {
+		count++;
+		if ( idx < 3 ) {
+			val_array[idx] = v;
+			idx++;
+		}
+	} );
+	EXPECT_EQ( count, 3 );
+	EXPECT_EQ( sut_.get_size(), 3 );
+	EXPECT_EQ( val_array[0], 1 );
+	EXPECT_EQ( val_array[1], 2 );
+	EXPECT_EQ( val_array[2], 3 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPopBack_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+
+	// Act
+	auto ret = sut_.pop_back();
+
+	// Assert
+	EXPECT_FALSE( ret.has_value() );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackPopBack_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+
+	// Act
+	auto ret = sut_.pop_back();
+
+	// Assert
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 1 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackPopBackTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+	sut_.pop_back();
+
+	// Act
+	auto ret = sut_.pop_back();
+
+	// Assert
+	EXPECT_FALSE( ret.has_value() );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopBack_ThenOneElement )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+	sut_.push_back( 2 );
+
+	// Act
+	auto ret = sut_.pop_back();
+
+	// Assert
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 2 );
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopBackTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+	sut_.push_back( 2 );
+	auto ret1 = sut_.pop_back();
+
+	// Act
+	auto ret2 = sut_.pop_back();
+
+	// Assert
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 2 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 1 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+////
+TEST_F( Test_lockfree_list, Empty_DoPushFrontPopBack_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+
+	// Act
+	auto ret = sut_.pop_back();
+
+	// Assert
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 1 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopBack_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+	sut_.push_front( 2 );
+
+	// Act
+	auto ret = sut_.pop_back();
+
+	// Assert
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 1 );
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopBackTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_front( 1 );
+	sut_.push_front( 2 );
+	auto ret1 = sut_.pop_back();
+
+	// Act
+	auto ret2 = sut_.pop_back();
+
+	// Assert
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 1 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 2 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoEmplaceFrontTwicePopBackTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.emplace_front( 1 );
+	sut_.emplace_front( 2 );
+	auto ret1 = sut_.pop_back();
+
+	// Act
+	auto ret2 = sut_.pop_back();
+
+	// Assert
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 1 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 2 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackPopFront_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+
+	// Act
+	auto ret = sut_.pop_front();
+
+	// Assert
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 1 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopFront_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+	sut_.push_back( 2 );
+
+	// Act
+	auto ret = sut_.pop_front();
+
+	// Assert
+	ASSERT_TRUE( ret.has_value() );
+	EXPECT_EQ( ret.value(), 1 );
+	EXPECT_EQ( sut_.get_size(), 1 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopFrontTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.push_back( 1 );
+	sut_.push_back( 2 );
+	auto ret1 = sut_.pop_front();
+
+	// Act
+	auto ret2 = sut_.pop_front();
+
+	// Assert
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 1 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 2 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoEmplaceBackTwicePopFrontTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.emplace_back( 1 );
+	sut_.emplace_back( 2 );
+	auto ret1 = sut_.pop_front();
+
+	// Act
+	auto ret2 = sut_.pop_front();
+
+	// Assert
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 1 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 2 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, TC4_DoForEach )
+{
+	// Arrange
+	constexpr int loop_num = 2000;
+	int           expect   = 0;
 	if ( ( loop_num % 2 ) == 0 ) {
 		// 偶数の場合
 		expect = loop_num * ( loop_num / 2 ) + loop_num / 2;
@@ -400,40 +815,74 @@ TEST_F( lflistTest, TC4 )
 		// 奇数の場合
 		expect = loop_num * ( ( loop_num + 1 ) / 2 );
 	}
-	std::cout << "Expect: " << expect << std::endl;
-	std::cout << "Sum:    " << sum << std::endl;
 
-	std::cout << "final count of p_test_obj[0] is " << count_list.get_size() << std::endl;
+	for ( int i = 0; i <= loop_num; i++ ) {
+		sut_.push_front( i );
+	}
 
-	EXPECT_EQ( expect, sum );
+	// Act
+	tut_list::value_type sum = 0;
+	sut_.for_each( [&sum]( tut_list::value_type& ref_value ) {
+		sum += ref_value;
+	} );
+
+	EXPECT_EQ( sut_.get_size(), loop_num + 1 );
+	EXPECT_EQ( expect, sum ) << "Expect: " << expect << std::endl
+							 << "Sum:    " << sum << std::endl;
 
 	return;
 }
 
-TEST_F( lflistTest, Pointer )
+TEST_F( Test_lockfree_list, NonOwnerPointer )
 {
 	using test_fifo_type3 = alpha::concurrent::lockfree_list<int*>;
 	test_fifo_type3* p_test_obj;
 
-	std::cout << "Pointer test#1" << std::endl;
-	p_test_obj = new test_fifo_type3( 8 );
-
-	p_test_obj->push_front( new int() );
-
-	delete p_test_obj;
-
-	std::cout << "Pointer test#2" << std::endl;
+	std::cout << "Pointer test" << std::endl;
 	p_test_obj = new test_fifo_type3( 8 );
 
 	p_test_obj->push_front( new int() );
 	auto ret = p_test_obj->pop_front();
 
-	ASSERT_TRUE( std::get<0>( ret ) );
+	ASSERT_TRUE( ret.has_value() );
 
-	delete std::get<1>( ret );
+	delete ret.value();
 	delete p_test_obj;
 
 	std::cout << "End Pointer test" << std::endl;
+}
+
+TEST_F( Test_lockfree_list, UniquePointer )
+{
+	using test_fifo_type3 = alpha::concurrent::lockfree_list<std::unique_ptr<int>>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "std::unique_ptr<int> test" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push_front( std::unique_ptr<int>( new int() ) );
+	auto ret = p_test_obj->pop_front();
+
+	ASSERT_TRUE( ret.has_value() );
+
+	delete p_test_obj;
+
+	std::cout << "End std::unique_ptr<int> test" << std::endl;
+}
+
+TEST_F( Test_lockfree_list, UniquePointer_Then_NoLeak )
+{
+	using test_fifo_type3 = alpha::concurrent::lockfree_list<std::unique_ptr<int>>;
+	test_fifo_type3* p_test_obj;
+
+	std::cout << "std::unique_ptr<int> test" << std::endl;
+	p_test_obj = new test_fifo_type3( 8 );
+
+	p_test_obj->push_front( std::unique_ptr<int>( new int() ) );
+
+	delete p_test_obj;
+
+	std::cout << "End std::unique_ptr<int> test" << std::endl;
 }
 
 class array_test {
@@ -454,27 +903,20 @@ private:
 	int x;
 };
 
-TEST_F( lflistTest, Array )
+TEST_F( Test_lockfree_list, NonOnwerArray )
 {
 	using test_fifo_type3 = alpha::concurrent::lockfree_list<array_test[]>;
 	test_fifo_type3* p_test_obj;
 
-	std::cout << "Array array_test[] test#1" << std::endl;
-	p_test_obj = new test_fifo_type3( 8 );
-
-	p_test_obj->push_front( new array_test[2] );
-
-	delete p_test_obj;
-
-	std::cout << "Array array_test[] test#2" << std::endl;
+	std::cout << "Array array_test[]" << std::endl;
 	p_test_obj = new test_fifo_type3( 8 );
 
 	p_test_obj->push_front( new array_test[2] );
 	auto ret = p_test_obj->pop_front();
 
-	ASSERT_TRUE( std::get<0>( ret ) );
+	ASSERT_TRUE( ret.has_value() );
 
-	delete[] std::get<1>( ret );
+	delete[] ret.value();
 	delete p_test_obj;
 
 	std::cout << "End Array array_test[] test" << std::endl;

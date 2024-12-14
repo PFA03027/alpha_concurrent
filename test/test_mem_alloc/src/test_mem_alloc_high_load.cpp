@@ -31,7 +31,7 @@ static alpha::concurrent::param_chunk_allocation param[] = {
 	{ 1024, 2800 },
 };
 
-pthread_barrier_t barrier;
+pthread_barrier_t global_shared_barrier;
 
 constexpr int max_slot_size  = 1000;
 constexpr int max_alloc_size = 900;
@@ -51,9 +51,9 @@ TEST( lfmemAllocOneChunk, TC_Load )
 
 	void* alloc_addr[max_slot_size];
 
-	static alpha::concurrent::param_chunk_allocation param = { 256, 20 };
+	static alpha::concurrent::param_chunk_allocation local_param = { 256, 20 };
 
-	alpha::concurrent::internal::chunk_header_multi_slot chms( param, 0, &test_st );
+	alpha::concurrent::internal::chunk_header_multi_slot chms( local_param, 0, &test_st );
 
 	//	pthread_barrier_wait( &barrier );
 
@@ -73,8 +73,8 @@ TEST( lfmemAllocOneChunk, TC_Load )
 		}
 	}
 
-	alpha::concurrent::chunk_statistics e = chms.get_statistics();
-	printf( "%s\n", e.print().c_str() );
+	alpha::concurrent::chunk_statistics cs = chms.get_statistics();
+	printf( "%s\n", cs.print().c_str() );
 
 	auto statistics = alpha::concurrent::gmem_get_statistics();
 	for ( auto& e : statistics.ch_st_ ) {
@@ -115,7 +115,7 @@ void* one_load_lock_free_actual_behavior( void* p_data )
 
 	void* alloc_addr[max_slot_size];
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	for ( int i = 0; i < num_loop * ( max_slot_size / 20 ); i++ ) {
 		int cur_alloc_num = num_dist( engine );
@@ -155,7 +155,7 @@ void* one_load_empty_actual_behavior( void* p_data )
 	std::uniform_int_distribution<> size_dist( 1, max_alloc_size );
 	char                            y;
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	for ( int i = 0; i < num_loop * ( max_slot_size / 20 ); i++ ) {
 		int cur_alloc_num = num_dist( engine );
@@ -202,7 +202,7 @@ void* one_load_lock_free_min2( void* p_data )
 
 	void* alloc_addr[max_slot_size];
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	for ( int i = 0; i < num_loop; i++ ) {
 		int cur_alloc_num = num_dist( engine );
@@ -239,7 +239,7 @@ void* one_load_empty( void* )
 	std::uniform_int_distribution<> size_dist( 1, max_alloc_size );
 	char                            y;
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	for ( int i = 0; i < num_loop; i++ ) {
 		int cur_alloc_num = num_dist( engine );
@@ -267,7 +267,7 @@ void load_test_lockfree( unsigned int num_of_thd )
 {
 	alpha::concurrent::general_mem_allocator test_gma( param, 7 );
 
-	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
@@ -275,7 +275,7 @@ void load_test_lockfree( unsigned int num_of_thd )
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
@@ -300,7 +300,7 @@ void load_test_lockfree_actual_behavior( unsigned int num_of_thd )
 {
 	alpha::concurrent::general_mem_allocator test_gma( param, 7 );
 
-	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
@@ -308,7 +308,7 @@ void load_test_lockfree_actual_behavior( unsigned int num_of_thd )
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
@@ -331,7 +331,7 @@ void load_test_lockfree_actual_behavior( unsigned int num_of_thd )
 
 void load_test_lockfree_min2( unsigned int num_of_thd )
 {
-	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	std::vector<std::unique_ptr<alpha::concurrent::general_mem_allocator>> free_gma_array( num_of_thd );
@@ -348,7 +348,7 @@ void load_test_lockfree_min2( unsigned int num_of_thd )
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
@@ -376,7 +376,7 @@ void load_test_lockfree_min2( unsigned int num_of_thd )
 
 void load_test_lockfree_min2_actual_behavior( unsigned int num_of_thd )
 {
-	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	alpha::concurrent::general_mem_allocator* free_gma_array[num_of_thd];
@@ -389,7 +389,7 @@ void load_test_lockfree_min2_actual_behavior( unsigned int num_of_thd )
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
@@ -417,7 +417,7 @@ void load_test_lockfree_min2_actual_behavior( unsigned int num_of_thd )
 
 void load_test_empty( unsigned int num_of_thd )
 {
-	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	void* dummy = nullptr;
@@ -427,7 +427,7 @@ void load_test_empty( unsigned int num_of_thd )
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
@@ -447,7 +447,7 @@ void load_test_empty( unsigned int num_of_thd )
 
 void load_test_empty_actual_behavior( unsigned int num_of_thd )
 {
-	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	void* dummy = nullptr;
@@ -457,7 +457,7 @@ void load_test_empty_actual_behavior( unsigned int num_of_thd )
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
@@ -480,7 +480,7 @@ void load_test_malloc_free( unsigned int num_of_thd )
 {
 	alpha::concurrent::general_mem_allocator test_gma( nullptr, 0 );
 
-	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
@@ -488,7 +488,7 @@ void load_test_malloc_free( unsigned int num_of_thd )
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );
@@ -511,7 +511,7 @@ void load_test_malloc_free_actual_behavior( unsigned int num_of_thd )
 {
 	alpha::concurrent::general_mem_allocator test_gma( nullptr, 0 );
 
-	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
@@ -519,7 +519,7 @@ void load_test_malloc_free_actual_behavior( unsigned int num_of_thd )
 	}
 	std::cout << "!!!Ready!!!" << std::endl;
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	std::cout << "!!!GO!!!" << std::endl;
 	fflush( NULL );

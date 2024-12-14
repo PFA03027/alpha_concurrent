@@ -11,6 +11,7 @@
 
 #include "lf_mem_alloc_slot_array.hpp"
 #include "mmap_allocator.hpp"
+#include "utility.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -118,6 +119,33 @@ slot_array_mgr::slot_array_mgr( chunk_header_multi_slot* p_owner, size_t num_of_
 		p_cur_slot                 = unchk_get_pre_pointer_of_slot( p_cur_slot );
 	}
 	free_slots_storage_.unchk_push_stack_list_to_head( p_pre_slot_header_of_array );
+}
+
+void* slot_array_mgr::allocate( size_t n, size_t req_alignsize )
+{
+	if ( ( expected_n_per_slot_ + default_slot_alignsize ) < ( n + req_alignsize ) ) {
+		// サイズ不足のため、確保に失敗
+		return nullptr;
+	}
+	slot_header_of_array* p_free_slot = free_slots_storage_.pop();
+	if ( p_free_slot == nullptr ) {
+		// フリースロットがないため、確保に失敗
+		return nullptr;
+	}
+
+	bool_size_t chk_ret_free_slot_idx = get_slot_idx_from_slot_header_of_array( p_free_slot );
+#if defined( ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR ) || defined( ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION )
+	if ( !chk_ret_free_slot_idx.is_ok_ ) {
+		internal::LogOutput( log_type::ERR, "recieved free slot is not belong to this slot_array_mgr" );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+		std::terminate();
+#else
+		return nullptr;
+#endif
+	}
+#endif
+
+	return p_free_slot->allocate( unchk_get_pointer_of_slot_container( chk_ret_free_slot_idx.idx_ ), slot_container_size_of_this_, n, req_alignsize );
 }
 
 bool_size_t slot_array_mgr::get_slot_idx_from_slot_header_of_array( slot_header_of_array* p_slot_header )

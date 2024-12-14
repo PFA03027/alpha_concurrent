@@ -9,13 +9,13 @@
  *
  */
 
-#ifndef LIFO_FREE_NODE_STACK_HPP_
-#define LIFO_FREE_NODE_STACK_HPP_
+#ifndef ALCONCCURRENT_SRC_LIFO_FREE_NODE_STACK_HPP_
+#define ALCONCCURRENT_SRC_LIFO_FREE_NODE_STACK_HPP_
 
 #include <mutex>
 #include <type_traits>
 
-#include "alconcurrent/hazard_ptr.hpp"
+#include "hazard_ptr_old.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -95,7 +95,7 @@ struct free_node_stack {
 
 	using node_type               = NODE_T;
 	using node_pointer            = NODE_T*;
-	using hzd_ptr_mgr_type        = hazard_ptr<node_type, HZD_IDX_MAX>;
+	using hzd_ptr_mgr_type        = hazard_ptr_storage<node_type, HZD_IDX_MAX>;
 	using scoped_hzd_type         = hazard_ptr_scoped_ref<node_type, HZD_IDX_MAX>;
 	using dynamic_tls_np_type     = dynamic_tls<node_pointer, threadlocal_no_allocate_handler>;
 	using scoped_np_accessor_type = typename dynamic_tls_np_type::scoped_accessor;

@@ -8,8 +8,8 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#ifndef INC_ALCONCURRENT_LF_MEM_ALLOC_IDX_MGR_HPP_
-#define INC_ALCONCURRENT_LF_MEM_ALLOC_IDX_MGR_HPP_
+#ifndef ALCONCURRENT_INC_INTERNAL_LF_MEM_ALLOC_IDX_MGR_HPP_
+#define ALCONCURRENT_INC_INTERNAL_LF_MEM_ALLOC_IDX_MGR_HPP_
 
 #include <atomic>
 #include <cstdlib>
@@ -52,7 +52,7 @@ enum class chunk_control_status : unsigned int {
  *
  */
 struct chunk_list_statistics {
-	constexpr chunk_list_statistics( void )
+	constexpr chunk_list_statistics( void ) noexcept
 	  : chunk_num_( 0 )
 	  , valid_chunk_num_( 0 )
 	  , total_slot_cnt_( 0 )
@@ -274,7 +274,7 @@ public:
 
 	void* operator new( std::size_t n, internal::alloc_only_chamber& allocator_arg )   // placement new
 	{
-		return allocator_arg.allocate( n, sizeof( uintptr_t ) );
+		return allocator_arg.allocate<sizeof( uintptr_t )>( n );
 	}
 	void operator delete( void* p, internal::alloc_only_chamber& allocator_arg ) noexcept   // placement delete...(3)
 	{
@@ -349,7 +349,7 @@ public:
 	constexpr chunk_list(
 		const param_chunk_allocation& ch_param_arg,     //!< [in] chunk allocation paramter
 		internal::alloc_only_chamber* p_allocator_arg   //!< [in] 割り当て専用アロケータへのポインタ
-		)
+		) noexcept
 	  : chunk_param_( ch_param_arg )
 	  , p_allocator_( p_allocator_arg )
 	  , p_top_chunk_()
@@ -417,7 +417,7 @@ private:
 	 * @brief それぞれのスレッド終了時に実行する処理を担うfunctor
 	 */
 	struct tl_chunk_param_destructor {
-		constexpr explicit tl_chunk_param_destructor( chunk_list* p_chlst_arg )
+		constexpr explicit tl_chunk_param_destructor( chunk_list* p_chlst_arg ) noexcept
 		  : p_chlst_( p_chlst_arg )
 		{
 		}

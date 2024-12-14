@@ -11,7 +11,7 @@ LIB_FILES :=  ../../libalconcurrent/libalconcurrent.a ../build_googletest/build/
 LIBS += -L../../libalconcurrent -L../build_googletest/build/lib
 LIBS += -lalconcurrent -lpthread -lgtest -lgtest_main
 
-TARGET =	test_lf_one_side_deque.exe
+TARGET =	test_od_node.exe
 
 -include $(DEPS)
 

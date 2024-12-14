@@ -45,7 +45,7 @@ void* gmem_allocate(
 	size_t n   //!< [in] memory size to allocate
 )
 {
-	return internal::get_g_gm_mem_instance_singleton.allocate( n, default_slot_alignsize );
+	return internal::get_g_gm_mem_instance_singleton.allocate( n );
 }
 
 void* gmem_allocate(

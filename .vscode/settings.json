@@ -64,9 +64,26 @@
         "memory_resource": "cpp",
         "random": "cpp",
         "fstream": "cpp",
+        "latch": "cpp",
+        "future": "cpp",
+        "cinttypes": "cpp",
         "future": "cpp",
         "latch": "cpp",
-        "cinttypes": "cpp"
+        "cinttypes": "cpp",
+        "cassert": "cpp",
+        "cerrno": "cpp"
     },
-    "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools"
+    "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
+    "testMate.cpp.test.advancedExecutables": [
+        {
+            "name": "${filename} with -g",
+            "pattern": "{build,Build,BUILD,out,Out,OUT}/**/*{test,Test,TEST}_*",
+            "cwd": "${absDirpath}",
+            "runTask": {
+                "before": [
+                    "make build-test with -g"
+                ]
+            }
+        },
+    ]
 }

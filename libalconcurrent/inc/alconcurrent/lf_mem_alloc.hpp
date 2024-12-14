@@ -8,8 +8,8 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#ifndef INC_ALCONCURRENT_LF_MEM_ALLOC_HPP_
-#define INC_ALCONCURRENT_LF_MEM_ALLOC_HPP_
+#ifndef ALCONCCURRENT_INC_LF_MEM_ALLOC_HPP_
+#define ALCONCCURRENT_INC_LF_MEM_ALLOC_HPP_
 
 #include <array>
 #include <atomic>
@@ -71,7 +71,7 @@ public:
 	/*!
 	 * @brief	constructor
 	 */
-	constexpr static_general_mem_allocator( void )
+	constexpr static_general_mem_allocator( void ) noexcept
 	  : allocating_only_allocator_( true, 32 * 1024 )
 	  , pr_ch_size_( 0 )
 	  , param_ch_array_impl {}
@@ -84,7 +84,7 @@ public:
 	 * @brief	constructor
 	 */
 	template <typename... Args>
-	constexpr static_general_mem_allocator( Args... args )
+	constexpr static_general_mem_allocator( Args... args ) noexcept
 	  : allocating_only_allocator_( true, 32 * 1024 )
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 	  , pr_ch_size_( 0 )
@@ -118,31 +118,53 @@ public:
 
 	/*!
 	 * @brief	allocate memory
+	 *
+	 * @warning
+	 * If req_align is not power of 2, terminate or just replace the value to sizeof( uintptr_t )
 	 */
-	void* allocate(
-		size_t n_arg   //!< [in] memory size to allocate
+	inline void* allocate(
+		size_t n_arg,      //!< [in] memory size to allocate
+		size_t req_align   //!< [in] requested align size. req_align should be the power of 2
 	)
 	{
-		return general_mem_allocator_impl_allocate( pr_ch_size_, param_ch_array_, n_arg, default_slot_alignsize );
+		if ( !internal::is_power_of_2( req_align ) ) {
+			internal::LogOutput( log_type::ERR, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
+#ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+			std::terminate();
+#else
+			static_assert( internal::is_power_of_2( default_slot_alignsize ), "default_slot_alignsize should be power of 2." );
+			req_align = default_slot_alignsize;
+#endif
+		}
+		return general_mem_allocator_impl_allocate( pr_ch_size_, param_ch_array_, n_arg, req_align );
 	}
 
 	/*!
 	 * @brief	allocate memory
 	 *
-	 * @exception
-	 * If req_align is not power of 2, throw std::logic_error.
+	 * @warning
+	 * If req_align is not power of 2, terminate or just replace the value to sizeof( uintptr_t )
 	 */
-	void* allocate(
-		size_t n_arg,      //!< [in] memory size to allocate
-		size_t req_align   //!< [in] requested align size. req_align should be the power of 2
+	inline void* allocate(
+		size_t n_arg   //!< [in] memory size to allocate
 	)
 	{
-		if ( !internal::is_power_of_2<decltype( req_align )>( req_align ) ) {
-			char buff[128];
-			snprintf( buff, 128, "req_align should be power of 2. but, req_align is %zu, 0x%zX", req_align, req_align );
-			throw std::logic_error( buff );
-		}
-		return general_mem_allocator_impl_allocate( pr_ch_size_, param_ch_array_, n_arg, req_align );
+		return allocate<default_slot_alignsize>( n_arg );
+	}
+
+	/**
+	 * @brief	allocate memory
+	 *
+	 * @tparam REQ_ALIGN requested align size. req_align should be the power of 2
+	 * @return void*
+	 */
+	template <size_t REQ_ALIGN>
+	void* allocate(
+		size_t n_arg   //!< [in] memory size to allocate
+	)
+	{
+		static_assert( internal::is_power_of_2( REQ_ALIGN ), "REQ_ALIGN should be power of 2." );
+		return general_mem_allocator_impl_allocate( pr_ch_size_, param_ch_array_, n_arg, REQ_ALIGN );
 	}
 
 	/*!
@@ -185,7 +207,7 @@ public:
 			return;
 		}
 
-		void* p_tmp     = allocating_only_allocator_.allocate( sizeof( internal::chunk_list[num] ), sizeof( uintptr_t ) );
+		void* p_tmp     = allocating_only_allocator_.allocate<sizeof( uintptr_t )>( sizeof( internal::chunk_list[num] ) );
 		param_ch_array_ = reinterpret_cast<internal::chunk_list*>( p_tmp );
 		for ( unsigned int i = 0; i < num; i++ ) {
 			new ( &( param_ch_array_[i] ) ) internal::chunk_list( p_param_array[i], &allocating_only_allocator_ );
@@ -254,6 +276,17 @@ public:
 	/*!
 	 * @brief	allocate memory
 	 */
+	template <size_t REQ_ALIGN>
+	void* allocate(
+		size_t n_arg   //!< [in] memory size to allocate
+	)
+	{
+		return allocator_impl_.allocate<REQ_ALIGN>( n_arg );
+	}
+
+	/*!
+	 * @brief	allocate memory
+	 */
 	void* allocate(
 		size_t n_arg   //!< [in] memory size to allocate
 	)
@@ -264,8 +297,8 @@ public:
 	/*!
 	 * @brief	allocate memory
 	 *
-	 * @exception
-	 * If req_align is not power of 2, throw std::logic_error.
+	 * @warning
+	 * If req_align is not power of 2, terminate or just replace the value to sizeof( uintptr_t )
 	 */
 	void* allocate(
 		size_t n_arg,      //!< [in] memory size to allocate

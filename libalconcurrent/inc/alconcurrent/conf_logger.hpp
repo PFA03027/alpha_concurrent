@@ -8,14 +8,16 @@
  * Copyright (C) 2021 by Teruaki Ata <PFA03027@nifty.com>
  */
 
-#ifndef INC_CONF_LOGGER_HPP_
-#define INC_CONF_LOGGER_HPP_
+#ifndef ALCONCCURRENT_INC_CONF_LOGGER_HPP_
+#define ALCONCCURRENT_INC_CONF_LOGGER_HPP_
 
 #include <execinfo.h>
 #include <string.h>
 
 #include <cstdio>
 #include <memory>
+
+#include "internal/cpp_std_configure.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -49,7 +51,7 @@ public:
 		const log_type,              //!< [in]	log type for logger
 		const size_t max_buf_size,   //!< [in]	max string buffer size of 3rd parameter
 		const char*  p_log_str       //!< [in]	pointer log string
-		) = 0;
+		) noexcept = 0;
 
 	virtual ~logger_if_abst() = default;
 };
@@ -57,6 +59,58 @@ public:
 namespace internal {
 
 extern logger_if_abst* p_concrete_logger_if;
+
+template <size_t BUFF_SIZE>
+class fixedbuff_string {
+public:
+	static_assert( BUFF_SIZE > 0, "BUFF_SIZE should be greater than 0(zero)" );
+
+	static constexpr size_t size = BUFF_SIZE;
+
+	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR_BODY fixedbuff_string( void ) noexcept
+	{
+		buff_[0] = 0;
+	}
+	ALCC_INTERNAL_CONSTEXPR_CONSTRUCTOR_BODY fixedbuff_string( const char* p ) noexcept
+	{
+		if ( p == nullptr ) {
+			buff_[0] = 0;
+			return;
+		}
+		for ( size_t i = 0; i < ( BUFF_SIZE - 1 ); i++ ) {
+			buff_[i] = p[i];
+			if ( p[i] == 0 ) {
+				return;
+			}
+		}
+		buff_[BUFF_SIZE - 1] = 0;
+	}
+
+	template <typename Arg1st, typename... ArgsRemain>
+	fixedbuff_string( const char* p_format, Arg1st x_arg1st, ArgsRemain... x_argsremain ) noexcept
+	{
+		print( p_format, x_arg1st, x_argsremain... );
+	}
+
+	constexpr const char* c_str( void ) const noexcept
+	{
+		return buff_;
+	}
+
+	template <typename... Args>
+	const fixedbuff_string& print( const char* p_format, Args... x_args ) noexcept
+	{
+		if ( p_format == nullptr ) {
+			buff_[0] = 0;
+		} else {
+			snprintf( buff_, size, p_format, x_args... );
+		}
+		return *this;
+	}
+
+private:
+	char buff_[BUFF_SIZE];
+};
 
 /*!
  * @brief	filter for logging
@@ -72,7 +126,7 @@ bool is_allowed_to_output(
 );
 
 template <typename... Args>
-inline void LogOutput( const log_type lt, const char* p_format, Args... args )
+inline void LogOutput( const log_type lt, const char* p_format, Args... args ) noexcept
 {
 	if ( internal::is_allowed_to_output( lt ) ) {
 		char buff[CONF_LOGGER_INTERNAL_BUFF_SIZE + 1];
@@ -85,7 +139,7 @@ inline void LogOutput( const log_type lt, const char* p_format, Args... args )
 	return;
 }
 
-inline void LogOutput( const log_type lt, const char* p_str )
+inline void LogOutput( const log_type lt, const char* p_str ) noexcept
 {
 	if ( internal::is_allowed_to_output( lt ) ) {
 		char buff[CONF_LOGGER_INTERNAL_BUFF_SIZE + 1];
@@ -140,7 +194,7 @@ struct bt_info {
 	int   count_;                                             //!< backtrace data size. Zero: no data, Plus value: call stack information is valid, Minus value: information of previous allocation
 	void* bt_[ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE];   //!< call stack of backtrace
 
-	constexpr bt_info( void )
+	constexpr bt_info( void ) noexcept
 	  : count_( 0 )
 	  , bt_ { 0 }
 	{
@@ -157,17 +211,41 @@ struct bt_info {
 	bt_info& operator=( bt_info&& )      = default;
 #endif
 
-	void dump_to_log( log_type lt, char c, int id );
+	void dump_to_log( log_type lt, char c, int id ) const noexcept;
+	void invalidate( void ) noexcept
+	{
+		if ( count_ > 0 ) {
+			count_ = -count_;
+		}
+	}
+
+	static inline bt_info record_backtrace( void ) noexcept
+	{
+		bt_info ans;
+		ans.count_ = backtrace( ans.bt_, ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE );
+		return ans;
+	}
 };
 
-#define RECORD_BACKTRACE_GET_BACKTRACE( BT_INFO_N )                                                                    \
-	do {                                                                                                               \
-		BT_INFO_N.count_ = backtrace( BT_INFO_N.bt_, alpha::concurrent::ALCONCURRENT_CONF_MAX_RECORD_BACKTRACE_SIZE ); \
-	} while ( 0 )
+/**
+ * @brief this macro function has obsolated
+ *
+ * please use alpha::concurrent::bt_info::record_backtrace()
+ */
+#define RECORD_BACKTRACE_GET_BACKTRACE( BT_INFO_N )                 \
+	{                                                               \
+		BT_INFO_N = alpha::concurrent::bt_info::record_backtrace(); \
+	}
+
+/**
+ * @brief this macro function has obsolated
+ *
+ * please use bt_info::invalidate()
+ */
 #define RECORD_BACKTRACE_INVALIDATE_BACKTRACE( BT_INFO_N ) \
-	do {                                                   \
-		BT_INFO_N.count_ = -( BT_INFO_N.count_ );          \
-	} while ( 0 )
+	{                                                      \
+		BT_INFO_N.invalidate();                            \
+	}
 
 }   // namespace concurrent
 }   // namespace alpha

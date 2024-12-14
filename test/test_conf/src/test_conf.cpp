@@ -51,7 +51,7 @@ class TEST_default_logger : public alpha::concurrent::logger_if_abst {
 		const alpha::concurrent::log_type,   //!< [in]	log type for logger
 		const size_t max_buf_size,           //!< [in]	max string buffer size of 3rd parameter
 		const char*  p_log_str               //!< [in]	pointer log string
-		) override
+		) noexcept override
 	{
 		printf( "%s\n", p_log_str );
 		//		fflush( NULL );

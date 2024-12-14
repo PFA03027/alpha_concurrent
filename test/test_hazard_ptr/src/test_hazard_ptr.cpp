@@ -11,7 +11,7 @@
 
 #include "gtest/gtest.h"
 
-#include "alconcurrent/hazard_ptr.hpp"
+#include "hazard_ptr_old.hpp"
 
 class delete_test {
 public:
@@ -41,9 +41,9 @@ private:
 constexpr int       num_thread = 16;
 constexpr uintptr_t loop_num   = 100000;
 
-alpha::concurrent::hazard_ptr<delete_test, 1> hazard_ptr_to;
+alpha::concurrent::hazard_ptr_storage<delete_test, 1> hazard_ptr_to;
 
-pthread_barrier_t barrier;
+pthread_barrier_t global_shared_barrier;
 
 /**
  * 各スレッドのメインルーチン。
@@ -54,8 +54,8 @@ void* func_refarencing( void* data )
 	std::atomic<delete_test*>* p_target = reinterpret_cast<std::atomic<delete_test*>*>( data );
 
 	alpha::concurrent::hazard_ptr_scoped_ref<
-		alpha::concurrent::hazard_ptr<delete_test, 1>::hzrd_type,
-		alpha::concurrent::hazard_ptr<delete_test, 1>::hzrd_max_slot>
+		alpha::concurrent::hazard_ptr_storage<delete_test, 1>::hzrd_type,
+		alpha::concurrent::hazard_ptr_storage<delete_test, 1>::hzrd_max_slot>
 		hzrd_ref( hazard_ptr_to, 0 );
 	//	printf( "p_target: %p\n", p_target );
 
@@ -63,7 +63,7 @@ void* func_refarencing( void* data )
 	hzrd_ref.regist_ptr_as_hazard_ptr( p_test_obj );
 
 	//	std::cout << "!!!Ready!!!" << std::endl;   // prints !!!Hello World!!!
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 	//	printf( "func_refarencing GO now!!!\n" );
 
 	if ( p_test_obj == p_target->load() ) {
@@ -95,8 +95,8 @@ void* func_delete_owner( void* data )
 
 	{
 		alpha::concurrent::hazard_ptr_scoped_ref<
-			alpha::concurrent::hazard_ptr<delete_test, 1>::hzrd_type,
-			alpha::concurrent::hazard_ptr<delete_test, 1>::hzrd_max_slot>
+			alpha::concurrent::hazard_ptr_storage<delete_test, 1>::hzrd_type,
+			alpha::concurrent::hazard_ptr_storage<delete_test, 1>::hzrd_max_slot>
 			hzrd_ref( hazard_ptr_to, 0 );
 
 		// printf( "p_target: %p\n", p_test_obj );
@@ -104,7 +104,7 @@ void* func_delete_owner( void* data )
 		hzrd_ref.regist_ptr_as_hazard_ptr( p_test_obj );
 
 		// std::cout << "!!!Ready!!!" << std::endl;   // prints !!!Hello World!!!
-		pthread_barrier_wait( &barrier );
+		pthread_barrier_wait( &global_shared_barrier );
 		// printf( "func_delete_owner GO now!!!\n" );
 
 		//		std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
@@ -131,7 +131,7 @@ void test_case1( void )
 {
 	std::atomic<delete_test*> atm_p_test_obj( new delete_test );
 
-	pthread_barrier_init( &barrier, NULL, num_thread + 2 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_thread + 2 );
 	pthread_t* threads = new pthread_t[num_thread + 1];
 
 	pthread_create( &threads[0], NULL, func_delete_owner, reinterpret_cast<void*>( &atm_p_test_obj ) );
@@ -141,7 +141,7 @@ void test_case1( void )
 	}
 	// std::cout << "!!!Ready!!!" << std::endl;
 	// std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 	// std::cout << "!!!GO!!!" << std::endl;
 
 	uintptr_t sum = 0;
@@ -165,7 +165,7 @@ void test_case1( void )
 
 	delete[] threads;
 
-	//	auto [hzrd_size, del_size] = alpha::concurrent::hazard_ptr<delete_test>::debug_get_glist_size();
+	//	auto [hzrd_size, del_size] = alpha::concurrent::hazard_ptr_storage<delete_test>::debug_get_glist_size();
 	//	printf( "glist_size: hazard ptr=%d, del ptr=%d\n", hzrd_size, del_size );
 
 	return;

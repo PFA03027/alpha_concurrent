@@ -51,13 +51,13 @@ static alpha::concurrent::param_chunk_allocation param2[] = {
 
 std::atomic<bool> err_flag( false );
 
-static pthread_barrier_t barrier;
+static pthread_barrier_t global_shared_barrier;
 
-constexpr size_t       max_slot_size  = 1000;
-constexpr size_t       max_alloc_size = 900;
-constexpr unsigned int num_loop       = 1000;
+constexpr size_t       max_slot_size           = 1000;
+constexpr size_t       max_alloc_size          = 900;
+constexpr unsigned int TEST_CONDITION_num_loop = 1000;
 
-using test_fifo_type = alpha::concurrent::fifo_list<void*, true, false>;
+using test_fifo_type = alpha::concurrent::fifo_list<void*>;
 
 struct test_params {
 	test_fifo_type*                           p_test_obj;
@@ -124,7 +124,7 @@ void* func_test_fifo( void* p_data )
 	std::uniform_int_distribution<>       num_dist( 1, max_slot_size - 1 );
 	std::uniform_int_distribution<size_t> size_dist( 1, max_alloc_size );
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	for ( unsigned int i = 0; i < p_test_param->num_loop; i++ ) {
@@ -135,28 +135,28 @@ void* func_test_fifo( void* p_data )
 			p_test_obj->push( p_tmp_alloc_to_push );
 
 			// std::this_thread::sleep_for( std::chrono::milliseconds( num_sleep( engine ) ) );
-
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-			auto [pop_flag, p_tmp_alloc] = p_test_obj->pop();
-#else
-			auto local_ret   = p_test_obj->pop();
-			auto pop_flag    = std::get<0>( local_ret );
-			auto p_tmp_alloc = std::get<1>( local_ret );
-#endif
-			if ( !pop_flag ) {
+			void* p_tmp_alloc;
+			auto  ret = p_test_obj->pop();
+			if ( !ret.has_value() ) {
 				printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 				printf( "fifo size count: %d\n", p_test_obj->get_size() );
+#endif
 
 				auto local_ret = p_test_obj->pop();
-				pop_flag       = std::get<0>( local_ret );
-				p_tmp_alloc    = std::get<1>( local_ret );
-				if ( !pop_flag ) {
+				if ( !local_ret.has_value() ) {
 					printf( "Bugggggggyyyy, then Bugggggggyyyy func_test_fifo()!!!\n" );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 					printf( "fifo size count: %d\n", p_test_obj->get_size() );
+#endif
 
 					err_flag.store( true );
 					return nullptr;
+				} else {
+					p_tmp_alloc = local_ret.value();
 				}
+			} else {
+				p_tmp_alloc = ret.value();
 			}
 
 			p_tmg->deallocate( p_tmp_alloc );
@@ -181,7 +181,7 @@ void* func_test_fifo_ggmem( void* p_data )
 	std::uniform_int_distribution<>       num_dist( 1, max_slot_size - 1 );
 	std::uniform_int_distribution<size_t> size_dist( 1, max_alloc_size );
 
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 	// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", 10, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	for ( unsigned int i = 0; i < p_test_param->num_loop; i++ ) {
@@ -192,28 +192,28 @@ void* func_test_fifo_ggmem( void* p_data )
 			p_test_obj->push( p_tmp_alloc_to_push );
 
 			// std::this_thread::sleep_for( std::chrono::milliseconds( num_sleep( engine ) ) );
-
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-			auto [pop_flag, p_tmp_alloc] = p_test_obj->pop();
-#else
-			auto local_ret   = p_test_obj->pop();
-			auto pop_flag    = std::get<0>( local_ret );
-			auto p_tmp_alloc = std::get<1>( local_ret );
-#endif
-			if ( !pop_flag ) {
+			void* p_tmp_alloc;
+			auto  ret = p_test_obj->pop();
+			if ( !ret.has_value() ) {
 				printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 				printf( "fifo size count: %d\n", p_test_obj->get_size() );
+#endif
 
 				auto local_ret = p_test_obj->pop();
-				pop_flag       = std::get<0>( local_ret );
-				p_tmp_alloc    = std::get<1>( local_ret );
-				if ( !pop_flag ) {
+				if ( !local_ret.has_value() ) {
 					printf( "Bugggggggyyyy, then Bugggggggyyyy func_test_fifo()!!!\n" );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 					printf( "fifo size count: %d\n", p_test_obj->get_size() );
+#endif
 
 					err_flag.store( true );
 					return nullptr;
+				} else {
+					p_tmp_alloc = local_ret.value();
 				}
+			} else {
+				p_tmp_alloc = ret.value();
 			}
 
 			alpha::concurrent::gmem_deallocate( p_tmp_alloc );
@@ -231,15 +231,15 @@ void load_test_lockfree_bw_mult_thread( unsigned int num_of_thd, alpha::concurre
 	test_params tda;
 	tda.p_test_obj = &fifo;
 	tda.p_tmg      = p_tmg_arg;
-	tda.num_loop   = num_loop / num_of_thd;
+	tda.num_loop   = TEST_CONDITION_num_loop / num_of_thd;
 
-	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_create( &threads[i], NULL, func_test_fifo, &tda );
 	}
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 #ifdef DEBUG_LOG
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
@@ -251,7 +251,7 @@ void load_test_lockfree_bw_mult_thread( unsigned int num_of_thd, alpha::concurre
 		pthread_join( threads[i], nullptr );
 	}
 
-	EXPECT_EQ( 0, fifo.get_size() );
+	EXPECT_TRUE( fifo.is_empty() );
 	EXPECT_FALSE( err_flag.load() );
 
 #ifdef DEBUG_LOG
@@ -281,15 +281,15 @@ void load_test_lockfree_bw_mult_thread_ggmem( unsigned int num_of_thd )
 	test_params tda;
 	tda.p_test_obj = &fifo;
 	tda.p_tmg      = nullptr;
-	tda.num_loop   = num_loop / num_of_thd;
+	tda.num_loop   = TEST_CONDITION_num_loop / num_of_thd;
 
-	pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+	pthread_barrier_init( &global_shared_barrier, NULL, num_of_thd + 1 );
 	pthread_t* threads = new pthread_t[num_of_thd];
 
 	for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 		pthread_create( &threads[i], NULL, func_test_fifo_ggmem, &tda );
 	}
-	pthread_barrier_wait( &barrier );
+	pthread_barrier_wait( &global_shared_barrier );
 
 #ifdef DEBUG_LOG
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
@@ -301,7 +301,7 @@ void load_test_lockfree_bw_mult_thread_ggmem( unsigned int num_of_thd )
 		pthread_join( threads[i], nullptr );
 	}
 
-	EXPECT_EQ( 0, fifo.get_size() );
+	EXPECT_TRUE( fifo.is_empty() );
 	EXPECT_FALSE( err_flag.load() );
 
 #ifdef DEBUG_LOG
@@ -335,20 +335,20 @@ void load_test_lockfree_bw_mult_thread_startstop( unsigned int num_of_thd, alpha
 	test_params tda;
 	tda.p_test_obj = &fifo;
 	tda.p_tmg      = p_tmg_arg;
-	tda.num_loop   = num_loop / start_stop_reqeat / num_of_thd;
+	tda.num_loop   = TEST_CONDITION_num_loop / start_stop_reqeat / num_of_thd;
 
 #ifdef DEBUG_LOG
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 #endif
 
 	for ( unsigned int j = 0; j < start_stop_reqeat; j++ ) {
-		pthread_barrier_init( &barrier, NULL, num_of_thd + 1 );
+		pthread_barrier_init( &global_shared_barrier, NULL, num_of_thd + 1 );
 		pthread_t* threads = new pthread_t[num_of_thd];
 
 		for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 			pthread_create( &threads[i], NULL, func_test_fifo, &tda );
 		}
-		pthread_barrier_wait( &barrier );
+		pthread_barrier_wait( &global_shared_barrier );
 
 		for ( unsigned int i = 0; i < num_of_thd; i++ ) {
 			pthread_join( threads[i], nullptr );
@@ -358,7 +358,7 @@ void load_test_lockfree_bw_mult_thread_startstop( unsigned int num_of_thd, alpha
 		// printf( "[%d] used pthread tsd key: %d, max used pthread tsd key: %d\n", j, alpha::concurrent::internal::get_num_of_tls_key(), alpha::concurrent::internal::get_max_num_of_tls_key() );
 	}
 
-	EXPECT_EQ( 0, fifo.get_size() );
+	EXPECT_TRUE( fifo.is_empty() );
 	EXPECT_FALSE( err_flag.load() );
 
 #ifdef DEBUG_LOG
@@ -453,22 +453,17 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 				fifo.push( p_tmp_alloc_to_push );
 
 				// std::this_thread::sleep_for( std::chrono::milliseconds( num_sleep( engine ) ) );
-
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-				auto [pop_flag, p_tmp_alloc] = fifo.pop();
-#else
-				auto local_ret   = fifo.pop();
-				auto pop_flag    = std::get<0>( local_ret );
-				auto p_tmp_alloc = std::get<1>( local_ret );
-#endif
-				if ( !pop_flag ) {
+				auto ret = fifo.pop();
+				if ( !ret.has_value() ) {
 					printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 					printf( "fifo size count: %d\n", fifo.get_size() );
+#endif
 					err_flag.store( true );
 					break;
 				}
 
-				alpha::concurrent::gmem_deallocate( p_tmp_alloc );
+				alpha::concurrent::gmem_deallocate( ret.value() );
 			}
 
 			{
@@ -490,21 +485,17 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 			}
 
 			for ( int i = 0; i < num_loop; i++ ) {
-#if ( __cplusplus >= 201703L /* check C++17 */ ) && defined( __cpp_structured_bindings )
-				auto [pop_flag, p_tmp_alloc] = fifo.pop();
-#else
-				auto local_ret   = fifo.pop();
-				auto pop_flag    = std::get<0>( local_ret );
-				auto p_tmp_alloc = std::get<1>( local_ret );
-#endif
-				if ( !pop_flag ) {
+				auto ret = fifo.pop();
+				if ( !ret.has_value() ) {
 					printf( "Bugggggggyyyy  func_test_fifo()!!!\n" );
+#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
 					printf( "fifo size count: %d\n", fifo.get_size() );
+#endif
 					err_flag.store( true );
 					break;
 				}
 
-				alpha::concurrent::gmem_deallocate( p_tmp_alloc );
+				alpha::concurrent::gmem_deallocate( ret.value() );
 			}
 
 			{
@@ -538,7 +529,7 @@ TEST( lfmemAllocLoad, TC_Unstable_Threads )
 			exit_cv.wait( lg, [&exit_count]() { return exit_count >= ( total_thread_num * 2 ); } );
 		}
 
-		EXPECT_EQ( 0, fifo.get_size() );
+		EXPECT_TRUE( fifo.is_empty() );
 	}
 
 	// alpha::concurrent::gmem_prune();
