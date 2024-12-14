@@ -715,6 +715,25 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopBackTwice_ThenEmpty )
 	EXPECT_EQ( sut_.get_size(), 0 );
 }
 
+TEST_F( Test_lockfree_list, Empty_DoEmplaceFrontTwicePopBackTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.emplace_front( 1 );
+	sut_.emplace_front( 2 );
+	auto ret1 = sut_.pop_back();
+
+	// Act
+	auto ret2 = sut_.pop_back();
+
+	// Assert
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 1 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 2 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
 TEST_F( Test_lockfree_list, Empty_DoPushBackPopFront_ThenEmpty )
 {
 	// Arrenge
@@ -752,6 +771,25 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopFrontTwice_ThenEmpty )
 	EXPECT_EQ( sut_.get_size(), 0 );
 	sut_.push_back( 1 );
 	sut_.push_back( 2 );
+	auto ret1 = sut_.pop_front();
+
+	// Act
+	auto ret2 = sut_.pop_front();
+
+	// Assert
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 1 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 2 );
+	EXPECT_EQ( sut_.get_size(), 0 );
+}
+
+TEST_F( Test_lockfree_list, Empty_DoEmplaceBackTwicePopFrontTwice_ThenEmpty )
+{
+	// Arrenge
+	EXPECT_EQ( sut_.get_size(), 0 );
+	sut_.emplace_back( 1 );
+	sut_.emplace_back( 2 );
 	auto ret1 = sut_.pop_front();
 
 	// Act

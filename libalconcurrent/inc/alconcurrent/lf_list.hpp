@@ -262,6 +262,21 @@ public:
 #endif
 	}
 
+	template <typename... Args>
+	void emplace_front(
+		Args&&... args   //!< [in]	a value to insert to front of this list
+	)
+	{
+		node_pointer p_new_node = alloc_node_impl();
+		p_new_node->emplace_value( std::forward<Args>( args )... );
+
+		insert_to_next_of_prev_impl( p_new_node, []( const value_type& ) -> bool { return true; } );
+
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		call_count_push_front_++;
+#endif
+	}
+
 	/*!
 	 * @brief	pop a value from the front of this list
 	 *
@@ -325,6 +340,20 @@ public:
 	{
 		node_pointer p_new_node = alloc_node_impl();
 		p_new_node->set_value( std::move( cont_arg ) );
+
+		insert_to_before_of_curr_impl( p_new_node, []( const value_type& ) -> bool { return false; } );
+
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		call_count_push_back_++;
+#endif
+	}
+	template <typename... Args>
+	void emplace_back(
+		Args&&... args   //!< [in]	a value to insert to back of this list
+	)
+	{
+		node_pointer p_new_node = alloc_node_impl();
+		p_new_node->emplace_value( std::forward<Args>( args )... );
 
 		insert_to_before_of_curr_impl( p_new_node, []( const value_type& ) -> bool { return false; } );
 
