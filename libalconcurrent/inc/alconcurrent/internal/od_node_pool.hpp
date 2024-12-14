@@ -35,6 +35,16 @@ struct countermeasure_gcc_bug_deletable_obj_abst {
 };
 #endif
 
+struct is_member_function_callable_impl {
+	template <typename T>
+	static auto check_reset_value( T* ) -> decltype( std::declval<T>().reset_value(), std::true_type() );
+	template <typename T>
+	static auto check_reset_value( ... ) -> std::false_type;
+};
+
+template <typename T>
+struct is_member_function_callable_reset_value : decltype( is_member_function_callable_impl::check_reset_value<T>( nullptr ) ) {};
+
 template <typename NODE_T>
 class od_node_pool {
 	static_assert( std::is_base_of<od_node_simple_link, NODE_T>::value, "NODE_T should be a derived class of od_node_simple_link." );
@@ -59,6 +69,7 @@ public:
 			get_tl_odn_list_still_in_hazard().push_back( p_nd );
 			return;
 		}
+		reset_value_of_node( p_nd );
 
 		tl_od_node_list& tl_odn_list_no_in_hazard = get_tl_odn_list_no_in_hazard();
 
@@ -113,6 +124,7 @@ public:
 				tl_odn_list_still_in_hazard.push_back( p_ans );
 				return nullptr;   // 使えるノードがなかった
 			}
+			// reset_value_of_node( p_ans ); しても良いが、呼び出し元へ戻したらすぐに上書きされるので、ここでの解放は無駄が多いと思われる。
 		} else {
 			raw_list tmp_odn_list_( std::move( tl_odn_list_still_in_hazard.move_to() ) );
 
@@ -127,11 +139,13 @@ public:
 				tl_odn_list_still_in_hazard.merge_push_back( std::move( tt_n_list ) );
 			} );
 			p_ans_baseclass_node = tmp_odn_list_.pop_front();
+			tmp_odn_list_.for_each<node_pointer>( reset_value_of_node_wrap );
 			tl_odn_list_no_in_hazard.merge_push_back( std::move( tmp_odn_list_ ) );
 			if ( p_ans_baseclass_node == nullptr ) {
 				return nullptr;   // 使えるノードがなかった
 			}
 			p_ans = static_cast<node_pointer>( p_ans_baseclass_node );
+			// reset_value_of_node( p_ans ); しても良いが、呼び出し元へ戻したらすぐに上書きされるので、ここでの解放は無駄が多いと思われる。
 		}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
@@ -312,6 +326,22 @@ private:
 		static std::atomic<size_t> node_count_in_tl_odn_list_;
 #endif
 	};
+
+	template <typename U = NODE_T, typename std::enable_if<is_member_function_callable_reset_value<U>::value>::type* = nullptr>
+	static void reset_value_of_node( node_pointer p_nd )
+	{
+		p_nd->reset_value();
+		return;
+	}
+	template <typename U = NODE_T, typename std::enable_if<!is_member_function_callable_reset_value<U>::value>::type* = nullptr>
+	static void reset_value_of_node( node_pointer p_nd )
+	{
+		return;
+	}
+	static void reset_value_of_node_wrap( node_pointer p_nd )
+	{
+		reset_value_of_node( p_nd );
+	}
 
 	static tl_od_node_list& get_tl_odn_list_still_in_hazard( void );
 	static tl_od_node_list& get_tl_odn_list_no_in_hazard( void );

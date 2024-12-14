@@ -65,6 +65,17 @@ public:
 		return ( p_head_ != nullptr ) && ( p_head_ != p_tail_ );
 	}
 
+	template <typename P>
+	void for_each( std::function<void( P )> pred )
+	{
+		node_pointer p_cur = p_head_;
+		while ( p_cur != nullptr ) {
+			node_pointer p_nxt = p_cur->next();
+			pred( static_cast<P>( p_cur ) );
+			p_cur = p_nxt;
+		}
+	}
+
 	/**
 	 * @brief if pred return true, that node is purged and push it into return value
 	 *
