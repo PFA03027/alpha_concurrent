@@ -80,6 +80,12 @@ public:
 		lf_fifo_impl_.push_back( allocate_node( std::move( v_arg ) ) );
 	}
 
+	template <typename... Args>
+	void emplace( Args&&... args )
+	{
+		lf_fifo_impl_.push_back( allocate_node_emplace( std::forward<Args>( args )... ) );
+	}
+
 	template <bool IsCopyConstructible = std::is_copy_constructible<value_type>::value,
 	          bool IsCopyAssignable    = std::is_copy_assignable<value_type>::value,
 	          typename std::enable_if<
@@ -97,6 +103,13 @@ public:
 	void push_head( T&& v_arg )
 	{
 		node_pointer p_old_sentinel = lf_fifo_impl_.push_front( allocate_node(), allocate_node( std::move( v_arg ) ) );
+		node_pool_t::push( p_old_sentinel );
+	}
+
+	template <typename... Args>
+	void emplace_head( Args&&... args )
+	{
+		node_pointer p_old_sentinel = lf_fifo_impl_.push_front( allocate_node(), allocate_node_emplace( std::forward<Args>( args )... ) );
 		node_pool_t::push( p_old_sentinel );
 	}
 
@@ -178,6 +191,20 @@ private:
 			allocated_node_count_++;
 #endif
 			p_new_nd = new node_type( std::move( v_arg ) );
+		}
+		return p_new_nd;
+	}
+	template <typename... Args>
+	static node_pointer allocate_node_emplace( Args&&... args )
+	{
+		node_pointer p_new_nd = node_pool_t::pop();
+		if ( p_new_nd != nullptr ) {
+			p_new_nd->emplace_value( std::forward<Args>( args )... );
+		} else {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			allocated_node_count_++;
+#endif
+			p_new_nd = new node_type( alcc_in_place, std::forward<Args>( args )... );
 		}
 		return p_new_nd;
 	}

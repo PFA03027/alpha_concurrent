@@ -130,3 +130,33 @@ TEST_F( Test_x_lockfree_fifo, PushHeadValuePushValue_DoPopValueTwice_Then_OrderI
 	ASSERT_TRUE( ret2.has_value() );
 	EXPECT_EQ( ret2.value(), 2 );
 }
+
+TEST_F( Test_x_lockfree_fifo, DoEmplace_Head )
+{
+	// Arrange
+	p_sut_->push( 10 );
+	p_sut_->emplace_head( 20 );
+
+	// Act
+	auto ret1 = p_sut_->pop();
+	auto ret2 = p_sut_->pop();
+
+	// Assert
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 20 );
+	ASSERT_TRUE( ret2.has_value() );
+	EXPECT_EQ( ret2.value(), 10 );
+}
+
+TEST_F( Test_x_lockfree_fifo, DoEmplace )
+{
+	// Arrange
+	p_sut_->emplace( 10 );
+
+	// Act
+	auto ret1 = p_sut_->pop();
+
+	// Assert
+	ASSERT_TRUE( ret1.has_value() );
+	EXPECT_EQ( ret1.value(), 10 );
+}

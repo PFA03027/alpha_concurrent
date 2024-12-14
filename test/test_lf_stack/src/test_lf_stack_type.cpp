@@ -58,18 +58,3 @@ static_assert( is_callable_push<tut_4, partly_userdefined_5_special_op_no_move_c
 
 // static_assert( !is_callable_push<tut_5, const partly_userdefined_5_special_op_no_copy_move_constructor_assignment&>::value );
 // static_assert( !is_callable_push<tut_5, partly_userdefined_5_special_op_no_copy_move_constructor_assignment&&>::value );
-
-TEST( Test_lf_stack_type_check, DoEmplace )
-{
-	// Arrange
-	tut_2 sut;
-
-	// Act
-	sut.emplace( 2, 3.0 );
-
-	// Arrange
-	auto poped_data = sut.pop();
-	ASSERT_TRUE( poped_data.has_value() );
-	EXPECT_EQ( poped_data.value().x_, 2 );
-	EXPECT_EQ( poped_data.value().y_, 3.0 );
-}

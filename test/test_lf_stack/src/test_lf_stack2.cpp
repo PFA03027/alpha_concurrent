@@ -23,6 +23,8 @@
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 #include "alconcurrent/lf_stack.hpp"
 
+#include "test_type_variation.hpp"
+
 class lfStackTest : public ::testing::Test {
 protected:
 	virtual void SetUp()
@@ -86,6 +88,21 @@ TEST_F( lfStackTest, CallPushPopTwo )
 	EXPECT_EQ( ret1.value(), 2 );
 	ASSERT_TRUE( ret2.has_value() );
 	EXPECT_EQ( ret2.value(), 1 );
+}
+
+TEST_F( lfStackTest, DoEmplace )
+{
+	// Arrange
+	alpha::concurrent::stack_list<partly_userdefined_5_special_op_no_default_constructor> sut;
+
+	// Act
+	sut.emplace( 2, 3.0 );
+
+	// Arrange
+	auto poped_data = sut.pop();
+	ASSERT_TRUE( poped_data.has_value() );
+	EXPECT_EQ( poped_data.value().x_, 2 );
+	EXPECT_EQ( poped_data.value().y_, 3.0 );
 }
 
 TEST_F( lfStackTest, Pointer1 )
