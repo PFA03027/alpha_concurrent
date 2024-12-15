@@ -17,6 +17,7 @@
 #include <mutex>
 #include <type_traits>
 
+#include "alconcurrent/internal/alloc_only_allocator.hpp"
 #include "lf_mem_alloc_basic_allocator.hpp"
 #include "lf_mem_alloc_slot.hpp"
 #include "lifo_free_node_stack.hpp"
@@ -34,8 +35,7 @@ struct slot_array_mgr {
 	const size_t                          expected_n_per_slot_;           //!< 自身のslot_array_mgrで管理しているslotが期待しているallocateサイズ
 	const size_t                          slot_container_size_of_this_;   //!< 自身のslot_array_mgrで管理しているslot_container1つ分のバイト数
 	std::atomic<chunk_header_multi_slot*> p_owner_chunk_header_;          //!< 自身のslot_array_mgrの所有権を持っているchunk_header_multi_slotへのポインタ
-	alloc_only_chamber                    allocator_;                     //!< 割り当て専用アロケータ
-	free_node_stack<slot_header_of_array> free_slots_storage_;            //!< 割り当てていないslot_header_of_arrayのリストを管理する
+	free_node_stack<slot_header_of_array> free_slots_storage_;            //!< 割り当てていないslot_header_of_arrayのリストを管理する。push/popはハザードポインタの登録状態を考慮する
 	slot_container* const                 p_slot_container_top;           //!< slot_container配列の先頭へのポインタ
 	slot_header_of_array                  slot_header_array_[0];          //!< 以降のアドレスにslot_header_of_arrayの可変長サイズ配列とslot_containerを保持するメモリ領域が続く。
 

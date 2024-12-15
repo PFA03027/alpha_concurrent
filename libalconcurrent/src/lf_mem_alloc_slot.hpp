@@ -23,6 +23,7 @@
 #include "alconcurrent/conf_logger.hpp"
 #endif
 
+#include "alconcurrent/hazard_ptr.hpp"
 #include "alconcurrent/lf_mem_alloc_type.hpp"
 
 namespace alpha {
@@ -148,10 +149,10 @@ static_assert( ( sizeof( slot_mheader ) % default_slot_alignsize ) == 0, "slot_m
  *
  */
 struct array_slot_sheader {
-	std::atomic<slot_header_of_array*> p_next_;   //!< stackリストとして繋がる次のslot_header_of_arrayへのポインタ
+	hazard_ptr_handler<slot_header_of_array> hpt_next_;   //!< stackリストとして繋がる次のslot_header_of_arrayへのハザードポインタハンドラ
 
 	constexpr array_slot_sheader( slot_header_of_array* p_next_arg = nullptr )
-	  : p_next_( p_next_arg )
+	  : hpt_next_( p_next_arg )
 	{
 	}
 
@@ -216,18 +217,18 @@ struct slot_header_of_array {
 
 	slot_header_of_array* get_next( void )
 	{
-		return sh_.p_next_.load( std::memory_order_acquire );
+		return sh_.hpt_next_.load( std::memory_order_acquire );
 	}
 
 	void set_next( slot_header_of_array* p_new_next )
 	{
-		sh_.p_next_.store( p_new_next, std::memory_order_release );
+		sh_.hpt_next_.store( p_new_next, std::memory_order_release );
 		return;
 	}
 
 	bool next_CAS( slot_header_of_array** pp_expect_ptr, slot_header_of_array* p_desired_ptr )
 	{
-		return sh_.p_next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr, std::memory_order_acq_rel );
+		return sh_.hpt_next_.compare_exchange_weak( *pp_expect_ptr, p_desired_ptr, std::memory_order_acq_rel );
 	}
 
 	void dump( int indent = 0 );
