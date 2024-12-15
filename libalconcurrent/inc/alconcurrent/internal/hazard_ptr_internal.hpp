@@ -84,7 +84,6 @@ public:
 	 * This API is for debug and test purpose.
 	 *
 	 * @pre this API should be called from main thread. And, all other threads should be exited before call this API.
-	 *      at least, caller side shold call alpha::concurrent::internal::retire_mgr::stop_prune_thread() before calling this API
 	 */
 	static void DestoryAll( void );
 

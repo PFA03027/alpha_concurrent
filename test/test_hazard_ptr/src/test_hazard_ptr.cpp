@@ -833,7 +833,6 @@ protected:
 
 	void TearDown() override
 	{
-		// alpha::concurrent::internal::retire_mgr::stop_prune_thread();
 
 		int cw, ce;
 		alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
@@ -865,7 +864,6 @@ protected:
 
 	void TearDown() override
 	{
-		// alpha::concurrent::internal::retire_mgr::stop_prune_thread();
 		alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
 
 		int cw, ce;
@@ -1086,7 +1084,6 @@ protected:
 
 	void TearDown() override
 	{
-		// alpha::concurrent::internal::retire_mgr::stop_prune_thread();
 		alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
 
 		int cw, ce;
@@ -1339,7 +1336,6 @@ protected:
 
 	void TearDown() override
 	{
-		// alpha::concurrent::internal::retire_mgr::stop_prune_thread();
 		alpha::concurrent::internal::hazard_ptr_mgr::DestoryAll();
 
 		int cw, ce;
