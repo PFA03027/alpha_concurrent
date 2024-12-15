@@ -72,7 +72,7 @@ public:
 	 * @brief	constructor
 	 */
 	constexpr static_general_mem_allocator( void ) noexcept
-	  : allocating_only_allocator_( true, 32 * 1024 )
+	  : allocating_only_allocator_( false, 32 * 1024 )
 	  , pr_ch_size_( 0 )
 	  , param_ch_array_impl {}
 	  , param_ch_array_( nullptr )
@@ -85,7 +85,7 @@ public:
 	 */
 	template <typename... Args>
 	constexpr static_general_mem_allocator( Args... args ) noexcept
-	  : allocating_only_allocator_( true, 32 * 1024 )
+	  : allocating_only_allocator_( false, 32 * 1024 )
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 	  , pr_ch_size_( 0 )
 #else
@@ -107,6 +107,7 @@ public:
 	/*!
 	 * @brief	destructor
 	 */
+#if 0
 	~static_general_mem_allocator()
 	{
 		if ( ( param_ch_array_ != param_ch_array_impl ) && ( param_ch_array_ != nullptr ) ) {
@@ -115,6 +116,7 @@ public:
 			}
 		}
 	}
+#endif
 
 	/*!
 	 * @brief	allocate memory
@@ -172,9 +174,13 @@ public:
 	 */
 	void deallocate(
 		void* p_mem   //!< [in] pointer to allocated memory by allocate()
-	)
+		) noexcept
 	{
-		general_mem_allocator_impl_deallocate( pr_ch_size_, param_ch_array_, p_mem );
+		try {
+			general_mem_allocator_impl_deallocate( pr_ch_size_, param_ch_array_, p_mem );
+		} catch ( ... ) {
+			// discard all exceptions
+		}
 	}
 
 	/*!
@@ -315,7 +321,11 @@ public:
 		void* p_mem   //!< [in] pointer to allocated memory by allocate()
 	)
 	{
-		allocator_impl_.deallocate( p_mem );
+		try {
+			allocator_impl_.deallocate( p_mem );
+		} catch ( ... ) {
+			// discard all exceptions
+		}
 	}
 
 	/*!
