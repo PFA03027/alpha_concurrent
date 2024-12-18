@@ -23,6 +23,7 @@
 #include <thread>
 #include <tuple>
 
+#include "conf_logger.hpp"
 #include "internal/hazard_ptr_internal.hpp"
 
 namespace alpha {

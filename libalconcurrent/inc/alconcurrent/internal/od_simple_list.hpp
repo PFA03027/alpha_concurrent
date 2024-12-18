@@ -93,7 +93,11 @@ public:
 	 */
 	void clear( std::function<void( node_pointer )> pred );
 
-	size_t size( void ) const noexcept
+	size_t size( void ) const
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+#else
+		noexcept
+#endif
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
 		if ( count_ == 0 ) {
