@@ -5,6 +5,7 @@ file(GLOB SOURCES src/*.cpp )
 add_executable(${EXEC_TARGET} EXCLUDE_FROM_ALL ${SOURCES})
 
 target_include_directories(${EXEC_TARGET} PRIVATE ../../libalconcurrent/src)
+target_include_directories(${EXEC_TARGET} PRIVATE ../../libalconcurrent/src2)
 target_include_directories(${EXEC_TARGET} PRIVATE ../test_common_inc)
 
 target_link_libraries(${EXEC_TARGET} alconcurrent gtest gtest_main pthread)
