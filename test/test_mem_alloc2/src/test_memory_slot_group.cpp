@@ -11,7 +11,7 @@
 
 #include "gtest/gtest.h"
 
-#include "mem_slotgroup.hpp"
+#include "mem_small_memory_slot.hpp"
 
 using tut = alpha::concurrent::internal::memory_slot_group;
 
@@ -31,7 +31,7 @@ TEST_P( Test_MemorySlotGroupBuffParam, CanConstruct )
 	// Assert
 	EXPECT_EQ( p_ret->magic_number_, tut::magic_number_value_ );
 	EXPECT_EQ( p_ret->p_list_mgr_, nullptr );
-	EXPECT_EQ( 24, p_ret->one_slot_bytes_ );
+	EXPECT_EQ( sizeof( alpha::concurrent::internal::slot_link_info ) + 16, p_ret->one_slot_bytes_ );
 	EXPECT_LE( 1, p_ret->num_slots_ );
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	EXPECT_LE( p_ret->data_, reinterpret_cast<unsigned char*>( &( p_ret->get_btinfo( 0 ) ) ) );
@@ -89,7 +89,7 @@ TEST( Test_MemorySlotGroup, NotYetAssign_DoAssignNewSlot_Then_same_to_begin )
 	auto p_ret = p_sut->assign_new_slot();
 
 	// Assert
-	EXPECT_EQ( p_ret, p_sut->p_slot_begin_ );
+	EXPECT_EQ( reinterpret_cast<unsigned char*>( p_ret ), p_sut->p_slot_begin_ );
 }
 
 TEST( Test_MemorySlotGroup, AllAssigned_DoAssignNewSlot_Then_Nullptr )
@@ -103,8 +103,8 @@ TEST( Test_MemorySlotGroup, AllAssigned_DoAssignNewSlot_Then_Nullptr )
 	EXPECT_FALSE( p_sut->is_assigned_all_slots() );
 	auto p_ret = p_sut->assign_new_slot();
 	EXPECT_NE( p_ret, nullptr );
-	EXPECT_LE( p_sut->p_slot_begin_, p_ret );
-	EXPECT_LT( p_ret, p_sut->p_slot_end_ );
+	EXPECT_LE( p_sut->p_slot_begin_, reinterpret_cast<unsigned char*>( p_ret ) );
+	EXPECT_LT( reinterpret_cast<unsigned char*>( p_ret ), p_sut->p_slot_end_ );
 	EXPECT_TRUE( p_sut->is_assigned_all_slots() );
 
 	// Act

@@ -14,4 +14,5 @@ endif()
 
 
 target_include_directories(alconcurrent  PUBLIC inc/  )
+target_include_directories(alconcurrent  PUBLIC src/  )
 

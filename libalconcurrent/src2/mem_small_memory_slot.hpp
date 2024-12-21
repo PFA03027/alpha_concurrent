@@ -1,102 +1,56 @@
 /**
- * @file alcc_mem_slotgroup.hpp
+ * @file mem_small_memory_slot.hpp
  * @author Teruaki Ata (PFA03027@nifty.com)
- * @brief the definition of memory slot, memory slot group and memory slot list
+ * @brief
  * @version 0.1
- * @date 2024-12-18
+ * @date 2024-12-22
  *
  * @copyright Copyright (c) 2024, Teruaki Ata (PFA03027@nifty.com)
  *
  */
 
-#ifndef ALCONCCURRENT_SRC_MEM_SLOTGROUP_HPP_
-#define ALCONCCURRENT_SRC_MEM_SLOTGROUP_HPP_
+#ifndef ALCONCCURRENT_SRC_MEM_SMALL_MEMORY_SLOT_HPP_
+#define ALCONCCURRENT_SRC_MEM_SMALL_MEMORY_SLOT_HPP_
 
 #include <atomic>
-#include <memory>
+#include <mutex>
 #include <type_traits>
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
 #include <exception>
 #endif
 
 #include "alconcurrent/conf_logger.hpp"
+#include "alconcurrent/hazard_ptr.hpp"
+
+#include "mem_common.hpp"
 
 namespace alpha {
 namespace concurrent {
 namespace internal {
 
-/**
- * @brief memory management type identifier
- *
- */
-enum class mem_type : uint8_t {
-	NON_USED     = 0,   //!< not assigned yet
-	SMALL_MEM    = 1,   //!< memory allocation type is small memory type
-	BIG_MEM      = 2,   //!< memory allocation type is big memory type
-	OVER_BIG_MEM = 3,   //!< memory allocation type is over big memory type
-};
+struct memory_slot_group;
 
-struct memory_slot_group_list;
+struct slot_link_info {
+	std::atomic<slot_link_info*> ap_slot_next_;
+	allocated_mem_top            link_to_memory_slot_group_;
+	union {
+		unsigned char   data_[0];
+		slot_link_info* p_temprary_link_next_;
+	};
 
-/**
- * @brief utility structure of unziped data of addr_w_mem_flag_ in allocated_mem_top
- *
- */
-template <typename T>
-struct unziped_allocation_info {
-	T*       p_mgr_;
-	mem_type mt_;
-	bool     is_used_;
-};
-
-/**
- * @brief allocated memory information
- *
- */
-struct allocated_mem_top {
-	std::atomic<uintptr_t> addr_w_mem_flag_;   //!< 0..1: memory allocation type, 2: using/released flag, 3..63: address information
-	unsigned char          data_[0];           //!< top for allocated memory
-
-	static constexpr size_t min_alignment_size_ = sizeof( std::atomic<uintptr_t> );
-
-	template <typename U>
-	static constexpr allocated_mem_top* emplace_on_mem( unsigned char* p_mem, U* p_mgr_arg, mem_type mt_arg, bool is_used_arg ) noexcept
+	static constexpr slot_link_info* emplace_on_mem( unsigned char* p_mem, memory_slot_group* p_owner ) noexcept
 	{
-		return new ( p_mem ) allocated_mem_top( p_mgr_arg, mt_arg, is_used_arg );
+		return new ( p_mem ) slot_link_info( p_owner );
 	}
 
-	static allocated_mem_top* get_structure_addr( void* p ) noexcept
-	{
-		uintptr_t addr = reinterpret_cast<uintptr_t>( p );
-		addr -= static_cast<uintptr_t>( sizeof( std::atomic<uintptr_t> ) );
-		return reinterpret_cast<allocated_mem_top*>( addr );
-	}
-
-	template <typename U>
-	unziped_allocation_info<U> load_allocation_info( std::memory_order mo = std::memory_order_acquire ) noexcept
-	{
-		uintptr_t                  addr_w_info = addr_w_mem_flag_.load( mo );
-		unziped_allocation_info<U> ans;
-		ans.p_mgr_   = reinterpret_cast<U*>( addr_w_info & ~( static_cast<uintptr_t>( 7L ) ) );
-		ans.mt_      = static_cast<mem_type>( addr_w_info & static_cast<uintptr_t>( 3L ) );
-		ans.is_used_ = ( ( addr_w_info & static_cast<uintptr_t>( 4L ) ) != 0 ) ? true : false;
-		return ans;
-	}
+	memory_slot_group* check_validity_to_ownwer_and_get( void ) noexcept;
 
 private:
-	template <typename U>
-	constexpr allocated_mem_top( U* p_mgr_arg, mem_type mt_arg, bool is_used_arg ) noexcept
-	  : addr_w_mem_flag_( zip_allocation_info( p_mgr_arg, mt_arg, is_used_arg ) )
+	constexpr slot_link_info( memory_slot_group* p_owner ) noexcept
+	  : ap_slot_next_( nullptr )
+	  , link_to_memory_slot_group_( p_owner, mem_type::SMALL_MEM, true )
 	  , data_ {}
 	{
-	}
-
-	template <typename U>
-	constexpr uintptr_t zip_allocation_info( U* p_mgr_arg, mem_type mt_arg, bool is_used_arg ) noexcept
-	{
-		return reinterpret_cast<uintptr_t>( p_mgr_arg ) |
-		       static_cast<uintptr_t>( mt_arg ) |
-		       ( is_used_arg ? static_cast<uintptr_t>( 4L ) : static_cast<uintptr_t>( 0 ) );
 	}
 
 	static constexpr void* operator new( std::size_t s, void* p ) noexcept   // placement new
@@ -109,8 +63,6 @@ private:
 	}
 };
 
-static_assert( std::is_trivially_destructible<allocated_mem_top>::value );
-
 /**
  * @brief back trace of allocation and free points
  *
@@ -119,6 +71,7 @@ struct btinfo_alloc_free {
 	bt_info alloc_trace_;
 	bt_info free_trace_;
 };
+static_assert( std::is_trivially_destructible<btinfo_alloc_free>::value );
 
 /**
  * @brief manager structure for memory slot array
@@ -126,6 +79,7 @@ struct btinfo_alloc_free {
  */
 struct memory_slot_group {
 	const uintptr_t                 magic_number_;         //!< magic number that indicates memory_slot_group
+	const size_t                    buffer_size_;          //!< size of buffer
 	memory_slot_group_list* const   p_list_mgr_;           //!< pointer to memory_slot_group_list
 	const size_t                    one_slot_bytes_;       //!< bytes of one memory slot
 	const size_t                    num_slots_;            //!< number of slot in this memory_slot_group
@@ -136,8 +90,9 @@ struct memory_slot_group {
 	unsigned char                   data_[0];              //!< buffer of back trace inforamtion array and memory slot array
 
 	static constexpr uintptr_t magic_number_value_ = 0xABAB7878CDCD3434UL;
+	static constexpr size_t    buffer_zone_bytes_  = 1UL;
 
-	static constexpr memory_slot_group* emplace_on_mem( unsigned char* p_mem, memory_slot_group_list* p_list_mgr_arg, size_t buffer_size, size_t requested_allocatable_bytes_of_a_slot ) noexcept
+	static constexpr memory_slot_group* emplace_on_mem( void* p_mem, memory_slot_group_list* p_list_mgr_arg, size_t buffer_size, size_t requested_allocatable_bytes_of_a_slot ) noexcept
 	{
 		return new ( p_mem ) memory_slot_group( p_list_mgr_arg, buffer_size, calc_one_slot_size( requested_allocatable_bytes_of_a_slot ) );
 	}
@@ -181,16 +136,22 @@ struct memory_slot_group {
 	 * @retval nullptr because no unassigned slot, fail to assign a slot
 	 * @retval non-nullptr success to assign a slot
 	 */
-	unsigned char* assign_new_slot( void ) noexcept
+	slot_link_info* assign_new_slot( void ) noexcept
 	{
 		unsigned char* p_allocated_slot = ap_unassigned_slot_.load( std::memory_order_acquire );
 		do {
 			if ( p_slot_end_ <= p_allocated_slot ) {
-				p_allocated_slot = nullptr;
-				break;
+				return nullptr;
 			}
 		} while ( !ap_unassigned_slot_.compare_exchange_strong( p_allocated_slot, p_allocated_slot + one_slot_bytes_, std::memory_order_acq_rel ) );
-		return p_allocated_slot;
+
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+		btinfo_alloc_free& cur_btinfo = get_btinfo( get_slot_idx( p_allocated_slot ) );
+		cur_btinfo.alloc_trace_       = bt_info::record_backtrace();
+		cur_btinfo.free_trace_.invalidate();
+#endif
+
+		return slot_link_info::emplace_on_mem( p_allocated_slot, this );
 	}
 
 	/**
@@ -214,6 +175,7 @@ struct memory_slot_group {
 private:
 	constexpr memory_slot_group( memory_slot_group_list* p_list_mgr_arg, size_t buffer_size, size_t calced_one_slot_bytes_arg ) noexcept
 	  : magic_number_( magic_number_value_ )
+	  , buffer_size_( buffer_size )
 	  , p_list_mgr_( p_list_mgr_arg )
 	  , one_slot_bytes_( calced_one_slot_bytes_arg )
 	  , num_slots_( calc_number_of_slots( buffer_size, one_slot_bytes_ ) )
@@ -246,7 +208,8 @@ private:
 
 constexpr size_t memory_slot_group::calc_one_slot_size( size_t requested_allocatable_bytes_of_a_slot ) noexcept
 {
-	size_t one_slot_bytes = sizeof( allocated_mem_top ) + requested_allocatable_bytes_of_a_slot + allocated_mem_top::min_alignment_size_ - 1;
+	size_t one_slot_bytes = ( requested_allocatable_bytes_of_a_slot < allocated_mem_top::min_alignment_size_ ) ? allocated_mem_top::min_alignment_size_ : requested_allocatable_bytes_of_a_slot;
+	one_slot_bytes += sizeof( slot_link_info ) + buffer_zone_bytes_ + allocated_mem_top::min_alignment_size_ - 1;
 	one_slot_bytes /= allocated_mem_top::min_alignment_size_;
 	one_slot_bytes *= allocated_mem_top::min_alignment_size_;
 	return one_slot_bytes;
@@ -319,32 +282,81 @@ constexpr unsigned char* memory_slot_group::calc_end_of_slots( unsigned char* da
 }
 
 /**
+ * @brief retrieved slots kept by stack
+ *
+ * とりあえずの、仮実装。後で、スレッドローカル変数を使って、ロックフリー化する。
+ */
+struct retrieved_slots_mgr {
+	hazard_ptr_handler<slot_link_info> hph_head_unused_memory_slot_stack_;   //!< pointer to head unused memory slot stack
+	mutable std::mutex                 mtx_;
+	slot_link_info*                    p_head_unused_memory_slot_stack_in_hazard_;   //!< pointer to head unused memory slot stack
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	std::atomic<size_t> count_in_not_hazard_;
+	std::atomic<size_t> count_in_hazard_;
+#endif
+
+	constexpr retrieved_slots_mgr( void ) noexcept
+	  : hph_head_unused_memory_slot_stack_( nullptr )
+	  , mtx_()
+	  , p_head_unused_memory_slot_stack_in_hazard_( nullptr )
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	  , count_in_not_hazard_( 0 )
+	  , count_in_hazard_( 0 )
+#endif
+	{
+	}
+
+	void            retrieve( slot_link_info* p ) noexcept;
+	slot_link_info* request_reuse( void ) noexcept;
+
+private:
+	using hazard_pointer = typename hazard_ptr_handler<slot_link_info>::hazard_pointer;
+
+	void            retrieve_impl( slot_link_info* p ) noexcept;
+	slot_link_info* request_reuse_impl( void ) noexcept;
+};
+static_assert( std::is_trivially_destructible<retrieved_slots_mgr>::value );
+
+/**
  * @brief manager structure for the list of memory_slot_group
  *
  */
 struct memory_slot_group_list {
 	const size_t                    allocatable_bytes_;                       //!< allocatable bytes per one slot
-	const size_t                    max_buffer_bytes_of_memory_slot_group_;   //!< max bytes for one memory_slot_group
+	const size_t                    limit_bytes_for_one_memory_slot_group_;   //!< max bytes for one memory_slot_group
 	std::atomic<size_t>             next_allocating_buffer_bytes_;            //!< allocating buffer size of next allocation for memory_slot_group
 	std::atomic<memory_slot_group*> ap_head_memory_slot_group_;               //!< pointer to head memory_slot_group of memory_slot_group stack
 	std::atomic<memory_slot_group*> ap_cur_assigning_memory_slot_group_;      //!< pointer to current slot allocating memory_slot_group
-	std::atomic<allocated_mem_top*> ap_head_unused_memory_slot_stack_;        //!< pointer to head unused memory slot stack
+	retrieved_slots_mgr             unused_retrieved_slots_mgr_;              //!< manager for retrieved slots
 
 	constexpr memory_slot_group_list(
-		const size_t allocatable_bytes_arg,
-		const size_t max_buffer_bytes_of_memory_slot_group_arg,
-		const size_t init_buffer_bytes_of_memory_slot_group_arg ) noexcept
+		const size_t allocatable_bytes_arg,                       //!< [in] max allocatable bytes by allocation
+		const size_t limit_bytes_for_one_memory_slot_group_arg,   //!< [in] limitation to allocate one memory_slot_group
+		const size_t init_buffer_bytes_of_memory_slot_group_arg   //!< [in] buffer size of one memory_slot_group when 1st allocation
+		) noexcept
 	  : allocatable_bytes_( allocatable_bytes_arg )
-	  , max_buffer_bytes_of_memory_slot_group_( max_buffer_bytes_of_memory_slot_group_arg )
+	  , limit_bytes_for_one_memory_slot_group_( limit_bytes_for_one_memory_slot_group_arg )
 	  , next_allocating_buffer_bytes_( check_init_buffer_size( allocatable_bytes_arg, init_buffer_bytes_of_memory_slot_group_arg ) )
 	  , ap_head_memory_slot_group_( nullptr )
 	  , ap_cur_assigning_memory_slot_group_( nullptr )
-	  , ap_head_unused_memory_slot_stack_( nullptr )
+	  , unused_retrieved_slots_mgr_()
 	{
 	}
 
-	void* allocate( size_t alignment = allocated_mem_top::min_alignment_size_ ) noexcept;
-	void  deallocate( void* p ) noexcept;
+	slot_link_info* allocate( void ) noexcept;
+	void            deallocate( slot_link_info* p ) noexcept;
+
+	/**
+	 * @brief request to allocate a memory_slot_group and push it to the head of memory_slot_group stack
+	 *
+	 */
+	void request_allocate_memory_slot_group( void ) noexcept;
+
+	/**
+	 * @brief free all memory_slot_group
+	 *
+	 */
+	void clear_for_test( void ) noexcept;
 
 private:
 	static constexpr size_t check_init_buffer_size( size_t requested_allocatable_bytes_of_a_slot, size_t request_init_buffer_size ) noexcept
@@ -353,7 +365,18 @@ private:
 		size_t ans          = ( min_size_val <= request_init_buffer_size ) ? request_init_buffer_size : min_size_val;
 		return ans;
 	}
+
+	static constexpr size_t clac_next_expected_buffer_size( size_t cur_size, size_t limit_size ) noexcept
+	{
+		size_t ans = cur_size * 2;
+		if ( limit_size < ans ) {
+			ans = limit_size;
+		}
+		return ans;
+	}
 };
+
+static_assert( std::is_trivially_destructible<memory_slot_group_list>::value );
 
 }   // namespace internal
 }   // namespace concurrent

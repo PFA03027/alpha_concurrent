@@ -1,0 +1,243 @@
+/**
+ * @file mem_small_memory_slot.cpp
+ * @author Teruaki Ata (PFA03027@nifty.com)
+ * @brief
+ * @version 0.1
+ * @date 2024-12-22
+ *
+ * @copyright Copyright (c) 2024, Teruaki Ata (PFA03027@nifty.com)
+ *
+ */
+
+#include "mem_small_memory_slot.hpp"
+#include "mem_common.hpp"
+#include "mmap_allocator.hpp"
+
+namespace alpha {
+namespace concurrent {
+namespace internal {
+
+memory_slot_group* slot_link_info::check_validity_to_ownwer_and_get( void ) noexcept
+{
+	memory_slot_group* p_slot_owner = link_to_memory_slot_group_.load_addr<memory_slot_group>();
+	if ( p_slot_owner == nullptr ) {
+		return nullptr;
+	}
+	if ( p_slot_owner->magic_number_ != memory_slot_group::magic_number_value_ ) {
+		return nullptr;
+	}
+	return p_slot_owner;
+}
+
+void retrieved_slots_mgr::retrieve_impl( slot_link_info* p ) noexcept
+{
+
+	if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p ) ) {
+		// ハザードポインタとして登録されている場合、ハザードポインタ登録中のリストに追加する
+		std::lock_guard<std::mutex> lock( mtx_ );
+		p->p_temprary_link_next_                   = p_head_unused_memory_slot_stack_in_hazard_;
+		p_head_unused_memory_slot_stack_in_hazard_ = p;
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		count_in_hazard_--;
+#endif
+	} else {
+		// ハザードポインタとして登録されていない場合、未使用スロットリストに登録する
+		slot_link_info* p_cur_head = hph_head_unused_memory_slot_stack_.load( std::memory_order_acquire );
+		do {
+			p->ap_slot_next_.store( p_cur_head, std::memory_order_release );
+		} while ( !hph_head_unused_memory_slot_stack_.compare_exchange_strong( p_cur_head, p, std::memory_order_acq_rel ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		count_in_not_hazard_--;
+#endif
+	}
+}
+
+void retrieved_slots_mgr::retrieve( slot_link_info* p ) noexcept
+{
+	memory_slot_group* p_slot_owner = p->check_validity_to_ownwer_and_get();
+	if ( p_slot_owner == nullptr ) {
+		LogOutput( log_type::WARN, "retrieved_slots_mgr::retrieve() invalid slot_link_info" );
+		return;
+	}
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+	btinfo_alloc_free& cur_btinfo = p_slot_owner->get_btinfo( p_slot_owner->get_slot_idx( p ) );
+	cur_btinfo.free_trace_        = bt_info::record_backtrace();
+#endif
+
+	retrieve_impl( p );
+}
+
+slot_link_info* retrieved_slots_mgr::request_reuse_impl( void ) noexcept
+{
+	// 未使用スロットリストから取得する
+	hazard_pointer          hp_cur_head = hph_head_unused_memory_slot_stack_.get_to_verify_exchange();
+	hazard_pointer::pointer p_new_head;
+	while ( true ) {
+		if ( !hph_head_unused_memory_slot_stack_.verify_exchange( hp_cur_head ) ) {
+			continue;
+		}
+		if ( hp_cur_head == nullptr ) {
+			break;
+		}
+
+		p_new_head = hp_cur_head->ap_slot_next_.load( std::memory_order_acquire );
+		if ( hph_head_unused_memory_slot_stack_.compare_exchange_strong_to_verify_exchange2( hp_cur_head, p_new_head ) ) {
+			// hp_cur_headの所有権を獲得
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+			count_in_not_hazard_--;
+#endif
+			return hp_cur_head.get();
+		}
+	}
+
+	// ここに来た時点で、未使用スロットリストが空のため、slotが取得できなかったことを示す。
+	// この場合、ハザードポインタ登録中リストからの取得を試みる。
+	// TODO: とりあえず、ロックの確保待ちを行う方式で暫定実装している。
+	std::lock_guard<std::mutex> lock( mtx_ );
+	slot_link_info*             p_cur      = nullptr;
+	slot_link_info*             p_tmp_head = nullptr;
+	while ( p_head_unused_memory_slot_stack_in_hazard_ != nullptr ) {
+		p_cur                                      = p_head_unused_memory_slot_stack_in_hazard_;
+		p_head_unused_memory_slot_stack_in_hazard_ = p_cur->p_temprary_link_next_;
+
+		if ( !hazard_ptr_mgr::CheckPtrIsHazardPtr( p_cur ) ) {
+			// p_curが利用可能なスロットとして見つかった
+			break;
+		}
+
+		// p_curはまだハザードポインタとして登録されているので、一時キープ用のリストに追加する
+		p_cur->p_temprary_link_next_ = p_tmp_head;
+		p_tmp_head                   = p_cur;
+		p_cur                        = nullptr;
+	}
+
+	// 一時的にキープしていたスロットを未使用スロットリストに戻す。
+	while ( p_tmp_head != nullptr ) {
+		slot_link_info* p_tmp                      = p_tmp_head;
+		p_tmp_head                                 = p_tmp_head->p_temprary_link_next_;
+		p_tmp->p_temprary_link_next_               = p_head_unused_memory_slot_stack_in_hazard_;
+		p_head_unused_memory_slot_stack_in_hazard_ = p_tmp;
+	}
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	if ( p_cur != nullptr ) {
+		count_in_hazard_--;
+	}
+#endif
+	return p_cur;
+}
+slot_link_info* retrieved_slots_mgr::request_reuse( void ) noexcept
+{
+	slot_link_info* p_ans = request_reuse_impl();
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+	if ( p_ans != nullptr ) {
+		memory_slot_group* p_slot_owner = p_ans->check_validity_to_ownwer_and_get();
+		if ( p_slot_owner == nullptr ) {
+			LogOutput( log_type::WARN, "retrieved_slots_mgr::request_reuse() invalid slot_link_info" );
+			return nullptr;
+		}
+		btinfo_alloc_free& cur_btinfo = p_slot_owner->get_btinfo( p_slot_owner->get_slot_idx( p_ans ) );
+		cur_btinfo.alloc_trace_       = bt_info::record_backtrace();
+		cur_btinfo.free_trace_.invalidate();
+	}
+#endif
+
+	return p_ans;
+}
+
+slot_link_info* memory_slot_group_list::allocate( void ) noexcept
+{
+	// 回収済み、再割り当て待ちリストからスロットの取得を試みる
+	slot_link_info* p_ans = unused_retrieved_slots_mgr_.request_reuse();
+	if ( p_ans != nullptr ) {
+		return p_ans;   // 取得できたので、そのまま返す
+	}
+
+	// 未使用スロットリストからスロットの取得を試みる
+	memory_slot_group* p_cur_memory_slot_group_target = ap_cur_assigning_memory_slot_group_.load( std::memory_order_acquire );
+	if ( p_cur_memory_slot_group_target == nullptr ) {
+		return nullptr;   // 割り当て可能なmemory_slot_groupがないので、nullptrを返す
+	}
+
+	// 割り当て可能なmemory_slot_groupがある場合、スロットの取得を試みる
+	while ( true ) {
+		// 未使用スロットの有無を確認
+		if ( p_cur_memory_slot_group_target->is_assigned_all_slots() ) {
+
+			// 次のmemory_slot_groupが検索可能かを確認する
+			memory_slot_group* p_new_memory_slot_group_target = p_cur_memory_slot_group_target->ap_next_group_.load( std::memory_order_acquire );
+			if ( p_new_memory_slot_group_target == nullptr ) {
+				// 次のmemory_slot_groupがない場合、先頭のmemory_slot_groupに戻って検索を続ける
+				p_new_memory_slot_group_target = ap_head_memory_slot_group_.load( std::memory_order_acquire );
+			}
+
+			// 次のmemory_slot_groupがある場合、次のmemory_slot_groupを検索対象に設定する
+			if ( !ap_cur_assigning_memory_slot_group_.compare_exchange_strong( p_cur_memory_slot_group_target, p_new_memory_slot_group_target, std::memory_order_acq_rel ) ) {
+				// 他のスレッドが先に次のmemory_slot_groupを検索対象に設定した場合、再度検索を最初からやり直す。
+				continue;
+			}
+
+			// 次のmemory_slot_groupを検索対象に設定できたので、次のmemory_slot_groupの状態を確認する。
+			if ( p_new_memory_slot_group_target->is_assigned_all_slots() ) {
+				// 次のmemory_slot_groupが全てのスロットを割り当て済みの場合、以降のmemory_slot_groupも全て割り当て済み。
+				if ( p_new_memory_slot_group_target == ap_head_memory_slot_group_.load( std::memory_order_acquire ) ) {
+					// 先頭のmemory_slot_groupが全てのスロットを割り当て済みの場合、空きスロットはないので、検索を終了する
+					break;
+				}
+				// 他のスレッドによる更新がなされているかもしれないので、検索を最初からやり直す。
+				p_cur_memory_slot_group_target = ap_head_memory_slot_group_.load( std::memory_order_acquire );
+				continue;
+			}
+		}
+		// ここに到達した場合、割り当て可能なmemory_slot_groupが見つかった。
+		// よって、スロットの取得を試みる
+		slot_link_info* p_slot = p_cur_memory_slot_group_target->assign_new_slot();
+		if ( p_slot != nullptr ) {
+			return p_slot;
+		}
+	}
+
+	return nullptr;
+}
+
+void memory_slot_group_list::deallocate( slot_link_info* p ) noexcept
+{
+	unused_retrieved_slots_mgr_.retrieve( p );
+}
+
+void memory_slot_group_list::request_allocate_memory_slot_group( void ) noexcept
+{
+	size_t cur_allocating_buffer_bytes = next_allocating_buffer_bytes_.load( std::memory_order_acquire );
+	auto   buffer_ret                  = allocate_by_mmap( cur_allocating_buffer_bytes, allocated_mem_top::min_alignment_size_ );
+	if ( buffer_ret.p_allocated_addr_ == nullptr ) {
+		return;
+	}
+	memory_slot_group* p_new_group = memory_slot_group::emplace_on_mem( buffer_ret.p_allocated_addr_, this, buffer_ret.allocated_size_, allocatable_bytes_ );
+	memory_slot_group* p_cur_head  = ap_head_memory_slot_group_.load( std::memory_order_acquire );
+	do {
+		p_new_group->ap_next_group_ = p_cur_head;
+	} while ( !ap_head_memory_slot_group_.compare_exchange_strong( p_cur_head, p_new_group, std::memory_order_acq_rel ) );
+
+	size_t new_alocating_buffer_bytes = clac_next_expected_buffer_size( cur_allocating_buffer_bytes, limit_bytes_for_one_memory_slot_group_ );
+	next_allocating_buffer_bytes_.compare_exchange_strong( cur_allocating_buffer_bytes, new_alocating_buffer_bytes, std::memory_order_acq_rel );
+
+	memory_slot_group* p_cur_memory_slot_group_target = ap_cur_assigning_memory_slot_group_.load( std::memory_order_acquire );
+	if ( p_cur_memory_slot_group_target == nullptr ) {
+		ap_cur_assigning_memory_slot_group_.compare_exchange_strong( p_cur_memory_slot_group_target, p_new_group, std::memory_order_acq_rel );
+	}
+}
+
+void memory_slot_group_list::clear_for_test( void ) noexcept
+{
+	memory_slot_group* p_cur = ap_head_memory_slot_group_.load( std::memory_order_acquire );
+	while ( p_cur != nullptr ) {
+		memory_slot_group* p_next = p_cur->ap_next_group_;
+		deallocate_by_munmap( p_cur, p_cur->buffer_size_ );
+		p_cur = p_next;
+	}
+	ap_head_memory_slot_group_.store( nullptr, std::memory_order_release );
+	ap_cur_assigning_memory_slot_group_.store( nullptr, std::memory_order_release );
+}
+
+}   // namespace internal
+}   // namespace concurrent
+}   // namespace alpha
