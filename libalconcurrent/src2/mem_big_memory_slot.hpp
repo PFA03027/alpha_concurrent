@@ -57,6 +57,33 @@ struct big_memory_slot {
 		return buffer_size_ - ( sizeof( big_memory_slot ) - sizeof( big_memory_slot* ) );
 	}
 
+	/**
+	 * @brief Get the aligned allocated mem top object
+	 *
+	 * @param align_bytes alignment bytes. This value should be power of 2.
+	 * @return allocated_mem_top*
+	 */
+	allocated_mem_top* get_aligned_allocated_mem_top( size_t align_bytes, size_t requested_allocation_size ) noexcept
+	{
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+		if ( !is_power_of_2( align_bytes ) ) {
+			std::terminate();
+		}
+#endif
+		uintptr_t addr = reinterpret_cast<uintptr_t>( data_ );
+		addr           = ( addr + ( align_bytes - 1 ) ) & ( ~( align_bytes - 1 ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+		uintptr_t end_addr = reinterpret_cast<uintptr_t>( data_ ) + buffer_size_;
+		if ( end_addr < ( addr + requested_allocation_size ) ) {
+			std::terminate();
+		}
+#endif
+		if ( addr == reinterpret_cast<uintptr_t>( data_ ) ) {
+			return &link_to_big_memory_slot_;
+		}
+		return allocated_mem_top::emplace_on_mem( reinterpret_cast<unsigned char*>( addr ), link_to_big_memory_slot_ );
+	}
+
 	static constexpr size_t calc_minimum_buffer_size( size_t requested_allocatable_size ) noexcept
 	{
 		return requested_allocatable_size + ( sizeof( big_memory_slot ) - sizeof( big_memory_slot* ) ) + 1;

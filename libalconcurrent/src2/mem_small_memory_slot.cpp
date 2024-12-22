@@ -95,27 +95,43 @@ slot_link_info* memory_slot_group_list::allocate( void ) noexcept
 bool memory_slot_group_list::deallocate( slot_link_info* p ) noexcept
 {
 	if ( p == nullptr ) {
-		LogOutput( log_type::WARN, "memory_slot_group_list::deallocate() nullptr" );
+		LogOutput( log_type::DEBUG, "memory_slot_group_list::deallocate() with nullptr" );
 		return false;
 	}
 	auto p_slot_owner = p->check_validity_to_ownwer_and_get();
 	if ( p_slot_owner == nullptr ) {
 		LogOutput( log_type::WARN, "memory_slot_group_list::deallocate() invalid slot_link_info" );
+		bt_info::record_backtrace().dump_to_log( log_type::WARN, 'i', 2 );
 		return false;
 	}
 
 	auto slot_info = p->link_to_memory_slot_group_.load_allocation_info<memory_slot_group>();
 	if ( slot_info.mt_ != mem_type::SMALL_MEM ) {
 		LogOutput( log_type::WARN, "memory_slot_group_list::deallocate() is called with unknown mem_type %u", static_cast<unsigned int>( slot_info.mt_ ) );
+		bt_info::record_backtrace().dump_to_log( log_type::WARN, 'u', 2 );
 		return false;
 	}
 
 	if ( slot_info.is_used_ == false ) {
 		LogOutput( log_type::WARN, "memory_slot_group_list::deallocate() is called with unused slot. this means double-free." );
+		bt_info::record_backtrace().dump_to_log( log_type::WARN, 'd', 7 );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+		LogOutput( log_type::WARN, "Allocated by below;" );
+		p->btinfo_.alloc_trace_.dump_to_log( log_type::WARN, 'd', 8 );
+		LogOutput( log_type::WARN, "Free by below;" );
+		p->btinfo_.free_trace_.dump_to_log( log_type::WARN, 'd', 9 );
+#endif
 		return false;
 	}
 	if ( !p->link_to_memory_slot_group_.compare_and_exchange_used_flag( slot_info.is_used_, false ) ) {
 		LogOutput( log_type::WARN, "memory_slot_group_list::deallocate() fail to change slot status as unused slot. this means double-free causes race-condition b/w threads." );
+		bt_info::record_backtrace().dump_to_log( log_type::WARN, 'd', 10 );
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+		LogOutput( log_type::WARN, "Allocated by below;" );
+		p->btinfo_.alloc_trace_.dump_to_log( log_type::WARN, 'd', 11 );
+		LogOutput( log_type::WARN, "Free by below;" );
+		p->btinfo_.free_trace_.dump_to_log( log_type::WARN, 'd', 12 );
+#endif
 		return false;
 	}
 

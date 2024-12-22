@@ -123,6 +123,31 @@ TEST( Test_MemorySlotGroupList, Empty_DoDeallocateWithNonRelatedPtr_Then_ReturnF
 	sut.clear_for_test();
 }
 
+TEST( Test_MemorySlotGroupList, DeallocateOneSlot_DoDeallocate_Then_ReturnFalse )
+{
+	// Arrange
+	constexpr size_t max_buffer_size  = 1024 * 4;
+	constexpr size_t init_buffer_size = 1024 * 4;
+	tut              sut( 15, max_buffer_size, init_buffer_size );
+
+	unsigned char buff_memory_slot_group[1024 * 4];
+	auto          p_ret = alpha::concurrent::internal::memory_slot_group::emplace_on_mem( buff_memory_slot_group, nullptr, 1024 * 4, 15 );
+	EXPECT_NE( p_ret->num_slots_, 0 );
+	alpha::concurrent::internal::slot_link_info* p_sli1 = p_ret->assign_new_slot();
+	EXPECT_NE( p_sli1, nullptr );
+	bool ret = sut.deallocate( p_sli1 );
+	EXPECT_TRUE( ret );
+
+	// Act
+	ret = sut.deallocate( p_sli1 );
+
+	// Assert
+	EXPECT_FALSE( ret );
+
+	// Cleanup
+	sut.clear_for_test();
+}
+
 TEST( Test_MemorySlotGroupList, DeallocateOneSlot_DoAllocate_Then_ReturnElement )
 {
 	// Arrange

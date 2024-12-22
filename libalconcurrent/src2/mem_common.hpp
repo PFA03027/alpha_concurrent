@@ -64,9 +64,20 @@ struct allocated_mem_top {
 		return new ( p_mem ) allocated_mem_top( p_mgr_arg, mt_arg, is_used_arg );
 	}
 
+	static constexpr allocated_mem_top* emplace_on_mem( unsigned char* p_mem, const allocated_mem_top& src ) noexcept
+	{
+		return new ( p_mem ) allocated_mem_top( src );
+	}
+
 	template <typename U>
 	constexpr allocated_mem_top( U* p_mgr_arg, mem_type mt_arg, bool is_used_arg ) noexcept
 	  : addr_w_mem_flag_( zip_allocation_info( p_mgr_arg, mt_arg, is_used_arg ) )
+	  , data_ {}
+	{
+	}
+
+	allocated_mem_top( const allocated_mem_top& src ) noexcept
+	  : addr_w_mem_flag_( src.addr_w_mem_flag_.load( std::memory_order_acquire ) )
 	  , data_ {}
 	{
 	}
@@ -239,7 +250,6 @@ private:
 template <typename SLOT_T>
 void retrieved_slots_mgr_impl<SLOT_T>::retrieve_impl( SLOT_T* p ) noexcept
 {
-
 	if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p ) ) {
 		// ハザードポインタとして登録されている場合、ハザードポインタ登録中のリストに追加する
 		std::lock_guard<std::mutex> lock( mtx_ );
@@ -263,6 +273,11 @@ void retrieved_slots_mgr_impl<SLOT_T>::retrieve_impl( SLOT_T* p ) noexcept
 template <typename SLOT_T>
 void retrieved_slots_mgr_impl<SLOT_T>::retrieve( SLOT_T* p ) noexcept
 {
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+	if ( p == nullptr ) {
+		std::terminate();
+	}
+#endif
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	auto               p_slot_owner = p->check_validity_to_ownwer_and_get();
 	btinfo_alloc_free& cur_btinfo   = p_slot_owner->get_btinfo( p_slot_owner->get_slot_idx( p ) );

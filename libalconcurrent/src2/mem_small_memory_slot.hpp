@@ -45,6 +45,33 @@ struct slot_link_info {
 
 	memory_slot_group* check_validity_to_ownwer_and_get( void ) noexcept;
 
+	/**
+	 * @brief Get the aligned allocated mem top object
+	 *
+	 * @param align_bytes alignment bytes. This value should be power of 2.
+	 * @return allocated_mem_top*
+	 */
+	allocated_mem_top* get_aligned_allocated_mem_top( size_t align_bytes, size_t requested_allocation_size, size_t slot_size ) noexcept
+	{
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+		if ( !is_power_of_2( align_bytes ) ) {
+			std::terminate();
+		}
+#endif
+		uintptr_t addr = reinterpret_cast<uintptr_t>( data_ );
+		addr           = ( addr + ( align_bytes - 1 ) ) & ( ~( align_bytes - 1 ) );
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+		uintptr_t end_addr = reinterpret_cast<uintptr_t>( data_ ) + slot_size;
+		if ( end_addr < ( addr + requested_allocation_size ) ) {
+			std::terminate();
+		}
+#endif
+		if ( addr == reinterpret_cast<uintptr_t>( data_ ) ) {
+			return &link_to_memory_slot_group_;
+		}
+		return allocated_mem_top::emplace_on_mem( reinterpret_cast<unsigned char*>( addr ), link_to_memory_slot_group_ );
+	}
+
 private:
 	constexpr slot_link_info( memory_slot_group* p_owner ) noexcept
 	  : ap_slot_next_( nullptr )
