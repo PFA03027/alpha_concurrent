@@ -55,7 +55,6 @@ public:
 		p_raw_next_ = p_n;
 	}
 
-#if 0
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else
 #if __cpp_aligned_new
@@ -99,7 +98,6 @@ public:
 
 	void operator delete( void* ptr, void* ) noexcept;     // delete for area that is initialized by placement new.
 	void operator delete[]( void* ptr, void* ) noexcept;   // delete for area that is initialized by placement new.
-#endif
 #endif
 
 private:
