@@ -51,6 +51,17 @@ struct big_memory_slot {
 		return new ( p_mem ) big_memory_slot( mt_arg, buffer_size );
 	}
 
+	big_memory_slot* check_validity_to_ownwer_and_get( void ) const noexcept;
+	constexpr size_t max_allocatable_size( void ) const noexcept
+	{
+		return buffer_size_ - ( sizeof( big_memory_slot ) - sizeof( big_memory_slot* ) );
+	}
+
+	static constexpr size_t calc_minimum_buffer_size( size_t requested_allocatable_size ) noexcept
+	{
+		return requested_allocatable_size + ( sizeof( big_memory_slot ) - sizeof( big_memory_slot* ) ) + 1;
+	}
+
 private:
 	constexpr big_memory_slot( mem_type mt_arg, size_t buffer_size ) noexcept
 	  : magic_number_( magic_number_value_ )
@@ -74,41 +85,43 @@ private:
 	}
 };
 
-/**
- * @brief retrieved slots kept by stack
- *
- * とりあえずの、仮実装。後で、スレッドローカル変数を使って、ロックフリー化する。
- */
-struct retrieved_big_memory_slots_mgr {
-	hazard_ptr_handler<big_memory_slot> hph_head_unused_memory_slot_stack_;   //!< pointer to head unused memory slot stack
-	mutable std::mutex                  mtx_;
-	big_memory_slot*                    p_head_unused_memory_slot_stack_in_hazard_;   //!< pointer to head unused memory slot stack
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-	std::atomic<size_t> count_in_not_hazard_;
-	std::atomic<size_t> count_in_hazard_;
-#endif
+using retrieved_big_slots_mgr = retrieved_slots_mgr_impl<big_memory_slot>;
+static_assert( std::is_trivially_destructible<retrieved_big_slots_mgr>::value );
 
-	constexpr retrieved_big_memory_slots_mgr( void ) noexcept
-	  : hph_head_unused_memory_slot_stack_( nullptr )
-	  , mtx_()
-	  , p_head_unused_memory_slot_stack_in_hazard_( nullptr )
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-	  , count_in_not_hazard_( 0 )
-	  , count_in_hazard_( 0 )
-#endif
+/**
+ * @brief manager structure for the list of big_memory_slot
+ *
+ */
+struct big_memory_slot_list {
+	retrieved_big_slots_mgr unused_retrieved_slots_mgr_;      //!< manager for retrieved slots
+	std::atomic<size_t>     unused_retrieved_memory_bytes_;   //!< count of slots in hazard
+
+	static constexpr size_t defualt_limit_bytes_of_unused_retrieved_memory_ = 1024 * 1024 * 4;   // 4MB
+	static size_t           limit_bytes_of_unused_retrieved_memory_;                             //!< limit bytes of unused retrieved memory for cache
+	static size_t           too_big_memory_slot_buffer_size_threshold_;                          //!< threshold of buffer size to be too big memory slot
+
+	constexpr big_memory_slot_list( void ) noexcept
+	  : unused_retrieved_slots_mgr_()
+	  , unused_retrieved_memory_bytes_( 0 )
 	{
 	}
 
-	void             retrieve( big_memory_slot* p ) noexcept;
-	big_memory_slot* request_reuse( size_t requested_size ) noexcept;
+	big_memory_slot* reuse_allocate( size_t requested_allocatable_size ) noexcept;
+	void             deallocate( big_memory_slot* p ) noexcept;
 
-private:
-	using hazard_pointer = typename hazard_ptr_handler<big_memory_slot>::hazard_pointer;
+	/**
+	 * @brief request to allocate a memory_slot_group and push it to the head of memory_slot_group stack
+	 *
+	 */
+	big_memory_slot* allocate_newly( size_t requested_allocatable_size ) noexcept;
 
-	void             retrieve_impl( big_memory_slot* p ) noexcept;
-	big_memory_slot* request_reuse_impl( void ) noexcept;
+	/**
+	 * @brief free all memory_slot_group
+	 *
+	 */
+	void clear_for_test( void ) noexcept;
 };
-static_assert( std::is_trivially_destructible<retrieved_big_memory_slots_mgr>::value );
+static_assert( std::is_trivially_destructible<big_memory_slot_list>::value );
 
 }   // namespace internal
 }   // namespace concurrent

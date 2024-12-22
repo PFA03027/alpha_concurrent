@@ -13,7 +13,7 @@
 
 #include "mem_small_memory_slot.hpp"
 
-using tut = alpha::concurrent::internal::retrieved_slots_mgr;
+using tut = alpha::concurrent::internal::retrieved_small_slots_mgr;
 
 TEST( Test_RetrievedSlotsMgr, CanConstruct )
 {

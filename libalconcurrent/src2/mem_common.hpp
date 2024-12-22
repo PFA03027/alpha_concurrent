@@ -79,7 +79,7 @@ struct allocated_mem_top {
 	}
 
 	template <typename U>
-	unziped_allocation_info<U> load_allocation_info( std::memory_order mo = std::memory_order_acquire ) noexcept
+	unziped_allocation_info<U> load_allocation_info( std::memory_order mo = std::memory_order_acquire ) const noexcept
 	{
 		uintptr_t                  addr_w_info = addr_w_mem_flag_.load( mo );
 		unziped_allocation_info<U> ans;
@@ -106,13 +106,13 @@ struct allocated_mem_top {
 	}
 
 	template <typename U>
-	U* load_addr( void ) noexcept
+	U* load_addr( void ) const noexcept
 	{
 		uintptr_t addr_w_info = addr_w_mem_flag_.load( std::memory_order_acquire );
 		return reinterpret_cast<U*>( addr_w_info & clear_all_flags );
 	}
 
-	mem_type load_mem_type( void ) noexcept
+	mem_type load_mem_type( void ) const noexcept
 	{
 		uintptr_t addr_w_info = addr_w_mem_flag_.load( std::memory_order_acquire );
 		return static_cast<mem_type>( addr_w_info & mem_type_bits_ );
@@ -183,6 +183,11 @@ static_assert( std::is_trivially_destructible<allocated_mem_top>::value );
  * @brief retrieved slots kept by stack
  *
  * とりあえずの、仮実装。後で、スレッドローカル変数を使って、ロックフリー化する。
+ *
+ * @tparam SLOT_T type of slot that requires below;
+ * SLOT_T* == decltype(p->p_temprary_link_next_)
+ * std::atomic<SLOT_T*> == decltype(p->ap_slot_next_)
+ * callable: p->check_validity_to_ownwer_and_get()
  */
 template <typename SLOT_T>
 struct retrieved_slots_mgr_impl {
@@ -205,7 +210,7 @@ struct retrieved_slots_mgr_impl {
 	{
 	}
 
-	void    retrieve( SLOT_T* p ) noexcept;
+	void    retrieve( SLOT_T* p ) noexcept;   // p should be valid pointer and *p should be valid as SLOT_T
 	SLOT_T* request_reuse( void ) noexcept;
 
 private:
@@ -242,14 +247,10 @@ void retrieved_slots_mgr_impl<SLOT_T>::retrieve_impl( SLOT_T* p ) noexcept
 template <typename SLOT_T>
 void retrieved_slots_mgr_impl<SLOT_T>::retrieve( SLOT_T* p ) noexcept
 {
-	auto p_slot_owner = p->check_validity_to_ownwer_and_get();
-	if ( p_slot_owner == nullptr ) {
-		LogOutput( log_type::WARN, "retrieved_slots_mgr_impl<SLOT_T>::retrieve() invalid SLOT_T" );
-		return;
-	}
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	btinfo_alloc_free& cur_btinfo = p_slot_owner->get_btinfo( p_slot_owner->get_slot_idx( p ) );
-	cur_btinfo.free_trace_        = bt_info::record_backtrace();
+	auto               p_slot_owner = p->check_validity_to_ownwer_and_get();
+	btinfo_alloc_free& cur_btinfo   = p_slot_owner->get_btinfo( p_slot_owner->get_slot_idx( p ) );
+	cur_btinfo.free_trace_          = bt_info::record_backtrace();
 #endif
 
 	retrieve_impl( p );

@@ -86,7 +86,21 @@ slot_link_info* memory_slot_group_list::allocate( void ) noexcept
 
 void memory_slot_group_list::deallocate( slot_link_info* p ) noexcept
 {
-	unused_retrieved_slots_mgr_.retrieve( p );
+	if ( p == nullptr ) {
+		LogOutput( log_type::WARN, "retrieved_slots_mgr_impl<SLOT_T>::retrieve() nullptr" );
+		return;
+	}
+	auto p_slot_owner = p->check_validity_to_ownwer_and_get();
+	if ( p_slot_owner == nullptr ) {
+		LogOutput( log_type::WARN, "retrieved_slots_mgr_impl<SLOT_T>::retrieve() invalid SLOT_T" );
+		return;
+	}
+	mem_type mt = p->link_to_memory_slot_group_.load_mem_type();
+	if ( mt == mem_type::SMALL_MEM ) {
+		unused_retrieved_slots_mgr_.retrieve( p );
+	} else {
+		LogOutput( log_type::WARN, "memory_slot_group_list::deallocate() is called with unknown mem_type %u", static_cast<unsigned int>( mt ) );
+	}
 }
 
 void memory_slot_group_list::request_allocate_memory_slot_group( void ) noexcept

@@ -283,8 +283,8 @@ constexpr unsigned char* memory_slot_group::calc_end_of_slots( unsigned char* da
 	return p_ans;
 }
 
-using retrieved_slots_mgr = retrieved_slots_mgr_impl<slot_link_info>;
-static_assert( std::is_trivially_destructible<retrieved_slots_mgr>::value );
+using retrieved_small_slots_mgr = retrieved_slots_mgr_impl<slot_link_info>;
+static_assert( std::is_trivially_destructible<retrieved_small_slots_mgr>::value );
 
 /**
  * @brief manager structure for the list of memory_slot_group
@@ -296,7 +296,7 @@ struct memory_slot_group_list {
 	std::atomic<size_t>             next_allocating_buffer_bytes_;            //!< allocating buffer size of next allocation for memory_slot_group
 	std::atomic<memory_slot_group*> ap_head_memory_slot_group_;               //!< pointer to head memory_slot_group of memory_slot_group stack
 	std::atomic<memory_slot_group*> ap_cur_assigning_memory_slot_group_;      //!< pointer to current slot allocating memory_slot_group
-	retrieved_slots_mgr             unused_retrieved_slots_mgr_;              //!< manager for retrieved slots
+	retrieved_small_slots_mgr       unused_retrieved_slots_mgr_;              //!< manager for retrieved slots
 
 	constexpr memory_slot_group_list(
 		const size_t allocatable_bytes_arg,                       //!< [in] max allocatable bytes by allocation
