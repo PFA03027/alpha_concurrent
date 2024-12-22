@@ -16,6 +16,7 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
+#if 1
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else
 #if __cpp_aligned_new
@@ -159,6 +160,7 @@ void od_node_simple_link::operator delete[]( void* ptr, void* ) noexcept   // de
 {
 	// nothing to do
 }
+#endif
 #endif
 
 }   // namespace internal
