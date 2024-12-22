@@ -73,6 +73,8 @@ struct btinfo_alloc_free {
 };
 static_assert( std::is_trivially_destructible<btinfo_alloc_free>::value );
 
+struct memory_slot_group_list;
+
 /**
  * @brief manager structure for memory slot array
  *
@@ -281,40 +283,7 @@ constexpr unsigned char* memory_slot_group::calc_end_of_slots( unsigned char* da
 	return p_ans;
 }
 
-/**
- * @brief retrieved slots kept by stack
- *
- * とりあえずの、仮実装。後で、スレッドローカル変数を使って、ロックフリー化する。
- */
-struct retrieved_slots_mgr {
-	hazard_ptr_handler<slot_link_info> hph_head_unused_memory_slot_stack_;   //!< pointer to head unused memory slot stack
-	mutable std::mutex                 mtx_;
-	slot_link_info*                    p_head_unused_memory_slot_stack_in_hazard_;   //!< pointer to head unused memory slot stack
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-	std::atomic<size_t> count_in_not_hazard_;
-	std::atomic<size_t> count_in_hazard_;
-#endif
-
-	constexpr retrieved_slots_mgr( void ) noexcept
-	  : hph_head_unused_memory_slot_stack_( nullptr )
-	  , mtx_()
-	  , p_head_unused_memory_slot_stack_in_hazard_( nullptr )
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-	  , count_in_not_hazard_( 0 )
-	  , count_in_hazard_( 0 )
-#endif
-	{
-	}
-
-	void            retrieve( slot_link_info* p ) noexcept;
-	slot_link_info* request_reuse( void ) noexcept;
-
-private:
-	using hazard_pointer = typename hazard_ptr_handler<slot_link_info>::hazard_pointer;
-
-	void            retrieve_impl( slot_link_info* p ) noexcept;
-	slot_link_info* request_reuse_impl( void ) noexcept;
-};
+using retrieved_slots_mgr = retrieved_slots_mgr_impl<slot_link_info>;
 static_assert( std::is_trivially_destructible<retrieved_slots_mgr>::value );
 
 /**
