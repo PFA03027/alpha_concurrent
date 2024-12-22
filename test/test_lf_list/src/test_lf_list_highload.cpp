@@ -19,7 +19,6 @@
 
 #include "alconcurrent/lf_list.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
-#include "alconcurrent/lf_mem_alloc_type.hpp"
 
 constexpr unsigned int   num_thread = 12;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 2000;
@@ -30,7 +29,6 @@ class lflistHighLoadTest : public ::testing::Test {
 protected:
 	virtual void SetUp()
 	{
-		alpha::concurrent::gmem_prune();
 	}
 
 	virtual void TearDown()

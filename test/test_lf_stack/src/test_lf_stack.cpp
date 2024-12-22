@@ -18,7 +18,6 @@
 #include "gtest/gtest.h"
 
 #include "alconcurrent/lf_mem_alloc.hpp"
-#include "alconcurrent/lf_mem_alloc_type.hpp"
 #include "alconcurrent/lf_stack.hpp"
 
 constexpr int            num_thread = 10;   // Tested until 128.
@@ -30,7 +29,6 @@ class lfStackTest_Highload : public ::testing::Test {
 protected:
 	virtual void SetUp()
 	{
-		alpha::concurrent::gmem_prune();
 	}
 
 	virtual void TearDown()

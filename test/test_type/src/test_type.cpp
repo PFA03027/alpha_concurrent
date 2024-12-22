@@ -15,7 +15,6 @@
 
 #include "alconcurrent/lf_fifo.hpp"
 #include "alconcurrent/lf_list.hpp"
-#include "alconcurrent/lf_mem_alloc_type.hpp"
 #include "alconcurrent/lf_stack.hpp"
 
 TEST( TestTypes, DoCompile )
