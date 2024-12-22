@@ -105,6 +105,24 @@ TEST( Test_MemorySlotGroupList, Empty_DoAllocate_Then_ReturnNullptr )
 	sut.clear_for_test();
 }
 
+TEST( Test_MemorySlotGroupList, Empty_DoDeallocateWithNonRelatedPtr_Then_ReturnFalse )
+{
+	// Arrange
+	constexpr size_t max_buffer_size  = 1024 * 4;
+	constexpr size_t init_buffer_size = 1024 * 4;
+	tut              sut( 15, max_buffer_size, init_buffer_size );
+	unsigned char    buff[1024 * 4] = { 0 };
+
+	// Act
+	auto ret = sut.deallocate( reinterpret_cast<alpha::concurrent::internal::slot_link_info*>( buff ) );
+
+	// Assert
+	EXPECT_FALSE( ret );
+
+	// Cleanup
+	sut.clear_for_test();
+}
+
 TEST( Test_MemorySlotGroupList, DeallocateOneSlot_DoAllocate_Then_ReturnElement )
 {
 	// Arrange

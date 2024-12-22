@@ -313,7 +313,7 @@ struct memory_slot_group_list {
 	}
 
 	slot_link_info* allocate( void ) noexcept;
-	void            deallocate( slot_link_info* p ) noexcept;
+	bool            deallocate( slot_link_info* p ) noexcept;
 
 	/**
 	 * @brief request to allocate a memory_slot_group and push it to the head of memory_slot_group stack

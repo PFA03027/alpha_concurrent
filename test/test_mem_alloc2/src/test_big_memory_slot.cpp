@@ -62,6 +62,22 @@ TEST( Test_BigMemorySlotList, Empty_DoAllocate_Then_ReturnNullptr )
 	sut.clear_for_test();
 }
 
+TEST( Test_BigMemorySlotList, Empty_DoDeallocateWithNonRelatedPtr_Then_ReturnFalse )
+{
+	// Arrange
+	alpha::concurrent::internal::big_memory_slot_list sut;
+	unsigned char                                     buff[1024 * 4];
+
+	// Act
+	auto ret = sut.deallocate( reinterpret_cast<alpha::concurrent::internal::big_memory_slot*>( buff ) );
+
+	// Assert
+	EXPECT_FALSE( ret );
+
+	// Cleanup
+	sut.clear_for_test();
+}
+
 TEST( Test_BigMemorySlotList, Empty_DoAllocatNewly_Then_ReturnValidPtr )
 {
 	// Arrange

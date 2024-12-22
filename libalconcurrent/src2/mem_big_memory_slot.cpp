@@ -70,26 +70,26 @@ big_memory_slot* big_memory_slot_list::reuse_allocate( size_t requested_allocata
 	return p_ans;
 }
 
-void big_memory_slot_list::deallocate( big_memory_slot* p ) noexcept
+bool big_memory_slot_list::deallocate( big_memory_slot* p ) noexcept
 {
 	if ( p == nullptr ) {
 		LogOutput( log_type::WARN, "big_memory_slot_list::deallocate() is called with nullptr" );
-		return;
+		return false;
 	}
 	auto p_slot_owner = p->check_validity_to_ownwer_and_get();
 	if ( p_slot_owner == nullptr ) {
 		LogOutput( log_type::WARN, "big_memory_slot_list::deallocate() is called with invalid big_memory_slot" );
-		return;
+		return false;
 	}
 
 	auto slot_info = p->link_to_big_memory_slot_.load_allocation_info<big_memory_slot>();
 	if ( slot_info.is_used_ == false ) {
 		LogOutput( log_type::WARN, "big_memory_slot_list::deallocate() is called with unused slot. this means double-free." );
-		return;
+		return false;
 	}
 	if ( !p->link_to_big_memory_slot_.compare_and_exchange_used_flag( slot_info.is_used_, false ) ) {
 		LogOutput( log_type::WARN, "big_memory_slot_list::deallocate() fail to change slot status as unused slot. this means double-free causes race-condition b/w threads." );
-		return;
+		return false;
 	}
 
 	if ( slot_info.mt_ == mem_type::BIG_MEM ) {
@@ -103,8 +103,9 @@ void big_memory_slot_list::deallocate( big_memory_slot* p ) noexcept
 		deallocate_by_munmap( p, p->buffer_size_ );
 	} else {
 		LogOutput( log_type::WARN, "big_memory_slot_list::deallocate() is called with unknown mem_type %u", static_cast<unsigned int>( slot_info.mt_ ) );
+		return false;
 	}
-	return;
+	return true;
 }
 
 big_memory_slot* big_memory_slot_list::allocate_newly( size_t requested_allocatable_size ) noexcept

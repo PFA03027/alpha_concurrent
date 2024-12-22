@@ -107,7 +107,7 @@ struct big_memory_slot_list {
 	}
 
 	big_memory_slot* reuse_allocate( size_t requested_allocatable_size ) noexcept;
-	void             deallocate( big_memory_slot* p ) noexcept;
+	bool             deallocate( big_memory_slot* p ) noexcept;
 
 	/**
 	 * @brief request to allocate a memory_slot_group and push it to the head of memory_slot_group stack
