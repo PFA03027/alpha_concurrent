@@ -61,6 +61,10 @@ big_memory_slot* big_memory_slot_list::reuse_allocate( size_t requested_allocata
 
 	if ( p_ans != nullptr ) {
 		unused_retrieved_memory_bytes_.fetch_sub( p_ans->buffer_size_, std::memory_order_release );
+		bool old_is_used = p_ans->link_to_big_memory_slot_.fetch_set( true );
+		if ( old_is_used ) {
+			LogOutput( log_type::ERR, "big_memory_slot_list::reuse_allocate() detected unexpected is_used flag" );
+		}
 	}
 
 	return p_ans;
@@ -78,18 +82,27 @@ void big_memory_slot_list::deallocate( big_memory_slot* p ) noexcept
 		return;
 	}
 
-	mem_type mt = p_slot_owner->link_to_big_memory_slot_.load_mem_type();
-	if ( mt == mem_type::BIG_MEM ) {
+	auto slot_info = p->link_to_big_memory_slot_.load_allocation_info<big_memory_slot>();
+	if ( slot_info.is_used_ == false ) {
+		LogOutput( log_type::WARN, "big_memory_slot_list::deallocate() is called with unused slot. this means double-free." );
+		return;
+	}
+	if ( !p->link_to_big_memory_slot_.compare_and_exchange_used_flag( slot_info.is_used_, false ) ) {
+		LogOutput( log_type::WARN, "big_memory_slot_list::deallocate() fail to change slot status as unused slot. this means double-free causes race-condition b/w threads." );
+		return;
+	}
+
+	if ( slot_info.mt_ == mem_type::BIG_MEM ) {
 		if ( ( unused_retrieved_memory_bytes_.load( std::memory_order_acquire ) + p->buffer_size_ ) > limit_bytes_of_unused_retrieved_memory_ ) {
 			deallocate_by_munmap( p, p->buffer_size_ );
 		} else {
 			unused_retrieved_memory_bytes_.fetch_add( p->buffer_size_, std::memory_order_release );
 			unused_retrieved_slots_mgr_.retrieve( p );
 		}
-	} else if ( mt == mem_type::OVER_BIG_MEM ) {
+	} else if ( slot_info.mt_ == mem_type::OVER_BIG_MEM ) {
 		deallocate_by_munmap( p, p->buffer_size_ );
 	} else {
-		LogOutput( log_type::WARN, "big_memory_slot_list::deallocate() is called with unknown mem_type %u", static_cast<unsigned int>( mt ) );
+		LogOutput( log_type::WARN, "big_memory_slot_list::deallocate() is called with unknown mem_type %u", static_cast<unsigned int>( slot_info.mt_ ) );
 	}
 	return;
 }

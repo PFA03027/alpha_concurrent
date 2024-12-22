@@ -34,6 +34,10 @@ slot_link_info* memory_slot_group_list::allocate( void ) noexcept
 	// 回収済み、再割り当て待ちリストからスロットの取得を試みる
 	slot_link_info* p_ans = unused_retrieved_slots_mgr_.request_reuse();
 	if ( p_ans != nullptr ) {
+		bool old_is_used = p_ans->link_to_memory_slot_group_.fetch_set( true );
+		if ( old_is_used ) {
+			LogOutput( log_type::ERR, "big_memory_slot_list::reuse_allocate() detected unexpected is_used flag" );
+		}
 		return p_ans;   // 取得できたので、そのまま返す
 	}
 
@@ -75,9 +79,13 @@ slot_link_info* memory_slot_group_list::allocate( void ) noexcept
 		}
 		// ここに到達した場合、割り当て可能なmemory_slot_groupが見つかった。
 		// よって、スロットの取得を試みる
-		slot_link_info* p_slot = p_cur_memory_slot_group_target->assign_new_slot();
-		if ( p_slot != nullptr ) {
-			return p_slot;
+		p_ans = p_cur_memory_slot_group_target->assign_new_slot();
+		if ( p_ans != nullptr ) {
+			bool old_is_used = p_ans->link_to_memory_slot_group_.fetch_set( true );
+			if ( old_is_used ) {
+				LogOutput( log_type::ERR, "big_memory_slot_list::reuse_allocate() detected unexpected is_used flag" );
+			}
+			return p_ans;
 		}
 	}
 
@@ -95,12 +103,23 @@ void memory_slot_group_list::deallocate( slot_link_info* p ) noexcept
 		LogOutput( log_type::WARN, "retrieved_slots_mgr_impl<SLOT_T>::retrieve() invalid SLOT_T" );
 		return;
 	}
-	mem_type mt = p->link_to_memory_slot_group_.load_mem_type();
-	if ( mt == mem_type::SMALL_MEM ) {
-		unused_retrieved_slots_mgr_.retrieve( p );
-	} else {
-		LogOutput( log_type::WARN, "memory_slot_group_list::deallocate() is called with unknown mem_type %u", static_cast<unsigned int>( mt ) );
+
+	auto slot_info = p->link_to_memory_slot_group_.load_allocation_info<memory_slot_group>();
+	if ( slot_info.mt_ != mem_type::SMALL_MEM ) {
+		LogOutput( log_type::WARN, "memory_slot_group_list::deallocate() is called with unknown mem_type %u", static_cast<unsigned int>( slot_info.mt_ ) );
+		return;
 	}
+
+	if ( slot_info.is_used_ == false ) {
+		LogOutput( log_type::WARN, "memory_slot_group_list::deallocate() is called with unused slot. this means double-free." );
+		return;
+	}
+	if ( !p->link_to_memory_slot_group_.compare_and_exchange_used_flag( slot_info.is_used_, false ) ) {
+		LogOutput( log_type::WARN, "memory_slot_group_list::deallocate() fail to change slot status as unused slot. this means double-free causes race-condition b/w threads." );
+		return;
+	}
+
+	unused_retrieved_slots_mgr_.retrieve( p );
 }
 
 void memory_slot_group_list::request_allocate_memory_slot_group( void ) noexcept

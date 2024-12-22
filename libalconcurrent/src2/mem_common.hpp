@@ -105,6 +105,22 @@ struct allocated_mem_top {
 		addr_w_mem_flag_.store( desired_addr_w_info, std::memory_order_release );
 	}
 
+	bool fetch_set( bool is_used ) noexcept
+	{
+		uintptr_t addr_w_info         = addr_w_mem_flag_.load( std::memory_order_acquire );
+		bool      ans                 = false;
+		uintptr_t desired_addr_w_info = 0;
+		do {
+			ans = ( addr_w_info & used_info_bits_ ) != 0;
+			if ( is_used ) {
+				desired_addr_w_info = addr_w_info | used_info_bits_;
+			} else {
+				desired_addr_w_info = addr_w_info & ( ~( used_info_bits_ ) );
+			}
+		} while ( !addr_w_mem_flag_.compare_exchange_strong( addr_w_info, desired_addr_w_info, std::memory_order_acq_rel ) );
+		return ans;
+	}
+
 	template <typename U>
 	U* load_addr( void ) const noexcept
 	{
