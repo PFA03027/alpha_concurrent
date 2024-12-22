@@ -65,6 +65,16 @@ big_memory_slot* big_memory_slot_list::reuse_allocate( size_t requested_allocata
 		if ( old_is_used ) {
 			LogOutput( log_type::ERR, "big_memory_slot_list::reuse_allocate() detected unexpected is_used flag" );
 		}
+
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+		auto p_slot_owner = p_ans->check_validity_to_ownwer_and_get();
+		if ( p_slot_owner == nullptr ) {
+			LogOutput( log_type::WARN, "big_memory_slot_list::reuse_allocate() is invalid big_memory_slot" );
+			return nullptr;
+		}
+		p_slot_owner->btinfo_.alloc_trace_ = bt_info::record_backtrace();
+		p_slot_owner->btinfo_.free_trace_.invalidate();
+#endif
 	}
 
 	return p_ans;
@@ -111,6 +121,9 @@ bool big_memory_slot_list::deallocate( big_memory_slot* p ) noexcept
 		if ( ( unused_retrieved_memory_bytes_.load( std::memory_order_acquire ) + p->buffer_size_ ) > limit_bytes_of_unused_retrieved_memory_ ) {
 			deallocate_by_munmap( p, p->buffer_size_ );
 		} else {
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+			p->btinfo_.free_trace_ = bt_info::record_backtrace();
+#endif
 			unused_retrieved_memory_bytes_.fetch_add( p->buffer_size_, std::memory_order_release );
 			unused_retrieved_slots_mgr_.retrieve( p );
 		}

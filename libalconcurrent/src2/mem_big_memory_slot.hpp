@@ -21,6 +21,7 @@
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/hazard_ptr.hpp"
 
+#include "alconcurrent/internal/cpp_std_configure.hpp"
 #include "mem_common.hpp"
 
 namespace alpha {

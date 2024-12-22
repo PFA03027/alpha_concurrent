@@ -38,6 +38,16 @@ enum class mem_type : uint8_t {
 };
 
 /**
+ * @brief back trace of allocation and free points
+ *
+ */
+struct btinfo_alloc_free {
+	bt_info alloc_trace_;
+	bt_info free_trace_;
+};
+static_assert( std::is_trivially_destructible<btinfo_alloc_free>::value );
+
+/**
  * @brief utility structure of unziped data of addr_w_mem_flag_ in allocated_mem_top
  *
  */
@@ -278,11 +288,6 @@ void retrieved_slots_mgr_impl<SLOT_T>::retrieve( SLOT_T* p ) noexcept
 		std::terminate();
 	}
 #endif
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	auto               p_slot_owner = p->check_validity_to_ownwer_and_get();
-	btinfo_alloc_free& cur_btinfo   = p_slot_owner->get_btinfo( p_slot_owner->get_slot_idx( p ) );
-	cur_btinfo.free_trace_          = bt_info::record_backtrace();
-#endif
 
 	retrieve_impl( p );
 }
@@ -351,18 +356,6 @@ template <typename SLOT_T>
 SLOT_T* retrieved_slots_mgr_impl<SLOT_T>::request_reuse( void ) noexcept
 {
 	SLOT_T* p_ans = request_reuse_impl();
-#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	if ( p_ans != nullptr ) {
-		auto p_slot_owner = p_ans->check_validity_to_ownwer_and_get();
-		if ( p_slot_owner == nullptr ) {
-			LogOutput( log_type::WARN, "retrieved_slots_mgr_impl<SLOT_T>::request_reuse() invalid SLOT_T" );
-			return nullptr;
-		}
-		btinfo_alloc_free& cur_btinfo = p_slot_owner->get_btinfo( p_slot_owner->get_slot_idx( p_ans ) );
-		cur_btinfo.alloc_trace_       = bt_info::record_backtrace();
-		cur_btinfo.free_trace_.invalidate();
-	}
-#endif
 
 	return p_ans;
 }

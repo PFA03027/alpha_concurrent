@@ -90,16 +90,6 @@ private:
 	}
 };
 
-/**
- * @brief back trace of allocation and free points
- *
- */
-struct btinfo_alloc_free {
-	bt_info alloc_trace_;
-	bt_info free_trace_;
-};
-static_assert( std::is_trivially_destructible<btinfo_alloc_free>::value );
-
 struct memory_slot_group_list;
 
 /**
@@ -370,9 +360,31 @@ private:
 		}
 		return ans;
 	}
+
+	slot_link_info* allocate_impl( void ) noexcept;
 };
 
 static_assert( std::is_trivially_destructible<memory_slot_group_list>::value );
+
+inline slot_link_info* memory_slot_group_list::allocate( void ) noexcept
+{
+	slot_link_info* p_ans = allocate_impl();
+	if ( p_ans == nullptr ) {
+		return p_ans;
+	}
+
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+	auto p_slot_owner = p_ans->check_validity_to_ownwer_and_get();
+	if ( p_slot_owner == nullptr ) {
+		LogOutput( log_type::WARN, "retrieved_slots_mgr_impl<SLOT_T>::request_reuse() invalid SLOT_T" );
+		return nullptr;
+	}
+	btinfo_alloc_free& cur_btinfo = p_slot_owner->get_btinfo( p_slot_owner->get_slot_idx( p_ans ) );
+	cur_btinfo.alloc_trace_       = bt_info::record_backtrace();
+	cur_btinfo.free_trace_.invalidate();
+#endif
+	return p_ans;
+}
 
 }   // namespace internal
 }   // namespace concurrent

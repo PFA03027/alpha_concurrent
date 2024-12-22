@@ -29,7 +29,7 @@ memory_slot_group* slot_link_info::check_validity_to_ownwer_and_get( void ) noex
 	return p_slot_owner;
 }
 
-slot_link_info* memory_slot_group_list::allocate( void ) noexcept
+slot_link_info* memory_slot_group_list::allocate_impl( void ) noexcept
 {
 	// 回収済み、再割り当て待ちリストからスロットの取得を試みる
 	slot_link_info* p_ans = unused_retrieved_slots_mgr_.request_reuse();
@@ -116,10 +116,11 @@ bool memory_slot_group_list::deallocate( slot_link_info* p ) noexcept
 		LogOutput( log_type::WARN, "memory_slot_group_list::deallocate() is called with unused slot. this means double-free." );
 		bt_info::record_backtrace().dump_to_log( log_type::WARN, 'd', 7 );
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+		btinfo_alloc_free& cur_btinfo = p_slot_owner->get_btinfo( p_slot_owner->get_slot_idx( p ) );
 		LogOutput( log_type::WARN, "Allocated by below;" );
-		p->btinfo_.alloc_trace_.dump_to_log( log_type::WARN, 'd', 8 );
+		cur_btinfo.alloc_trace_.dump_to_log( log_type::WARN, 'd', 8 );
 		LogOutput( log_type::WARN, "Free by below;" );
-		p->btinfo_.free_trace_.dump_to_log( log_type::WARN, 'd', 9 );
+		cur_btinfo.free_trace_.dump_to_log( log_type::WARN, 'd', 9 );
 #endif
 		return false;
 	}
@@ -127,14 +128,19 @@ bool memory_slot_group_list::deallocate( slot_link_info* p ) noexcept
 		LogOutput( log_type::WARN, "memory_slot_group_list::deallocate() fail to change slot status as unused slot. this means double-free causes race-condition b/w threads." );
 		bt_info::record_backtrace().dump_to_log( log_type::WARN, 'd', 10 );
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+		btinfo_alloc_free& cur_btinfo = p_slot_owner->get_btinfo( p_slot_owner->get_slot_idx( p ) );
 		LogOutput( log_type::WARN, "Allocated by below;" );
-		p->btinfo_.alloc_trace_.dump_to_log( log_type::WARN, 'd', 11 );
+		cur_btinfo.alloc_trace_.dump_to_log( log_type::WARN, 'd', 11 );
 		LogOutput( log_type::WARN, "Free by below;" );
-		p->btinfo_.free_trace_.dump_to_log( log_type::WARN, 'd', 12 );
+		cur_btinfo.free_trace_.dump_to_log( log_type::WARN, 'd', 12 );
 #endif
 		return false;
 	}
 
+#ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
+	btinfo_alloc_free& cur_btinfo = p_slot_owner->get_btinfo( p_slot_owner->get_slot_idx( p ) );
+	cur_btinfo.free_trace_        = bt_info::record_backtrace();
+#endif
 	unused_retrieved_slots_mgr_.retrieve( p );
 	return true;
 }

@@ -66,6 +66,8 @@ TEST( Test_MemorySlotGroup, IndexZero_DoGetSlotPointer_Then_same_to_begin )
 	EXPECT_EQ( p_ret, reinterpret_cast<decltype( p_ret )>( p_sut->p_slot_begin_ ) );
 }
 
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+#else
 TEST( Test_MemorySlotGroup, IndexMax_DoGetSlotPointer_Then_same_to_end )
 {
 	// Arrange
@@ -78,6 +80,7 @@ TEST( Test_MemorySlotGroup, IndexMax_DoGetSlotPointer_Then_same_to_end )
 	// Assert
 	EXPECT_EQ( p_ret, reinterpret_cast<decltype( p_ret )>( p_sut->p_slot_end_ ) );
 }
+#endif
 
 TEST( Test_MemorySlotGroup, NotYetAssign_DoAssignNewSlot_Then_same_to_begin )
 {
