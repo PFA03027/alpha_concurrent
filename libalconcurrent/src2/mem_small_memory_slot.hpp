@@ -127,6 +127,7 @@ struct memory_slot_group {
 	}
 
 	static constexpr size_t calc_minimum_buffer_size( size_t requested_allocatable_bytes_of_a_slot ) noexcept;
+	static constexpr size_t calc_one_slot_size( size_t requested_allocatable_bytes_of_a_slot ) noexcept;
 
 	ssize_t get_slot_idx( void* p ) const noexcept
 	{
@@ -147,7 +148,7 @@ struct memory_slot_group {
 	 *
 	 * @warning this I/F does not check the valid range for slot_idx.
 	 */
-	unsigned char* get_slot_pointer( size_t slot_idx ) noexcept
+	slot_link_info* get_slot_pointer( size_t slot_idx ) noexcept
 	{
 		unsigned char* p_ans = p_slot_begin_ + ( slot_idx * one_slot_bytes_ );
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
@@ -155,7 +156,7 @@ struct memory_slot_group {
 			std::terminate();
 		}
 #endif
-		return p_ans;
+		return reinterpret_cast<slot_link_info*>( p_ans );
 	}
 
 	/**
@@ -216,7 +217,6 @@ private:
 	{
 	}
 
-	static constexpr size_t calc_one_slot_size( size_t requested_allocatable_bytes_of_a_slot ) noexcept;
 	static constexpr size_t calc_number_of_slots( size_t buffer_size, size_t one_slot_bytes_arg ) noexcept;
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	static constexpr btinfo_alloc_free* calc_begin_of_btinfo( unsigned char* data_top ) noexcept;

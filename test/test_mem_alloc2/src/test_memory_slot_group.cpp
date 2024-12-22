@@ -63,7 +63,7 @@ TEST( Test_MemorySlotGroup, IndexZero_DoGetSlotPointer_Then_same_to_begin )
 	auto p_ret = p_sut->get_slot_pointer( 0 );
 
 	// Assert
-	EXPECT_EQ( p_ret, p_sut->p_slot_begin_ );
+	EXPECT_EQ( p_ret, reinterpret_cast<decltype( p_ret )>( p_sut->p_slot_begin_ ) );
 }
 
 TEST( Test_MemorySlotGroup, IndexMax_DoGetSlotPointer_Then_same_to_end )
@@ -76,7 +76,7 @@ TEST( Test_MemorySlotGroup, IndexMax_DoGetSlotPointer_Then_same_to_end )
 	auto p_ret = p_sut->get_slot_pointer( p_sut->num_slots_ );
 
 	// Assert
-	EXPECT_EQ( p_ret, p_sut->p_slot_end_ );
+	EXPECT_EQ( p_ret, reinterpret_cast<decltype( p_ret )>( p_sut->p_slot_end_ ) );
 }
 
 TEST( Test_MemorySlotGroup, NotYetAssign_DoAssignNewSlot_Then_same_to_begin )
