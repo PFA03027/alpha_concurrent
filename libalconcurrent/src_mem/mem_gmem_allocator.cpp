@@ -56,7 +56,7 @@ void* x_gmem_allocate(
 	if ( req_align > internal::allocated_mem_top::min_alignment_size_ ) {
 		needed_bytes += req_align - 1;
 		if ( needed_bytes < n ) {
-			internal::LogOutput( log_type::ERR, "overflow." );
+			internal::LogOutput( log_type::ERR, "overflow. requested bytes = %zu, requested align = %zu", n, req_align );
 			return nullptr;
 		}
 	}
