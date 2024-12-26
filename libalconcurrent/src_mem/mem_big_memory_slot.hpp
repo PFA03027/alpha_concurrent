@@ -23,6 +23,7 @@
 
 #include "alconcurrent/internal/cpp_std_configure.hpp"
 #include "mem_common.hpp"
+#include "mem_retrieved_slot_array_mgr.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -113,24 +114,22 @@ private:
 	}
 };
 
-using retrieved_big_slots_mgr = retrieved_slots_mgr_impl<big_memory_slot>;
-static_assert( std::is_trivially_destructible<retrieved_big_slots_mgr>::value );
+using retrieved_big_slots_array_mgr = retrieved_slots_stack_array_mgr<big_memory_slot>;
 
 /**
  * @brief manager structure for the list of big_memory_slot
  *
  */
 struct big_memory_slot_list {
-	retrieved_big_slots_mgr unused_retrieved_slots_mgr_;      //!< manager for retrieved slots
-	std::atomic<size_t>     unused_retrieved_memory_bytes_;   //!< count of slots in hazard
+	std::atomic<size_t> unused_retrieved_memory_bytes_;   //!< count of slots in hazard
 
 	static constexpr size_t defualt_limit_bytes_of_unused_retrieved_memory_ = 1024 * 1024 * 4;   // 4MB
 	static size_t           limit_bytes_of_unused_retrieved_memory_;                             //!< limit bytes of unused retrieved memory for cache
 	static size_t           too_big_memory_slot_buffer_size_threshold_;                          //!< threshold of buffer size to be too big memory slot
+	static constexpr size_t slot_array_idx_ = 0;
 
 	constexpr big_memory_slot_list( void ) noexcept
-	  : unused_retrieved_slots_mgr_()
-	  , unused_retrieved_memory_bytes_( 0 )
+	  : unused_retrieved_memory_bytes_( 0 )
 	{
 	}
 

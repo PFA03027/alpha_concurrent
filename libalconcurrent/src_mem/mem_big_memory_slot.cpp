@@ -37,7 +37,7 @@ big_memory_slot* big_memory_slot_list::reuse_allocate( size_t requested_allocata
 	big_memory_slot* p_tmp_head = nullptr;
 	big_memory_slot* p_ans      = nullptr;
 	while ( true ) {
-		p_ans = unused_retrieved_slots_mgr_.request_reuse();
+		p_ans = retrieved_big_slots_array_mgr::request_reuse( slot_array_idx_ );
 		if ( p_ans == nullptr ) {
 			// 候補スロットがなくなったので、終了する。
 			break;
@@ -56,7 +56,7 @@ big_memory_slot* big_memory_slot_list::reuse_allocate( size_t requested_allocata
 	while ( p_tmp_head != nullptr ) {
 		big_memory_slot* p_tmp = p_tmp_head;
 		p_tmp_head             = p_tmp_head->p_temprary_link_next_;
-		unused_retrieved_slots_mgr_.retrieve( p_tmp );
+		retrieved_big_slots_array_mgr::retrieve( slot_array_idx_, p_tmp );
 	}
 
 	if ( p_ans != nullptr ) {
@@ -125,7 +125,7 @@ bool big_memory_slot_list::deallocate( big_memory_slot* p ) noexcept
 			p->btinfo_.free_trace_ = bt_info::record_backtrace();
 #endif
 			unused_retrieved_memory_bytes_.fetch_add( p->buffer_size_, std::memory_order_release );
-			unused_retrieved_slots_mgr_.retrieve( p );
+			retrieved_big_slots_array_mgr::retrieve( slot_array_idx_, p );
 		}
 	} else if ( slot_info.mt_ == mem_type::OVER_BIG_MEM ) {
 		deallocate_by_munmap( p, p->buffer_size_ );
@@ -159,10 +159,10 @@ big_memory_slot* big_memory_slot_list::allocate_newly( size_t requested_allocata
 void big_memory_slot_list::clear_for_test( void ) noexcept
 {
 	big_memory_slot* p_ans = nullptr;
-	p_ans                  = unused_retrieved_slots_mgr_.request_reuse();
+	p_ans                  = retrieved_big_slots_array_mgr::request_reuse( slot_array_idx_ );
 	while ( p_ans != nullptr ) {
 		deallocate_by_munmap( p_ans, p_ans->buffer_size_ );
-		p_ans = unused_retrieved_slots_mgr_.request_reuse();
+		p_ans = retrieved_big_slots_array_mgr::request_reuse( slot_array_idx_ );
 	}
 }
 

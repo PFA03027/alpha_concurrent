@@ -32,7 +32,7 @@ memory_slot_group* slot_link_info::check_validity_to_ownwer_and_get( void ) noex
 slot_link_info* memory_slot_group_list::allocate_impl( void ) noexcept
 {
 	// 回収済み、再割り当て待ちリストからスロットの取得を試みる
-	slot_link_info* p_ans = unused_retrieved_slots_mgr_.request_reuse();
+	slot_link_info* p_ans = retrieved_small_slots_array_mgr::request_reuse( retrieved_array_idx_ );
 	if ( p_ans != nullptr ) {
 		bool old_is_used = p_ans->link_to_memory_slot_group_.fetch_set( true );
 		if ( old_is_used ) {
@@ -141,7 +141,7 @@ bool memory_slot_group_list::deallocate( slot_link_info* p ) noexcept
 	btinfo_alloc_free& cur_btinfo = p_slot_owner->get_btinfo( p_slot_owner->get_slot_idx( p ) );
 	cur_btinfo.free_trace_        = bt_info::record_backtrace();
 #endif
-	unused_retrieved_slots_mgr_.retrieve( p );
+	retrieved_small_slots_array_mgr::retrieve( retrieved_array_idx_, p );
 	return true;
 }
 

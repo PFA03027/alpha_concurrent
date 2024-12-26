@@ -23,6 +23,7 @@
 #include "alconcurrent/hazard_ptr.hpp"
 
 #include "mem_common.hpp"
+#include "mem_retrieved_slot_array_mgr.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -300,32 +301,34 @@ constexpr unsigned char* memory_slot_group::calc_end_of_slots( unsigned char* da
 	return p_ans;
 }
 
-using retrieved_small_slots_mgr = retrieved_slots_mgr_impl<slot_link_info>;
-static_assert( std::is_trivially_destructible<retrieved_small_slots_mgr>::value );
+using retrieved_small_slots_array_mgr = retrieved_slots_stack_array_mgr<slot_link_info>;
 
 /**
  * @brief manager structure for the list of memory_slot_group
  *
  */
 struct memory_slot_group_list {
+	const size_t                    retrieved_array_idx_;                     //!< index of memory_slot_group_list in g_memory_slot_group_list_array
 	const size_t                    allocatable_bytes_;                       //!< allocatable bytes per one slot
 	const size_t                    limit_bytes_for_one_memory_slot_group_;   //!< max bytes for one memory_slot_group
 	std::atomic<size_t>             next_allocating_buffer_bytes_;            //!< allocating buffer size of next allocation for memory_slot_group
 	std::atomic<memory_slot_group*> ap_head_memory_slot_group_;               //!< pointer to head memory_slot_group of memory_slot_group stack
 	std::atomic<memory_slot_group*> ap_cur_assigning_memory_slot_group_;      //!< pointer to current slot allocating memory_slot_group
-	retrieved_small_slots_mgr       unused_retrieved_slots_mgr_;              //!< manager for retrieved slots
+	// retrieved_small_slots_mgr       unused_retrieved_slots_mgr_;              //!< manager for retrieved slots
 
 	constexpr memory_slot_group_list(
-		const size_t allocatable_bytes_arg,                       //!< [in] max allocatable bytes by allocation
-		const size_t limit_bytes_for_one_memory_slot_group_arg,   //!< [in] limitation to allocate one memory_slot_group
-		const size_t init_buffer_bytes_of_memory_slot_group_arg   //!< [in] buffer size of one memory_slot_group when 1st allocation
+		const size_t allocatable_bytes_arg,                        //!< [in] max allocatable bytes by allocation
+		const size_t limit_bytes_for_one_memory_slot_group_arg,    //!< [in] limitation to allocate one memory_slot_group
+		const size_t init_buffer_bytes_of_memory_slot_group_arg,   //!< [in] buffer size of one memory_slot_group when 1st allocation
+		const size_t retrieved_array_idx_arg = 0                   //!< [in] index of memory_slot_group_list in g_memory_slot_group_list_array
 		) noexcept
-	  : allocatable_bytes_( allocatable_bytes_arg )
+	  : retrieved_array_idx_( retrieved_array_idx_arg )
+	  , allocatable_bytes_( allocatable_bytes_arg )
 	  , limit_bytes_for_one_memory_slot_group_( limit_bytes_for_one_memory_slot_group_arg )
 	  , next_allocating_buffer_bytes_( check_init_buffer_size( allocatable_bytes_arg, init_buffer_bytes_of_memory_slot_group_arg ) )
 	  , ap_head_memory_slot_group_( nullptr )
 	  , ap_cur_assigning_memory_slot_group_( nullptr )
-	  , unused_retrieved_slots_mgr_()
+	//   , unused_retrieved_slots_mgr_()
 	{
 	}
 
