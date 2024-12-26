@@ -48,7 +48,7 @@ internal::big_memory_slot_list g_big_memory_slot_list;
  * @exception
  * If req_align is not power of 2, throw std::logic_error.
  */
-void* x_gmem_allocate(
+void* gmem_allocate(
 	size_t n,          //!< [in] memory size to allocate
 	size_t req_align   //!< [in] requested align size. req_align should be the power of 2
 )
@@ -100,7 +100,7 @@ void* x_gmem_allocate(
  * @note
  * If p_mem is not a memory that is not allocated by gmem_allocate(), this I/F will try to free by calling free().
  */
-bool x_gmem_deallocate(
+bool gmem_deallocate(
 	void* p_mem   //!< [in] pointer to free.
 )
 {

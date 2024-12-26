@@ -18,23 +18,23 @@ TEST( Test_GMemAllocator, CanAllocate )
 	// Arrange
 
 	// Act
-	auto p_ret = alpha::concurrent::x_gmem_allocate( 1024 * 4 );
+	auto p_ret = alpha::concurrent::gmem_allocate( 1024 * 4 );
 
 	// Assert
 	EXPECT_NE( p_ret, nullptr );
 
 	// Cleanup
-	alpha::concurrent::x_gmem_deallocate( p_ret );
+	alpha::concurrent::gmem_deallocate( p_ret );
 }
 
 TEST( Test_GMemAllocator, CanDeallocate_Then_ReturnTrue )
 {
 	// Arrange
-	auto p_ret = alpha::concurrent::x_gmem_allocate( 1024 * 4 );
+	auto p_ret = alpha::concurrent::gmem_allocate( 1024 * 4 );
 	EXPECT_NE( p_ret, nullptr );
 
 	// Act
-	bool ret = alpha::concurrent::x_gmem_deallocate( p_ret );
+	bool ret = alpha::concurrent::gmem_deallocate( p_ret );
 
 	// Assert
 	EXPECT_TRUE( ret );
@@ -47,7 +47,7 @@ TEST( Test_GMemAllocator, DoDeallocateWithNullPtr_Then_ReturnFalse )
 	// Arrange
 
 	// Act
-	bool ret = alpha::concurrent::x_gmem_deallocate( nullptr );
+	bool ret = alpha::concurrent::gmem_deallocate( nullptr );
 
 	// Assert
 	EXPECT_FALSE( ret );
@@ -58,13 +58,13 @@ TEST( Test_GMemAllocator, DoDeallocateWithNullPtr_Then_ReturnFalse )
 TEST( Test_GMemAllocator, Deallocated_DoDeallocateWithSamePtr_Then_ReturnFalse )
 {
 	// Arrange
-	auto p_ret = alpha::concurrent::x_gmem_allocate( 1024 * 4 );
+	auto p_ret = alpha::concurrent::gmem_allocate( 1024 * 4 );
 	EXPECT_NE( p_ret, nullptr );
-	bool ret = alpha::concurrent::x_gmem_deallocate( p_ret );
+	bool ret = alpha::concurrent::gmem_deallocate( p_ret );
 	EXPECT_TRUE( ret );
 
 	// Act
-	ret = alpha::concurrent::x_gmem_deallocate( p_ret );
+	ret = alpha::concurrent::gmem_deallocate( p_ret );
 
 	// Assert
 	EXPECT_FALSE( ret );
@@ -77,11 +77,11 @@ TEST( Test_GMemAllocator, CanAllocateWithBigSize )
 	// Arrange
 
 	// Act
-	auto p_ret = alpha::concurrent::x_gmem_allocate( 1024 * 1024 );
+	auto p_ret = alpha::concurrent::gmem_allocate( 1024 * 1024 );
 
 	// Assert
 	EXPECT_NE( p_ret, nullptr );
-	bool ret = alpha::concurrent::x_gmem_deallocate( p_ret );
+	bool ret = alpha::concurrent::gmem_deallocate( p_ret );
 	EXPECT_TRUE( ret );
 
 	// Cleanup
@@ -92,11 +92,11 @@ TEST( Test_GMemAllocator, CanAllocateWithOverBigSize )
 	// Arrange
 
 	// Act
-	auto p_ret = alpha::concurrent::x_gmem_allocate( 1024 * 1024 * 5 );
+	auto p_ret = alpha::concurrent::gmem_allocate( 1024 * 1024 * 5 );
 
 	// Assert
 	EXPECT_NE( p_ret, nullptr );
-	bool ret = alpha::concurrent::x_gmem_deallocate( p_ret );
+	bool ret = alpha::concurrent::gmem_deallocate( p_ret );
 	EXPECT_TRUE( ret );
 
 	// Cleanup
