@@ -3,11 +3,10 @@ The purpose of libalconcurrent library provides semi lock-free algorithms and se
 If you are possible to design the necessary memory size, semi lock-free algorithms are mostly same behavior of lock-free.
 
 # Pre-requirement
-* C++11 standard and standard C++ library are required.
-* POSIX pthread thread local storage API is required.
+* C++14 standard and standard C++ library are required.
 
 ## Supplement
-C++14 or newer C++ standard is better to compile.
+C++17 or newer C++ standard is better to compile.
 
 # fifo_list class in lf_fifo.hpp
 Semi-lock free FIFO type queue
@@ -145,15 +144,6 @@ And then, you could get better performance.
 (G++ version 11.3.0 works well.)
 So, now this option is defined as default configuration.
 
-### ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER
-If compile with ALCONCURRENT_CONF_ENABLE_SLOT_CHECK_MARKER, memory slot offset is checked by simple algorithm.
-This makes better behavior for memory corruption.
-So, now this option is defined as default configuration.
-
-### ALCONCURRENT_CONF_PREFER_TO_SHARE_CHUNK
-If compile with ALCONCURRENT_CONF_PREFER_TO_SHARE_CHUNK, it will behave like sharing the memory slot as much as possible.  
-If this option is not set, prefer to use per-thread memory slots. Since each thread has an independent memory slot, it is less likely that memory allocation and release contention will occur. On the other hand, since each thread has an empty memory slot, the efficiency of memory usage decreases.
-
 ### Utility option
 #### ALCONCURRENT_CONF_ENABLE_DETAIL_STATISTICS_MESUREMENT
 If define this macro, it enables to measure the additional statistics that is the internal information to debug lock-free algorithm.
@@ -167,9 +157,6 @@ This macro loses the lock-free nature of the memory allocation process and is pr
 #### ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 If you would like to record the backtrace of allcation and free for debugging, please define this macro.
 If you define this macro, the compilation also needs -g(debug symbol) and it is better to define  -rdynamic.
-
-#### ALCONCURRENT_CONF_ENABLE_CHECK_OVERRUN_WRITING
-If compile with ALCONCURRENT_CONF_ENABLE_CHECK_OVERRUN_WRITING, write over run is checked.
 
 ### Internal use build option
 #### ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
@@ -201,55 +188,4 @@ Please see "LICENSE.txt"
 
 # TODO
 * 全般的な改善
--- コールスタック管理クラスのベース部品クラス化
--- ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION と ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERRORのどちらかでロジックエラー検査が有効になるようにする。
--- -Wsign-conversion対応の追加
-** コンストラクタのconstexpr対応
-** atomic<>変数系の、std::hardware_destructive_interference_size 対応
-
-* alloc_only_chamberの改善
--- サイズ0要求の場合に最低サイズ1で確保する対応。アドレスが必ず異なるようにする要件を保証するため。
--- deallocateのI/F追加。基本的には、削除済みマーキングをするだけ。2重フリー、リークチェックできるようにするため
--- allocate時とdeallcate時のコールスタックを記録する機能の追加。
--- 2重フリーの場合のエラー及びコールスタック情報の出力。
--- noexceptを積極的に付与する
--- デバッグ機能追加
---- 使用中、解放済みをチェックする機能の追加。
---- 内容のdump機能
---- 特定のアドレスに特化した内容のdump機能
---- room_boader内メンバ変数のconst化(is_freed_を除く)
---- room_boaderのI/Fのconst化、constexpr化
---- メイン関数の最後に呼び出す等の方法による、解放漏れによる簡易リークチェック機能の追加。
-
-* dynamic_tlsクラスの改善
-** メモリ効率改善など、計算で求められるアドレス情報の省略など
-
-* ハザードポインタ管理クラスの改善
--- RAIIによるハザードポインタ登録管理用クラスの作成
--- atomic<T*>用のRAIIによるハザードポインタ登録管理用クラスの作成 -> 単純なatomic<T*>ではなく、atomic<T*>を内包したhazard_ptrクラスを作る。
--- このクラスでretireは扱わない。ガベージコレクタクラスで扱うべき。
--- ハザードポインタ管理クラスは、alloc_only_chamberにのみ依存するようにする（べき？）
--- 強制リソース解放＆初期化のI/F追加。alloc_only_chamberでのリークチェック用機能を使用してデバッグするため。
--- ハザードポインタのスロットについて、nullptrが指定された場合は、専用スロットを使用する実装で、nullptrが来ても動作可能とする。
-   -> nullptrは、確保失敗扱いで実装完了。
-
-* lf_mem_allocクラスの改善
-** サイズ0要求の場合に最低サイズ1で確保する対応。アドレスが必ず異なるようにする要件を保証するため。
-** allocate/deallocateに特化させる。
-
-* retire管理モジュール
--- hazard pointerモジュールから独立させ、lf_mem_allocよりも上位のレイヤに挿入する
--- 遅延解放処理となるretire系を独立化させる。デストラクタ処理やメモリ開放の遅延実行に対応するためには、別スレッドを建てるなどの対応が必要となるため。
-
-
-* 各種ロックフリーアルゴリズムの改善
--- フリーノード管理クラスをどうするか？ retire系に一任する？
--- 如何に、mallocを呼ばないか？ retireによって、フリーノードストレージに戻す？
--- ノードは再利用する。
--- フリーノードストレージは、ダイナミックスレッドローカルストレージを使用しない実装にする。
--- フリーノードのリサイクル先の制御に応援要求フラグで制御する。
---- 一番早いスレッドローカルストレージ。ただし、共有できない。
-　　- 例えば、プロデューサー・コンシューマーモデルでは、コンシューマー側にノードがたまり続けて活用されない状況を生み出してしまう欠点を持つ。
---- 排他制御付きグローバルストレージ。軽いが、ロックを必要とする。
-    - 競合が起きなけれ、ロックを必要とする点は、欠点として表れにくい。
---- ロックフリーグローバルストレージ。重いがロックフリーという性質を持てる。フリーノードストレージの最後の砦。
+-- mmap()によるメモリ確保処理を、別スレッドで行い、mmap()処理を隠す
