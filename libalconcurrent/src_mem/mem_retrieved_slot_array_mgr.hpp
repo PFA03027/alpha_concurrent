@@ -159,6 +159,8 @@ struct retrieved_slots_stack_lockable {
 
 	void reset_for_test( void ) noexcept
 	{
+		std::lock_guard<std::mutex> lock( mtx_ );
+		head_unused_memory_slot_stack_.reset_for_test();
 	}
 
 private:
@@ -262,6 +264,8 @@ struct retrieved_slots_stack_array_mgr {
 	static void         retrieve( size_t idx, slot_pointer p ) noexcept;
 	static slot_pointer request_reuse( size_t idx ) noexcept;
 
+	static void reset_for_test( void ) noexcept;
+
 private:
 	static retrieved_slots_stack_lockfree<SLOT_T> global_non_hazard_retrieved_slots_lockfree_stack_[max_entry_];
 	static retrieved_slots_stack_lockable<SLOT_T> global_in_hazard_retrieved_slots_lockable_stack_[max_entry_];
@@ -269,14 +273,10 @@ private:
 	struct tls_data {
 		retrieved_slots_stack<SLOT_T> non_hazard_retrieved_slots_stack_[max_entry_];
 		retrieved_slots_stack<SLOT_T> in_hazard_retrieved_slots_stack_[max_entry_];
-		size_t                        continues_failed_count_[max_entry_];
-		size_t                        max_continues_failed_count_[max_entry_];
 
 		constexpr tls_data( void ) noexcept
 		  : non_hazard_retrieved_slots_stack_ {}
 		  , in_hazard_retrieved_slots_stack_ {}
-		  , continues_failed_count_ { 0 }
-		  , max_continues_failed_count_ { 0 }
 		{
 		}
 
@@ -369,6 +369,18 @@ typename retrieved_slots_stack_array_mgr<SLOT_T>::slot_pointer retrieved_slots_s
 	}
 
 	return global_in_hazard_retrieved_slots_lockable_stack_[idx].try_pop();
+}
+
+template <typename SLOT_T>
+void retrieved_slots_stack_array_mgr<SLOT_T>::reset_for_test( void ) noexcept
+{
+	for ( size_t i = 0; i < max_entry_; i++ ) {
+		global_non_hazard_retrieved_slots_lockfree_stack_[i].reset_for_test();
+		global_in_hazard_retrieved_slots_lockable_stack_[i].reset_for_test();
+
+		tls_data_.non_hazard_retrieved_slots_stack_[i].reset_for_test();
+		tls_data_.in_hazard_retrieved_slots_stack_[i].reset_for_test();
+	}
 }
 
 }   // namespace internal

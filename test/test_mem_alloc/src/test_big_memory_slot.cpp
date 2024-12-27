@@ -66,7 +66,7 @@ TEST( Test_BigMemorySlotList, Empty_DoDeallocateWithNonRelatedPtr_Then_ReturnFal
 {
 	// Arrange
 	alpha::concurrent::internal::big_memory_slot_list sut;
-	unsigned char                                     buff[1024 * 4];
+	unsigned char                                     buff[1024 * 4] = { 0 };
 
 	// Act
 	auto ret = sut.deallocate( reinterpret_cast<alpha::concurrent::internal::big_memory_slot*>( buff ) );

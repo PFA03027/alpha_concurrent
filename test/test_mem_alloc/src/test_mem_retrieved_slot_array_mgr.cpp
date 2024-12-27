@@ -502,6 +502,7 @@ using tut4 = alpha::concurrent::internal::retrieved_slots_stack_array_mgr<alpha:
 TEST( Test_RetrievedSlotsStackArrayMgr, CanPushWithNullPtr )
 {
 	// Arrange
+	tut4::reset_for_test();
 
 	// Act
 	tut4::retrieve( 0, nullptr );
@@ -514,6 +515,7 @@ TEST( Test_RetrievedSlotsStackArrayMgr, CanPushWithNullPtr )
 TEST( Test_RetrievedSlotsStackArrayMgr, CanPush )
 {
 	// Arrange
+	tut4::reset_for_test();
 	unsigned char                                buffer1[1024];
 	alpha::concurrent::internal::slot_link_info* p_sli1 = alpha::concurrent::internal::slot_link_info::emplace_on_mem( buffer1, nullptr );
 
@@ -528,6 +530,7 @@ TEST( Test_RetrievedSlotsStackArrayMgr, CanPush )
 TEST( Test_RetrievedSlotsStackArrayMgr, CanPushTwoElement )
 {
 	// Arrange
+	tut4::reset_for_test();
 	unsigned char                                buffer1[1024];
 	alpha::concurrent::internal::slot_link_info* p_sli1 = alpha::concurrent::internal::slot_link_info::emplace_on_mem( buffer1, nullptr );
 	unsigned char                                buffer2[1024];
@@ -546,6 +549,7 @@ TEST( Test_RetrievedSlotsStackArrayMgr, CanPushTwoElement )
 TEST( Test_RetrievedSlotsStackArrayMgr, Empty_CanPop_Then_ReturnNullPtr )
 {
 	// Arrange
+	tut4::reset_for_test();
 
 	// Act
 	auto p = tut4::request_reuse( 0 );
