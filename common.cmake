@@ -4,7 +4,7 @@ set(WARNING_OPT "-Wall -Wconversion -Wsign-conversion -Werror -Wshadow")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WARNING_OPT}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${WARNING_OPT}")
 
-# set(CMAKE_CXX_STANDARD 11)	# for test purpose
+# set(CMAKE_CXX_STANDARD 11)	# for test purpose, but not support now
 # set(CMAKE_CXX_STANDARD 14)	# for test purpose
 # set(CMAKE_CXX_STANDARD 17)	# for test purpose
 # set(CMAKE_CXX_STANDARD 20)	# for test purpose

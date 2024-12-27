@@ -363,15 +363,50 @@ public:
 		return cnt_it->destruct_tls_by_key_release( key );
 	}
 
-	void* operator new( std::size_t n );                               // usual new...(1)
-	void* operator new( std::size_t n, std::align_val_t alignment );   // usual new with alignment...(1) C++11/C++14 just ignore. C++17 and after uses this.
-	void  operator delete( void* p_mem ) noexcept;                     // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+#else
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size );                                     // possible throw std::bad_alloc, from C++11
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, const std::nothrow_t& ) noexcept;     // possible return nullptr, instead of throwing exception, from C++11
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size );                                   // possible throw std::bad_alloc, from C++11
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, const std::nothrow_t& ) noexcept;   // possible return nullptr, instead of throwing exception, from C++11
 
-	void* operator new[]( std::size_t n );             // usual new...(1)
-	void  operator delete[]( void* p_mem ) noexcept;   // usual delete...(2)	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放しない
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, void* ptr ) noexcept;     // placement new, from C++11
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, void* ptr ) noexcept;   // placement new for array, from C++11
 
-	void* operator new( std::size_t n, void* p );          // placement new
-	void  operator delete( void* p, void* p2 ) noexcept;   // placement delete...(3)
+	void operator delete( void* ptr ) noexcept;     // from C++11
+	void operator delete[]( void* ptr ) noexcept;   // from C++11
+
+	void operator delete( void* ptr, std::size_t size ) noexcept;     // from C++14
+	void operator delete[]( void* ptr, std::size_t size ) noexcept;   // from C++14
+
+	void operator delete( void* ptr, const std::nothrow_t& ) noexcept;     // from C++11
+	void operator delete[]( void* ptr, const std::nothrow_t& ) noexcept;   // from C++11
+
+	void operator delete( void* ptr, std::size_t size, const std::nothrow_t& ) noexcept;     // from C++14
+	void operator delete[]( void* ptr, std::size_t size, const std::nothrow_t& ) noexcept;   // from C++14
+
+	void operator delete( void* ptr, void* ) noexcept;     // delete for area that is initialized by placement new.
+	void operator delete[]( void* ptr, void* ) noexcept;   // delete for area that is initialized by placement new.
+
+#if __cpp_aligned_new
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment );                                     // possible throw std::bad_alloc, from C++17
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;     // possible return nullptr, instead of throwing exception, from C++17
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, std::align_val_t alignment );                                   // possible throw std::bad_alloc, from C++17
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;   // possible return nullptr, instead of throwing exception, from C++17
+
+	void operator delete( void* ptr, std::align_val_t alignment ) noexcept;     // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+	void operator delete[]( void* ptr, std::align_val_t alignment ) noexcept;   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+
+	void operator delete( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept;     // from C++17
+	void operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept;   // from C++17
+
+	void operator delete( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept;     // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+	void operator delete[]( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept;   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+
+	void operator delete( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;     // from C++17
+	void operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;   // from C++17
+#endif
+#endif
 
 	dynamic_tls_content_array* p_next_;   //!< thread local storage方向で、次のarrayへのポインタ
 	const size_t               base_idx_;
@@ -531,15 +566,59 @@ public:
 
 	void call_destructor_and_release_ownership( void );
 
-	void* operator new( std::size_t n );                               // usual new...(1)
-	void* operator new( std::size_t n, std::align_val_t alignment );   // usual new with alignment...(1) C++11/C++14 just ignore. C++17 and after uses this.
-	void  operator delete( void* p_mem ) noexcept;                     // usual delete...(2)	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放しない
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+#else
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size );                                     // possible throw std::bad_alloc, from C++11
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, const std::nothrow_t& ) noexcept;     // possible return nullptr, instead of throwing exception, from C++11
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size );                                   // possible throw std::bad_alloc, from C++11
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, const std::nothrow_t& ) noexcept;   // possible return nullptr, instead of throwing exception, from C++11
 
-	void* operator new[]( std::size_t n );             // usual new...(1)
-	void  operator delete[]( void* p_mem ) noexcept;   // usual delete...(2)	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放しない
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, void* ptr ) noexcept;     // placement new, from C++11
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, void* ptr ) noexcept;   // placement new for array, from C++11
 
-	void* operator new( std::size_t n, void* p );          // placement new
-	void  operator delete( void* p, void* p2 ) noexcept;   // placement delete...(3)
+	void operator delete( void* ptr ) noexcept;     // from C++11
+	void operator delete[]( void* ptr ) noexcept;   // from C++11
+
+	void operator delete( void* ptr, std::size_t size ) noexcept;     // from C++14
+	void operator delete[]( void* ptr, std::size_t size ) noexcept;   // from C++14
+
+	void operator delete( void* ptr, const std::nothrow_t& ) noexcept;     // from C++11
+	void operator delete[]( void* ptr, const std::nothrow_t& ) noexcept;   // from C++11
+
+	void operator delete( void* ptr, std::size_t size, const std::nothrow_t& ) noexcept;     // from C++14
+	void operator delete[]( void* ptr, std::size_t size, const std::nothrow_t& ) noexcept;   // from C++14
+
+	void operator delete( void* ptr, void* ) noexcept;     // delete for area that is initialized by placement new.
+	void operator delete[]( void* ptr, void* ) noexcept;   // delete for area that is initialized by placement new.
+
+#if __cpp_aligned_new
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment );                                     // possible throw std::bad_alloc, from C++17
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;     // possible return nullptr, instead of throwing exception, from C++17
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, std::align_val_t alignment );                                   // possible throw std::bad_alloc, from C++17
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;   // possible return nullptr, instead of throwing exception, from C++17
+
+	void operator delete( void* ptr, std::align_val_t alignment ) noexcept;     // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+	void operator delete[]( void* ptr, std::align_val_t alignment ) noexcept;   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+
+	void operator delete( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept;     // from C++17
+	void operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept;   // from C++17
+
+	void operator delete( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept;     // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+	void operator delete[]( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept;   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+
+	void operator delete( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;     // from C++17
+	void operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;   // from C++17
+#endif
+#endif
+
+	// void* operator new( std::size_t n );             // usual new...(1)
+	// void  operator delete( void* p_mem ) noexcept;   // usual delete...(2)	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放しない
+
+	// void* operator new[]( std::size_t n );             // usual new...(1)
+	// void  operator delete[]( void* p_mem ) noexcept;   // usual delete...(2)	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放しない
+
+	// void* operator new( std::size_t n, void* p );          // placement new
+	// void  operator delete( void* p, void* p2 ) noexcept;   // placement delete...(3)
 
 	std::atomic<dynamic_tls_content_head*> p_next_;   //!< thread方向で、次のarrayへのポインタ
 
@@ -960,109 +1039,333 @@ void dynamic_tls_content_head::call_destructor_and_release_ownership( void )
 	return;
 }
 
-void* dynamic_tls_content_head::operator new( std::size_t n )   // usual new...(1)
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+#else
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_head::operator new( std::size_t size )   // possible throw std::bad_alloc, from C++11
 {
 	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
-	void* p_ans = dynamic_tls_key_allocating_only( n );
+	void* p_ans = dynamic_tls_key_allocating_only( size );
 	if ( p_ans == nullptr ) {
 		throw std::bad_alloc();
 	}
 
 	return p_ans;
 }
-void* dynamic_tls_content_head::operator new( std::size_t n, std::align_val_t alignment )   // usual new with alignment...(1) C++11/C++14 just ignore. C++17 and after uses this.
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_head::operator new( std::size_t size, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++11
 {
 	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
-	void* p_ans = dynamic_tls_key_allocating_only( n, static_cast<size_t>( alignment ) );
+	void* p_ans = dynamic_tls_key_allocating_only( size );
+	return p_ans;
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_head::operator new[]( std::size_t size )   // possible throw std::bad_alloc, from C++11
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	void* p_ans = dynamic_tls_key_allocating_only( size );
 	if ( p_ans == nullptr ) {
 		throw std::bad_alloc();
 	}
 
 	return p_ans;
 }
-void dynamic_tls_content_head::operator delete( void* p_mem ) noexcept   // usual delete...(2)
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_head::operator new[]( std::size_t size, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++11
 {
-	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
-}
-
-void* dynamic_tls_content_head::operator new[]( std::size_t n )   // usual new...(1)
-{
-	// dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
-	// が、このクラスが配列形式で使用する想定はされていない。
-	void* p_ans = dynamic_tls_key_allocating_only( n );
-	if ( p_ans == nullptr ) {
-		throw std::bad_alloc();
-	}
-
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	void* p_ans = dynamic_tls_key_allocating_only( size );
 	return p_ans;
 }
-void dynamic_tls_content_head::operator delete[]( void* p_mem ) noexcept   // usual delete...(2)
-{
-	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
-}
 
-void* dynamic_tls_content_head::operator new( std::size_t n, void* p )   // placement new
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_head::operator new( std::size_t size, void* ptr ) noexcept   // placement new, from C++11
 {
 	// dynamic_tls_content_headのクラスがplacement new形式で使用する想定はされていない。
-	return p;
+	return ptr;
 }
-void dynamic_tls_content_head::operator delete( void* p, void* p2 ) noexcept   // placement delete...(3)
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_head::operator new[]( std::size_t size, void* ptr ) noexcept   // placement new for array, from C++11
+{
+	// dynamic_tls_content_headのクラスがplacement new形式で使用する想定はされていない。
+	return ptr;
+}
+
+void dynamic_tls_content_head::operator delete( void* ptr ) noexcept   // from C++11
 {
 	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
 }
+void dynamic_tls_content_head::operator delete[]( void* ptr ) noexcept   // from C++11
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void dynamic_tls_content_head::operator delete( void* ptr, std::size_t size ) noexcept   // from C++14
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_head::operator delete[]( void* ptr, std::size_t size ) noexcept   // from C++14
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void dynamic_tls_content_head::operator delete( void* ptr, const std::nothrow_t& ) noexcept   // from C++11
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_head::operator delete[]( void* ptr, const std::nothrow_t& ) noexcept   // from C++11
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void dynamic_tls_content_head::operator delete( void* ptr, std::size_t size, const std::nothrow_t& ) noexcept   // from C++14
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_head::operator delete[]( void* ptr, std::size_t size, const std::nothrow_t& ) noexcept   // from C++14
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void dynamic_tls_content_head::operator delete( void* ptr, void* ) noexcept   // delete for area that is initialized by placement new.
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_head::operator delete[]( void* ptr, void* ) noexcept   // delete for area that is initialized by placement new.
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+#if __cpp_aligned_new
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_head::operator new( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	void* p_ans = dynamic_tls_key_allocating_only( size, static_cast<size_t>( alignment ) );
+	if ( p_ans == nullptr ) {
+		throw std::bad_alloc();
+	}
+
+	return p_ans;
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_head::operator new( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++17
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	void* p_ans = dynamic_tls_key_allocating_only( size, static_cast<size_t>( alignment ) );
+	return p_ans;
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_head::operator new[]( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	void* p_ans = dynamic_tls_key_allocating_only( size, static_cast<size_t>( alignment ) );
+	if ( p_ans == nullptr ) {
+		throw std::bad_alloc();
+	}
+
+	return p_ans;
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_head::operator new[]( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++17
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	void* p_ans = dynamic_tls_key_allocating_only( size, static_cast<size_t>( alignment ) );
+	return p_ans;
+}
+
+void dynamic_tls_content_head::operator delete( void* ptr, std::align_val_t alignment ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_head::operator delete[]( void* ptr, std::align_val_t alignment ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void dynamic_tls_content_head::operator delete( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept   // from C++17
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_head::operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept   // from C++17
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void dynamic_tls_content_head::operator delete( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_head::operator delete[]( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void dynamic_tls_content_head::operator delete( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_head::operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17
+{
+	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+#endif
+#endif
 
 /////////////////////////////////////////////////////////////////////////
 
-void* dynamic_tls_content_array::operator new( std::size_t n )   // usual new...(1)
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+#else
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_array::operator new( std::size_t size )   // possible throw std::bad_alloc, from C++11
 {
 	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
-	void* p_ans = dynamic_tls_key_allocating_only( n );
+	void* p_ans = dynamic_tls_key_allocating_only( size );
 	if ( p_ans == nullptr ) {
 		throw std::bad_alloc();
 	}
 
 	return p_ans;
 }
-void* dynamic_tls_content_array::operator new( std::size_t n, std::align_val_t alignment )   // usual new with alignment...(1) C++11/C++14 just ignore. C++17 and after uses this.
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_array::operator new( std::size_t size, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++11
 {
 	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
-	void* p_ans = dynamic_tls_key_allocating_only( n, static_cast<size_t>( alignment ) );
+	void* p_ans = dynamic_tls_key_allocating_only( size );
+	return p_ans;
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_array::operator new[]( std::size_t size )   // possible throw std::bad_alloc, from C++11
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	void* p_ans = dynamic_tls_key_allocating_only( size );
 	if ( p_ans == nullptr ) {
 		throw std::bad_alloc();
 	}
 
 	return p_ans;
 }
-void dynamic_tls_content_array::operator delete( void* p_mem ) noexcept   // usual delete...(2)
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_array::operator new[]( std::size_t size, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++11
 {
-	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
-}
-
-void* dynamic_tls_content_array::operator new[]( std::size_t n )   // usual new...(1)
-{
-	// dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
-	// が、このクラスが配列形式で使用する想定はされていない。
-	void* p_ans = dynamic_tls_key_allocating_only( n );
-	if ( p_ans == nullptr ) {
-		throw std::bad_alloc();
-	}
-
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	void* p_ans = dynamic_tls_key_allocating_only( size );
 	return p_ans;
 }
-void dynamic_tls_content_array::operator delete[]( void* p_mem ) noexcept   // usual delete...(2)
-{
-	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
-}
 
-void* dynamic_tls_content_array::operator new( std::size_t n, void* p )   // placement new
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_array::operator new( std::size_t size, void* ptr ) noexcept   // placement new, from C++11
 {
 	// dynamic_tls_content_arrayのクラスがplacement new形式で使用する想定はされていない。
-	return p;
+	return ptr;
 }
-void dynamic_tls_content_array::operator delete( void* p, void* p2 ) noexcept   // placement delete...(3)
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_array::operator new[]( std::size_t size, void* ptr ) noexcept   // placement new for array, from C++11
+{
+	// dynamic_tls_content_arrayのクラスがplacement new形式で使用する想定はされていない。
+	return ptr;
+}
+
+void dynamic_tls_content_array::operator delete( void* ptr ) noexcept   // from C++11
 {
 	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
 }
+void dynamic_tls_content_array::operator delete[]( void* ptr ) noexcept   // from C++11
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void dynamic_tls_content_array::operator delete( void* ptr, std::size_t size ) noexcept   // from C++14
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_array::operator delete[]( void* ptr, std::size_t size ) noexcept   // from C++14
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void dynamic_tls_content_array::operator delete( void* ptr, const std::nothrow_t& ) noexcept   // from C++11
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_array::operator delete[]( void* ptr, const std::nothrow_t& ) noexcept   // from C++11
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void dynamic_tls_content_array::operator delete( void* ptr, std::size_t size, const std::nothrow_t& ) noexcept   // from C++14
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_array::operator delete[]( void* ptr, std::size_t size, const std::nothrow_t& ) noexcept   // from C++14
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void dynamic_tls_content_array::operator delete( void* ptr, void* ) noexcept   // delete for area that is initialized by placement new.
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_array::operator delete[]( void* ptr, void* ) noexcept   // delete for area that is initialized by placement new.
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+#if __cpp_aligned_new
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_array::operator new( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	void* p_ans = dynamic_tls_key_allocating_only( size, static_cast<size_t>( alignment ) );
+	if ( p_ans == nullptr ) {
+		throw std::bad_alloc();
+	}
+
+	return p_ans;
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_array::operator new( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++17
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	void* p_ans = dynamic_tls_key_allocating_only( size, static_cast<size_t>( alignment ) );
+	return p_ans;
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_array::operator new[]( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	void* p_ans = dynamic_tls_key_allocating_only( size, static_cast<size_t>( alignment ) );
+	if ( p_ans == nullptr ) {
+		throw std::bad_alloc();
+	}
+
+	return p_ans;
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_array::operator new[]( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++17
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
+	void* p_ans = dynamic_tls_key_allocating_only( size, static_cast<size_t>( alignment ) );
+	return p_ans;
+}
+
+void dynamic_tls_content_array::operator delete( void* ptr, std::align_val_t alignment ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_array::operator delete[]( void* ptr, std::align_val_t alignment ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void dynamic_tls_content_array::operator delete( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept   // from C++17
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_array::operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept   // from C++17
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void dynamic_tls_content_array::operator delete( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_array::operator delete[]( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+
+void dynamic_tls_content_array::operator delete( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+void dynamic_tls_content_array::operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17
+{
+	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
+}
+#endif
+#endif
 
 /////////////////////////////////////////////////////////////////////////
 bool dynamic_tls_key_array::release_key( dynamic_tls_key* p_key_arg )

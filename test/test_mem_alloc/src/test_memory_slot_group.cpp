@@ -29,7 +29,8 @@ TEST_P( Test_MemorySlotGroupBuffParam, CanConstruct )
 	tut* p_ret = tut::emplace_on_mem( buff, nullptr, buff_size, 15 );
 
 	// Assert
-	EXPECT_EQ( p_ret->magic_number_, tut::magic_number_value_ );
+	auto mn = tut::magic_number_value_;
+	EXPECT_EQ( p_ret->magic_number_, mn );
 	EXPECT_EQ( p_ret->p_list_mgr_, nullptr );
 	EXPECT_EQ( sizeof( alpha::concurrent::internal::slot_link_info ) + 16, p_ret->one_slot_bytes_ );
 	EXPECT_LE( 1, p_ret->num_slots_ );

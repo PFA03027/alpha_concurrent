@@ -33,6 +33,13 @@
 #endif
 
 // configuration for constexpr adaptation
+#if __cplusplus >= 201304L
+#define ALCC_INTERNAL_CPPSTD14_CONSTEXPR constexpr
+#else
+#define ALCC_INTERNAL_CPPSTD14_CONSTEXPR
+#endif
+
+// configuration for constexpr adaptation
 #if __cplusplus >= 201703L
 #define ALCC_INTERNAL_CPPSTD17_CONSTEXPR constexpr
 #else

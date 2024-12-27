@@ -8,6 +8,7 @@
 
 #include <pthread.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <future>
