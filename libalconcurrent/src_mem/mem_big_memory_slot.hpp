@@ -22,7 +22,7 @@
 #include "alconcurrent/hazard_ptr.hpp"
 
 #include "alconcurrent/internal/cpp_std_configure.hpp"
-#include "mem_common.hpp"
+#include "mem_allocated_mem_top.hpp"
 #include "mem_retrieved_slot_array_mgr.hpp"
 
 namespace alpha {

@@ -10,7 +10,7 @@
  */
 
 #include "mem_big_memory_slot.hpp"
-#include "mem_common.hpp"
+#include "mem_allocated_mem_top.hpp"
 #include "mmap_allocator.hpp"
 
 namespace alpha {

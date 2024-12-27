@@ -1,5 +1,5 @@
 /**
- * @file mem_common.hpp
+ * @file mem_allocated_mem_top.hpp
  * @author Teruaki Ata (PFA03027@nifty.com)
  * @brief
  * @version 0.1
@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef ALCONCCURRENT_SRC_MEM_COMMON_HPP_
-#define ALCONCCURRENT_SRC_MEM_COMMON_HPP_
+#ifndef ALCONCCURRENT_SRC_MEM_ALLOCATED_MEM_TOP_HPP_
+#define ALCONCCURRENT_SRC_MEM_ALLOCATED_MEM_TOP_HPP_
 
 #include <atomic>
 #include <mutex>

@@ -11,7 +11,7 @@
 
 #include "gtest/gtest.h"
 
-#include "mem_common.hpp"
+#include "mem_allocated_mem_top.hpp"
 
 using tut = alpha::concurrent::internal::allocated_mem_top;
 
