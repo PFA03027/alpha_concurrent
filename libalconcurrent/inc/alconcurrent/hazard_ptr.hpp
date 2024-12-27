@@ -22,6 +22,7 @@
 #include <mutex>
 #include <thread>
 #include <tuple>
+#include <type_traits>
 
 #include "conf_logger.hpp"
 #include "internal/hazard_ptr_internal.hpp"
@@ -348,9 +349,10 @@ constexpr bool operator>=( const T1* a, const hazard_ptr<T2>& b ) noexcept
 template <typename T>
 class hazard_ptr_handler {
 public:
-	using element_type   = T;
-	using pointer        = T*;
-	using hazard_pointer = hazard_ptr<T>;
+	using element_type         = T;
+	using pointer              = T*;
+	using hazard_pointer       = hazard_ptr<T>;
+	using hazard_const_pointer = hazard_ptr<typename std::add_const<T>::type>;
 
 	constexpr hazard_ptr_handler( void ) noexcept
 	  : ap_target_p_( nullptr )
@@ -688,9 +690,10 @@ private:
 template <typename T>
 class hazard_ptr_w_mark_handler {
 public:
-	using element_type   = T;
-	using pointer        = T*;
-	using hazard_pointer = hazard_ptr<T>;
+	using element_type         = T;
+	using pointer              = T*;
+	using hazard_pointer       = hazard_ptr<T>;
+	using hazard_const_pointer = hazard_ptr<typename std::add_const<T>::type>;
 
 	struct pointer_w_mark {
 		bool    mark_ = false;
@@ -794,7 +797,7 @@ public:
 		return load( order ).mark_;
 	}
 
-	bool verify_exchange( hazard_pointer_w_mark& hp_w_mark )
+	bool verify_exchange( hazard_pointer_w_mark& hp_w_mark ) noexcept
 	{
 		addr_markable addr_desired = zip_tuple_to_addr_markable( hp_w_mark );
 		addr_markable addr_expect  = a_target_addr_.load( std::memory_order_acquire );
@@ -806,13 +809,13 @@ public:
 		return ret;
 	}
 
-	hazard_pointer_w_mark get_to_verify_exchange( void )
+	hazard_pointer_w_mark get_to_verify_exchange( void ) const noexcept
 	{
 		addr_markable addr_expect = a_target_addr_.load( std::memory_order_acquire );
 		return hazard_pointer_w_mark { unzip_addr_markable_to_tuple( addr_expect ) };
 	}
 
-	void reuse_to_verify_exchange( hazard_pointer_w_mark& hp_w_mark_reuse )
+	void reuse_to_verify_exchange( hazard_pointer_w_mark& hp_w_mark_reuse ) const noexcept
 	{
 		addr_markable addr_expect = a_target_addr_.load( std::memory_order_acquire );
 		hp_w_mark_reuse           = unzip_addr_markable_to_tuple( addr_expect );

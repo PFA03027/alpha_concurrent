@@ -269,10 +269,14 @@ private:
 	struct tls_data {
 		retrieved_slots_stack<SLOT_T> non_hazard_retrieved_slots_stack_[max_entry_];
 		retrieved_slots_stack<SLOT_T> in_hazard_retrieved_slots_stack_[max_entry_];
+		size_t                        continues_failed_count_[max_entry_];
+		size_t                        max_continues_failed_count_[max_entry_];
 
 		constexpr tls_data( void ) noexcept
 		  : non_hazard_retrieved_slots_stack_ {}
 		  , in_hazard_retrieved_slots_stack_ {}
+		  , continues_failed_count_ { 0 }
+		  , max_continues_failed_count_ { 0 }
 		{
 		}
 

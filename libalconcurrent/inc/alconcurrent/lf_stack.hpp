@@ -153,6 +153,11 @@ public:
 		return ans;
 	}
 
+	size_t count_size( void ) const
+	{
+		return lf_stack_impl_.count_size();
+	}
+
 	bool is_empty( void ) const
 	{
 		return lf_stack_impl_.is_empty();

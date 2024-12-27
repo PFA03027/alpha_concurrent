@@ -476,18 +476,14 @@ void od_lockfree_list::exchange_sentinel_connection( node_pointer p_sentinel_of_
 	}
 }
 
-size_t od_lockfree_list::size( void ) const noexcept
+size_t od_lockfree_list::count_size( void ) noexcept
 {
-	// FIXME: Caution: この処理は、スレッドセーフではない。ほかのスレッドで削除/挿入されていた場合、数え上げがうまくいかない。
-	size_t                               count   = 0;
-	hazard_ptr_handler_t::pointer_w_mark p_m_cur = head_.hazard_handler_of_next().load();
-	while ( ( p_m_cur.p_ != &sentinel_ ) && ( p_m_cur.p_ != nullptr ) ) {   // 繋ぎ変え処理との競合を考慮し、nullptrもチェックする。
-		hazard_ptr_handler_t::pointer_w_mark p_m_nxt = p_m_cur.p_->hazard_handler_of_next().load();
-		if ( !p_m_nxt.mark_ ) {
-			count++;
-		}
-		p_m_cur = p_m_nxt;
-	}
+	size_t          count = 0;
+	for_each_func_t pred  = [&count]( const node_pointer ) -> bool {
+        ++count;
+        return false;
+	};
+	for_each( pred );
 
 	return count;
 }

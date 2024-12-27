@@ -12,8 +12,8 @@
 #ifndef ALCONCURRENT_INC_INTERNAL_OD_LOCKFREE_LIST_HPP_
 #define ALCONCURRENT_INC_INTERNAL_OD_LOCKFREE_LIST_HPP_
 
-#include "alconcurrent/internal/od_node_essence.hpp"
 #include "alconcurrent/internal/alcc_optional.hpp"
+#include "alconcurrent/internal/od_node_essence.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -204,7 +204,7 @@ public:
 	 *
 	 * @return size_t
 	 */
-	size_t size( void ) const noexcept;
+	size_t count_size( void ) noexcept;
 
 	/*!
 	 * @brief	インスタンス内で保持している終端ノード（番兵ノード）かどうかを調べる。

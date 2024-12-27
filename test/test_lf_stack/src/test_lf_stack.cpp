@@ -54,9 +54,7 @@ void* func_test_fifo( void* data )
 		auto ret = p_test_obj->pop();
 		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string( v ).c_str() );
-#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
-			printf( "fifo size count: %d\n", p_test_obj->get_size() );
-#endif
+			printf( "fifo size count: %zu\n", p_test_obj->count_size() );
 			exit( 1 );
 		}
 		v = ret.value() + 1;
@@ -77,9 +75,7 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( test_lifo_type* p_test_obj[] )
 			auto ret = p_test_obj[0]->pop();
 			if ( !ret.has_value() ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v1 ).c_str() );
-#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
-				printf( "fifo size count idx 0: %d\n", p_test_obj[0]->get_size() );
-#endif
+				printf( "fifo size count idx 0: %zu\n", p_test_obj[0]->count_size() );
 				exit( 1 );
 			}
 			v1 = ret.value() + 1;
@@ -88,9 +84,7 @@ std::tuple<uintptr_t, uintptr_t> func_test_fifo2( test_lifo_type* p_test_obj[] )
 			auto ret = p_test_obj[1]->pop();
 			if ( !ret.has_value() ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v2 ).c_str() );
-#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
-				printf( "fifo size count idx 1: %d\n", p_test_obj[1]->get_size() );
-#endif
+				printf( "fifo size count idx 1: %zu\n", p_test_obj[1]->count_size() );
 				exit( 1 );
 			}
 			v2 = ret.value() + 1;
@@ -151,11 +145,6 @@ TEST_F( lfStackTest_Highload, TC1 )
 
 	delete[] threads;
 
-#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
-	std::cout << "Allocated nodes #0:    " << p_test_obj[0]->get_allocated_num() << std::endl;
-	std::cout << "Allocated nodes #1:    " << p_test_obj[1]->get_allocated_num() << std::endl;
-#endif
-
 	return;
 }
 
@@ -177,9 +166,7 @@ void* func_test4_fifo( void* data )
 		auto ret = p_test_obj->pop();
 		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_fifo()!!!  %s\n", std::to_string( v ).c_str() );
-#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
-			printf( "fifo size count: %d\n", p_test_obj->get_size() );
-#endif
+			printf( "fifo size count: %zu\n", p_test_obj->count_size() );
 			exit( 1 );
 		}
 		v = ret.value() + 1;
@@ -201,9 +188,7 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( test_lifo_type2* p_test_obj[]
 			auto ret = p_test_obj[0]->pop();
 			if ( !ret.has_value() ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v1 ).c_str() );
-#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
-				printf( "fifo size count idx 0: %d\n", p_test_obj[0]->get_size() );
-#endif
+				printf( "fifo size count idx 0: %zu\n", p_test_obj[0]->count_size() );
 				exit( 1 );
 			}
 			v1 = ret.value() + 1;
@@ -212,18 +197,14 @@ std::tuple<uintptr_t, uintptr_t> func_test4_fifo2( test_lifo_type2* p_test_obj[]
 			auto ret = p_test_obj[1]->pop();
 			if ( !ret.has_value() ) {
 				printf( "Bugggggggyyyy!!!  func_test_fifo2()  %s\n", std::to_string( v2 ).c_str() );
-#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
-				printf( "fifo size count idx 1: %d\n", p_test_obj[1]->get_size() );
-#endif
+				printf( "fifo size count idx 1: %zu\n", p_test_obj[1]->count_size() );
 				exit( 1 );
 			}
 			v2 = ret.value() + 1;
 		}
 	}
 
-#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
-	printf( "final count of p_test_obj[0] is %d", p_test_obj[0]->get_size() );
-#endif
+	printf( "final count of p_test_obj[0] is %zu", p_test_obj[0]->count_size() );
 
 	return std::tuple<uintptr_t, uintptr_t>( v1, v2 );
 }
@@ -278,11 +259,6 @@ TEST_F( lfStackTest_Highload, TC2 )
 	EXPECT_EQ( ( num_thread + 2 ) * loop_num, sum );
 
 	delete[] threads;
-
-#ifdef ALCONCURRENT_CONF_ENABLE_SIZE_INFO_FROFILE
-	std::cout << "Allocated nodes #0:    " << p_test_obj[0]->get_allocated_num() << std::endl;
-	std::cout << "Allocated nodes #1:    " << p_test_obj[1]->get_allocated_num() << std::endl;
-#endif
 
 	delete p_test_obj[0];
 	delete p_test_obj[1];

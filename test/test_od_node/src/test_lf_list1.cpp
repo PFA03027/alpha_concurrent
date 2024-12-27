@@ -135,14 +135,14 @@ TEST_F( Test_od_lockfree_list, OneNode_DoMoveConstruct )
 	tut_list target = std::move( sut_ );
 
 	// Assert
-	EXPECT_EQ( sut_.size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	ret1 = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_FALSE( ret1.first.mark_ );
 	EXPECT_FALSE( ret1.second.mark_ );
 	EXPECT_FALSE( sut_.is_head_node( ret1 ) );
 	EXPECT_TRUE( sut_.is_end_node( ret1 ) );
 
-	EXPECT_EQ( target.size(), 1 );
+	EXPECT_EQ( target.count_size(), 1 );
 	ret1      = target.find_if( []( const tut_list::node_pointer ) { return true; } );
 	auto ret2 = target.find_if( []( const tut_list::node_pointer ) { return false; } );
 	EXPECT_FALSE( target.is_head_node( ret1 ) );
@@ -177,14 +177,14 @@ TEST_F( Test_od_lockfree_list, EmptyAndOneNode_DoMoveAssignment )
 	target = std::move( sut_ );
 
 	// Assert
-	EXPECT_EQ( sut_.size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	ret1 = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_FALSE( ret1.first.mark_ );
 	EXPECT_FALSE( ret1.second.mark_ );
 	EXPECT_FALSE( sut_.is_head_node( ret1 ) );
 	EXPECT_TRUE( sut_.is_end_node( ret1 ) );
 
-	EXPECT_EQ( target.size(), 1 );
+	EXPECT_EQ( target.count_size(), 1 );
 	ret1      = target.find_if( []( const tut_list::node_pointer ) { return true; } );
 	auto ret2 = target.find_if( []( const tut_list::node_pointer ) { return false; } );
 	EXPECT_FALSE( target.is_head_node( ret1 ) );
@@ -203,18 +203,18 @@ TEST_F( Test_od_lockfree_list, OneNodeAndOneNode_DoMoveAssignment )
 	auto                   ret1        = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	tut_list::node_pointer p_new_node1 = new tut_list::node_type;
 	sut_.insert_to_before_of_curr( p_new_node1, ret1.first, ret1.second );
-	EXPECT_EQ( sut_.size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 
 	ret1                               = target.find_if( []( const tut_list::node_pointer ) { return true; } );
 	tut_list::node_pointer p_new_node2 = new tut_list::node_type;
 	target.insert_to_before_of_curr( p_new_node2, ret1.first, ret1.second );
-	EXPECT_EQ( target.size(), 1 );
+	EXPECT_EQ( target.count_size(), 1 );
 
 	// Act
 	target = std::move( sut_ );
 
 	// Assert
-	EXPECT_EQ( sut_.size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	ret1 = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_FALSE( ret1.first.mark_ );
 	EXPECT_FALSE( ret1.second.mark_ );
@@ -222,7 +222,7 @@ TEST_F( Test_od_lockfree_list, OneNodeAndOneNode_DoMoveAssignment )
 	EXPECT_FALSE( sut_.is_head_node( ret1 ) );
 	EXPECT_TRUE( sut_.is_end_node( ret1 ) );
 
-	EXPECT_EQ( target.size(), 1 );
+	EXPECT_EQ( target.count_size(), 1 );
 	ret1      = target.find_if( []( const tut_list::node_pointer ) { return true; } );
 	auto ret2 = target.find_if( []( const tut_list::node_pointer ) { return false; } );
 	EXPECT_FALSE( target.is_head_node( ret1 ) );
@@ -243,7 +243,7 @@ TEST_F( Test_od_lockfree_list, Empty_DoClear )
 	sut_.clear();
 
 	// Assert
-	EXPECT_EQ( sut_.size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	auto ret1 = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_FALSE( ret1.first.mark_ );
 	EXPECT_FALSE( ret1.second.mark_ );
@@ -263,7 +263,7 @@ TEST_F( Test_od_lockfree_list, OneNode_DoClear )
 	sut_.clear();
 
 	// Assert
-	EXPECT_EQ( sut_.size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	ret1 = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_FALSE( ret1.first.mark_ );
 	EXPECT_FALSE( ret1.second.mark_ );
@@ -292,13 +292,13 @@ TEST_F( Test_od_lockfree_list, Empty_DoInsertBefore_ThenOneNode )
 	// Arrenge
 	auto                   ret        = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	tut_list::node_pointer p_new_node = new tut_list::node_type;
-	EXPECT_EQ( sut_.size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 
 	// Act
 	sut_.insert_to_before_of_curr( p_new_node, ret.first, ret.second );
 
 	// Assert
-	EXPECT_EQ( sut_.size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 
 	ret = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_TRUE( sut_.is_head_node( ret.first ) );
@@ -322,13 +322,13 @@ TEST_F( Test_od_lockfree_list, Empty_DoInsertNext_ThenOneNode )
 	// Arrenge
 	auto                   ret        = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	tut_list::node_pointer p_new_node = new tut_list::node_type;
-	EXPECT_EQ( sut_.size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 
 	// Act
 	sut_.insert_to_next_of_prev( p_new_node, ret.first, ret.second );
 
 	// Assert
-	EXPECT_EQ( sut_.size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 
 	ret = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_TRUE( sut_.is_head_node( ret.first ) );
@@ -351,13 +351,13 @@ TEST_F( Test_od_lockfree_list, Empty_DoRemove_ThenEmpty )
 {
 	// Arrenge
 	auto ret = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
-	EXPECT_EQ( sut_.size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 
 	// Act
 	sut_.remove( ret.first, std::move( ret.second ) );
 
 	// Assert
-	EXPECT_EQ( sut_.size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 
 	auto ret1 = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_FALSE( ret1.first.mark_ );
@@ -373,14 +373,14 @@ TEST_F( Test_od_lockfree_list, OneNode_DoRemoveFirstNode_ThenEmpty )
 	auto                   ret        = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	tut_list::node_pointer p_new_node = new tut_list::node_type;
 	sut_.insert_to_next_of_prev( p_new_node, ret.first, ret.second );
-	EXPECT_EQ( sut_.size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 	ret = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 
 	// Act
 	sut_.remove( ret.first, std::move( ret.second ) );
 
 	// Assert
-	EXPECT_EQ( sut_.size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 
 	auto ret1 = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_FALSE( ret1.first.mark_ );
@@ -399,7 +399,7 @@ TEST_F( Test_od_lockfree_list, EmptyAndEmpty_DoSwap )
 	sut_.swap( target );
 
 	// Assert
-	EXPECT_EQ( sut_.size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	auto ret1 = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_FALSE( ret1.first.mark_ );
 	EXPECT_FALSE( ret1.second.mark_ );
@@ -407,7 +407,7 @@ TEST_F( Test_od_lockfree_list, EmptyAndEmpty_DoSwap )
 	EXPECT_FALSE( sut_.is_head_node( ret1 ) );
 	EXPECT_TRUE( sut_.is_end_node( ret1 ) );
 
-	EXPECT_EQ( target.size(), 0 );
+	EXPECT_EQ( target.count_size(), 0 );
 	auto ret2 = target.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_FALSE( ret2.first.mark_ );
 	EXPECT_FALSE( ret2.second.mark_ );
@@ -423,13 +423,13 @@ TEST_F( Test_od_lockfree_list, EmptyAndOneNode_DoSwap )
 	auto                   ret        = target.find_if( []( const tut_list::node_pointer ) { return true; } );
 	tut_list::node_pointer p_new_node = new tut_list::node_type;
 	target.insert_to_next_of_prev( p_new_node, ret.first, ret.second );
-	EXPECT_EQ( target.size(), 1 );
+	EXPECT_EQ( target.count_size(), 1 );
 
 	// Act
 	sut_.swap( target );
 
 	// Assert
-	EXPECT_EQ( sut_.size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 	auto ret1 = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_FALSE( ret1.first.mark_ );
 	EXPECT_FALSE( ret1.second.mark_ );
@@ -438,7 +438,7 @@ TEST_F( Test_od_lockfree_list, EmptyAndOneNode_DoSwap )
 	EXPECT_FALSE( sut_.is_end_node( ret1 ) );
 	EXPECT_EQ( ret1.second.hp_, p_new_node );
 
-	EXPECT_EQ( target.size(), 0 );
+	EXPECT_EQ( target.count_size(), 0 );
 	auto ret2 = target.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_FALSE( ret2.first.mark_ );
 	EXPECT_FALSE( ret2.second.mark_ );
@@ -455,13 +455,13 @@ TEST_F( Test_od_lockfree_list, OneNodeAndEmpty_DoSwap )
 	auto                   ret        = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	tut_list::node_pointer p_new_node = new tut_list::node_type;
 	sut_.insert_to_next_of_prev( p_new_node, ret.first, ret.second );
-	EXPECT_EQ( sut_.size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 
 	// Act
 	sut_.swap( target );
 
 	// Assert
-	EXPECT_EQ( sut_.size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	auto ret1 = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_FALSE( ret1.first.mark_ );
 	EXPECT_FALSE( ret1.second.mark_ );
@@ -469,7 +469,7 @@ TEST_F( Test_od_lockfree_list, OneNodeAndEmpty_DoSwap )
 	EXPECT_FALSE( sut_.is_head_node( ret1 ) );
 	EXPECT_TRUE( sut_.is_end_node( ret1 ) );
 
-	EXPECT_EQ( target.size(), 1 );
+	EXPECT_EQ( target.count_size(), 1 );
 	auto ret2 = target.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_FALSE( ret2.first.mark_ );
 	EXPECT_FALSE( ret2.second.mark_ );
@@ -485,19 +485,19 @@ TEST_F( Test_od_lockfree_list, OneNodeAndOneNode_DoSwap )
 	auto                   ret         = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	tut_list::node_pointer p_new_node1 = new tut_list::node_type;
 	sut_.insert_to_next_of_prev( p_new_node1, ret.first, ret.second );
-	EXPECT_EQ( sut_.size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 
 	tut_list target;
 	ret                                = target.find_if( []( const tut_list::node_pointer ) { return true; } );
 	tut_list::node_pointer p_new_node2 = new tut_list::node_type;
 	target.insert_to_next_of_prev( p_new_node2, ret.first, ret.second );
-	EXPECT_EQ( target.size(), 1 );
+	EXPECT_EQ( target.count_size(), 1 );
 
 	// Act
 	sut_.swap( target );
 
 	// Assert
-	EXPECT_EQ( sut_.size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 	auto ret1 = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_FALSE( ret1.first.mark_ );
 	EXPECT_FALSE( ret1.second.mark_ );
@@ -506,7 +506,7 @@ TEST_F( Test_od_lockfree_list, OneNodeAndOneNode_DoSwap )
 	EXPECT_FALSE( sut_.is_end_node( ret1 ) );
 	EXPECT_EQ( ret1.second.hp_, p_new_node2 );
 
-	EXPECT_EQ( target.size(), 1 );
+	EXPECT_EQ( target.count_size(), 1 );
 	auto ret2 = target.find_if( []( const tut_list::node_pointer ) { return true; } );
 	EXPECT_FALSE( ret2.first.mark_ );
 	EXPECT_FALSE( ret2.second.mark_ );
@@ -535,7 +535,7 @@ TEST_F( Test_od_lockfree_list, OneNode_DoForeach )
 	auto                   ret         = sut_.find_if( []( const tut_list::node_pointer ) { return true; } );
 	tut_list::node_pointer p_new_node1 = new tut_list::node_type;
 	sut_.insert_to_next_of_prev( p_new_node1, ret.first, ret.second );
-	EXPECT_EQ( sut_.size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 
 	int  count = 0;
 	auto f     = [&count]( tut_list::node_pointer ) { count++; };

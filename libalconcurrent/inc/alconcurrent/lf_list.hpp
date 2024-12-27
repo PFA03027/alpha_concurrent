@@ -407,9 +407,9 @@ public:
 	 * @warning
 	 * This List will be access by several thread concurrently. So, true number of this List may be changed when caller uses the returned value.
 	 */
-	size_t get_size( void ) const
+	size_t count_size( void )
 	{
-		return lf_list_impl_.size();
+		return lf_list_impl_.count_size();
 	}
 
 	/*!

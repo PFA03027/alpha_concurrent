@@ -84,6 +84,8 @@ public:
 
 	bool is_empty( void ) const;
 
+	size_t count_size( void ) const;
+
 	size_t profile_info_count( void ) const;
 
 protected:
