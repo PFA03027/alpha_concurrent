@@ -283,6 +283,13 @@ private:
 		~tls_data( void )
 		{
 			for ( size_t i = 0; i < max_entry_; i++ ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_GMEM_PROFILE
+				LogOutput( log_type::DUMP,
+				           "retrieved_slots_stack_array_mgr: idx=%zu, non-hazard slots=%zu, in-hazard slots=%zu",
+				           i,
+				           non_hazard_retrieved_slots_stack_[i].count(),
+				           in_hazard_retrieved_slots_stack_[i].count() );
+#endif
 				global_non_hazard_retrieved_slots_lockfree_stack_[i].merge( std::move( non_hazard_retrieved_slots_stack_[i] ) );
 				global_in_hazard_retrieved_slots_lockable_stack_[i].merge( std::move( in_hazard_retrieved_slots_stack_[i] ) );
 			}

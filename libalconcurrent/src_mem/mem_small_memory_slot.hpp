@@ -314,7 +314,6 @@ struct memory_slot_group_list {
 	std::atomic<size_t>             next_allocating_buffer_bytes_;            //!< allocating buffer size of next allocation for memory_slot_group
 	std::atomic<memory_slot_group*> ap_head_memory_slot_group_;               //!< pointer to head memory_slot_group of memory_slot_group stack
 	std::atomic<memory_slot_group*> ap_cur_assigning_memory_slot_group_;      //!< pointer to current slot allocating memory_slot_group
-	// retrieved_small_slots_mgr       unused_retrieved_slots_mgr_;              //!< manager for retrieved slots
 
 	constexpr memory_slot_group_list(
 		const size_t allocatable_bytes_arg,                        //!< [in] max allocatable bytes by allocation
@@ -328,7 +327,6 @@ struct memory_slot_group_list {
 	  , next_allocating_buffer_bytes_( check_init_buffer_size( allocatable_bytes_arg, init_buffer_bytes_of_memory_slot_group_arg ) )
 	  , ap_head_memory_slot_group_( nullptr )
 	  , ap_cur_assigning_memory_slot_group_( nullptr )
-	//   , unused_retrieved_slots_mgr_()
 	{
 	}
 
@@ -372,19 +370,18 @@ static_assert( std::is_trivially_destructible<memory_slot_group_list>::value );
 inline slot_link_info* memory_slot_group_list::allocate( void ) noexcept
 {
 	slot_link_info* p_ans = allocate_impl();
-	if ( p_ans == nullptr ) {
-		return p_ans;
-	}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-	auto p_slot_owner = p_ans->check_validity_to_ownwer_and_get();
-	if ( p_slot_owner == nullptr ) {
-		LogOutput( log_type::WARN, "retrieved_slots_mgr_impl<SLOT_T>::request_reuse() invalid SLOT_T" );
-		return nullptr;
+	if ( p_ans != nullptr ) {
+		auto p_slot_owner = p_ans->check_validity_to_ownwer_and_get();
+		if ( p_slot_owner == nullptr ) {
+			LogOutput( log_type::WARN, "retrieved_slots_mgr_impl<SLOT_T>::request_reuse() invalid SLOT_T" );
+			return nullptr;
+		}
+		btinfo_alloc_free& cur_btinfo = p_slot_owner->get_btinfo( p_slot_owner->get_slot_idx( p_ans ) );
+		cur_btinfo.alloc_trace_       = bt_info::record_backtrace();
+		cur_btinfo.free_trace_.invalidate();
 	}
-	btinfo_alloc_free& cur_btinfo = p_slot_owner->get_btinfo( p_slot_owner->get_slot_idx( p_ans ) );
-	cur_btinfo.alloc_trace_       = bt_info::record_backtrace();
-	cur_btinfo.free_trace_.invalidate();
 #endif
 	return p_ans;
 }
