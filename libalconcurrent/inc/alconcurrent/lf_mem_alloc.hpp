@@ -27,12 +27,27 @@ namespace concurrent {
  *
  * @return pointer to allocated memory. If failed to allocate, return nullptr.
  *
+ * @note
+ * The returned memory is aligned by sizeof( uintptr_t ).
+ */
+ALCC_INTERNAL_NODISCARD_ATTR void* gmem_allocate(
+	size_t n   //!< [in] memory size to allocate
+	) noexcept;
+
+/*!
+ * @brief	allocate memory
+ *
+ * This I/F allocates a memory from a global general_mem_allocator instance. @n
+ * The allocated memory must free by gmem_deallocate().
+ *
+ * @return pointer to allocated memory. If failed to allocate, return nullptr.
+ *
  * @exception
  * If req_align is not power of 2, throw std::logic_error.
  */
 ALCC_INTERNAL_NODISCARD_ATTR void* gmem_allocate(
-	size_t n,                                //!< [in] memory size to allocate
-	size_t req_align = sizeof( uintptr_t )   //!< [in] requested align size. req_align should be the power of 2
+	size_t n,          //!< [in] memory size to allocate
+	size_t req_align   //!< [in] requested align size. req_align should be the power of 2
 );
 
 /*!

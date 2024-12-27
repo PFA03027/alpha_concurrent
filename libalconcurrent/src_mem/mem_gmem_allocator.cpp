@@ -48,10 +48,10 @@ internal::big_memory_slot_list g_big_memory_slot_list;
  * @exception
  * If req_align is not power of 2, throw std::logic_error.
  */
-void* gmem_allocate(
+void* gmem_allocate_impl(
 	size_t n,          //!< [in] memory size to allocate
 	size_t req_align   //!< [in] requested align size. req_align should be the power of 2
-)
+	) noexcept
 {
 	size_t needed_bytes = n;
 	if ( req_align > internal::allocated_mem_top::min_alignment_size_ ) {
@@ -92,14 +92,25 @@ void* gmem_allocate(
 	return nullptr;
 }
 
-/*!
- * @brief	deallocate memory
- *
- * This I/F free a memory area that is allocated by gmem_allocate().
- *
- * @note
- * If p_mem is not a memory that is not allocated by gmem_allocate(), this I/F will try to free by calling free().
- */
+ALCC_INTERNAL_NODISCARD_ATTR void* gmem_allocate(
+	size_t n   //!< [in] memory size to allocate
+	) noexcept
+{
+	return gmem_allocate_impl( n, sizeof( uintptr_t ) );
+}
+
+ALCC_INTERNAL_NODISCARD_ATTR void* gmem_allocate(
+	size_t n,                                //!< [in] memory size to allocate
+	size_t req_align = sizeof( uintptr_t )   //!< [in] requested align size. req_align should be the power of 2
+)
+{
+	if ( !internal::is_power_of_2( req_align ) ) {
+		internal::LogOutput( log_type::ERR, "req_align is not power of 2." );
+		throw std::logic_error( "req_align is not power of 2." );
+	}
+	return gmem_allocate_impl( n, req_align );
+}
+
 bool gmem_deallocate(
 	void* p_mem   //!< [in] pointer to free.
 )
