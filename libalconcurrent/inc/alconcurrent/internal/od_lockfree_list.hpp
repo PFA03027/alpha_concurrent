@@ -38,14 +38,17 @@ namespace internal {
  */
 class od_lockfree_list {
 public:
-	using node_type             = od_node_1bit_markable_link_by_hazard_handler;
-	using node_pointer          = od_node_1bit_markable_link_by_hazard_handler*;
-	using hazard_ptr_handler_t  = typename od_node_1bit_markable_link_by_hazard_handler::hazard_ptr_handler_t;
-	using hazard_pointer        = typename od_node_1bit_markable_link_by_hazard_handler::hazard_pointer;
-	using pointer_w_mark        = typename od_node_1bit_markable_link_by_hazard_handler::pointer_w_mark;
-	using hazard_pointer_w_mark = typename od_node_1bit_markable_link_by_hazard_handler::hazard_pointer_w_mark;
-	using find_predicate_t      = std::function<bool( const node_pointer )>;   //!< find_if関数で使用する述語関数を保持するfunction型
-	using for_each_func_t       = std::function<void( node_pointer )>;         //!< for_each関数で各要素の処理を実行するための関数を保持するfunction型
+	using node_type                   = od_node_1bit_markable_link_by_hazard_handler;
+	using node_pointer                = od_node_1bit_markable_link_by_hazard_handler*;
+	using const_node_pointer          = const od_node_1bit_markable_link_by_hazard_handler*;
+	using hazard_ptr_handler_t        = typename od_node_1bit_markable_link_by_hazard_handler::hazard_ptr_handler_t;
+	using hazard_pointer              = typename od_node_1bit_markable_link_by_hazard_handler::hazard_pointer;
+	using pointer_w_mark              = typename od_node_1bit_markable_link_by_hazard_handler::pointer_w_mark;
+	using hazard_pointer_w_mark       = typename od_node_1bit_markable_link_by_hazard_handler::hazard_pointer_w_mark;
+	using hazard_const_pointer_w_mark = typename od_node_1bit_markable_link_by_hazard_handler::hazard_const_pointer_w_mark;
+	using find_predicate_t            = std::function<bool( const_node_pointer )>;   //!< find_if関数で使用する述語関数を保持するfunction型
+	using for_each_func_t             = std::function<void( node_pointer )>;         //!< for_each関数で各要素の処理を実行するための関数を保持するfunction型
+	using for_each_const_func_t       = std::function<void( const_node_pointer )>;   //!< for_each関数で各要素の処理を実行するための関数を保持するfunction型
 
 	constexpr od_lockfree_list( void ) noexcept
 	  : sentinel_()
@@ -176,13 +179,27 @@ public:
 	 * また、trueを返した後、呼び出し元に戻るまでの間に削除マークがつく可能性がある。
 	 * よって、有効なノードへのhazardポインタが返ってきたとしても、そのノードが削除されないわけではない。
 	 * ただし、この場合はハザードポインタとして登録がされているため、ノードの解放までは行われないため継続してアクセスは可能。
+	 *
+	 * @warning
+	 * predは、同じノードに対して複数回適用される。これは、事前の削除処理時に発生した競合や、並行処理でリストへの追加・削除が行われると生じる。
 	 */
 	std::pair<hazard_pointer_w_mark, hazard_pointer_w_mark> find_if(
-		find_predicate_t pred   //!< [in]	引数には、const node_pointerが渡される
+		find_predicate_t& pred   //!< [in]	引数には、const node_pointerが渡される
 	);
+	std::pair<hazard_pointer_w_mark, hazard_pointer_w_mark> find_if(
+		find_predicate_t&& pred   //!< [in]	引数には、const node_pointerが渡される
+	);
+	std::pair<hazard_const_pointer_w_mark, hazard_const_pointer_w_mark> find_if(
+		find_predicate_t& pred   //!< [in]	引数には、const node_pointerが渡される
+	) const;
+	std::pair<hazard_const_pointer_w_mark, hazard_const_pointer_w_mark> find_if(
+		find_predicate_t&& pred   //!< [in]	引数には、const node_pointerが渡される
+	) const;
 
-	std::pair<hazard_pointer_w_mark, hazard_pointer_w_mark> find_head( void );
-	std::pair<hazard_pointer_w_mark, hazard_pointer_w_mark> find_tail( void );
+	std::pair<hazard_pointer_w_mark, hazard_pointer_w_mark>             find_head( void );
+	std::pair<hazard_pointer_w_mark, hazard_pointer_w_mark>             find_tail( void );
+	std::pair<hazard_const_pointer_w_mark, hazard_const_pointer_w_mark> find_head( void ) const;
+	std::pair<hazard_const_pointer_w_mark, hazard_const_pointer_w_mark> find_tail( void ) const;
 
 	/*!
 	 * @brief	Applies the specified function to all elements.
@@ -190,12 +207,18 @@ public:
 	 * 対象を処理している最中にも削除マークがつく可能性がある。
 	 * また、対象の処理をしている間の排他制御は行わないため、処理関数内で排他制御を行うこと。
 	 */
-	for_each_func_t for_each(
-		const for_each_func_t& f   //!< [in]	A function f is passed value_type& as an argument
+	void for_each(
+		for_each_func_t& f   //!< [in]	A function f is passed value_type& as an argument
 	);
-	for_each_func_t for_each(
+	void for_each(
 		for_each_func_t&& f   //!< [in]	A function f is passed value_type& as an argument
 	);
+	void for_each(
+		for_each_const_func_t& f   //!< [in]	A function f is passed value_type& as an argument
+	) const;
+	void for_each(
+		for_each_const_func_t&& f   //!< [in]	A function f is passed value_type& as an argument
+	) const;
 
 	/**
 	 * @brief 有効なノード数を数え上げる
@@ -204,7 +227,7 @@ public:
 	 *
 	 * @return size_t
 	 */
-	size_t count_size( void ) noexcept;
+	size_t count_size( void ) const noexcept;
 
 	/*!
 	 * @brief	インスタンス内で保持している終端ノード（番兵ノード）かどうかを調べる。
@@ -265,9 +288,13 @@ protected:
 
 private:
 	std::pair<hazard_pointer_w_mark, hazard_pointer_w_mark> find_if_impl(
-		find_predicate_t pred,             //!< [in]	引数には、const node_pointerが渡される
-		node_pointer     p_sentinel_node   //!< [in] 終端として判定するノード
+		find_predicate_t& pred,             //!< [in]	引数には、const node_pointerが渡される
+		node_pointer      p_sentinel_node   //!< [in] 終端として判定するノード
 	);
+	std::pair<hazard_const_pointer_w_mark, hazard_const_pointer_w_mark> find_if_impl(
+		find_predicate_t&  pred,             //!< [in]	引数には、const node_pointerが渡される
+		const_node_pointer p_sentinel_node   //!< [in] 終端として判定するノード
+	) const;
 
 	void call_base_do_for_purged_node( node_pointer p_nd );
 

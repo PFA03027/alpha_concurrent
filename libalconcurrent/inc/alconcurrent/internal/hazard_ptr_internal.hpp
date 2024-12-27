@@ -41,13 +41,13 @@ constexpr std::memory_order hzrd_slot_memory_order_for_store = std::memory_order
 
 class hzrd_slot_releaser {
 public:
-	inline void operator()( std::atomic<void*>* ptr ) const noexcept
+	inline void operator()( std::atomic<const void*>* ptr ) const noexcept
 	{
 		if ( ptr == nullptr ) return;
 		ptr->store( nullptr, std::memory_order_release );
 	}
 };
-using hzrd_slot_ownership_t = std::unique_ptr<std::atomic<void*>, hzrd_slot_releaser>;
+using hzrd_slot_ownership_t = std::unique_ptr<std::atomic<const void*>, hzrd_slot_releaser>;
 
 /////////////////////////////////////////////////////////////////
 class hazard_ptr_mgr {
@@ -60,7 +60,7 @@ public:
 	 * @retval nullptr fail to assign or p is nullptr
 	 * @retval non-nullptr success to assign
 	 */
-	static hzrd_slot_ownership_t AssignHazardPtrSlot( void* p );
+	static hzrd_slot_ownership_t AssignHazardPtrSlot( const void* p );
 
 	/**
 	 * @brief Check if p is still in hazard pointer list or not
@@ -76,7 +76,7 @@ public:
 	 *
 	 * @param pred
 	 */
-	static void ScanHazardPtrs( std::function<void( void* )> pred );
+	static void ScanHazardPtrs( std::function<void( const void* )> pred );
 
 	/**
 	 * @brief remove all hazard_ptr_group from internal global variable

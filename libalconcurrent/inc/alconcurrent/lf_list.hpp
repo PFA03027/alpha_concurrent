@@ -38,9 +38,10 @@ public:
 	                       ( std::is_move_constructible<T>::value && std::is_move_assignable<T>::value ) ) ),
 	               "T should be copy constructible and copy assignable, or, move constructible and move assignable" );
 
-	using value_type      = T;
-	using predicate_t     = std::function<bool( const value_type& )>;   //!< find_if関数で使用する述語関数を保持するfunction型
-	using for_each_func_t = std::function<void( value_type& )>;         //!< for_each関数で各要素の処理を実行するための関数を保持するfunction型
+	using value_type            = T;
+	using predicate_t           = std::function<bool( const value_type& )>;   //!< find_if関数で使用する述語関数を保持するfunction型
+	using for_each_func_t       = std::function<void( value_type& )>;         //!< for_each関数で各要素の処理を実行するための関数を保持するfunction型
+	using for_each_const_func_t = std::function<void( const value_type& )>;   //!< for_each関数で各要素の処理を実行するための関数を保持するfunction型
 
 	constexpr x_lockfree_list( void ) noexcept
 	  : lf_list_impl_()
@@ -217,8 +218,8 @@ public:
 	 * Therefore, when a non-lock-free function such as exclusive control by mutex is used, the lock-free
 	 * property of this class is limited.
 	 */
-	for_each_func_t for_each(
-		for_each_func_t&& f   //!< [in]	A function f is passed value_type& as an argument
+	void for_each(
+		for_each_func_t& f   //!< [in]	A function f is passed value_type& as an argument
 	)
 	{
 		lf_list_impl_.for_each(
@@ -227,7 +228,15 @@ public:
 				return f( p_my_t->get_value() );
 			} );
 
-		return std::move( f );
+		return;
+	}
+	void for_each(
+		for_each_func_t&& f   //!< [in]	A function f is passed value_type& as an argument
+	)
+	{
+		for_each( f );
+
+		return;
 	}
 
 	/*!
@@ -407,7 +416,7 @@ public:
 	 * @warning
 	 * This List will be access by several thread concurrently. So, true number of this List may be changed when caller uses the returned value.
 	 */
-	size_t count_size( void )
+	size_t count_size( void ) const
 	{
 		return lf_list_impl_.count_size();
 	}
@@ -448,8 +457,8 @@ private:
 	)
 	{
 		return lf_list_impl_.find_if(
-			[&pred]( const od_lockfree_list::node_pointer p_nd ) -> bool {
-				x_lockfree_list::node_pointer p_my_t = static_cast<x_lockfree_list::node_pointer>( p_nd );
+			[&pred]( od_lockfree_list::const_node_pointer p_nd ) -> bool {
+				auto p_my_t = static_cast<typename std::add_pointer<typename std::add_const<x_lockfree_list::node_type>::type>::type>( p_nd );
 				return pred( p_my_t->get_value() );
 			} );
 	}

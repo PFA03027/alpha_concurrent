@@ -227,61 +227,61 @@ private:
 template <class T1, class T2>
 constexpr bool operator==( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept
 {
-	return reinterpret_cast<void*>( a.p_ ) == reinterpret_cast<void*>( b.p_ );
+	return reinterpret_cast<const void*>( a.p_ ) == reinterpret_cast<const void*>( b.p_ );
 }
 
 template <class T1, class T2>
 constexpr bool operator!=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept
 {
-	return reinterpret_cast<void*>( a.p_ ) != reinterpret_cast<void*>( b.p_ );
+	return reinterpret_cast<const void*>( a.p_ ) != reinterpret_cast<const void*>( b.p_ );
 }
 
 template <class T1, class T2>
 constexpr bool operator<( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept
 {
-	return reinterpret_cast<void*>( a.p_ ) < reinterpret_cast<void*>( b.p_ );
+	return reinterpret_cast<const void*>( a.p_ ) < reinterpret_cast<const void*>( b.p_ );
 }
 
 template <class T1, class T2>
 constexpr bool operator<=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept
 {
-	return reinterpret_cast<void*>( a.p_ ) <= reinterpret_cast<void*>( b.p_ );
+	return reinterpret_cast<const void*>( a.p_ ) <= reinterpret_cast<const void*>( b.p_ );
 }
 
 template <class T1, class T2>
 constexpr bool operator>( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept
 {
-	return reinterpret_cast<void*>( a.p_ ) > reinterpret_cast<void*>( b.p_ );
+	return reinterpret_cast<const void*>( a.p_ ) > reinterpret_cast<const void*>( b.p_ );
 }
 
 template <class T1, class T2>
 constexpr bool operator>=( const hazard_ptr<T1>& a, const hazard_ptr<T2>& b ) noexcept
 {
-	return reinterpret_cast<void*>( a.p_ ) >= reinterpret_cast<void*>( b.p_ );
+	return reinterpret_cast<const void*>( a.p_ ) >= reinterpret_cast<const void*>( b.p_ );
 }
 
 template <class T1>
 constexpr bool operator==( const hazard_ptr<T1>& a, std::nullptr_t ) noexcept
 {
-	return reinterpret_cast<void*>( a.p_ ) == nullptr;
+	return a.p_ == nullptr;
 }
 
 template <class T1>
 constexpr bool operator!=( const hazard_ptr<T1>& a, std::nullptr_t ) noexcept
 {
-	return reinterpret_cast<void*>( a.p_ ) != nullptr;
+	return a.p_ != nullptr;
 }
 
 template <class T1>
 constexpr bool operator==( std::nullptr_t, const hazard_ptr<T1>& a ) noexcept
 {
-	return reinterpret_cast<void*>( a.p_ ) == nullptr;
+	return a.p_ == nullptr;
 }
 
 template <class T1>
 constexpr bool operator!=( std::nullptr_t, const hazard_ptr<T1>& a ) noexcept
 {
-	return reinterpret_cast<void*>( a.p_ ) != nullptr;
+	return a.p_ != nullptr;
 }
 
 template <class T1, class T2>
@@ -692,6 +692,7 @@ class hazard_ptr_w_mark_handler {
 public:
 	using element_type         = T;
 	using pointer              = T*;
+	using const_pointer        = typename std::add_pointer<typename std::add_const<T>::type>::type;
 	using hazard_pointer       = hazard_ptr<T>;
 	using hazard_const_pointer = hazard_ptr<typename std::add_const<T>::type>;
 
@@ -699,43 +700,52 @@ public:
 		bool    mark_ = false;
 		pointer p_    = nullptr;
 	};
-	struct hazard_pointer_w_mark {
-		bool           mark_;
-		hazard_pointer hp_;   // std::memory_order_releaseを扱いやすくするために、mark_の後にアトミック変数関連の操作を持つhazard_pointerの変数を宣言する。
+	struct const_pointer_w_mark {
+		bool          mark_ = false;
+		const_pointer p_    = nullptr;
+	};
 
-		constexpr hazard_pointer_w_mark( void )
+	template <typename HZD_PTR_T, typename PTR_T>
+	struct hazard_pointer_w_mark_impl {
+		bool      mark_;
+		HZD_PTR_T hp_;   // std::memory_order_releaseを扱いやすくするために、mark_の後にアトミック変数関連の操作を持つhazard_pointerの変数を宣言する。
+
+		constexpr hazard_pointer_w_mark_impl( void )
 		  : mark_( false )
 		  , hp_()
 		{
 		}
-		explicit constexpr hazard_pointer_w_mark( pointer p_arg )
+		explicit constexpr hazard_pointer_w_mark_impl( PTR_T p_arg )
 		  : mark_( false )
 		  , hp_( p_arg )
 		{
 		}
-		hazard_pointer_w_mark( const hazard_pointer_w_mark& )            = default;
-		hazard_pointer_w_mark( hazard_pointer_w_mark&& )                 = default;
-		hazard_pointer_w_mark& operator=( const hazard_pointer_w_mark& ) = default;
-		hazard_pointer_w_mark& operator=( hazard_pointer_w_mark&& )      = default;
-		~hazard_pointer_w_mark()                                         = default;
+		hazard_pointer_w_mark_impl( const hazard_pointer_w_mark_impl& )            = default;
+		hazard_pointer_w_mark_impl( hazard_pointer_w_mark_impl&& )                 = default;
+		hazard_pointer_w_mark_impl& operator=( const hazard_pointer_w_mark_impl& ) = default;
+		hazard_pointer_w_mark_impl& operator=( hazard_pointer_w_mark_impl&& )      = default;
+		~hazard_pointer_w_mark_impl()                                              = default;
 
-		explicit hazard_pointer_w_mark( const pointer_w_mark& src )
+		explicit hazard_pointer_w_mark_impl( const pointer_w_mark& src )
 		  : mark_( src.mark_ )
 		  , hp_( src.p_ )
 		{
 		}
-		hazard_pointer_w_mark& operator=( const pointer_w_mark& src )
+		hazard_pointer_w_mark_impl& operator=( const pointer_w_mark& src )
 		{
 			mark_ = src.mark_;
 			hp_.store( src.p_ );
 			return *this;
 		}
-		void swap( hazard_pointer_w_mark& src ) noexcept
+		void swap( hazard_pointer_w_mark_impl& src ) noexcept
 		{
 			std::swap( mark_, src.mark_ );
 			hp_.swap( src.hp_ );
 		}
 	};
+
+	using hazard_pointer_w_mark       = hazard_pointer_w_mark_impl<hazard_pointer, pointer>;
+	using hazard_const_pointer_w_mark = hazard_pointer_w_mark_impl<hazard_const_pointer, const_pointer>;
 
 	constexpr hazard_ptr_w_mark_handler( void ) noexcept
 	  : a_target_addr_( static_cast<addr_markable>( 0U ) )
@@ -797,7 +807,10 @@ public:
 		return load( order ).mark_;
 	}
 
-	bool verify_exchange( hazard_pointer_w_mark& hp_w_mark ) noexcept
+	template <typename HAZARD_PTR_T,
+	          typename std::enable_if<std::is_same<HAZARD_PTR_T, hazard_pointer_w_mark>::value ||
+	                                  std::is_same<HAZARD_PTR_T, hazard_const_pointer_w_mark>::value>::type* = nullptr>
+	bool verify_exchange( HAZARD_PTR_T& hp_w_mark ) const noexcept
 	{
 		addr_markable addr_desired = zip_tuple_to_addr_markable( hp_w_mark );
 		addr_markable addr_expect  = a_target_addr_.load( std::memory_order_acquire );
@@ -809,13 +822,21 @@ public:
 		return ret;
 	}
 
-	hazard_pointer_w_mark get_to_verify_exchange( void ) const noexcept
+	template <typename HAZARD_PTR_T = hazard_pointer_w_mark,
+	          typename PTR_T        = typename std::conditional<std::is_same<HAZARD_PTR_T, hazard_pointer_w_mark>::value, pointer_w_mark, const_pointer_w_mark>::type>
+	HAZARD_PTR_T get_to_verify_exchange( void ) const noexcept
 	{
 		addr_markable addr_expect = a_target_addr_.load( std::memory_order_acquire );
-		return hazard_pointer_w_mark { unzip_addr_markable_to_tuple( addr_expect ) };
+		return HAZARD_PTR_T { unzip_addr_markable_to_tuple<PTR_T>( addr_expect ) };
 	}
 
 	void reuse_to_verify_exchange( hazard_pointer_w_mark& hp_w_mark_reuse ) const noexcept
+	{
+		addr_markable addr_expect = a_target_addr_.load( std::memory_order_acquire );
+		hp_w_mark_reuse           = unzip_addr_markable_to_tuple( addr_expect );
+		return;
+	}
+	void reuse_to_verify_exchange( hazard_const_pointer_w_mark& hp_w_mark_reuse ) const noexcept
 	{
 		addr_markable addr_expect = a_target_addr_.load( std::memory_order_acquire );
 		hp_w_mark_reuse           = unzip_addr_markable_to_tuple( addr_expect );
@@ -955,6 +976,30 @@ private:
 		} */
 		return ans;
 	}
+	static constexpr addr_markable zip_tuple_to_addr_markable( const_pointer_w_mark& tp )
+	{
+		// reinterpret_castはconstexprの中では使えない。
+		addr_markable ans = reinterpret_cast<addr_markable>( tp.p_ );
+		if ( tp.mark_ ) {
+			ans |= static_cast<addr_markable>( 1U );
+		} /*
+		else {
+		    ans &= ~(static_cast<addr_markable>(1U));
+		} */
+		return ans;
+	}
+	static constexpr addr_markable zip_tuple_to_addr_markable( hazard_const_pointer_w_mark& tp )
+	{
+		// reinterpret_castはconstexprの中では使えない。
+		addr_markable ans = reinterpret_cast<addr_markable>( tp.hp_.get() );
+		if ( tp.mark_ ) {
+			ans |= static_cast<addr_markable>( 1U );
+		} /*
+		else {
+		    ans &= ~(static_cast<addr_markable>(1U));
+		} */
+		return ans;
+	}
 	static constexpr addr_markable zip_tuple_to_addr_markable( pointer p, bool mark )
 	{
 		// reinterpret_castはconstexprの中では使えない。
@@ -967,12 +1012,14 @@ private:
 		} */
 		return ans;
 	}
-	static constexpr pointer_w_mark unzip_addr_markable_to_tuple( addr_markable addr )
+
+	template <typename TUPLE_T = pointer_w_mark>
+	static constexpr TUPLE_T unzip_addr_markable_to_tuple( addr_markable addr ) noexcept
 	{
 		// reinterpret_castはconstexprの中では使えない。
 		pointer p_ans = reinterpret_cast<pointer>( addr & ( ~( static_cast<addr_markable>( 1U ) ) ) );
 		bool    b_ans = ( ( addr & static_cast<addr_markable>( 1U ) ) == 0 ) ? false : true;
-		return pointer_w_mark { b_ans, p_ans };
+		return TUPLE_T { b_ans, p_ans };
 	}
 
 	static constexpr bool is_marked( addr_markable tut ) noexcept

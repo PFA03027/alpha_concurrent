@@ -128,7 +128,7 @@ public:
 		} else {
 			raw_list tmp_odn_list_( std::move( tl_odn_list_still_in_hazard.move_to() ) );
 
-			hazard_ptr_mgr::ScanHazardPtrs( [&tmp_odn_list_, &tl_odn_list_still_in_hazard]( void* p_in_hazard ) {
+			hazard_ptr_mgr::ScanHazardPtrs( [&tmp_odn_list_, &tl_odn_list_still_in_hazard]( const void* p_in_hazard ) {
 				auto tt_n_list = tmp_odn_list_.split_if( [p_in_hazard]( auto p_cur_node ) -> bool {
 					// cur_nodeの型は、od_node_simple_linkへの参照型で渡される。
 					// cur_nodeの本来の型は、od_node_poolが保持する型node_typeである。
@@ -174,7 +174,7 @@ public:
 		raw_list         tmp_odn_list                = std::move( tl_odn_list_still_in_hazard.move_to() );
 
 		if ( !tmp_odn_list.is_empty() ) {
-			hazard_ptr_mgr::ScanHazardPtrs( [&tmp_odn_list, &tl_odn_list_still_in_hazard]( void* p_in_hazard ) {
+			hazard_ptr_mgr::ScanHazardPtrs( [&tmp_odn_list, &tl_odn_list_still_in_hazard]( const void* p_in_hazard ) {
 				auto tt_n_list = tmp_odn_list.split_if( [p_in_hazard]( auto p_cur_node ) -> bool {
 					return p_in_hazard == static_cast<const_node_pointer>( p_cur_node )->get_pointer_of_hazard_check();   // pointerが同じならtrueを返す。
 				} );

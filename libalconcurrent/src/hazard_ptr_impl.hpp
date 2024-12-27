@@ -349,7 +349,7 @@ private:
 class alignas( atomic_variable_align ) hazard_ptr_group {
 public:
 	static constexpr size_t kArraySize = 7;
-	using hzrd_p_array_t               = std::array<std::atomic<void*>, kArraySize>;   // std::atomic<void*>をクラスでラップしてアライメントを調整した場合でも、処理負荷は変わらなかった。
+	using hzrd_p_array_t               = std::array<std::atomic<const void*>, kArraySize>;   // std::atomic<void*>をクラスでラップしてアライメントを調整した場合でも、処理負荷は変わらなかった。
 	using reference                    = hzrd_p_array_t::reference;
 	using const_reference              = hzrd_p_array_t::const_reference;
 	using iterator                     = hzrd_p_array_t::iterator;
@@ -397,7 +397,7 @@ public:
 	 * Then the algorithm that uses hazard pointer do the unexpected behaviour.
 	 * This unexpected behaviour impacts all hazard pointer user.
 	 */
-	hzrd_slot_ownership_t try_assign( void* p );
+	hzrd_slot_ownership_t try_assign( const void* p );
 
 	/**
 	 * @brief try to get ownership
@@ -414,7 +414,7 @@ public:
 	void force_clear( void ) noexcept;
 
 	bool check_pointer_is_hazard_pointer( void* p ) noexcept;
-	void scan_hazard_pointers( std::function<void( void* )>& pred );
+	void scan_hazard_pointers( std::function<void( const void* )>& pred );
 
 	del_markable_pointer::writer_accesser get_valid_chain_next_writer_accesser( void )
 	{
@@ -531,7 +531,7 @@ public:
 	 * @retval nullptr fail to assign or p is nullptr
 	 * @retval non-nullptr success to assign
 	 */
-	hzrd_slot_ownership_t slot_assign( void* p );
+	hzrd_slot_ownership_t slot_assign( const void* p );
 
 private:
 	hazard_ptr_group::ownership_t ownership_ticket_;
@@ -576,7 +576,7 @@ public:
 	 * @return true p is still listed in hazard pointer list
 	 * @return false p is not hazard pointer
 	 */
-	void scan_hazard_pointers( std::function<void( void* )>& pred );
+	void scan_hazard_pointers( std::function<void( const void* )>& pred );
 
 	/**
 	 * @brief remove all hazard_ptr_group

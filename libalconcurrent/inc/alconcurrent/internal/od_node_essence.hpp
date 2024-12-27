@@ -165,10 +165,11 @@ private:
  */
 class alignas( atomic_variable_align ) od_node_1bit_markable_link_by_hazard_handler {
 public:
-	using hazard_ptr_handler_t  = hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>;
-	using hazard_pointer        = typename hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>::hazard_pointer;
-	using hazard_pointer_w_mark = typename hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>::hazard_pointer_w_mark;
-	using pointer_w_mark        = typename hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>::pointer_w_mark;
+	using hazard_ptr_handler_t        = hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>;
+	using hazard_pointer              = typename hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>::hazard_pointer;
+	using hazard_pointer_w_mark       = typename hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>::hazard_pointer_w_mark;
+	using hazard_const_pointer_w_mark = typename hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>::hazard_const_pointer_w_mark;
+	using pointer_w_mark              = typename hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>::pointer_w_mark;
 
 	explicit constexpr od_node_1bit_markable_link_by_hazard_handler( od_node_1bit_markable_link_by_hazard_handler* p_next_arg = nullptr ) noexcept
 	  : hph_next_( p_next_arg )
