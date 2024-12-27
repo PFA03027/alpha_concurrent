@@ -16,6 +16,8 @@
 #include <version>
 #endif
 
+#include <type_traits>
+
 // configuration for constinit
 #if __cpp_constinit >= 201907L
 #define ALCC_INTERNAL_CONSTINIT constinit

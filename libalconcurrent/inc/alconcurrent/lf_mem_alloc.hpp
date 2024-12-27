@@ -14,6 +14,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "internal/cpp_std_configure.hpp"
+
 namespace alpha {
 namespace concurrent {
 
@@ -23,13 +25,12 @@ namespace concurrent {
  * This I/F allocates a memory from a global general_mem_allocator instance. @n
  * The allocated memory must free by gmem_deallocate().
  *
- * @note
- * This uses default_param_array and num_of_default_param_array as initial allocation parameter
+ * @return pointer to allocated memory. If failed to allocate, return nullptr.
  *
  * @exception
  * If req_align is not power of 2, throw std::logic_error.
  */
-void* gmem_allocate(
+ALCC_INTERNAL_NODISCARD_ATTR void* gmem_allocate(
 	size_t n,                                //!< [in] memory size to allocate
 	size_t req_align = sizeof( uintptr_t )   //!< [in] requested align size. req_align should be the power of 2
 );

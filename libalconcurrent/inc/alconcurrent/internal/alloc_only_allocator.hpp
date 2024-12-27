@@ -21,6 +21,7 @@
 #include <type_traits>
 
 #include "alconcurrent/conf_logger.hpp"
+#include "alconcurrent/internal/cpp_std_configure.hpp"
 
 namespace alpha {
 namespace concurrent {
