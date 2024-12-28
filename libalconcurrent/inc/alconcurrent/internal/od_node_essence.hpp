@@ -108,7 +108,7 @@ private:
  * @brief node of one direction linked by hazard handler
  *
  */
-class /*alignas( atomic_variable_align )*/ od_node_link_by_hazard_handler {
+class alignas( atomic_variable_align ) od_node_link_by_hazard_handler {
 public:
 	using hazard_ptr_handler_t = hazard_ptr_handler<od_node_link_by_hazard_handler>;
 	using hazard_pointer       = typename hazard_ptr_handler<od_node_link_by_hazard_handler>::hazard_pointer;
@@ -161,7 +161,7 @@ private:
  * @brief node of one direction linked by hazard handler that is markable
  *
  */
-class /* alignas( atomic_variable_align ) */ od_node_1bit_markable_link_by_hazard_handler {
+class alignas( atomic_variable_align ) od_node_1bit_markable_link_by_hazard_handler {
 public:
 	using hazard_ptr_handler_t        = hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>;
 	using hazard_pointer              = typename hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>::hazard_pointer;
