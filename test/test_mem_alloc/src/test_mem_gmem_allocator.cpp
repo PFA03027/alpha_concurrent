@@ -72,6 +72,21 @@ TEST( Test_GMemAllocator, Deallocated_DoDeallocateWithSamePtr_Then_ReturnFalse )
 	// Cleanup
 }
 
+TEST( Test_GMemAllocator, CanAllocateWithZeroSize )
+{
+	// Arrange
+
+	// Act
+	auto p_ret = alpha::concurrent::gmem_allocate( 0 );
+
+	// Assert
+	EXPECT_NE( p_ret, nullptr );
+	bool ret = alpha::concurrent::gmem_deallocate( p_ret );
+	EXPECT_TRUE( ret );
+
+	// Cleanup
+}
+
 TEST( Test_GMemAllocator, CanAllocateWithBigSize )
 {
 	// Arrange
