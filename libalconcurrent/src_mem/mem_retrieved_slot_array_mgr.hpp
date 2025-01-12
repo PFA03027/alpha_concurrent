@@ -259,7 +259,7 @@ template <typename SLOT_T>
 struct retrieved_slots_stack_array_mgr {
 	using slot_pointer = SLOT_T*;
 
-	static constexpr size_t max_entry_ = 16;
+	static constexpr size_t max_entry_ = 128;
 
 	static void         retrieve( size_t idx, slot_pointer p ) noexcept;
 	static slot_pointer request_reuse( size_t idx ) noexcept;
