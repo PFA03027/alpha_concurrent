@@ -26,8 +26,9 @@
 using tut = alpha::concurrent::fifo_list<void*>;
 
 struct allocator_if {
-	virtual void* allocate( size_t size ) = 0;
-	virtual void  deallocate( void* p )   = 0;
+	virtual void*       allocate( size_t size ) = 0;
+	virtual void        deallocate( void* p )   = 0;
+	virtual const char* name( void )            = 0;
 };
 
 struct allocator_gmem : public allocator_if {
@@ -40,6 +41,11 @@ struct allocator_gmem : public allocator_if {
 	{
 		alpha::concurrent::gmem_deallocate( p );
 	}
+
+	const char* name( void ) override
+	{
+		return "gmem";
+	}
 };
 
 struct allocator_malloc : public allocator_if {
@@ -51,6 +57,11 @@ struct allocator_malloc : public allocator_if {
 	void deallocate( void* p ) override
 	{
 		free( p );
+	}
+
+	const char* name( void ) override
+	{
+		return "malloc";
 	}
 };
 
@@ -110,7 +121,10 @@ public:
 			if ( num == 0 ) {
 				return alpha::concurrent::alcc_nullopt;
 			}
-			pop_memory_from_fifo( *p_fifo, *p_allocator, num );
+			bool pop_ret = pop_memory_from_fifo( *p_fifo, *p_allocator, num );
+			if ( !pop_ret ) {
+				throw std::runtime_error( "fail to pop" );
+			}
 			total_num += num;
 		}
 
@@ -156,7 +170,8 @@ TEST_P( Test_MemGmemHighLoadParam, test_mem_gmem_high_load )
 	// Assert
 	size_t total_num = 0;
 	for ( size_t i = 0; i < num_thread; i++ ) {
-		alpha::concurrent::alcc_optional<size_t> result = results[i].get();
+		alpha::concurrent::alcc_optional<size_t> result;
+		ASSERT_NO_THROW( result = results[i].get() );
 		EXPECT_TRUE( result.has_value() );
 		if ( result.has_value() ) {
 			// printf( "total_num = %zu\n", result.value() );
@@ -164,25 +179,28 @@ TEST_P( Test_MemGmemHighLoadParam, test_mem_gmem_high_load )
 		}
 	}
 
-	printf( "(%zu,%zu) sum of total_num = %zu\n", test_pattern.first, test_pattern.second, total_num );
+	printf( "(%zu,%zu, %s)\tsum of total_num = %zu\n", test_pattern.first, test_pattern.second, p_allocator_obj->name(), total_num );
 }
+
+allocator_gmem   test_gmem_allocator;
+allocator_malloc test_malloc_allocator;
 
 INSTANTIATE_TEST_SUITE_P(
 	allocation_size_variation,
 	Test_MemGmemHighLoadParam,
 	testing::Values(
-		std::tuple<size_t, size_t, allocator_if*> { 0, 511, new allocator_gmem },
-		std::tuple<size_t, size_t, allocator_if*> { 0, 511, new allocator_malloc },
-		std::tuple<size_t, size_t, allocator_if*> { 512, 1024 * 128 - 1, new allocator_gmem },
-		std::tuple<size_t, size_t, allocator_if*> { 512, 1024 * 128 - 1, new allocator_malloc },
-		std::tuple<size_t, size_t, allocator_if*> { 1024 * 129, 1024 * 1024 * 5, new allocator_gmem },
-		std::tuple<size_t, size_t, allocator_if*> { 1024 * 129, 1024 * 1024 * 5, new allocator_malloc },
-		std::tuple<size_t, size_t, allocator_if*> { 0, 1024 * 16, new allocator_gmem },
-		std::tuple<size_t, size_t, allocator_if*> { 0, 1024 * 16, new allocator_malloc },
-		std::tuple<size_t, size_t, allocator_if*> { 0, 1024 * 127, new allocator_gmem },
-		std::tuple<size_t, size_t, allocator_if*> { 0, 1024 * 127, new allocator_malloc },
-		std::tuple<size_t, size_t, allocator_if*> { 0, 1024 * 1024 * 5, new allocator_gmem },
-		std::tuple<size_t, size_t, allocator_if*> { 0, 1024 * 1024 * 5, new allocator_malloc }
+		std::tuple<size_t, size_t, allocator_if*> { 0, 512, &test_gmem_allocator },
+		std::tuple<size_t, size_t, allocator_if*> { 0, 512, &test_malloc_allocator },
+		std::tuple<size_t, size_t, allocator_if*> { 512 + 1, 1024 * 128 - 1, &test_gmem_allocator },
+		std::tuple<size_t, size_t, allocator_if*> { 512 + 1, 1024 * 128 - 1, &test_malloc_allocator },
+		std::tuple<size_t, size_t, allocator_if*> { 1024 * 129, 1024 * 1024 * 5, &test_gmem_allocator },
+		std::tuple<size_t, size_t, allocator_if*> { 1024 * 129, 1024 * 1024 * 5, &test_malloc_allocator },
+		std::tuple<size_t, size_t, allocator_if*> { 0, 1024 * 16, &test_gmem_allocator },
+		std::tuple<size_t, size_t, allocator_if*> { 0, 1024 * 16, &test_malloc_allocator },
+		std::tuple<size_t, size_t, allocator_if*> { 0, 1024 * 127, &test_gmem_allocator },
+		std::tuple<size_t, size_t, allocator_if*> { 0, 1024 * 127, &test_malloc_allocator },
+		std::tuple<size_t, size_t, allocator_if*> { 0, 1024 * 1024 * 5, &test_gmem_allocator },
+		std::tuple<size_t, size_t, allocator_if*> { 0, 1024 * 1024 * 5, &test_malloc_allocator }
 		//
 		) );
 

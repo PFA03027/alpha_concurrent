@@ -11,7 +11,7 @@ LIB_FILES :=  ../../build/libalconcurrent/libalconcurrent.a ../../build/lib/libg
 LIBS += -L../../build/libalconcurrent -L../../build/lib
 LIBS += -lalconcurrent -lpthread -lgtest -lgtest_main
 
-TARGET =	test_mem_alloc2.exe
+TARGET =	test_mem_alloc.exe
 
 -include $(DEPS)
 
