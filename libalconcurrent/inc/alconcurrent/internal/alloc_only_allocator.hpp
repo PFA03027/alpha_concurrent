@@ -21,6 +21,7 @@
 #include <type_traits>
 
 #include "alconcurrent/conf_logger.hpp"
+#include "alconcurrent/internal/cpp_std_configure.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -31,32 +32,6 @@ namespace internal {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 // internal I/F
 constexpr size_t default_align_size = 32;   // default_align_size should be power of 2
-
-/**
- * @brief is power of 2 ?
- *
- * @param v
- * @return true
- * @return false
- */
-template <typename T>
-constexpr bool is_power_of_2( T v )
-{
-	static_assert( std::is_integral<T>::value, "T should be integral type" );
-#if ( __cpp_constexpr >= 201304 )
-	// 2のn乗かどうかを判定する。
-	if ( v < 1 ) return false;
-	if ( v == 1 ) return true;   // 2のゼロ乗と考えてtrueを返す。
-
-	// step1: 最も下位に1が立っているビットのみ残した値を抽出する
-	T v2 = -v & v;
-	// step2: 2のn乗の数値は、ビットが1つだけ立っている。よって、2のn乗の数値は最も下位のビットが1つだけ。よって、v2はvと同じになる。
-	bool ans = ( v == v2 );
-	return ans;
-#else
-	return ( ( v == ( -v & v ) ) && ( v >= 2 ) ) || ( v == 1 );
-#endif
-}
 
 class alloc_chamber;
 

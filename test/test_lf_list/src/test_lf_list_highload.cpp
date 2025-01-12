@@ -8,6 +8,7 @@
 
 #include <pthread.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <future>
@@ -19,7 +20,6 @@
 
 #include "alconcurrent/lf_list.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
-#include "alconcurrent/lf_mem_alloc_type.hpp"
 
 constexpr unsigned int   num_thread = 12;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 2000;
@@ -30,7 +30,6 @@ class lflistHighLoadTest : public ::testing::Test {
 protected:
 	virtual void SetUp()
 	{
-		alpha::concurrent::gmem_prune();
 	}
 
 	virtual void TearDown()
@@ -52,7 +51,7 @@ typename test_list::value_type func_test_list_front2front( test_list* p_test_obj
 		auto ret = p_test_obj->pop_front();
 		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_list_front2front()!!!  %s\n", std::to_string( v ).c_str() );
-			printf( "list size count: %zu\n", p_test_obj->get_size() );
+			printf( "list size count: %zu\n", p_test_obj->count_size() );
 			break;
 		}
 		v = ret.value() + 1;
@@ -74,7 +73,7 @@ typename test_list::value_type func_test_list_back2back( test_list* p_test_obj, 
 		auto ret = p_test_obj->pop_back();
 		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_list_back2back()!!!  %s\n", std::to_string( v ).c_str() );
-			printf( "list size count: %zu\n", p_test_obj->get_size() );
+			printf( "list size count: %zu\n", p_test_obj->count_size() );
 			break;
 		}
 		v = ret.value() + 1;
@@ -97,7 +96,7 @@ typename test_list::value_type func_test_list_front2back( test_list* p_test_obj,
 		auto ret = p_test_obj->pop_back();
 		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_list_front2back()!!!  %s\n", std::to_string( v ).c_str() );
-			printf( "list size count: %zu\n", p_test_obj->get_size() );
+			printf( "list size count: %zu\n", p_test_obj->count_size() );
 			break;
 		}
 		v = ret.value() + 1;
@@ -119,7 +118,7 @@ typename test_list::value_type func_test_list_back2front( test_list* p_test_obj,
 		auto ret = p_test_obj->pop_front();
 		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_list_back2front() by pop_front!!!  %s\n", std::to_string( v ).c_str() );
-			printf( "list size count: %zu\n", p_test_obj->get_size() );
+			printf( "list size count: %zu\n", p_test_obj->count_size() );
 			break;
 		}
 
@@ -141,12 +140,12 @@ typename test_list::value_type func_test_list_pop_front( test_list* p_test_obj, 
 		auto ret = p_test_obj->pop_front();
 		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_list_pop_front() by pop_back!!!  %s\n", std::to_string( v ).c_str() );
-			printf( "list size count: %zu\n", p_test_obj->get_size() );
+			printf( "list size count: %zu\n", p_test_obj->count_size() );
 			break;
 		}
 		if ( ( ret.value() <= 0 ) || ( ret.value() > ( num_thread * loop_num ) ) ) {
 			printf( "Bugggggggyyyy read by func_test_list_pop_front()!!!  %s\n", std::to_string( ret.value() ).c_str() );
-			printf( "list size count: %zu\n", p_test_obj->get_size() );
+			printf( "list size count: %zu\n", p_test_obj->count_size() );
 			break;
 		}
 
@@ -168,12 +167,12 @@ typename test_list::value_type func_test_list_pop_back( test_list* p_test_obj, p
 		auto ret = p_test_obj->pop_back();
 		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  func_test_list_pop_back() by pop_back!!!  %s\n", std::to_string( v ).c_str() );
-			printf( "list size count: %zu\n", p_test_obj->get_size() );
+			printf( "list size count: %zu\n", p_test_obj->count_size() );
 			break;
 		}
 		if ( ( ret.value() <= 0 ) || ( ret.value() > ( num_thread * loop_num ) ) ) {
 			printf( "Bugggggggyyyy read by func_test_list_pop_back()!!!  %s\n", std::to_string( ret.value() ).c_str() );
-			printf( "list size count: %zu\n", p_test_obj->get_size() );
+			printf( "list size count: %zu\n", p_test_obj->count_size() );
 			break;
 		}
 
@@ -264,9 +263,9 @@ TEST_F( lflistHighLoadTest, TC0_1_ManyElements_DoPopBack_Then_Empty )
 	// に等しくなるはず。
 	EXPECT_EQ( expect, sum ) << "Expect: " << std::to_string( expect ) << std::endl
 							 << "Sum:    " << sum << std::endl;
-	EXPECT_EQ( count_list.get_size(), 0 );
+	EXPECT_EQ( count_list.count_size(), 0 );
 
-	if ( count_list.get_size() > 0 ) {
+	if ( count_list.count_size() > 0 ) {
 		auto ret = count_list.pop_back();
 		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
@@ -323,9 +322,9 @@ TEST_F( lflistHighLoadTest, TC0_2_ManyElements_DoPopFront_Then_Empty )
 	// に等しくなるはず。
 	EXPECT_EQ( expect, sum ) << "Expect: " << std::to_string( expect ) << std::endl
 							 << "Sum:    " << sum << std::endl;
-	EXPECT_EQ( count_list.get_size(), 0 );
+	EXPECT_EQ( count_list.count_size(), 0 );
 
-	if ( count_list.get_size() > 0 ) {
+	if ( count_list.count_size() > 0 ) {
 		auto ret = count_list.pop_back();
 		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
@@ -377,7 +376,7 @@ TEST_F( lflistHighLoadTest, TC0_3_Empty_DoPushFront_Then_ManyElements )
 		auto ret = count_list.pop_front();
 		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  TC0_2_Empty_DoPushFront_Then_ManyElements() by pop_back!!!  %s\n", std::to_string( i ).c_str() );
-			printf( "list size count: %zu\n", count_list.get_size() );
+			printf( "list size count: %zu\n", count_list.count_size() );
 			break;
 		}
 		sum += ret.value();
@@ -395,9 +394,9 @@ TEST_F( lflistHighLoadTest, TC0_3_Empty_DoPushFront_Then_ManyElements )
 
 	EXPECT_EQ( expect, sum ) << "Expect: " << std::to_string( expect ) << std::endl
 							 << "Sum:    " << sum << std::endl;
-	EXPECT_EQ( count_list.get_size(), 0 );
+	EXPECT_EQ( count_list.count_size(), 0 );
 
-	if ( count_list.get_size() > 0 ) {
+	if ( count_list.count_size() > 0 ) {
 		auto ret = count_list.pop_back();
 		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
@@ -442,7 +441,7 @@ TEST_F( lflistHighLoadTest, TC0_4_Empty_DoPushBack_Then_ManyElements )
 		auto ret = count_list.pop_front();
 		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  TC0_2_Empty_DoPushFront_Then_ManyElements() by pop_back!!!  %s\n", std::to_string( i ).c_str() );
-			printf( "list size count: %zu\n", count_list.get_size() );
+			printf( "list size count: %zu\n", count_list.count_size() );
 			break;
 		}
 		sum += ret.value();
@@ -459,9 +458,9 @@ TEST_F( lflistHighLoadTest, TC0_4_Empty_DoPushBack_Then_ManyElements )
 	// に等しくなるはず。
 	EXPECT_EQ( expect, sum ) << "Expect: " << std::to_string( expect ) << std::endl
 							 << "Sum:    " << sum << std::endl;
-	EXPECT_EQ( count_list.get_size(), 0 );
+	EXPECT_EQ( count_list.count_size(), 0 );
 
-	if ( count_list.get_size() > 0 ) {
+	if ( count_list.count_size() > 0 ) {
 		auto ret = count_list.pop_back();
 		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
@@ -512,9 +511,9 @@ TEST_F( lflistHighLoadTest, TC1_1_Empty_DoManyPushFrontPopFront_Then_Empty )
 	// に等しくなるはず。
 	EXPECT_EQ( tmp_num_thread * loop_num, sum ) << "Expect: " << std::to_string( tmp_num_thread * loop_num ) << std::endl
 												<< "Sum:    " << sum << std::endl;
-	EXPECT_EQ( count_list.get_size(), 0 );
+	EXPECT_EQ( count_list.count_size(), 0 );
 
-	if ( count_list.get_size() > 0 ) {
+	if ( count_list.count_size() > 0 ) {
 		auto ret = count_list.pop_back();
 		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
@@ -565,9 +564,9 @@ TEST_F( lflistHighLoadTest, TC1_2_Empty_DoManyPushBackPopBack_Then_Empty )
 	// に等しくなるはず。
 	EXPECT_EQ( tmp_num_thread * loop_num, sum ) << "Expect: " << std::to_string( tmp_num_thread * loop_num ) << std::endl
 												<< "Sum:    " << sum << std::endl;
-	EXPECT_EQ( count_list.get_size(), 0 );
+	EXPECT_EQ( count_list.count_size(), 0 );
 
-	if ( count_list.get_size() > 0 ) {
+	if ( count_list.count_size() > 0 ) {
 		auto ret = count_list.pop_back();
 		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
@@ -618,9 +617,9 @@ TEST_F( lflistHighLoadTest, TC1_3_Empty_DoManyPushFrontPopBack_Then_Empty )
 
 	EXPECT_EQ( tmp_num_thread * loop_num, sum ) << "Expect: " << std::to_string( tmp_num_thread * loop_num ) << std::endl
 												<< "Sum:    " << sum << std::endl;
-	EXPECT_EQ( count_list.get_size(), 0 );
+	EXPECT_EQ( count_list.count_size(), 0 );
 
-	if ( count_list.get_size() > 0 ) {
+	if ( count_list.count_size() > 0 ) {
 		auto ret = count_list.pop_back();
 		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
@@ -668,7 +667,7 @@ TEST_F( lflistHighLoadTest, TC1_4_Empty_DoManyPushBackPopFront_Then_Empty )
 	// に等しくなるはず。
 	EXPECT_EQ( tmp_num_thread * loop_num, sum ) << "Expect: " << std::to_string( tmp_num_thread * loop_num ) << std::endl
 												<< "Sum:    " << sum << std::endl;
-	EXPECT_EQ( count_list.get_size(), 0 );
+	EXPECT_EQ( count_list.count_size(), 0 );
 
 	return;
 }
@@ -728,9 +727,9 @@ TEST_F( lflistHighLoadTest, TC1_5_Empty_DoManyCrossPushPopFrontPushPopBack_Then_
 	// に等しくなるはず。
 	EXPECT_EQ( tmp_num_thread * 2 * loop_num, sum ) << "Expect: " << std::to_string( tmp_num_thread * 2 * loop_num ) << std::endl
 													<< "Sum:    " << sum << std::endl;
-	EXPECT_EQ( count_list.get_size(), 0 );
+	EXPECT_EQ( count_list.count_size(), 0 );
 
-	if ( count_list.get_size() > 0 ) {
+	if ( count_list.count_size() > 0 ) {
 		auto ret = count_list.pop_back();
 		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
@@ -793,9 +792,9 @@ TEST_F( lflistHighLoadTest, TC1_6_Empty_DoManyCrossPushFrontBackPopFrontBack_The
 	// に等しくなるはず。
 	EXPECT_EQ( tmp_num_thread * 2 * loop_num, sum ) << "Expect: " << std::to_string( tmp_num_thread * 2 * loop_num ) << std::endl
 													<< "Sum:    " << sum << std::endl;
-	EXPECT_EQ( count_list.get_size(), 0 );
+	EXPECT_EQ( count_list.count_size(), 0 );
 
-	if ( count_list.get_size() > 0 ) {
+	if ( count_list.count_size() > 0 ) {
 		auto ret = count_list.pop_back();
 		std::cout << "remained value:    " << ret.value() << std::endl;
 	}
@@ -861,13 +860,13 @@ std::pair<typename test_list::value_type, typename test_list::value_type> func_t
 
 			if ( !pop_flag ) {
 				printf( "Bugggggggyyyy  func_test_list_insert_remove()!!! fail to remove %s\n", std::to_string( v ).c_str() );
-				printf( "list size count: %zu\n", p_test_obj->get_size() );
+				printf( "list size count: %zu\n", p_test_obj->count_size() );
 				is_success = false;
 				break;
 			}
 			if ( ( vv <= 0 ) || ( vv > num_of_values ) ) {
 				printf( "Bugggggggyyyy  func_test_list_insert_remove() value is out-of-range!!!  %s\n", std::to_string( vv ).c_str() );
-				printf( "list size count: %zu\n", p_test_obj->get_size() );
+				printf( "list size count: %zu\n", p_test_obj->count_size() );
 				is_success = false;
 				break;
 			}
@@ -930,7 +929,7 @@ TEST_F( lflistHighLoadTest, TC2_Empty_DoManyInsertRemove_Then_Empty )
 	// に等しくなるはず。
 	EXPECT_EQ( expect, sum ) << "Expect: " << std::to_string( expect ) << std::endl
 							 << "Sum:    " << sum << std::endl;
-	EXPECT_EQ( count_list.get_size(), 0 ) << "nodes:              " << count_list.get_size() << std::endl;
+	EXPECT_EQ( count_list.count_size(), 0 ) << "nodes:              " << count_list.count_size() << std::endl;
 
 	return;
 }
@@ -1050,7 +1049,7 @@ TEST_F( lflistHighLoadTest, TC3_Empty_DoPushRemoveAllIf_Then_Empty )
 	// に等しくなるはず。
 	EXPECT_EQ( tmp_num_thread * 2 * loop_num, sum ) << "Expect: " << std::to_string( tmp_num_thread * 2 * loop_num ) << std::endl
 													<< "Sum:    " << sum << std::endl;
-	EXPECT_EQ( count_list.get_size(), 0 ) << "nodes:              " << count_list.get_size() << std::endl;
+	EXPECT_EQ( count_list.count_size(), 0 ) << "nodes:              " << count_list.count_size() << std::endl;
 
 	return;
 }

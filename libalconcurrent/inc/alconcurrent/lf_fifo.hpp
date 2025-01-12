@@ -143,6 +143,11 @@ public:
 		return alcc_optional<value_type> { popped_value_storage };
 	}
 
+	size_t count_size( void ) const
+	{
+		return lf_fifo_impl_.count_size();
+	}
+
 	bool is_empty( void ) const
 	{
 		return lf_fifo_impl_.is_empty();
@@ -238,6 +243,11 @@ private:
 			od_lockfree_fifo::node_pointer p_node = od_lockfree_fifo::release_sentinel_node();
 			if ( p_node == nullptr ) return nullptr;
 			return static_cast<x_lockfree_fifo::node_pointer>( p_node );
+		}
+
+		size_t count_size( void ) const
+		{
+			return od_lockfree_fifo::count_size();
 		}
 
 		bool is_empty( void ) const

@@ -66,6 +66,8 @@ public:
 	 */
 	ALCC_INTERNAL_NODISCARD_ATTR node_pointer pop_front( void ) noexcept;
 
+	size_t count_size( void ) const;
+
 	bool is_empty( void ) const;
 
 	size_t profile_info_count( void ) const;

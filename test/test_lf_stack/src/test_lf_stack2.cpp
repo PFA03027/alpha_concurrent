@@ -20,7 +20,6 @@
 
 #include "gtest/gtest.h"
 
-#include "alconcurrent/lf_mem_alloc_type.hpp"
 #include "alconcurrent/lf_stack.hpp"
 
 #include "test_type_variation.hpp"

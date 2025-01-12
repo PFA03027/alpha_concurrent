@@ -82,8 +82,8 @@ od_lockfree_list::~od_lockfree_list()
 }
 
 std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::find_if_impl(
-	od_lockfree_list::find_predicate_t pred,             //!< [in]	引数には、const node_pointerが渡される
-	od_lockfree_list::node_pointer     p_sentinel_node   //!< [in] 終端として判定するノード
+	find_predicate_t& pred,             //!< [in]	引数には、const node_pointerが渡される
+	node_pointer      p_sentinel_node   //!< [in] 終端として判定するノード
 )
 {
 	hazard_pointer_w_mark hp_prev_node_w_m;
@@ -136,36 +136,122 @@ std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_poin
 	}
 }
 
+std::pair<od_lockfree_list::hazard_const_pointer_w_mark, od_lockfree_list::hazard_const_pointer_w_mark> od_lockfree_list::find_if_impl(
+	find_predicate_t&  pred,             //!< [in]	引数には、const node_pointerが渡される
+	const_node_pointer p_sentinel_node   //!< [in] 終端として判定するノード
+) const
+{
+	hazard_const_pointer_w_mark hp_prev_node_w_m;
+	hazard_const_pointer_w_mark hp_curr_node_w_m;
+	hazard_const_pointer_w_mark hp_next_node_w_m;
+	while ( true ) {   // 先頭からやり直すためのループ
+		hp_prev_node_w_m.mark_ = false;
+		hp_prev_node_w_m.hp_.store( &head_ );
+		head_.hazard_handler_of_next().reuse_to_verify_exchange( hp_curr_node_w_m );
+		if ( !head_.hazard_handler_of_next().verify_exchange( hp_curr_node_w_m ) ) {
+			continue;
+		}
+		while ( true ) {   // リストをたどるループ
+			if ( hp_curr_node_w_m.hp_ == p_sentinel_node ) {
+				// listが空なので、処理終了。
+				return std::pair<od_lockfree_list::hazard_const_pointer_w_mark, od_lockfree_list::hazard_const_pointer_w_mark> { std::move( hp_prev_node_w_m ), std::move( hp_curr_node_w_m ) };
+			}
+			hp_curr_node_w_m.hp_->hazard_handler_of_next().reuse_to_verify_exchange( hp_next_node_w_m );
+			if ( !hp_curr_node_w_m.hp_->hazard_handler_of_next().verify_exchange( hp_next_node_w_m ) ) {
+				continue;
+			}
+
+			if ( hp_next_node_w_m.hp_ == nullptr ) {
+				// 繋ぎ変え処理と衝突し、currが他のインスタンスのsentinelに到達した。また、検索処理自体は終了したため、処理完了とする。
+				// ただし、戻り値のハザードポインタは、currは使用しない。
+				return std::pair<od_lockfree_list::hazard_const_pointer_w_mark, od_lockfree_list::hazard_const_pointer_w_mark> { std::move( hp_prev_node_w_m ), od_lockfree_list::hazard_const_pointer_w_mark( p_sentinel_node ) };
+			}
+
+			// currノードの削除マークを確認する。なお、currノードの削除マークは、hp_next_node_w_mに入っている。
+			// 削除マークがついている場合でも、削除処理は行わない。これは、このメンバ関数がconstメンバ関数であるためである。
+			if ( !hp_next_node_w_m.mark_ ) {
+				if ( pred( hp_curr_node_w_m.hp_.get() ) ) {
+					// 検査中に削除マークがつく可能性があるため、検査が真であることに加えて、検査後も削除マークがついていなければ、検索成功とする。
+					if ( !hp_curr_node_w_m.hp_->is_marked() ) {
+						return std::pair<od_lockfree_list::hazard_const_pointer_w_mark, od_lockfree_list::hazard_const_pointer_w_mark> { std::move( hp_prev_node_w_m ), std::move( hp_curr_node_w_m ) };
+					}
+				}
+			}
+
+			// currが該当ではないので、次のノードに進める。
+			hp_prev_node_w_m.swap( hp_curr_node_w_m );
+			hp_curr_node_w_m.swap( hp_next_node_w_m );
+		}
+	}
+}
+
 std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::find_if(
-	od_lockfree_list::find_predicate_t pred   //!< [in]	引数には、const node_pointerが渡される
+	find_predicate_t& pred   //!< [in]	引数には、const node_pointerが渡される
 )
+{
+	return find_if_impl( pred, &sentinel_ );
+}
+
+std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::find_if(
+	find_predicate_t&& pred   //!< [in]	引数には、const node_pointerが渡される
+)
+{
+	return find_if_impl( pred, &sentinel_ );
+}
+
+std::pair<od_lockfree_list::hazard_const_pointer_w_mark, od_lockfree_list::hazard_const_pointer_w_mark> od_lockfree_list::find_if(
+	find_predicate_t& pred   //!< [in]	引数には、const node_pointerが渡される
+) const
+{
+	return find_if_impl( pred, &sentinel_ );
+}
+std::pair<od_lockfree_list::hazard_const_pointer_w_mark, od_lockfree_list::hazard_const_pointer_w_mark> od_lockfree_list::find_if(
+	find_predicate_t&& pred   //!< [in]	引数には、const node_pointerが渡される
+) const
 {
 	return find_if_impl( pred, &sentinel_ );
 }
 
 std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::find_head( void )
 {
-	return find_if_impl(
-		[this]( node_pointer p_nd ) -> bool {
+	return find_if(
+		[]( const_node_pointer p_nd ) -> bool {
 			return true;
-		},
-		&sentinel_ );
+		} );
 }
 
 std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark> od_lockfree_list::find_tail( void )
 {
-	return find_if_impl(
-		[this]( node_pointer p_nd ) -> bool {
+	return find_if(
+		[this]( const_node_pointer p_nd ) -> bool {
 			pointer_w_mark tmp = p_nd->hazard_handler_of_next().load();
 			if ( tmp.mark_ ) return false;
 			if ( tmp.p_ == &sentinel_ ) return true;
 			return false;
-		},
-		&sentinel_ );
+		} );
 }
 
-od_lockfree_list::for_each_func_t od_lockfree_list::for_each(
-	for_each_func_t&& f   //!< [in]	A function f is passed value_type& as an argument
+std::pair<od_lockfree_list::hazard_const_pointer_w_mark, od_lockfree_list::hazard_const_pointer_w_mark> od_lockfree_list::find_head( void ) const
+{
+	return find_if(
+		[]( const_node_pointer p_nd ) -> bool {
+			return true;
+		} );
+}
+
+std::pair<od_lockfree_list::hazard_const_pointer_w_mark, od_lockfree_list::hazard_const_pointer_w_mark> od_lockfree_list::find_tail( void ) const
+{
+	return find_if(
+		[this]( const_node_pointer p_nd ) -> bool {
+			pointer_w_mark tmp = p_nd->hazard_handler_of_next().load();
+			if ( tmp.mark_ ) return false;
+			if ( tmp.p_ == &sentinel_ ) return true;
+			return false;
+		} );
+}
+
+void od_lockfree_list::for_each(
+	for_each_func_t& f   //!< [in]	A function f is passed value_type& as an argument
 )
 {
 	hazard_pointer_w_mark hp_prev_node_w_m;
@@ -203,15 +289,64 @@ od_lockfree_list::for_each_func_t od_lockfree_list::for_each(
 		hp_curr_node_w_m.swap( hp_next_node_w_m );
 	}
 
-	return f;
+	return;
 }
 
-od_lockfree_list::for_each_func_t od_lockfree_list::for_each(
-	const for_each_func_t& f   //!< [in]	A function f is passed value_type& as an argument
+void od_lockfree_list::for_each(
+	for_each_func_t&& f   //!< [in]	A function f is passed value_type& as an argument
 )
 {
-	for_each_func_t copyed_func = f;
-	return for_each( std::move( copyed_func ) );
+	for_each_func_t moved_func = std::move( f );
+	for_each( moved_func );
+}
+
+void od_lockfree_list::for_each(
+	for_each_const_func_t& f   //!< [in]	A function f is passed value_type& as an argument
+) const
+{
+	hazard_const_pointer_w_mark hp_prev_node_w_m;
+	hazard_const_pointer_w_mark hp_curr_node_w_m;
+	hazard_const_pointer_w_mark hp_next_node_w_m;
+
+	hp_prev_node_w_m.mark_ = false;
+	hp_prev_node_w_m.hp_.store( &head_ );
+	do {
+		head_.hazard_handler_of_next().reuse_to_verify_exchange( hp_curr_node_w_m );
+	} while ( !head_.hazard_handler_of_next().verify_exchange( hp_curr_node_w_m ) );
+	while ( true ) {   // リストをたどるループ
+		if ( hp_curr_node_w_m.hp_ == &sentinel_ ) {
+			// listが空なので、処理終了。
+			break;
+		}
+		hp_curr_node_w_m.hp_->hazard_handler_of_next().reuse_to_verify_exchange( hp_next_node_w_m );
+		if ( !hp_curr_node_w_m.hp_->hazard_handler_of_next().verify_exchange( hp_next_node_w_m ) ) {
+			continue;
+		}
+
+		if ( hp_next_node_w_m.hp_ == nullptr ) {
+			// 繋ぎ変え処理と衝突し、currが他のインスタンスのsentinelに到達した。また、検索処理自体は終了したため、処理完了とする。
+			// ただし、戻り値のハザードポインタは、currは使用しない。
+			break;
+		}
+
+		// currノードの削除マークを確認する。なお、currノードの削除マークは、hp_next_node_w_mに入っている。
+		if ( !hp_next_node_w_m.mark_ ) {
+			f( hp_curr_node_w_m.hp_.get() );
+		}
+
+		// currが該当ではないので、次のノードに進める。
+		hp_prev_node_w_m.swap( hp_curr_node_w_m );
+		hp_curr_node_w_m.swap( hp_next_node_w_m );
+	}
+
+	return;
+}
+void od_lockfree_list::for_each(
+	for_each_const_func_t&& f   //!< [in]	A function f is passed value_type& as an argument
+) const
+{
+	for_each_const_func_t moved_func = std::move( f );
+	for_each( moved_func );
 }
 
 bool od_lockfree_list::insert_to_next_of_prev(
@@ -469,25 +604,20 @@ void od_lockfree_list::exchange_sentinel_connection( node_pointer p_sentinel_of_
 {
 	while ( true ) {
 		// callback呼び出しのため、クラスインスタンスに紐づけて処理する必要あり。
-		auto ret = find_if_impl( []( const node_pointer ) { return false; }, p_sentinel_of_from );
+		auto ret = find_if( []( const_node_pointer ) -> bool { return false; } );
 		if ( ret.first.hp_->hazard_handler_of_next().compare_exchange_strong_to_verify_exchange2( ret.second, p_sentinel_of_to ) ) {
 			break;
 		}
 	}
 }
 
-size_t od_lockfree_list::size( void ) const noexcept
+size_t od_lockfree_list::count_size( void ) const noexcept
 {
-	// FIXME: Caution: この処理は、スレッドセーフではない。ほかのスレッドで削除/挿入されていた場合、数え上げがうまくいかない。
-	size_t                               count   = 0;
-	hazard_ptr_handler_t::pointer_w_mark p_m_cur = head_.hazard_handler_of_next().load();
-	while ( ( p_m_cur.p_ != &sentinel_ ) && ( p_m_cur.p_ != nullptr ) ) {   // 繋ぎ変え処理との競合を考慮し、nullptrもチェックする。
-		hazard_ptr_handler_t::pointer_w_mark p_m_nxt = p_m_cur.p_->hazard_handler_of_next().load();
-		if ( !p_m_nxt.mark_ ) {
-			count++;
-		}
-		p_m_cur = p_m_nxt;
-	}
+	size_t count = 0;
+	for_each( [&count]( const_node_pointer ) -> bool {
+		++count;
+		return false;
+	} );
 
 	return count;
 }

@@ -16,35 +16,8 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
-#if 0
 #ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
 #else
-#if __cpp_aligned_new
-ALCC_INTERNAL_NODISCARD_ATTR void* od_node_simple_link::operator new( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
-{
-	void* p_ans = gmem_allocate( size, static_cast<size_t>( alignment ) );
-	if ( p_ans == nullptr ) {
-		throw std::bad_alloc();
-	}
-	return p_ans;
-}
-ALCC_INTERNAL_NODISCARD_ATTR void* od_node_simple_link::operator new( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++17
-{
-	return gmem_allocate( size, static_cast<size_t>( alignment ) );
-}
-ALCC_INTERNAL_NODISCARD_ATTR void* od_node_simple_link::operator new[]( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
-{
-	void* p_ans = gmem_allocate( size, static_cast<size_t>( alignment ) );
-	if ( p_ans == nullptr ) {
-		throw std::bad_alloc();
-	}
-	return p_ans;
-}
-ALCC_INTERNAL_NODISCARD_ATTR void* od_node_simple_link::operator new[]( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++17
-{
-	return gmem_allocate( size, static_cast<size_t>( alignment ) );
-}
-#endif
 ALCC_INTERNAL_NODISCARD_ATTR void* od_node_simple_link::operator new( std::size_t size )   // possible throw std::bad_alloc, from C++11
 {
 	void* p_ans = gmem_allocate( size );
@@ -79,43 +52,6 @@ ALCC_INTERNAL_NODISCARD_ATTR void* od_node_simple_link::operator new[]( std::siz
 	return ptr;
 }
 
-#if __cpp_aligned_new
-void od_node_simple_link::operator delete( void* ptr, std::align_val_t alignment ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
-{
-	gmem_deallocate( ptr );
-}
-void od_node_simple_link::operator delete[]( void* ptr, std::align_val_t alignment ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
-{
-	gmem_deallocate( ptr );
-}
-
-void od_node_simple_link::operator delete( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept   // from C++17
-{
-	gmem_deallocate( ptr );
-}
-void od_node_simple_link::operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept   // from C++17
-{
-	gmem_deallocate( ptr );
-}
-
-void od_node_simple_link::operator delete( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
-{
-	gmem_deallocate( ptr );
-}
-void od_node_simple_link::operator delete[]( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
-{
-	gmem_deallocate( ptr );
-}
-
-void od_node_simple_link::operator delete( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17
-{
-	gmem_deallocate( ptr );
-}
-void od_node_simple_link::operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17
-{
-	gmem_deallocate( ptr );
-}
-#endif
 void od_node_simple_link::operator delete( void* ptr ) noexcept   // from C++11
 {
 	gmem_deallocate( ptr );
@@ -159,6 +95,67 @@ void od_node_simple_link::operator delete( void* ptr, void* ) noexcept   // dele
 void od_node_simple_link::operator delete[]( void* ptr, void* ) noexcept   // delete for area that is initialized by placement new.
 {
 	// nothing to do
+}
+
+#if __cpp_aligned_new
+ALCC_INTERNAL_NODISCARD_ATTR void* od_node_simple_link::operator new( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
+{
+	void* p_ans = gmem_allocate( size, static_cast<size_t>( alignment ) );
+	if ( p_ans == nullptr ) {
+		throw std::bad_alloc();
+	}
+	return p_ans;
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* od_node_simple_link::operator new( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++17
+{
+	return gmem_allocate( size, static_cast<size_t>( alignment ) );
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* od_node_simple_link::operator new[]( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
+{
+	void* p_ans = gmem_allocate( size, static_cast<size_t>( alignment ) );
+	if ( p_ans == nullptr ) {
+		throw std::bad_alloc();
+	}
+	return p_ans;
+}
+ALCC_INTERNAL_NODISCARD_ATTR void* od_node_simple_link::operator new[]( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // possible return nullptr, instead of throwing exception, from C++17
+{
+	return gmem_allocate( size, static_cast<size_t>( alignment ) );
+}
+void od_node_simple_link::operator delete( void* ptr, std::align_val_t alignment ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	gmem_deallocate( ptr );
+}
+void od_node_simple_link::operator delete[]( void* ptr, std::align_val_t alignment ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	gmem_deallocate( ptr );
+}
+
+void od_node_simple_link::operator delete( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept   // from C++17
+{
+	gmem_deallocate( ptr );
+}
+void od_node_simple_link::operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept   // from C++17
+{
+	gmem_deallocate( ptr );
+}
+
+void od_node_simple_link::operator delete( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	gmem_deallocate( ptr );
+}
+void od_node_simple_link::operator delete[]( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+{
+	gmem_deallocate( ptr );
+}
+
+void od_node_simple_link::operator delete( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17
+{
+	gmem_deallocate( ptr );
+}
+void od_node_simple_link::operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept   // from C++17
+{
+	gmem_deallocate( ptr );
 }
 #endif
 #endif

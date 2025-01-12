@@ -20,7 +20,6 @@
 
 #include "alconcurrent/lf_fifo.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
-#include "alconcurrent/lf_mem_alloc_type.hpp"
 
 constexpr int            num_thread = 1;   // Tested until 128.
 constexpr std::uintptr_t loop_num   = 10000;

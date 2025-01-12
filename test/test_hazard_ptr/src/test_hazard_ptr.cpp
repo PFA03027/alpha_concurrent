@@ -22,8 +22,8 @@
 TEST( TestHazardSlotOwnershipT, DoDestroy_Then_ClearSlot )
 {
 	// Arrange
-	int                dummy = 1;
-	std::atomic<void*> dummy2( &dummy );
+	int                      dummy = 1;
+	std::atomic<const void*> dummy2( &dummy );
 
 	{
 		// Act

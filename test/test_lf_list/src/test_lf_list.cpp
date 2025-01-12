@@ -106,28 +106,28 @@ TEST_F( Test_lockfree_list, Empty_DoInsertToTail_ThenOneElement )
 TEST_F( Test_lockfree_list, Empty_DoRemoveOneIf_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 
 	// Act
 	auto ret = sut_.remove_one_if( []( const tut_list::value_type& v ) -> bool { return v == 0; } );
 
 	// Assert
 	ASSERT_FALSE( ret.has_value() );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, OneElement_DoRemoveOneIf_ThenEmpty )
 {
 	// Arrenge
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 
 	// Act
 	auto ret = sut_.remove_one_if( []( const tut_list::value_type& v ) -> bool { return v == 1; } );
 
 	// Assert
 	ASSERT_TRUE( ret.has_value() );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, TwoElement_DoRemoveOneIfFromHead_ThenOneElement )
@@ -135,14 +135,14 @@ TEST_F( Test_lockfree_list, TwoElement_DoRemoveOneIfFromHead_ThenOneElement )
 	// Arrenge
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
-	EXPECT_EQ( sut_.get_size(), 2 );
+	EXPECT_EQ( sut_.count_size(), 2 );
 
 	// Act
 	auto ret = sut_.remove_one_if( []( const tut_list::value_type& v ) -> bool { return v == 2; } );
 
 	// Assert
 	ASSERT_TRUE( ret.has_value() );
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 }
 
 TEST_F( Test_lockfree_list, TwoElement_DoRemoveOneIfFromTail_ThenOneElement )
@@ -150,14 +150,14 @@ TEST_F( Test_lockfree_list, TwoElement_DoRemoveOneIfFromTail_ThenOneElement )
 	// Arrenge
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
-	EXPECT_EQ( sut_.get_size(), 2 );
+	EXPECT_EQ( sut_.count_size(), 2 );
 
 	// Act
 	auto ret = sut_.remove_one_if( []( const tut_list::value_type& v ) -> bool { return v == 1; } );
 
 	// Assert
 	ASSERT_TRUE( ret.has_value() );
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 }
 
 TEST_F( Test_lockfree_list, ThreeElement_DoRemoveOneIfFromMid_ThenTwoElement )
@@ -166,55 +166,56 @@ TEST_F( Test_lockfree_list, ThreeElement_DoRemoveOneIfFromMid_ThenTwoElement )
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 3 );   // 先頭に挿入
-	EXPECT_EQ( sut_.get_size(), 3 );
+	EXPECT_EQ( sut_.count_size(), 3 );
 
 	// Act
 	auto ret = sut_.remove_one_if( []( const tut_list::value_type& v ) -> bool { return v == 2; } );
 
 	// Assert
 	ASSERT_TRUE( ret.has_value() );
-	EXPECT_EQ( sut_.get_size(), 2 );
+	EXPECT_EQ( *ret, 2 );
+	EXPECT_EQ( sut_.count_size(), 2 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoRemoveAllIf_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 
 	// Act
 	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return true; } );
 
 	// Assert
 	EXPECT_EQ( ret, 0 );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, OneElement_DoRemoveAllIf_ThenEmpty )
 {
 	// Arrenge
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 
 	// Act
 	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return true; } );
 
 	// Assert
 	EXPECT_EQ( ret, 1 );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, OneElement_DoRemoveAllIf_ThenOneElement )
 {
 	// Arrenge
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 
 	// Act
 	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return false; } );
 
 	// Assert
 	EXPECT_EQ( ret, 0 );
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 }
 
 TEST_F( Test_lockfree_list, TwoElement_DoRemoveAllIfFromHead_ThenOneElement )
@@ -222,14 +223,14 @@ TEST_F( Test_lockfree_list, TwoElement_DoRemoveAllIfFromHead_ThenOneElement )
 	// Arrenge
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
-	EXPECT_EQ( sut_.get_size(), 2 );
+	EXPECT_EQ( sut_.count_size(), 2 );
 
 	// Act
 	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return v == 2; } );
 
 	// Assert
 	EXPECT_EQ( ret, 1 );
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 }
 
 TEST_F( Test_lockfree_list, TwoElement_DoRemoveAllIfFromTail_ThenOneElement )
@@ -237,14 +238,14 @@ TEST_F( Test_lockfree_list, TwoElement_DoRemoveAllIfFromTail_ThenOneElement )
 	// Arrenge
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
-	EXPECT_EQ( sut_.get_size(), 2 );
+	EXPECT_EQ( sut_.count_size(), 2 );
 
 	// Act
 	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return v == 1; } );
 
 	// Assert
 	EXPECT_EQ( ret, 1 );
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 }
 
 TEST_F( Test_lockfree_list, TwoElement_DoRemoveAllIf_ThenEmpty )
@@ -252,14 +253,14 @@ TEST_F( Test_lockfree_list, TwoElement_DoRemoveAllIf_ThenEmpty )
 	// Arrenge
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
-	EXPECT_EQ( sut_.get_size(), 2 );
+	EXPECT_EQ( sut_.count_size(), 2 );
 
 	// Act
 	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return true; } );
 
 	// Assert
 	EXPECT_EQ( ret, 2 );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, TwoElement_DoRemoveAllIf_ThenTwoElement )
@@ -267,14 +268,14 @@ TEST_F( Test_lockfree_list, TwoElement_DoRemoveAllIf_ThenTwoElement )
 	// Arrenge
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
-	EXPECT_EQ( sut_.get_size(), 2 );
+	EXPECT_EQ( sut_.count_size(), 2 );
 
 	// Act
 	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return false; } );
 
 	// Assert
 	EXPECT_EQ( ret, 0 );
-	EXPECT_EQ( sut_.get_size(), 2 );
+	EXPECT_EQ( sut_.count_size(), 2 );
 }
 
 TEST_F( Test_lockfree_list, ThreeElement_DoRemoveAllIfFromMid_ThenTwoElement )
@@ -283,14 +284,14 @@ TEST_F( Test_lockfree_list, ThreeElement_DoRemoveAllIfFromMid_ThenTwoElement )
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 3 );   // 先頭に挿入
-	EXPECT_EQ( sut_.get_size(), 3 );
+	EXPECT_EQ( sut_.count_size(), 3 );
 
 	// Act
 	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return v == 2; } );
 
 	// Assert
 	EXPECT_EQ( ret, 1 );
-	EXPECT_EQ( sut_.get_size(), 2 );
+	EXPECT_EQ( sut_.count_size(), 2 );
 }
 
 TEST_F( Test_lockfree_list, ThreeElement_DoRemoveAllIf_ThenEmpty )
@@ -299,14 +300,14 @@ TEST_F( Test_lockfree_list, ThreeElement_DoRemoveAllIf_ThenEmpty )
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 3 );   // 先頭に挿入
-	EXPECT_EQ( sut_.get_size(), 3 );
+	EXPECT_EQ( sut_.count_size(), 3 );
 
 	// Act
 	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return true; } );
 
 	// Assert
 	EXPECT_EQ( ret, 3 );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, ThreeElement_DoRemoveAllIf_ThenThreeElement )
@@ -315,20 +316,20 @@ TEST_F( Test_lockfree_list, ThreeElement_DoRemoveAllIf_ThenThreeElement )
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 3 );   // 先頭に挿入
-	EXPECT_EQ( sut_.get_size(), 3 );
+	EXPECT_EQ( sut_.count_size(), 3 );
 
 	// Act
 	size_t ret = sut_.remove_all_if( []( const tut_list::value_type& v ) -> bool { return false; } );
 
 	// Assert
 	EXPECT_EQ( ret, 0 );
-	EXPECT_EQ( sut_.get_size(), 3 );
+	EXPECT_EQ( sut_.count_size(), 3 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoForEach )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	int count = 0;
 
 	// Act
@@ -336,14 +337,14 @@ TEST_F( Test_lockfree_list, Empty_DoForEach )
 
 	// Assert
 	EXPECT_EQ( count, 0 );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, OneElement_DoForEach )
 {
 	// Arrenge
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 	int count = 0;
 
 	// Act
@@ -351,7 +352,7 @@ TEST_F( Test_lockfree_list, OneElement_DoForEach )
 
 	// Assert
 	EXPECT_EQ( count, 1 );
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 }
 
 TEST_F( Test_lockfree_list, TwoElement_DoForEach )
@@ -359,7 +360,7 @@ TEST_F( Test_lockfree_list, TwoElement_DoForEach )
 	// Arrenge
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
-	EXPECT_EQ( sut_.get_size(), 2 );
+	EXPECT_EQ( sut_.count_size(), 2 );
 	int count = 0;
 
 	// Act
@@ -367,7 +368,7 @@ TEST_F( Test_lockfree_list, TwoElement_DoForEach )
 
 	// Assert
 	EXPECT_EQ( count, 2 );
-	EXPECT_EQ( sut_.get_size(), 2 );
+	EXPECT_EQ( sut_.count_size(), 2 );
 }
 
 TEST_F( Test_lockfree_list, ThreeElement_DoForEach )
@@ -376,7 +377,7 @@ TEST_F( Test_lockfree_list, ThreeElement_DoForEach )
 	sut_.insert( []( const int& v ) -> bool { return true; }, 1 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 2 );   // 先頭に挿入
 	sut_.insert( []( const int& v ) -> bool { return true; }, 3 );   // 先頭に挿入
-	EXPECT_EQ( sut_.get_size(), 3 );
+	EXPECT_EQ( sut_.count_size(), 3 );
 	int count = 0;
 	int val_array[3];
 	int idx = 0;
@@ -392,7 +393,7 @@ TEST_F( Test_lockfree_list, ThreeElement_DoForEach )
 
 	// Assert
 	EXPECT_EQ( count, 3 );
-	EXPECT_EQ( sut_.get_size(), 3 );
+	EXPECT_EQ( sut_.count_size(), 3 );
 	EXPECT_EQ( val_array[0], 3 );
 	EXPECT_EQ( val_array[1], 2 );
 	EXPECT_EQ( val_array[2], 1 );
@@ -403,32 +404,32 @@ TEST_F( Test_lockfree_list, ThreeElement_DoForEach )
 TEST_F( Test_lockfree_list, Empty_DoPushFront_ThenOneElement )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 
 	// Act
 	sut_.push_front( 1 );
 
 	// Assert
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushFrontTwice_ThenTwoElement )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_front( 1 );
 
 	// Act
 	sut_.push_front( 2 );
 
 	// Assert
-	EXPECT_EQ( sut_.get_size(), 2 );
+	EXPECT_EQ( sut_.count_size(), 2 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushFrontThree_ThenThreeElement )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_front( 1 );
 	sut_.push_front( 2 );
 
@@ -447,7 +448,7 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontThree_ThenThreeElement )
 		}
 	} );
 	EXPECT_EQ( count, 3 );
-	EXPECT_EQ( sut_.get_size(), 3 );
+	EXPECT_EQ( sut_.count_size(), 3 );
 	EXPECT_EQ( val_array[0], 3 );
 	EXPECT_EQ( val_array[1], 2 );
 	EXPECT_EQ( val_array[2], 1 );
@@ -456,20 +457,20 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontThree_ThenThreeElement )
 TEST_F( Test_lockfree_list, Empty_DoPopFront_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 
 	// Act
 	auto ret = sut_.pop_front();
 
 	// Assert
 	EXPECT_FALSE( ret.has_value() );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushFrontPopFront_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_front( 1 );
 
 	// Act
@@ -478,13 +479,13 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontPopFront_ThenEmpty )
 	// Assert
 	ASSERT_TRUE( ret.has_value() );
 	EXPECT_EQ( ret.value(), 1 );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushFrontPopFrontTwice_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_front( 1 );
 	sut_.pop_front();
 
@@ -493,13 +494,13 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontPopFrontTwice_ThenEmpty )
 
 	// Assert
 	EXPECT_FALSE( ret.has_value() );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopFront_ThenOneElement )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_front( 1 );
 	sut_.push_front( 2 );
 
@@ -509,13 +510,13 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopFront_ThenOneElement )
 	// Assert
 	ASSERT_TRUE( ret.has_value() );
 	EXPECT_EQ( ret.value(), 2 );
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopFrontTwice_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_front( 1 );
 	sut_.push_front( 2 );
 	auto ret1 = sut_.pop_front();
@@ -528,7 +529,7 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopFrontTwice_ThenEmpty )
 	EXPECT_EQ( ret1.value(), 2 );
 	ASSERT_TRUE( ret2.has_value() );
 	EXPECT_EQ( ret2.value(), 1 );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 ////
@@ -536,32 +537,32 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopFrontTwice_ThenEmpty )
 TEST_F( Test_lockfree_list, Empty_DoPushBack_ThenOneElement )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 
 	// Act
 	sut_.push_back( 1 );
 
 	// Assert
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushBackTwice_ThenTwoElement )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_back( 1 );
 
 	// Act
 	sut_.push_back( 2 );
 
 	// Assert
-	EXPECT_EQ( sut_.get_size(), 2 );
+	EXPECT_EQ( sut_.count_size(), 2 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushBackThree_ThenThreeElement )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_back( 1 );
 	sut_.push_back( 2 );
 
@@ -580,7 +581,7 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackThree_ThenThreeElement )
 		}
 	} );
 	EXPECT_EQ( count, 3 );
-	EXPECT_EQ( sut_.get_size(), 3 );
+	EXPECT_EQ( sut_.count_size(), 3 );
 	EXPECT_EQ( val_array[0], 1 );
 	EXPECT_EQ( val_array[1], 2 );
 	EXPECT_EQ( val_array[2], 3 );
@@ -589,20 +590,20 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackThree_ThenThreeElement )
 TEST_F( Test_lockfree_list, Empty_DoPopBack_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 
 	// Act
 	auto ret = sut_.pop_back();
 
 	// Assert
 	EXPECT_FALSE( ret.has_value() );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushBackPopBack_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_back( 1 );
 
 	// Act
@@ -611,13 +612,13 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackPopBack_ThenEmpty )
 	// Assert
 	ASSERT_TRUE( ret.has_value() );
 	EXPECT_EQ( ret.value(), 1 );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushBackPopBackTwice_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_back( 1 );
 	sut_.pop_back();
 
@@ -626,13 +627,13 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackPopBackTwice_ThenEmpty )
 
 	// Assert
 	EXPECT_FALSE( ret.has_value() );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopBack_ThenOneElement )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_back( 1 );
 	sut_.push_back( 2 );
 
@@ -642,13 +643,13 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopBack_ThenOneElement )
 	// Assert
 	ASSERT_TRUE( ret.has_value() );
 	EXPECT_EQ( ret.value(), 2 );
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopBackTwice_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_back( 1 );
 	sut_.push_back( 2 );
 	auto ret1 = sut_.pop_back();
@@ -661,14 +662,14 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopBackTwice_ThenEmpty )
 	EXPECT_EQ( ret1.value(), 2 );
 	ASSERT_TRUE( ret2.has_value() );
 	EXPECT_EQ( ret2.value(), 1 );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 ////
 TEST_F( Test_lockfree_list, Empty_DoPushFrontPopBack_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_front( 1 );
 
 	// Act
@@ -677,13 +678,13 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontPopBack_ThenEmpty )
 	// Assert
 	ASSERT_TRUE( ret.has_value() );
 	EXPECT_EQ( ret.value(), 1 );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopBack_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_front( 1 );
 	sut_.push_front( 2 );
 
@@ -693,13 +694,13 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopBack_ThenEmpty )
 	// Assert
 	ASSERT_TRUE( ret.has_value() );
 	EXPECT_EQ( ret.value(), 1 );
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopBackTwice_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_front( 1 );
 	sut_.push_front( 2 );
 	auto ret1 = sut_.pop_back();
@@ -712,13 +713,13 @@ TEST_F( Test_lockfree_list, Empty_DoPushFrontTwicePopBackTwice_ThenEmpty )
 	EXPECT_EQ( ret1.value(), 1 );
 	ASSERT_TRUE( ret2.has_value() );
 	EXPECT_EQ( ret2.value(), 2 );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoEmplaceFrontTwicePopBackTwice_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.emplace_front( 1 );
 	sut_.emplace_front( 2 );
 	auto ret1 = sut_.pop_back();
@@ -731,13 +732,13 @@ TEST_F( Test_lockfree_list, Empty_DoEmplaceFrontTwicePopBackTwice_ThenEmpty )
 	EXPECT_EQ( ret1.value(), 1 );
 	ASSERT_TRUE( ret2.has_value() );
 	EXPECT_EQ( ret2.value(), 2 );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushBackPopFront_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_back( 1 );
 
 	// Act
@@ -746,13 +747,13 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackPopFront_ThenEmpty )
 	// Assert
 	ASSERT_TRUE( ret.has_value() );
 	EXPECT_EQ( ret.value(), 1 );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopFront_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_back( 1 );
 	sut_.push_back( 2 );
 
@@ -762,13 +763,13 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopFront_ThenEmpty )
 	// Assert
 	ASSERT_TRUE( ret.has_value() );
 	EXPECT_EQ( ret.value(), 1 );
-	EXPECT_EQ( sut_.get_size(), 1 );
+	EXPECT_EQ( sut_.count_size(), 1 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopFrontTwice_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.push_back( 1 );
 	sut_.push_back( 2 );
 	auto ret1 = sut_.pop_front();
@@ -781,13 +782,13 @@ TEST_F( Test_lockfree_list, Empty_DoPushBackTwicePopFrontTwice_ThenEmpty )
 	EXPECT_EQ( ret1.value(), 1 );
 	ASSERT_TRUE( ret2.has_value() );
 	EXPECT_EQ( ret2.value(), 2 );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, Empty_DoEmplaceBackTwicePopFrontTwice_ThenEmpty )
 {
 	// Arrenge
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 	sut_.emplace_back( 1 );
 	sut_.emplace_back( 2 );
 	auto ret1 = sut_.pop_front();
@@ -800,7 +801,7 @@ TEST_F( Test_lockfree_list, Empty_DoEmplaceBackTwicePopFrontTwice_ThenEmpty )
 	EXPECT_EQ( ret1.value(), 1 );
 	ASSERT_TRUE( ret2.has_value() );
 	EXPECT_EQ( ret2.value(), 2 );
-	EXPECT_EQ( sut_.get_size(), 0 );
+	EXPECT_EQ( sut_.count_size(), 0 );
 }
 
 TEST_F( Test_lockfree_list, TC4_DoForEach )
@@ -826,7 +827,7 @@ TEST_F( Test_lockfree_list, TC4_DoForEach )
 		sum += ref_value;
 	} );
 
-	EXPECT_EQ( sut_.get_size(), loop_num + 1 );
+	EXPECT_EQ( sut_.count_size(), loop_num + 1 );
 	EXPECT_EQ( expect, sum ) << "Expect: " << expect << std::endl
 							 << "Sum:    " << sum << std::endl;
 

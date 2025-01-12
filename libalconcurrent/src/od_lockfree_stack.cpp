@@ -99,6 +99,34 @@ ALCC_INTERNAL_NODISCARD_ATTR od_lockfree_stack::node_pointer od_lockfree_stack::
 	return hp_cur_head.get();
 }
 
+size_t od_lockfree_stack::count_size( void ) const
+{
+	size_t                      ans       = 0;
+	const hazard_ptr_handler_t* p_hph_cur = &hph_head_;
+	hazard_pointer              hp_pre_node;
+	hazard_pointer              hp_cur_node = p_hph_cur->get_to_verify_exchange();
+	while ( true ) {
+		if ( !p_hph_cur->verify_exchange( hp_cur_node ) ) {
+			continue;
+		}
+		if ( hp_cur_node == nullptr ) {
+			// 末端に到達したので、ループを終了する。
+			break;
+		}
+
+		// ここに到達した時点で、1つ分のノードの存在確認完了
+		// hp_cur_nodeがハザードポインタとして登録済みの状態。
+		ans++;
+
+		// 次のノードに進める
+		hp_pre_node.swap( hp_cur_node );
+		p_hph_cur   = &( hp_pre_node->hazard_handler_of_next() );
+		hp_cur_node = p_hph_cur->get_to_verify_exchange();
+	}
+
+	return ans;
+}
+
 bool od_lockfree_stack::is_empty( void ) const
 {
 	return hph_head_.load() == nullptr;

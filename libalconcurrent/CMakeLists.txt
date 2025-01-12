@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 project(libalconcurrent CXX)
 
-file(GLOB SOURCES src/*.cpp )
+file(GLOB SOURCES src/*.cpp src_mem/*.cpp )
 
 # GREETINGS_BUILD_SHARED_LIBSというオプションを作成。デフォルトをOFFに設定。
 option(ALCONCURRENT_BUILD_SHARED_LIBS "build alconcurrent as a shared library" OFF)
@@ -14,4 +14,5 @@ endif()
 
 
 target_include_directories(alconcurrent  PUBLIC inc/  )
+target_include_directories(alconcurrent  PUBLIC src/  )
 

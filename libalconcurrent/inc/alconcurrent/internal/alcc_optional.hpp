@@ -35,9 +35,9 @@ namespace concurrent {
 
 #if ( __cpp_lib_optional >= 201606 ) && !defined( ALCONCURRENT_CONF_FORCE_USE_ORIG_RETURN_OPTIONAL )
 
-using alcc_nullopt_t                           = std::nullopt_t;
+using alcc_nullopt_t                         = std::nullopt_t;
 inline constexpr alcc_nullopt_t alcc_nullopt = std::nullopt;
-using alcc_in_place_t                          = std::in_place_t;
+using alcc_in_place_t                        = std::in_place_t;
 inline constexpr alcc_in_place_t alcc_in_place;
 
 template <typename T>
@@ -48,13 +48,13 @@ using bad_alcc_optional_access = std::bad_optional_access;
 #else
 
 struct alcc_nullopt_t {};
-inline constexpr alcc_nullopt_t alcc_nullopt;
+constexpr alcc_nullopt_t alcc_nullopt;
 
 struct alcc_in_place_t {
 	explicit alcc_in_place_t() = default;
 };
 
-inline constexpr alcc_in_place_t alcc_in_place {};
+constexpr alcc_in_place_t alcc_in_place {};
 
 class bad_alcc_optional_access : public std::exception {};
 
@@ -149,7 +149,7 @@ struct constexpr_optional_base {
 };
 
 template <typename T>
-using OptionalBase = std::conditional_t<std::is_trivially_destructible<T>::value, constexpr_optional_base<T>, optional_base<T>>;
+using OptionalBase = typename std::conditional<std::is_trivially_destructible<T>::value, constexpr_optional_base<T>, optional_base<T>>::type;
 
 }   // namespace internal
 
@@ -232,7 +232,7 @@ public:
 	{
 	}
 
-	template <typename U                                                                                                      = T,
+	template <typename U                                                                                                    = T,
 	          typename std::enable_if<std::is_constructible<T, U>::value &&
 	                                  !std::is_same<typename internal::remove_cvref<U>::type, alcc_in_place_t>::value &&
 	                                  !std::is_same<typename internal::remove_cvref<U>::type, alcc_optional>::value>::type* = nullptr>

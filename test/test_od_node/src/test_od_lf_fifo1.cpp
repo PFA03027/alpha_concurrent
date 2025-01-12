@@ -81,8 +81,8 @@ TEST_F( Test_od_lockfree_fifo, DoubleReleaseSentinel_Then_Destruct )
 	EXPECT_EQ( p_released_sentinel_node, nullptr );
 	int cw, ce;
 	alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
-	EXPECT_EQ( ce, 1 );
-	EXPECT_EQ( cw, 1 );
+	EXPECT_EQ( ce, 0 );
+	EXPECT_EQ( cw, 2 );
 }
 
 TEST_F( Test_od_lockfree_fifo, CanMoveConstruct_Then_Destruct )
@@ -102,8 +102,8 @@ TEST_F( Test_od_lockfree_fifo, CanMoveConstruct_Then_Destruct )
 	EXPECT_EQ( p_released_sentinel_node, nullptr );
 	int cw, ce;
 	alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
-	EXPECT_EQ( ce, 1 );
-	EXPECT_EQ( cw, 1 );
+	EXPECT_EQ( ce, 0 );
+	EXPECT_EQ( cw, 2 );
 }
 
 TEST_F( Test_od_lockfree_fifo, CanPush_Then_Pop )
@@ -217,8 +217,8 @@ TEST_F( Test_od_lockfree_fifo, ConstructNoSentinel_CallIsEmpty_Then_True )
 	EXPECT_TRUE( ret );
 	int cw, ce;
 	alpha::concurrent::GetErrorWarningLogCountAndReset( &ce, &cw );
-	EXPECT_EQ( ce, 1 );
-	EXPECT_EQ( cw, 0 );
+	EXPECT_EQ( ce, 0 );
+	EXPECT_EQ( cw, 1 );
 }
 
 TEST_F( Test_od_lockfree_fifo, Construct_CallIsEmpty_Then_True )

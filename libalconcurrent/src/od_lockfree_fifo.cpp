@@ -282,15 +282,50 @@ ALCC_INTERNAL_NODISCARD_ATTR od_lockfree_fifo::node_pointer od_lockfree_fifo::in
 bool od_lockfree_fifo::is_empty( void ) const
 {
 	hazard_pointer hp_head_node = hph_head_.get_to_verify_exchange();
-	while ( !hph_head_.verify_exchange( hp_head_node ) ) {}
 
 	if ( hp_head_node == nullptr ) {
-		internal::LogOutput( log_type::ERR, "ERR: Sentinel node has been released already." );
+		internal::LogOutput( log_type::WARN, "WARN: is_empty() is called, but Sentinel node has been released already." );
 		return true;
 	}
 
 	hazard_pointer::pointer p_head_next = hp_head_node->hazard_handler_of_next().load();
 	return p_head_next == nullptr;
+}
+
+size_t od_lockfree_fifo::count_size( void ) const
+{
+	size_t                      ans       = 0;
+	const hazard_ptr_handler_t* p_hph_cur = &hph_head_;
+	hazard_pointer              hp_pre_node;
+	hazard_pointer              hp_cur_node = p_hph_cur->get_to_verify_exchange();
+	hazard_pointer              hp_nxt_node;
+	while ( true ) {
+		if ( !p_hph_cur->verify_exchange( hp_cur_node ) ) {
+			continue;
+		}
+		if ( hp_cur_node == nullptr ) {
+			// 番兵が解放済みの場合、ここに到達する。
+			break;
+		}
+
+		hp_nxt_node = hp_cur_node->hazard_handler_of_next().get_to_verify_exchange();
+		while ( !hp_cur_node->hazard_handler_of_next().verify_exchange( hp_nxt_node ) ) {}
+		if ( hp_nxt_node == nullptr ) {
+			// 番兵ノード、あるいは末端に到達したので、ループを終了する。
+			break;
+		}
+
+		// ここに到達した時点で、hp_cur_nodeとhp_nxt_nodeがハザードポインタとして登録済みの状態。
+		// かつ、1つ分のノードの存在確認完了
+		ans++;
+
+		// 次のノードに進める
+		hp_pre_node.swap( hp_cur_node );
+		hp_cur_node.swap( hp_nxt_node );
+		p_hph_cur = &( hp_pre_node->hazard_handler_of_next() );
+	}
+
+	return ans;
 }
 
 size_t od_lockfree_fifo::profile_info_count( void ) const
