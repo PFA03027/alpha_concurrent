@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "conf_logger.hpp"
 #include "internal/cpp_std_configure.hpp"
 
 namespace alpha {
@@ -61,6 +62,8 @@ ALCC_INTERNAL_NODISCARD_ATTR void* gmem_allocate(
 bool gmem_deallocate(
 	void* p_mem   //!< [in] pointer to free.
 );
+
+void gmem_dump_status( log_type lt, char c, int id ) noexcept;
 
 }   // namespace concurrent
 }   // namespace alpha

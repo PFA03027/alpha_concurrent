@@ -36,6 +36,31 @@ memory_slot_group* slot_link_info::check_validity_to_ownwer_and_get( void ) noex
 	return p_slot_owner;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+memory_slot_group_statistics memory_slot_group::get_statistics( void ) const noexcept
+{
+	size_t total_slots  = 0;
+	size_t in_use_slots = 0;
+	size_t free_slots   = 0;
+
+	for ( size_t i = 0; i < num_slots_; i++ ) {
+		const slot_link_info* p_i_sli   = get_slot_pointer( i );
+		const slot_link_info* p_end_sli = reinterpret_cast<const slot_link_info*>( ap_unassigned_slot_.load() );
+		if ( p_end_sli <= p_i_sli ) break;
+
+		total_slots++;
+		unziped_allocation_info<void> alloc_info = p_i_sli->link_to_memory_slot_group_.load_allocation_info<void>();
+		if ( alloc_info.is_used_ ) {
+			in_use_slots++;
+		} else {
+			free_slots++;
+		}
+	}
+
+	return { total_slots, in_use_slots, free_slots };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 slot_link_info* memory_slot_group_list::allocate_impl( void ) noexcept
 {
 	// 回収済み、再割り当て待ちリストからスロットの取得を試みる
@@ -185,6 +210,40 @@ void memory_slot_group_list::clear_for_test( void ) noexcept
 	}
 	ap_head_memory_slot_group_.store( nullptr, std::memory_order_release );
 	ap_cur_assigning_memory_slot_group_.store( nullptr, std::memory_order_release );
+}
+
+void memory_slot_group_list::dump_status( log_type lt, char c, int id ) noexcept
+{
+	LogOutput( lt,
+	           "[%c-%d] idx=%zu, allocatable_bytes_=%zu, limit_bytes_for_one_memory_slot_group_=%zu, next_allocating_buffer_bytes_=%zu, ap_head_memory_slot_group_=%p",
+	           c, id, retrieved_array_idx_,
+	           allocatable_bytes_,
+	           limit_bytes_for_one_memory_slot_group_,
+	           next_allocating_buffer_bytes_.load(),
+	           ap_head_memory_slot_group_.load() );
+
+	size_t             memory_slot_group_count = 0;
+	size_t             total_slots             = 0;
+	size_t             in_use_slots            = 0;
+	size_t             free_slots              = 0;
+	memory_slot_group* p_cur_msg               = ap_head_memory_slot_group_.load();
+	while ( p_cur_msg != nullptr ) {
+		memory_slot_group_count++;
+		memory_slot_group_statistics ret = p_cur_msg->get_statistics();
+		total_slots += ret.total_slots_;
+		in_use_slots += ret.in_use_slots_;
+		free_slots += ret.free_slots_;
+
+		p_cur_msg = p_cur_msg->ap_next_group_.load();
+	}
+
+	LogOutput( lt,
+	           "[%c-%d] idx=%zu, memory_slot_group_count=%zu, total_slots=%zu, in_use_slots=%zu, free_slots=%zu",
+	           c, id, retrieved_array_idx_,
+	           memory_slot_group_count,
+	           total_slots,
+	           in_use_slots,
+	           free_slots );
 }
 
 void memory_slot_group_list::dump_log( log_type lt, char c, int id ) noexcept

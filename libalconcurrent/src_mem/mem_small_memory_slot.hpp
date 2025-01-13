@@ -29,6 +29,12 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
+struct memory_slot_group_statistics {
+	size_t total_slots_;
+	size_t in_use_slots_;
+	size_t free_slots_;
+};
+
 struct memory_slot_group;
 
 struct slot_link_info {
@@ -149,6 +155,16 @@ struct memory_slot_group {
 #endif
 		return reinterpret_cast<slot_link_info*>( p_ans );
 	}
+	const slot_link_info* get_slot_pointer( size_t slot_idx ) const noexcept
+	{
+		unsigned char* p_ans = p_slot_begin_ + ( slot_idx * one_slot_bytes_ );
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+		if ( p_slot_end_ <= p_ans ) {
+			std::terminate();
+		}
+#endif
+		return reinterpret_cast<const slot_link_info*>( p_ans );
+	}
 
 	/**
 	 * @brief assign a memory slot from unassigned slots
@@ -192,6 +208,8 @@ struct memory_slot_group {
 		return calc_begin_of_btinfo( data_ )[slot_idx];
 	}
 #endif
+
+	memory_slot_group_statistics get_statistics( void ) const noexcept;
 
 private:
 	constexpr memory_slot_group( memory_slot_group_list* p_list_mgr_arg, size_t buffer_size, size_t calced_one_slot_bytes_arg ) noexcept
@@ -344,6 +362,8 @@ struct memory_slot_group_list {
 	 *
 	 */
 	void clear_for_test( void ) noexcept;
+
+	void dump_status( log_type lt, char c, int id ) noexcept;
 
 	static void dump_log( log_type lt, char c, int id ) noexcept;
 

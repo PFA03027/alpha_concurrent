@@ -306,5 +306,13 @@ bool gmem_deallocate(
 	return ans;
 }
 
+void gmem_dump_status( log_type lt, char c, int id ) noexcept
+{
+	constexpr size_t array_count = sizeof( g_memory_slot_group_list_array ) / sizeof( g_memory_slot_group_list_array[0] );
+	for ( size_t i = 0; i < array_count; ++i ) {
+		g_memory_slot_group_list_array[i].dump_status( lt, c, id );
+	}
+}
+
 }   // namespace concurrent
 }   // namespace alpha

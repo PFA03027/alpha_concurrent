@@ -39,12 +39,7 @@ public:
 	using value_type = T;
 
 	x_lockfree_fifo( void ) noexcept
-	  :
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-	  allocated_node_count_( 0 )
-	  ,
-#endif
-	  lf_fifo_impl_()
+	  : lf_fifo_impl_()
 	{
 	}
 
@@ -280,12 +275,17 @@ private:
 
 	using node_pool_t = od_node_pool<node_type>;
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-	std::atomic<size_t> allocated_node_count_;
-#endif
 	node_fifo_lockfree_t lf_fifo_impl_;
 
-};   // namespace concurrent
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+	static std::atomic<size_t> allocated_node_count_;
+#endif
+};
+
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+template <typename T>
+std::atomic<size_t> x_lockfree_fifo<T>::allocated_node_count_( 0 );
+#endif
 
 }   // namespace internal
 

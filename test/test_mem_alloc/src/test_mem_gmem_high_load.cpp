@@ -182,6 +182,9 @@ TEST_P( Test_MemGmemHighLoadParam, test_mem_gmem_high_load )
 
 	printf( "(%zu,%zu, %s)\tsum of total_num = %zu\n", test_pattern.first, test_pattern.second, p_allocator_obj->name(), total_num );
 	alpha::concurrent::internal::memory_slot_group_list::dump_log( alpha::concurrent::log_type::DUMP, 'a', 1 );
+#ifdef ALCONCURRENT_CONF_ENABLE_GMEM_PROFILE
+	alpha::concurrent::gmem_dump_status( alpha::concurrent::log_type::DUMP, 'a', 1 );
+#endif
 }
 
 allocator_gmem   test_gmem_allocator;

@@ -777,15 +777,15 @@ alloc_chamber_statistics alloc_only_chamber::get_statistics( void ) const noexce
 
 void alloc_only_chamber::dump_to_log( log_type lt, char c, int id ) const noexcept
 {
-	alloc_chamber_statistics total_statistics;
-
+#ifdef ALCONCURRENT_CONF_ENABLE_GMEM_PROFILE
 	auto p_cur_chamber = head_.load( std::memory_order_acquire );
 	while ( p_cur_chamber != nullptr ) {
 		p_cur_chamber->dump_to_log( lt, c, id );
 		p_cur_chamber = p_cur_chamber->next_.load( std::memory_order_acquire );
 	}
+#endif
 
-	total_statistics = get_statistics();
+	alloc_chamber_statistics total_statistics = get_statistics();
 	internal::LogOutput( lt, "[%d-%c] alloc_chamber_statistics %s", id, c, total_statistics.print().c_str() );
 }
 
