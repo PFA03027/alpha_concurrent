@@ -317,8 +317,8 @@ struct memory_slot_group_list {
 
 	constexpr memory_slot_group_list(
 		const size_t allocatable_bytes_arg,                        //!< [in] max allocatable bytes by allocation
-		const size_t limit_bytes_for_one_memory_slot_group_arg,    //!< [in] limitation to allocate one memory_slot_group
 		const size_t init_buffer_bytes_of_memory_slot_group_arg,   //!< [in] buffer size of one memory_slot_group when 1st allocation
+		const size_t limit_bytes_for_one_memory_slot_group_arg,    //!< [in] limitation to allocate one memory_slot_group
 		const size_t retrieved_array_idx_arg = 0                   //!< [in] index of memory_slot_group_list in g_memory_slot_group_list_array
 		) noexcept
 	  : retrieved_array_idx_( retrieved_array_idx_arg )

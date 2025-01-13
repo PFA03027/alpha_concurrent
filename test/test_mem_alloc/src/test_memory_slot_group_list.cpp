@@ -22,7 +22,7 @@ TEST( Test_MemorySlotGroupList, CanConstruct )
 	constexpr size_t init_buffer_size = 1024 * 4;
 
 	// Act
-	tut sut( 15, max_buffer_size, init_buffer_size );
+	tut sut( 15, init_buffer_size, max_buffer_size );
 
 	// Assert
 	EXPECT_EQ( sut.allocatable_bytes_, 15 );
@@ -39,7 +39,7 @@ TEST( Test_MemorySlotGroupList, CanConstructWithTooSmallInitBuffSize )
 	constexpr size_t init_buffer_size = 1;
 
 	// Act
-	tut sut( 15, max_buffer_size, init_buffer_size );
+	tut sut( 15, init_buffer_size, max_buffer_size );
 
 	// Assert
 	EXPECT_EQ( sut.allocatable_bytes_, 15 );
