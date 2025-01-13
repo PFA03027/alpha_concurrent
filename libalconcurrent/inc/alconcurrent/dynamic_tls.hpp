@@ -244,7 +244,7 @@ struct threadlocal_default_handler {
  *
  * @note
  * lf_mem_allocクラスで使用するため、
- * コンポーネントの上下関係から、メモリの確保にはnewを使用せず、malloc/freeと配置newのみを使用する。
+ * コンポーネントの上下関係から、メモリの確保にはnewを使用せず、alloc_only_chamber allocatorと配置newのみを使用する。
  *
  * @brief Class that realizes dynamic thread local storage
  *

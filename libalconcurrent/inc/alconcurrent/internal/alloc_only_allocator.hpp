@@ -83,11 +83,12 @@ public:
 	ALCC_INTERNAL_NODISCARD_ATTR inline void* allocate( size_t req_size, size_t req_align ) noexcept
 	{
 		if ( !is_power_of_2( req_align ) ) {
-			LogOutput( log_type::WARN, "ignore req_align, becuase req_align is not power of 2. req_align is %zu, 0x%zX", req_align, req_align );
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
+			LogOutput( log_type::ERR, "req_align is invalid value, becuase req_align is not power of 2. req_align is %zu, 0x%zX", req_align, req_align );
 			std::terminate();
 #else
 			static_assert( is_power_of_2( default_align_size ), "default_align_size should be power of 2" );
+			LogOutput( log_type::WARN, "ignore req_align, becuase req_align is not power of 2. req_align is %zu, 0x%zX", req_align, req_align );
 			req_align = default_align_size;
 #endif
 		}
