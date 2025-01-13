@@ -345,6 +345,8 @@ struct memory_slot_group_list {
 	 */
 	void clear_for_test( void ) noexcept;
 
+	static void dump_log( log_type lt, char c, int id ) noexcept;
+
 private:
 	static constexpr size_t check_init_buffer_size( size_t requested_allocatable_bytes_of_a_slot, size_t request_init_buffer_size ) noexcept
 	{

@@ -10,6 +10,7 @@
  */
 
 #include "mem_small_memory_slot.hpp"
+#include "alloc_only_allocator.hpp"
 #include "mem_allocated_mem_top.hpp"
 #include "mmap_allocator.hpp"
 
@@ -17,6 +18,12 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+// configuration value
+constexpr size_t          conf_pre_mmap_size = 1024 * 1024;
+static alloc_only_chamber gmem_alloc_only_inst( false, conf_pre_mmap_size );   // グローバルインスタンスは、プロセス終了までメモリ領域を維持するために、デストラクタが呼ばれてもmmapした領域を解放しない。
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 memory_slot_group* slot_link_info::check_validity_to_ownwer_and_get( void ) noexcept
 {
 	memory_slot_group* p_slot_owner = link_to_memory_slot_group_.load_addr<memory_slot_group>();
@@ -148,11 +155,11 @@ bool memory_slot_group_list::deallocate( slot_link_info* p ) noexcept
 void memory_slot_group_list::request_allocate_memory_slot_group( void ) noexcept
 {
 	size_t cur_allocating_buffer_bytes = next_allocating_buffer_bytes_.load( std::memory_order_acquire );
-	auto   buffer_ret                  = allocate_by_mmap( cur_allocating_buffer_bytes, allocated_mem_top::min_alignment_size_ );
-	if ( buffer_ret.p_allocated_addr_ == nullptr ) {
+	auto   p_buffer_ret                = gmem_alloc_only_inst.allocate( cur_allocating_buffer_bytes, allocated_mem_top::min_alignment_size_ );
+	if ( p_buffer_ret == nullptr ) {
 		return;
 	}
-	memory_slot_group* p_new_group = memory_slot_group::emplace_on_mem( buffer_ret.p_allocated_addr_, this, buffer_ret.allocated_size_, allocatable_bytes_ );
+	memory_slot_group* p_new_group = memory_slot_group::emplace_on_mem( p_buffer_ret, this, cur_allocating_buffer_bytes, allocatable_bytes_ );
 	memory_slot_group* p_cur_head  = ap_head_memory_slot_group_.load( std::memory_order_acquire );
 	do {
 		p_new_group->ap_next_group_ = p_cur_head;
@@ -173,11 +180,16 @@ void memory_slot_group_list::clear_for_test( void ) noexcept
 	memory_slot_group* p_cur = ap_head_memory_slot_group_.load( std::memory_order_acquire );
 	while ( p_cur != nullptr ) {
 		memory_slot_group* p_next = p_cur->ap_next_group_;
-		deallocate_by_munmap( p_cur, p_cur->buffer_size_ );
+		gmem_alloc_only_inst.deallocate( p_cur );
 		p_cur = p_next;
 	}
 	ap_head_memory_slot_group_.store( nullptr, std::memory_order_release );
 	ap_cur_assigning_memory_slot_group_.store( nullptr, std::memory_order_release );
+}
+
+void memory_slot_group_list::dump_log( log_type lt, char c, int id ) noexcept
+{
+	gmem_alloc_only_inst.dump_to_log( lt, c, id );
 }
 
 }   // namespace internal
