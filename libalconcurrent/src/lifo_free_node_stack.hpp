@@ -17,7 +17,7 @@
 
 #include "alconcurrent/dynamic_tls.hpp"
 #include "alconcurrent/hazard_ptr.hpp"
-#include "alconcurrent/internal/alloc_only_allocator.hpp"
+#include "alloc_only_allocator.hpp"
 
 namespace alpha {
 namespace concurrent {

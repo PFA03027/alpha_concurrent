@@ -9,7 +9,7 @@
  *
  */
 
-#include "alconcurrent/internal/alloc_only_allocator.hpp"
+#include "alloc_only_allocator.hpp"
 #include "mmap_allocator.hpp"
 
 #include "gtest/gtest.h"
