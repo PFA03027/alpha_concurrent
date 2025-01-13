@@ -388,7 +388,7 @@ public:
 	void operator delete( void* ptr, void* ) noexcept;     // delete for area that is initialized by placement new.
 	void operator delete[]( void* ptr, void* ) noexcept;   // delete for area that is initialized by placement new.
 
-#if __cpp_aligned_new
+#if __cpp_aligned_new >= 201606
 	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment );                                     // possible throw std::bad_alloc, from C++17
 	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;     // possible return nullptr, instead of throwing exception, from C++17
 	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, std::align_val_t alignment );                                   // possible throw std::bad_alloc, from C++17
@@ -591,7 +591,7 @@ public:
 	void operator delete( void* ptr, void* ) noexcept;     // delete for area that is initialized by placement new.
 	void operator delete[]( void* ptr, void* ) noexcept;   // delete for area that is initialized by placement new.
 
-#if __cpp_aligned_new
+#if __cpp_aligned_new >= 201606
 	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment );                                     // possible throw std::bad_alloc, from C++17
 	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;     // possible return nullptr, instead of throwing exception, from C++17
 	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, std::align_val_t alignment );                                   // possible throw std::bad_alloc, from C++17
@@ -1130,7 +1130,7 @@ void dynamic_tls_content_head::operator delete[]( void* ptr, void* ) noexcept   
 	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
 }
 
-#if __cpp_aligned_new
+#if __cpp_aligned_new >= 201606
 ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_head::operator new( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
 {
 	// 	dynamic_tls_content_headは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する
@@ -1295,7 +1295,7 @@ void dynamic_tls_content_array::operator delete[]( void* ptr, void* ) noexcept  
 	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用してるため、何もしない。
 }
 
-#if __cpp_aligned_new
+#if __cpp_aligned_new >= 201606
 ALCC_INTERNAL_NODISCARD_ATTR void* dynamic_tls_content_array::operator new( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
 {
 	// 	dynamic_tls_content_arrayは、破棄しないクラスなので、メモリ開放を行わないメモリアロケータを使用する

@@ -80,7 +80,7 @@ public:
 	void operator delete( void* ptr, void* ) noexcept;     // delete for area that is initialized by placement new.
 	void operator delete[]( void* ptr, void* ) noexcept;   // delete for area that is initialized by placement new.
 
-#if __cpp_aligned_new
+#if __cpp_aligned_new >= 201606
 	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment );                                     // possible throw std::bad_alloc, from C++17
 	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;     // possible return nullptr, instead of throwing exception, from C++17
 	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, std::align_val_t alignment );                                   // possible throw std::bad_alloc, from C++17
@@ -108,7 +108,7 @@ private:
  * @brief node of one direction linked by hazard handler
  *
  */
-class alignas( atomic_variable_align ) od_node_link_by_hazard_handler {
+class ALIGNAS_ATOMIC_VARIABLE_ALIGN od_node_link_by_hazard_handler {
 public:
 	using hazard_ptr_handler_t = hazard_ptr_handler<od_node_link_by_hazard_handler>;
 	using hazard_pointer       = typename hazard_ptr_handler<od_node_link_by_hazard_handler>::hazard_pointer;
@@ -161,7 +161,7 @@ private:
  * @brief node of one direction linked by hazard handler that is markable
  *
  */
-class alignas( atomic_variable_align ) od_node_1bit_markable_link_by_hazard_handler {
+class ALIGNAS_ATOMIC_VARIABLE_ALIGN od_node_1bit_markable_link_by_hazard_handler {
 public:
 	using hazard_ptr_handler_t        = hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>;
 	using hazard_pointer              = typename hazard_ptr_w_mark_handler<od_node_1bit_markable_link_by_hazard_handler>::hazard_pointer;

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.1)
 project(alpha_concurrent CXX)
 set(CMAKE_VERBOSE_MAKEFILE 1)
 
-set(CMAKE_CXX_FLAGS_RELEASE " -DNDEBUG -O2")
+include(common.cmake)
 
 # Switch build target
 set(BUILD_TARGET normal CACHE STRING "Build target?")
