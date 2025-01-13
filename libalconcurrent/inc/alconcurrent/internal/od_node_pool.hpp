@@ -110,6 +110,7 @@ public:
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 				--node_count_total_;
 #endif
+				// tl_odn_list_no_in_hazard.merge_push_back( std::move( lk.ref() ) );
 				return static_cast<node_pointer>( p_ans_baseclass_node );
 			}
 		}
@@ -239,7 +240,7 @@ private:
 		~tl_od_node_list()
 		{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-			internal::LogOutput( log_type::TEST, "mv thread local node %zu (%zu)", od_list_.size(), node_count_in_tl_odn_list_.load() );
+			internal::LogOutput( log_type::DUMP, "mv thread local node %zu (%zu)", od_list_.size(), node_count_in_tl_odn_list_.load() );
 			node_count_in_tl_odn_list_ -= od_list_.size();
 #endif
 			ref_g_odn_list_.lock().ref().merge_push_back( std::move( od_list_ ) );
