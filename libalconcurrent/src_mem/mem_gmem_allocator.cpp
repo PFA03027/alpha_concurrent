@@ -10,9 +10,11 @@
  */
 
 #include "alconcurrent/lf_mem_alloc.hpp"
+
 #include "mem_big_memory_slot.hpp"
 #include "mem_retrieved_slot_array_mgr.hpp"
 #include "mem_small_memory_slot.hpp"
+#include "mmap_allocator.hpp"
 
 namespace alpha {
 namespace concurrent {

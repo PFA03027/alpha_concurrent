@@ -23,6 +23,8 @@
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/internal/cpp_std_configure.hpp"
 
+#include "mmap_allocator.hpp"
+
 namespace alpha {
 namespace concurrent {
 

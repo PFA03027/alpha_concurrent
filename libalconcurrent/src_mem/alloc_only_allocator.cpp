@@ -721,9 +721,9 @@ void* alloc_only_chamber::chked_allocate( size_t req_size, size_t req_align ) no
 {
 	void* p_ans = try_allocate( req_size, req_align );
 
-	while ( p_ans == nullptr ) {
+	if ( p_ans == nullptr ) {
 		size_t cur_pre_alloc_size = pre_alloc_size_;
-		if ( cur_pre_alloc_size < req_size ) {
+		if ( cur_pre_alloc_size < ( req_size + sizeof( alloc_chamber ) ) ) {
 			cur_pre_alloc_size = req_size * 2 + sizeof( alloc_chamber );
 #if 0
 			internal::LogOutput( log_type::DEBUG, "requested size is over pre allocation size: req=0x%zx, therefore try to allocate double size: try=0x%zu", req_size, cur_pre_alloc_size );

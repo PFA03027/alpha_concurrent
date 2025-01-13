@@ -18,6 +18,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include "alconcurrent/conf_logger.hpp"
 #include "mmap_allocator.hpp"
 
 namespace alpha {
@@ -37,7 +38,7 @@ namespace internal {
 // }
 
 // static const size_t page_size = get_cur_system_page_size();
-static constexpr size_t page_size = 1024 * 4;   //  = sysconf( _SC_PAGE_SIZE );
+static constexpr size_t page_size = 1024 * 4;   //  = sysconf( _SC_PAGE_SIZE ); It assumes that the values ​​are powers of 2.
 
 std::atomic<size_t> cur_total_allocation_size( 0 );
 std::atomic<size_t> max_total_allocation_size( 0 );
@@ -50,19 +51,33 @@ struct alloc_params {
 
 inline alloc_params calc_cur_system_alloc_params( size_t req_alloc_size, size_t align_size ) noexcept
 {
-	if ( align_size < sizeof( uintptr_t ) ) {
-		align_size = sizeof( uintptr_t );   // 最低のアライメントをポインタサイズに制約する
+	// 適切なalignment値を計算する。
+	size_t corrected_align_size = page_size;
+	if ( align_size <= page_size ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+		if ( !is_power_of_2( align_size ) ) {
+			LogOutput( log_type::ERR, "req_align(%zu) of allocate_by_mmap() is not power of 2.", align_size );
+		}
+#endif
+	} else {
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+		if ( ( align_size % page_size ) == 0 ) {
+			corrected_align_size = align_size;
+		} else {
+			LogOutput( log_type::ERR, "req_align(%zu) of allocate_by_mmap() is not multiple of 4096.", align_size );
+			corrected_align_size = page_size;
+		}
+#else
+		corrected_align_size = align_size;
+#endif
 	}
+	size_t min_aligne_size = corrected_align_size;
 
-	size_t num_alloc_pages     = req_alloc_size / page_size;
-	size_t cur_real_alloc_size = page_size * ( num_alloc_pages + ( ( ( req_alloc_size % page_size ) == 0 ) ? 0 : 1 ) );
+	size_t num_alloc_pages     = ( req_alloc_size + ( page_size - 1 ) ) / page_size;
+	size_t cur_real_alloc_size = page_size * num_alloc_pages;
 
-	size_t num_align_pages = align_size / page_size;
-	size_t min_aligne_size = page_size * ( num_align_pages + ( ( ( align_size % page_size ) == 0 ) ? 0 : 1 ) );
-
-	size_t overfit_base_size = ( req_alloc_size <= align_size ) ? ( align_size * 2 ) : ( align_size + req_alloc_size );
-	size_t num_overfit_pages = overfit_base_size / page_size;
-	size_t overfit_size      = page_size * ( num_overfit_pages + ( ( ( overfit_base_size % page_size ) == 0 ) ? 0 : 1 ) );
+	size_t num_overfit_pages = ( req_alloc_size + ( min_aligne_size - 1 ) ) / page_size;
+	size_t overfit_size      = page_size * num_overfit_pages;
 
 	return alloc_params { min_aligne_size, cur_real_alloc_size, overfit_size };
 }
@@ -72,9 +87,6 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size ) noe
 	if ( req_alloc_size > conf_max_mmap_alloc_size ) {
 		// too big allocation request
 		return allocate_result { nullptr, 0 };
-	}
-	if ( align_size < sizeof( void* ) ) {
-		align_size = sizeof( void* );   // 最低のアライメントをポインタサイズに制約する
 	}
 
 	alloc_params page_aligned_params = calc_cur_system_alloc_params( req_alloc_size, align_size );
@@ -122,6 +134,9 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size ) noe
 		if ( munmap_ret1 != 0 ) {
 			// auto cur_errno = errno;
 			perror( "munmap of pre block is fail." );
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+			exit( 1 );
+#endif
 		}
 	}
 	if ( size_unmap_post_block != 0 ) {
@@ -129,6 +144,9 @@ allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size ) noe
 		if ( munmap_ret2 != 0 ) {
 			// auto cur_errno = errno;
 			perror( "munmap of post block is fail." );
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+			exit( 1 );
+#endif
 		}
 	}
 #endif
