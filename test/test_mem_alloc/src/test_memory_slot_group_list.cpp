@@ -154,6 +154,7 @@ TEST( Test_MemorySlotGroupList, DeallocateOneSlot_DoAllocate_Then_ReturnElement 
 	constexpr size_t max_buffer_size  = 1024 * 4;
 	constexpr size_t init_buffer_size = 1024 * 4;
 	tut              sut( 15, max_buffer_size, init_buffer_size );
+	sut.clear_for_test();
 
 	unsigned char buff_memory_slot_group[1024 * 4];
 	auto          p_ret = alpha::concurrent::internal::memory_slot_group::emplace_on_mem( buff_memory_slot_group, nullptr, 1024 * 4, 15 );

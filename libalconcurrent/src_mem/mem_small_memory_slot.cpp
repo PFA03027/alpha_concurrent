@@ -169,6 +169,7 @@ void memory_slot_group_list::request_allocate_memory_slot_group( void ) noexcept
 
 void memory_slot_group_list::clear_for_test( void ) noexcept
 {
+	retrieved_small_slots_array_mgr::reset_for_test();
 	memory_slot_group* p_cur = ap_head_memory_slot_group_.load( std::memory_order_acquire );
 	while ( p_cur != nullptr ) {
 		memory_slot_group* p_next = p_cur->ap_next_group_;
