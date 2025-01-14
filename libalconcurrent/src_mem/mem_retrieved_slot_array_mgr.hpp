@@ -368,7 +368,18 @@ typename retrieved_slots_stack_array_mgr<SLOT_T>::slot_pointer retrieved_slots_s
 		}
 	}
 
-	return global_in_hazard_retrieved_slots_lockable_stack_[idx].try_pop();
+	p = global_in_hazard_retrieved_slots_lockable_stack_[idx].try_pop();
+	if ( p != nullptr ) {
+		if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p ) ) {
+			// まだハザードポインタとして登録されている場合、ハザードポインタ登録中のリストに差し戻す。
+			tls_data_.in_hazard_retrieved_slots_stack_[idx].push( p );
+		} else {
+			// ハザードポインタとして登録されていない場合
+			return p;
+		}
+	}
+
+	return nullptr;
 }
 
 template <typename SLOT_T>
