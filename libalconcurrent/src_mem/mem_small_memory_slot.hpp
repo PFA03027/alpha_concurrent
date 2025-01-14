@@ -50,7 +50,7 @@ struct slot_link_info {
 		return new ( p_mem ) slot_link_info( p_owner );
 	}
 
-	memory_slot_group* check_validity_to_ownwer_and_get( void ) noexcept;
+	memory_slot_group* check_validity_to_owner_and_get( void ) noexcept;
 
 	/**
 	 * @brief Get the aligned allocated mem top object
@@ -395,7 +395,7 @@ inline slot_link_info* memory_slot_group_list::allocate( void ) noexcept
 
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	if ( p_ans != nullptr ) {
-		auto p_slot_owner = p_ans->check_validity_to_ownwer_and_get();
+		auto p_slot_owner = p_ans->check_validity_to_owner_and_get();
 		if ( p_slot_owner == nullptr ) {
 			LogOutput( log_type::WARN, "retrieved_slots_mgr_impl<SLOT_T>::request_reuse() invalid SLOT_T" );
 			return nullptr;

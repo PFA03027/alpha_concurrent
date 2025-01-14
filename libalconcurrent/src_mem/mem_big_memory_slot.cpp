@@ -20,7 +20,7 @@ namespace internal {
 size_t big_memory_slot_list::limit_bytes_of_unused_retrieved_memory_    = big_memory_slot_list::defualt_limit_bytes_of_unused_retrieved_memory_;
 size_t big_memory_slot_list::too_big_memory_slot_buffer_size_threshold_ = big_memory_slot_list::defualt_limit_bytes_of_unused_retrieved_memory_;
 
-big_memory_slot* big_memory_slot::check_validity_to_ownwer_and_get( void ) const noexcept
+big_memory_slot* big_memory_slot::check_validity_to_owner_and_get( void ) const noexcept
 {
 	big_memory_slot* p_slot_owner = link_to_big_memory_slot_.load_addr<big_memory_slot>();
 	if ( p_slot_owner == nullptr ) {
@@ -67,7 +67,7 @@ big_memory_slot* big_memory_slot_list::reuse_allocate( size_t requested_allocata
 		}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
-		auto p_slot_owner = p_ans->check_validity_to_ownwer_and_get();
+		auto p_slot_owner = p_ans->check_validity_to_owner_and_get();
 		if ( p_slot_owner == nullptr ) {
 			LogOutput( log_type::WARN, "big_memory_slot_list::reuse_allocate() is invalid big_memory_slot" );
 			return nullptr;
@@ -86,7 +86,7 @@ bool big_memory_slot_list::deallocate( big_memory_slot* p ) noexcept
 		LogOutput( log_type::DEBUG, "big_memory_slot_list::deallocate() is called with nullptr" );
 		return false;
 	}
-	auto p_slot_owner = p->check_validity_to_ownwer_and_get();
+	auto p_slot_owner = p->check_validity_to_owner_and_get();
 	if ( p_slot_owner == nullptr ) {
 		LogOutput( log_type::WARN, "big_memory_slot_list::deallocate() is called with invalid big_memory_slot" );
 		bt_info::record_backtrace().dump_to_log( log_type::WARN, 'i', 1 );

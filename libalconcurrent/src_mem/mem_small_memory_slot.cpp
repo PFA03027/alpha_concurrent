@@ -24,7 +24,7 @@ constexpr size_t          conf_pre_mmap_size = 1024 * 1024;
 static alloc_only_chamber gmem_alloc_only_inst( false, conf_pre_mmap_size );   // グローバルインスタンスは、プロセス終了までメモリ領域を維持するために、デストラクタが呼ばれてもmmapした領域を解放しない。
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-memory_slot_group* slot_link_info::check_validity_to_ownwer_and_get( void ) noexcept
+memory_slot_group* slot_link_info::check_validity_to_owner_and_get( void ) noexcept
 {
 	memory_slot_group* p_slot_owner = link_to_memory_slot_group_.load_addr<memory_slot_group>();
 	if ( p_slot_owner == nullptr ) {
@@ -130,7 +130,7 @@ bool memory_slot_group_list::deallocate( slot_link_info* p ) noexcept
 		LogOutput( log_type::DEBUG, "memory_slot_group_list::deallocate() with nullptr" );
 		return false;
 	}
-	auto p_slot_owner = p->check_validity_to_ownwer_and_get();
+	auto p_slot_owner = p->check_validity_to_owner_and_get();
 	if ( p_slot_owner == nullptr ) {
 		LogOutput( log_type::WARN, "memory_slot_group_list::deallocate() invalid slot_link_info" );
 		bt_info::record_backtrace().dump_to_log( log_type::WARN, 'i', 2 );
