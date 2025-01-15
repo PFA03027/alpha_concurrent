@@ -47,6 +47,7 @@ public:
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		internal::LogOutput( log_type::DUMP, "x_lockfree_fifo: allocated_node_count = %zu", allocated_node_count_.load() );
+		internal::LogOutput( log_type::DUMP, "od_node_pool: %s", node_pool_t::profile_info_string().c_str() );
 #endif
 
 		auto tmp = pop();

@@ -240,7 +240,7 @@ private:
 		~tl_od_node_list()
 		{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-			internal::LogOutput( log_type::DUMP, "mv thread local node %zu (%zu)", od_list_.size(), node_count_in_tl_odn_list_.load() );
+			// internal::LogOutput( log_type::DUMP, "this thread local nodes: %zu, current total thread local nodes: %zu", od_list_.size(), node_count_in_tl_odn_list_.load() );
 			node_count_in_tl_odn_list_ -= od_list_.size();
 #endif
 			ref_g_odn_list_.lock().ref().merge_push_back( std::move( od_list_ ) );
