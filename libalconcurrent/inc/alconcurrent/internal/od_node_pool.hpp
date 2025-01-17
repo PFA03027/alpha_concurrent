@@ -19,6 +19,7 @@
 
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/hazard_ptr.hpp"
+#include "alconcurrent/internal/od_lockfree_stack.hpp"
 #include "alconcurrent/internal/od_simple_list.hpp"
 
 namespace alpha {
@@ -51,7 +52,7 @@ class od_node_pool {
 	static_assert(
 		std::is_base_of<od_node_link_by_hazard_handler, NODE_T>::value ||
 			std::is_base_of<od_node_1bit_markable_link_by_hazard_handler, NODE_T>::value,
-		"NODE_T should be a derived class of od_node_simple_link." );
+		"NODE_T should be a derived class of od_node_link_by_hazard_handler or od_node_1bit_markable_link_by_hazard_handler." );
 
 public:
 	using node_type    = NODE_T;
@@ -87,7 +88,8 @@ public:
 			return;
 		}
 
-		tl_odn_list_no_in_hazard.push_back( p_nd );   // スレッドローカルな変数に保存する。
+		g_odn_lockfree_list_no_in_hazard_.push_front( p_nd );
+		// tl_odn_list_no_in_hazard.push_back( p_nd );   // スレッドローカルな変数に保存する。
 		return;
 	}
 
@@ -114,6 +116,16 @@ public:
 					// tl_odn_list_no_in_hazard.merge_push_back( std::move( lk.ref() ) );
 					return static_cast<node_pointer>( p_ans_baseclass_node );
 				}
+			}
+		}
+
+		{
+			auto p_baseclass_node = g_odn_lockfree_list_no_in_hazard_.pop_front();
+			if ( p_baseclass_node != nullptr ) {
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+				--node_count_total_;
+#endif
+				return static_cast<node_pointer>( p_baseclass_node );
 			}
 		}
 
@@ -218,6 +230,7 @@ private:
 	using const_node_pointer = const NODE_T*;
 	using raw_list           = od_simple_list;
 	using g_node_list_t      = od_simple_list_lockable;
+	using g_lockfree_list_t  = typename std::conditional<std::is_base_of<od_node_link_by_hazard_handler, NODE_T>::value, od_lockfree_stack, od_lockfree_stack_m>::type;
 
 	class tl_od_node_list
 #ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
@@ -424,8 +437,9 @@ private:
 	static tl_od_node_list& get_tl_odn_list_still_in_hazard( void );
 	static tl_od_node_list& get_tl_odn_list_no_in_hazard( void );
 
-	static g_node_list_t g_odn_list_no_in_hazard_;      //!< 他スレッド終了時等、共通プールとしてハザードポインタに登録されていないノードを引き受けるためのグローバル変数。
-	static g_node_list_t g_odn_list_still_in_hazard_;   //!< 他スレッド終了時等、共通プールとしてハザードポインタに登録されているノードを引き受けるためのグローバル変数。
+	static g_lockfree_list_t g_odn_lockfree_list_no_in_hazard_;   //!< ハザードポインタに登録されていないノードを引き受けるためのグローバル変数。
+	static g_node_list_t     g_odn_list_no_in_hazard_;            //!< 他スレッド終了時等、共通プールとしてハザードポインタに登録されていないノードを引き受けるためのグローバル変数。
+	static g_node_list_t     g_odn_list_still_in_hazard_;         //!< 他スレッド終了時等、共通プールとしてハザードポインタに登録されているノードを引き受けるためのグローバル変数。
 #ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
 	static thread_local tl_od_node_list* x_tl_p_odn_list_still_in_hazard_;   //!< ハザードポインタに登録されている場合に、一時保管するためのリスト。へのポインタ。下の表現方法の代用。
 	static thread_local tl_od_node_list* x_tl_p_odn_list_no_in_hazard_;      //!< ハザードポインタに登録されている場合に、一時保管するためのリスト。へのポインタ。下の表現方法の代用。
@@ -438,6 +452,8 @@ private:
 #endif
 };
 
+template <typename NODE_T>
+typename od_node_pool<NODE_T>::g_lockfree_list_t od_node_pool<NODE_T>::g_odn_lockfree_list_no_in_hazard_;
 template <typename NODE_T>
 typename od_node_pool<NODE_T>::g_node_list_t od_node_pool<NODE_T>::g_odn_list_no_in_hazard_;
 template <typename NODE_T>
