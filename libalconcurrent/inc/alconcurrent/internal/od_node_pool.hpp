@@ -67,7 +67,19 @@ public:
 #endif
 
 		if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p_nd->get_pointer_of_hazard_check() ) ) {
-			get_tl_odn_list_still_in_hazard().push_back( p_nd );
+			// スレッドローカルのハザードポインタ登録中のリストが大きくなりすぎていたら、まとめて棚卸をする。
+			tl_od_node_list& tl_odn_list_still_in_hazard = get_tl_odn_list_still_in_hazard();
+			if ( tl_odn_list_still_in_hazard.size() >= 50 ) {
+				tl_od_node_list& tl_odn_list_no_in_hazard = get_tl_odn_list_no_in_hazard();
+				node_pointer     p_ans                    = try_pop_from_still_in_hazard_list(
+                    tl_odn_list_still_in_hazard.move_to(),
+                    tl_odn_list_still_in_hazard,
+                    tl_odn_list_no_in_hazard );
+				if ( p_ans != nullptr ) {
+					tl_odn_list_no_in_hazard.push_back( p_ans );
+				}
+			}
+			tl_odn_list_still_in_hazard.push_back( p_nd );
 			return;
 		}
 		reset_value_of_node( p_nd );
@@ -133,7 +145,7 @@ public:
 			// スレッドローカルのハザードポインタ登録中のリストの中から使えるノードを探す。
 			tl_od_node_list& tl_odn_list_still_in_hazard = get_tl_odn_list_still_in_hazard();
 			node_pointer     p_ans                       = try_pop_from_still_in_hazard_list(
-                std::move( tl_odn_list_still_in_hazard.move_to() ),
+                tl_odn_list_still_in_hazard.move_to(),
                 tl_odn_list_still_in_hazard,
                 tl_odn_list_no_in_hazard );
 			if ( p_ans != nullptr ) {
