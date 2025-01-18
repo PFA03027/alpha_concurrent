@@ -14,10 +14,7 @@
 #ifndef ALCONCCURRENT_INC_HAZARD_PTR_HPP_
 #define ALCONCCURRENT_INC_HAZARD_PTR_HPP_
 
-#include <pthread.h>
-
 #include <atomic>
-#include <list>
 #include <memory>
 #include <mutex>
 #include <thread>

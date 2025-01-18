@@ -12,13 +12,9 @@
 #ifndef ALCONCURRENT_INC_INTERNAL_OD_NODE_POOL_HPP_
 #define ALCONCURRENT_INC_INTERNAL_OD_NODE_POOL_HPP_
 
-#ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
-#include <list>
-#include <memory>
-#endif
-
 #include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/hazard_ptr.hpp"
+#include "alconcurrent/internal/cpp_std_configure.hpp"
 #include "alconcurrent/internal/od_lockfree_stack.hpp"
 #include "alconcurrent/internal/od_simple_list.hpp"
 
@@ -31,8 +27,75 @@ namespace internal {
  * @brief counter measure code for https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66944
  *
  */
-struct countermeasure_gcc_bug_deletable_obj_abst {
+class countermeasure_gcc_bug_deletable_obj_abst {
+public:
 	virtual ~countermeasure_gcc_bug_deletable_obj_abst() = default;
+
+	template <typename T, typename... Args>
+	static T* make_instance_and_store_tls( Args&&... args )
+	{
+		T* p_ans = new T { std::forward<Args>( args )... };
+		push_tls_list( p_ans );
+		return p_ans;
+	}
+
+#ifdef ALCONCURRENT_CONF_USE_MALLOC_ALLWAYS_FOR_DEBUG_WITH_SANITIZER
+#else
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size );                                     // possible throw std::bad_alloc, from C++11
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, const std::nothrow_t& ) noexcept;     // possible return nullptr, instead of throwing exception, from C++11
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size );                                   // possible throw std::bad_alloc, from C++11
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, const std::nothrow_t& ) noexcept;   // possible return nullptr, instead of throwing exception, from C++11
+
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, void* ptr ) noexcept;     // placement new, from C++11
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, void* ptr ) noexcept;   // placement new for array, from C++11
+
+	void operator delete( void* ptr ) noexcept;     // from C++11
+	void operator delete[]( void* ptr ) noexcept;   // from C++11
+
+	void operator delete( void* ptr, std::size_t size ) noexcept;     // from C++14
+	void operator delete[]( void* ptr, std::size_t size ) noexcept;   // from C++14
+
+	void operator delete( void* ptr, const std::nothrow_t& ) noexcept;     // from C++11
+	void operator delete[]( void* ptr, const std::nothrow_t& ) noexcept;   // from C++11
+
+	void operator delete( void* ptr, std::size_t size, const std::nothrow_t& ) noexcept;     // from C++14
+	void operator delete[]( void* ptr, std::size_t size, const std::nothrow_t& ) noexcept;   // from C++14
+
+	void operator delete( void* ptr, void* ) noexcept;     // delete for area that is initialized by placement new.
+	void operator delete[]( void* ptr, void* ) noexcept;   // delete for area that is initialized by placement new.
+
+#if __cpp_aligned_new >= 201606
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment );                                     // possible throw std::bad_alloc, from C++17
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;     // possible return nullptr, instead of throwing exception, from C++17
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, std::align_val_t alignment );                                   // possible throw std::bad_alloc, from C++17
+	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;   // possible return nullptr, instead of throwing exception, from C++17
+
+	void operator delete( void* ptr, std::align_val_t alignment ) noexcept;     // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+	void operator delete[]( void* ptr, std::align_val_t alignment ) noexcept;   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+
+	void operator delete( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept;     // from C++17
+	void operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment ) noexcept;   // from C++17
+
+	void operator delete( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept;     // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+	void operator delete[]( void* ptr, std::align_val_t alignment, const std::nothrow_t& ) noexcept;   // from C++17, and no sized deallocation support(in case of using clang without -fsized-deallocation)
+
+	void operator delete( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;     // from C++17
+	void operator delete[]( void* ptr, std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;   // from C++17
+#endif
+#endif
+
+protected:
+	constexpr countermeasure_gcc_bug_deletable_obj_abst( void ) noexcept
+	  : p_next_( nullptr )
+	{
+	}
+
+private:
+	static void push_tls_list( countermeasure_gcc_bug_deletable_obj_abst* p );
+
+	countermeasure_gcc_bug_deletable_obj_abst* p_next_;
+
+	friend class countermeasure_gcc_bug_deletable_obj_abst_tls_list;
 };
 #endif
 
@@ -507,7 +570,6 @@ template <typename NODE_T>
 typename od_node_pool<NODE_T>::g_node_list_t od_node_pool<NODE_T>::g_odn_list_still_in_hazard_;
 
 #ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
-extern thread_local std::list<std::unique_ptr<countermeasure_gcc_bug_deletable_obj_abst>> tl_list_list;
 template <typename NODE_T>
 thread_local typename od_node_pool<NODE_T>::tl_od_node_list* od_node_pool<NODE_T>::x_tl_p_odn_list_still_in_hazard_ = nullptr;
 template <typename NODE_T>
@@ -531,8 +593,7 @@ inline typename od_node_pool<NODE_T>::tl_od_node_list& od_node_pool<NODE_T>::get
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
 	if ( x_tl_p_odn_list_still_in_hazard_ == nullptr ) {
-		x_tl_p_odn_list_still_in_hazard_ = new tl_od_node_list( g_odn_list_still_in_hazard_ );
-		tl_list_list.push_back( std::unique_ptr<countermeasure_gcc_bug_deletable_obj_abst>( x_tl_p_odn_list_still_in_hazard_ ) );
+		x_tl_p_odn_list_still_in_hazard_ = countermeasure_gcc_bug_deletable_obj_abst::make_instance_and_store_tls<tl_od_node_list>( g_odn_list_still_in_hazard_ );
 	}
 	return *x_tl_p_odn_list_still_in_hazard_;
 #else
@@ -545,8 +606,7 @@ inline typename od_node_pool<NODE_T>::tl_od_node_list& od_node_pool<NODE_T>::get
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_COUNTERMEASURE_GCC_BUG_66944
 	if ( x_tl_p_odn_list_no_in_hazard_ == nullptr ) {
-		x_tl_p_odn_list_no_in_hazard_ = new tl_od_node_list( g_odn_list_no_in_hazard_ );
-		tl_list_list.push_back( std::unique_ptr<countermeasure_gcc_bug_deletable_obj_abst>( x_tl_p_odn_list_no_in_hazard_ ) );
+		x_tl_p_odn_list_no_in_hazard_ = countermeasure_gcc_bug_deletable_obj_abst::make_instance_and_store_tls<tl_od_node_list>( g_odn_list_no_in_hazard_ );
 	}
 	return *x_tl_p_odn_list_no_in_hazard_;
 #else

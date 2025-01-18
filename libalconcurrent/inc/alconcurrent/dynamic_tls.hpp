@@ -19,8 +19,6 @@
 #ifndef ALCONCCURRENT_INC_DYNAMIC_TLS_HPP_
 #define ALCONCCURRENT_INC_DYNAMIC_TLS_HPP_
 
-#include <pthread.h>
-
 #include <atomic>
 #include <cassert>
 #include <cstdlib>
