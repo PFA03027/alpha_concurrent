@@ -1,9 +1,9 @@
 
 include ../common.mk
 
-CXXFLAGS +=	-c -MMD -MP $(CXX_STD) -O2 -g -Wall -I./inc/
+CXXFLAGS +=	-c -MMD -MP $(CXX_STD) -O2 -g -Wall -I./inc/ -I./src_mem/ -I./src/
 
-SRCS := $(wildcard src/*.cpp)
+SRCS := $(wildcard src/*.cpp src_mem/*.cpp)
 OBJS := $(SRCS:%.cpp=%.o)
 DEPS := $(SRCS:%.cpp=%.d)
 

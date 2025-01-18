@@ -149,6 +149,21 @@ public:
 		return lf_fifo_impl_.is_empty();
 	}
 
+	/*!
+	 * @brief	get the total number of the allocated internal nodes
+	 *
+	 * @warning
+	 * This List will be access by several thread concurrently. So, true number of this List may be changed when caller uses the returned value.
+	 */
+	size_t get_allocated_num( void )
+	{
+		size_t ans = 0;
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		ans = allocated_node_count_.load();
+#endif
+		return ans;
+	}
+
 	static void clear_node_pool_as_possible_as( void )
 	{
 		node_pool_t::clear_as_possible_as();
@@ -157,6 +172,16 @@ public:
 private:
 	using node_type    = od_node_type1<T>;
 	using node_pointer = od_node_type1<T>*;
+
+	static void pre_allocate_nodes( size_t n )
+	{
+		for ( size_t i = 0; i < n; i++ ) {
+			node_pool_t::push( new node_type );
+		}
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
+		allocated_node_count_ += n;
+#endif
+	}
 
 	static node_pointer allocate_node( void )
 	{

@@ -436,6 +436,11 @@ public:
 		return ans;
 	}
 
+	static void clear_node_pool_as_possible_as( void )
+	{
+		node_pool_t::clear_as_possible_as();
+	}
+
 private:
 	using node_type    = od_node_type2<T>;
 	using node_pointer = od_node_type2<T>*;
