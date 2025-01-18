@@ -257,8 +257,8 @@ ALCC_INTERNAL_NODISCARD_ATTR void* gmem_allocate(
 }
 
 ALCC_INTERNAL_NODISCARD_ATTR void* gmem_allocate(
-	size_t n,                                //!< [in] memory size to allocate
-	size_t req_align = sizeof( uintptr_t )   //!< [in] requested align size. req_align should be the power of 2
+	size_t n,          //!< [in] memory size to allocate
+	size_t req_align   //!< [in] requested align size. req_align should be the power of 2
 )
 {
 	if ( !internal::is_power_of_2( req_align ) ) {
@@ -279,6 +279,10 @@ bool gmem_deallocate(
 	bool                         ans           = false;
 	internal::allocated_mem_top* p_top         = internal::allocated_mem_top::get_structure_addr( p_mem );
 	auto                         slot_info_tmp = p_top->load_allocation_info<void>();
+	if ( slot_info_tmp.p_mgr_ == nullptr ) {
+		internal::LogOutput( log_type::ERR, "gmem does not allocate this address %p", p_mem );
+		return false;
+	}
 	if ( slot_info_tmp.mt_ == internal::mem_type::SMALL_MEM ) {
 		auto slot_info = p_top->load_allocation_info<internal::memory_slot_group>();
 		auto idx       = slot_info.p_mgr_->get_slot_idx( p_mem );
@@ -306,6 +310,39 @@ bool gmem_deallocate(
 	return ans;
 }
 
+size_t get_max_allocatable_size(
+	void* p_mem   //!< [in] pointer to free.
+)
+{
+	if ( p_mem == nullptr ) {
+		return 0;
+	}
+
+	internal::allocated_mem_top* p_top         = internal::allocated_mem_top::get_structure_addr( p_mem );
+	auto                         slot_info_tmp = p_top->load_allocation_info<void>();
+	if ( slot_info_tmp.p_mgr_ == nullptr ) {
+		internal::LogOutput( log_type::ERR, "gmem does not allocate this address %p", p_mem );
+		return 0;
+	}
+	if ( slot_info_tmp.mt_ == internal::mem_type::SMALL_MEM ) {
+		auto slot_info = p_top->load_allocation_info<internal::memory_slot_group>();
+		auto idx       = slot_info.p_mgr_->get_slot_idx( p_mem );
+		if ( idx < 0 ) {
+			internal::LogOutput( log_type::ERR, "invalid slot index." );
+			return 0;
+		}
+		internal::slot_link_info* p_slot = slot_info.p_mgr_->get_slot_pointer( static_cast<size_t>( idx ) + 1 );
+		return reinterpret_cast<uintptr_t>( p_slot ) - reinterpret_cast<uintptr_t>( p_mem );
+	} else if ( ( slot_info_tmp.mt_ == internal::mem_type::BIG_MEM ) || ( slot_info_tmp.mt_ == internal::mem_type::OVER_BIG_MEM ) ) {
+		auto slot_info = p_top->load_allocation_info<internal::big_memory_slot>();
+		return slot_info.p_mgr_->buffer_size_ - ( reinterpret_cast<uintptr_t>( p_mem ) - reinterpret_cast<uintptr_t>( slot_info.p_mgr_ ) );
+	} else {
+		internal::LogOutput( log_type::ERR, "unknown slot type." );
+	}
+
+	return 0;
+}
+
 void gmem_dump_status( log_type lt, char c, int id ) noexcept
 {
 	constexpr size_t array_count = sizeof( g_memory_slot_group_list_array ) / sizeof( g_memory_slot_group_list_array[0] );
@@ -316,3 +353,48 @@ void gmem_dump_status( log_type lt, char c, int id ) noexcept
 
 }   // namespace concurrent
 }   // namespace alpha
+
+#if 0
+void* malloc( size_t n )
+{
+	return alpha::concurrent::gmem_allocate( n );
+}
+
+void free( void* p )
+{
+	alpha::concurrent::gmem_deallocate( p );
+}
+
+void* calloc( size_t nmemb, size_t n )
+{
+	void* p_ans = alpha::concurrent::gmem_allocate( nmemb * n );
+	if ( p_ans != nullptr ) {
+		memset( p_ans, 0, nmemb * n );
+	}
+	return p_ans;
+}
+
+void* realloc( void* ptr, size_t n )
+{
+	if ( ptr == nullptr ) {
+		return alpha::concurrent::gmem_allocate( n );
+	}
+	if ( n == 0 ) {
+		alpha::concurrent::gmem_deallocate( ptr );
+		return nullptr;
+	}
+
+	size_t possible_max_size = alpha::concurrent::get_max_allocatable_size( ptr );
+	if ( n <= possible_max_size ) {
+		return ptr;
+	}
+
+	void* p_ans = alpha::concurrent::gmem_allocate( n );
+	if ( p_ans != nullptr ) {
+		memcpy( p_ans, ptr, possible_max_size );
+	}
+	alpha::concurrent::gmem_deallocate( ptr );
+
+	return p_ans;
+}
+#endif

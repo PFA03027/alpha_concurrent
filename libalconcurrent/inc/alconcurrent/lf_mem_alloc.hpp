@@ -65,6 +65,10 @@ bool gmem_deallocate(
 
 void gmem_dump_status( log_type lt, char c, int id ) noexcept;
 
+size_t get_max_allocatable_size(
+	void* p_mem   //!< [in] pointer.
+);
+
 }   // namespace concurrent
 }   // namespace alpha
 
