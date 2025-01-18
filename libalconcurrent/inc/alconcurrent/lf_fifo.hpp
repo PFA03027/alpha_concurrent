@@ -38,9 +38,15 @@ public:
 
 	using value_type = T;
 
-	x_lockfree_fifo( void ) noexcept
+	x_lockfree_fifo( void )
 	  : lf_fifo_impl_()
+	  , allocated_node_count_( 0 )
 	{
+	}
+	x_lockfree_fifo( size_t reserve_size )
+	  : x_lockfree_fifo()
+	{
+		pre_allocate_nodes( reserve_size );
 	}
 
 	~x_lockfree_fifo()
@@ -54,8 +60,11 @@ public:
 		while ( tmp.has_value() ) {
 			tmp = pop();
 		}
-
 		node_pool_t::push( lf_fifo_impl_.release_sentinel_node() );
+
+		for ( size_t i = 0; i < allocated_node_count_.load(); i++ ) {   // allocateしたノードをすべて開放する
+			delete node_pool_t::pop();
+		}
 	}
 
 	template <bool IsCopyConstructible = std::is_copy_constructible<value_type>::value,
@@ -157,11 +166,7 @@ public:
 	 */
 	size_t get_allocated_num( void )
 	{
-		size_t ans = 0;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-		ans = allocated_node_count_.load();
-#endif
-		return ans;
+		return allocated_node_count_.load();
 	}
 
 	static void clear_node_pool_as_possible_as( void )
@@ -173,63 +178,61 @@ private:
 	using node_type    = od_node_type1<T>;
 	using node_pointer = od_node_type1<T>*;
 
-	static void pre_allocate_nodes( size_t n )
+	void pre_allocate_nodes( size_t n )
 	{
 		for ( size_t i = 0; i < n; i++ ) {
 			node_pool_t::push( new node_type );
 		}
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		allocated_node_count_ += n;
-#endif
 	}
 
-	static node_pointer allocate_node( void )
+	static node_pointer allocate_node_as_sentinel( void )
 	{
 		node_pointer p_new_nd = node_pool_t::pop();
 		if ( p_new_nd == nullptr ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-			allocated_node_count_++;
-#endif
 			p_new_nd = new node_type;
 		}
 		return p_new_nd;
 	}
-	static node_pointer allocate_node( const T& v_arg )
+	node_pointer allocate_node( void )
+	{
+		node_pointer p_new_nd = node_pool_t::pop();
+		if ( p_new_nd == nullptr ) {
+			allocated_node_count_++;
+			p_new_nd = new node_type;
+		}
+		return p_new_nd;
+	}
+	node_pointer allocate_node( const T& v_arg )
 	{
 		node_pointer p_new_nd = node_pool_t::pop();
 		if ( p_new_nd != nullptr ) {
 			p_new_nd->set_value( v_arg );
 		} else {
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			allocated_node_count_++;
-#endif
 			p_new_nd = new node_type( v_arg );
 		}
 		return p_new_nd;
 	}
-	static node_pointer allocate_node( T&& v_arg )
+	node_pointer allocate_node( T&& v_arg )
 	{
 		node_pointer p_new_nd = node_pool_t::pop();
 		if ( p_new_nd != nullptr ) {
 			p_new_nd->set_value( std::move( v_arg ) );
 		} else {
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			allocated_node_count_++;
-#endif
 			p_new_nd = new node_type( std::move( v_arg ) );
 		}
 		return p_new_nd;
 	}
 	template <typename... Args>
-	static node_pointer allocate_node_emplace( Args&&... args )
+	node_pointer allocate_node_emplace( Args&&... args )
 	{
 		node_pointer p_new_nd = node_pool_t::pop();
 		if ( p_new_nd != nullptr ) {
 			p_new_nd->emplace_value( std::forward<Args>( args )... );
 		} else {
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			allocated_node_count_++;
-#endif
 			p_new_nd = new node_type( alcc_in_place, std::forward<Args>( args )... );
 		}
 		return p_new_nd;
@@ -238,7 +241,7 @@ private:
 	class node_fifo_lockfree_t : private od_lockfree_fifo {
 	public:
 		node_fifo_lockfree_t( void )
-		  : od_lockfree_fifo( x_lockfree_fifo::allocate_node() )
+		  : od_lockfree_fifo( x_lockfree_fifo::allocate_node_as_sentinel() )
 		{
 		}
 
@@ -301,26 +304,18 @@ private:
 
 	using node_pool_t = od_node_pool<node_type>;
 
-	node_fifo_lockfree_t lf_fifo_impl_;
-
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-	static std::atomic<size_t> allocated_node_count_;
-#endif
+	node_fifo_lockfree_t lf_fifo_impl_;           //!< lock-free fifo
+	std::atomic<size_t>  allocated_node_count_;   //!< allocated nodes count
 };
-
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-template <typename T>
-std::atomic<size_t> x_lockfree_fifo<T>::allocated_node_count_( 0 );
-#endif
 
 }   // namespace internal
 
 template <typename T>
 class fifo_list : public internal::x_lockfree_fifo<T> {
 public:
-	fifo_list( void ) = default;
-	fifo_list( size_t reserve_size ) noexcept
-	  : fifo_list()
+	fifo_list( void ) noexcept = default;
+	fifo_list( size_t reserve_size )
+	  : internal::x_lockfree_fifo<T>( reserve_size )
 	{
 	}
 };
@@ -329,9 +324,9 @@ class fifo_list<T[]> : public internal::x_lockfree_fifo<T*> {
 public:
 	using value_type = T[];
 
-	fifo_list( void ) = default;
-	fifo_list( size_t reserve_size ) noexcept
-	  : fifo_list()
+	fifo_list( void ) noexcept = default;
+	fifo_list( size_t reserve_size )
+	  : internal::x_lockfree_fifo<T*>( reserve_size )
 	{
 	}
 };
@@ -341,8 +336,8 @@ public:
 	using value_type = T[N];
 
 	fifo_list( void ) = default;
-	fifo_list( size_t reserve_size ) noexcept
-	  : fifo_list()
+	fifo_list( size_t reserve_size )
+	  : internal::x_lockfree_fifo<std::array<T, N>>( reserve_size )
 	{
 	}
 
