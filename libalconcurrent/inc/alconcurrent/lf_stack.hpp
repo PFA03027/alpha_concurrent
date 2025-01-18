@@ -38,16 +38,15 @@ public:
 
 	constexpr x_lockfree_stack( void ) noexcept
 	  : lf_stack_impl_()
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	  , allocated_node_count_( 0 )
-#endif
 	{
 	}
-
-	x_lockfree_stack( size_t reserve_size ) noexcept
+	x_lockfree_stack( size_t reserve_size )
 	  : x_lockfree_stack()
 	{
+		pre_allocate_nodes( reserve_size );
 	}
+
 	~x_lockfree_stack()
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
@@ -62,6 +61,10 @@ public:
 		while ( tmp.has_value() ) {
 			tmp = pop();
 		}
+
+		for ( size_t i = 0; i < allocated_node_count_.load(); i++ ) {   // allocateしたノードをすべて開放する
+			delete node_pool_t::pop();
+		}
 	}
 
 	template <bool IsCopyConstructible = std::is_copy_constructible<value_type>::value,
@@ -74,9 +77,7 @@ public:
 		if ( p_new_nd != nullptr ) {
 			p_new_nd->set_value( v_arg );
 		} else {
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			allocated_node_count_++;
-#endif
 			p_new_nd = new node_type( v_arg );
 		}
 		lf_stack_impl_.push_front( p_new_nd );
@@ -92,9 +93,7 @@ public:
 		if ( p_new_nd != nullptr ) {
 			p_new_nd->set_value( std::move( v_arg ) );
 		} else {
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			allocated_node_count_++;
-#endif
 			p_new_nd = new node_type( std::move( v_arg ) );
 		}
 		lf_stack_impl_.push_front( p_new_nd );
@@ -107,9 +106,7 @@ public:
 		if ( p_new_nd != nullptr ) {
 			p_new_nd->emplace_value( std::forward<Args>( args )... );
 		} else {
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			allocated_node_count_++;
-#endif
 			p_new_nd = new node_type( alcc_in_place, std::forward<Args>( args )... );
 		}
 		lf_stack_impl_.push_front( p_new_nd );
@@ -163,6 +160,22 @@ public:
 		return lf_stack_impl_.is_empty();
 	}
 
+	/*!
+	 * @brief	get the total number of the allocated internal nodes
+	 *
+	 * @warning
+	 * This List will be access by several thread concurrently. So, true number of this List may be changed when caller uses the returned value.
+	 */
+	size_t get_allocated_num( void )
+	{
+		return allocated_node_count_.load();
+	}
+
+	static void clear_node_pool_as_possible_as( void )
+	{
+		node_pool_t::clear_as_possible_as();
+	}
+
 private:
 	using node_type    = od_node_type1<T>;
 	using node_pointer = od_node_type1<T>*;
@@ -170,11 +183,16 @@ private:
 	using node_stack_lockfree_t = od_lockfree_stack;
 	using node_pool_t           = od_node_pool<node_type>;
 
-	node_stack_lockfree_t lf_stack_impl_;
+	void pre_allocate_nodes( size_t n )
+	{
+		for ( size_t i = 0; i < n; i++ ) {
+			node_pool_t::push( new node_type );
+		}
+		allocated_node_count_ += n;
+	}
 
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-	std::atomic<size_t> allocated_node_count_;
-#endif
+	node_stack_lockfree_t lf_stack_impl_;          //!< lock free stack
+	std::atomic<size_t>   allocated_node_count_;   //!< number of allocated nodes
 };
 
 }   // namespace internal
@@ -182,9 +200,9 @@ private:
 template <typename T>
 class stack_list : public internal::x_lockfree_stack<T> {
 public:
-	stack_list( void ) = default;
-	stack_list( size_t reserve_size ) noexcept
-	  : stack_list()
+	stack_list( void ) noexcept = default;
+	stack_list( size_t reserve_size )
+	  : internal::x_lockfree_stack<T>( reserve_size )
 	{
 	}
 };
@@ -193,9 +211,9 @@ class stack_list<T[]> : public internal::x_lockfree_stack<T*> {
 public:
 	using value_type = T[];
 
-	stack_list( void ) = default;
-	stack_list( size_t reserve_size ) noexcept
-	  : stack_list()
+	stack_list( void ) noexcept = default;
+	stack_list( size_t reserve_size )
+	  : internal::x_lockfree_stack<T*>( reserve_size )
 	{
 	}
 };
@@ -204,9 +222,9 @@ class stack_list<T[N]> : public internal::x_lockfree_stack<std::array<T, N>> {
 public:
 	using value_type = T[N];
 
-	stack_list( void ) = default;
-	stack_list( size_t reserve_size ) noexcept
-	  : stack_list()
+	stack_list( void ) noexcept = default;
+	stack_list( size_t reserve_size )
+	  : internal::x_lockfree_stack<std::array<T, N>>( reserve_size )
 	{
 	}
 

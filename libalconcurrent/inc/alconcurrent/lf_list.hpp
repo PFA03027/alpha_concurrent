@@ -45,8 +45,8 @@ public:
 
 	constexpr x_lockfree_list( void ) noexcept
 	  : lf_list_impl_()
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	  , allocated_node_count_( 0 )
+#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 	  , call_count_push_front_( 0 )
 	  , call_count_pop_front_( 0 )
 	  , call_count_push_back_( 0 )
@@ -54,11 +54,12 @@ public:
 #endif
 	{
 	}
-
-	x_lockfree_list( size_t reserve_size ) noexcept
+	x_lockfree_list( size_t reserve_size )
 	  : x_lockfree_list()
 	{
+		pre_allocate_nodes( reserve_size );
 	}
+
 	~x_lockfree_list()
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
@@ -72,6 +73,10 @@ public:
 #endif
 
 		lf_list_impl_.clear();
+
+		for ( size_t i = 0; i < allocated_node_count_.load(); i++ ) {   // allocateしたノードをすべて開放する
+			delete node_pool_t::pop();
+		}
 	}
 
 	void find_if( predicate_t& f )
@@ -429,11 +434,12 @@ public:
 	 */
 	size_t get_allocated_num( void )
 	{
-		size_t ans = 0;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-		ans = allocated_node_count_.load();
-#endif
-		return ans;
+		return allocated_node_count_.load();
+	}
+
+	static void clear_node_pool_as_possible_as( void )
+	{
+		node_pool_t::clear_as_possible_as();
 	}
 
 private:
@@ -468,9 +474,7 @@ private:
 		node_pointer p_new_node = x_lockfree_list::node_pool_t::pop();
 		if ( p_new_node == nullptr ) {
 			p_new_node = new node_type;
-#ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 			allocated_node_count_++;
-#endif
 		}
 
 		return p_new_node;
@@ -514,10 +518,18 @@ private:
 		return alcc_optional<std::pair<od_lockfree_list::hazard_pointer_w_mark, od_lockfree_list::hazard_pointer_w_mark>> { std::move( ret ) };
 	}
 
-	node_list_lockfree_t lf_list_impl_;
+	void pre_allocate_nodes( size_t n )
+	{
+		for ( size_t i = 0; i < n; i++ ) {
+			node_pool_t::push( new node_type );
+		}
+		allocated_node_count_ += n;
+	}
+
+	node_list_lockfree_t lf_list_impl_;           //!< lock free list
+	std::atomic<size_t>  allocated_node_count_;   //!< number of allocated node count
 
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-	std::atomic<size_t> allocated_node_count_;
 	std::atomic<size_t> call_count_push_front_;
 	std::atomic<size_t> call_count_pop_front_;
 	std::atomic<size_t> call_count_push_back_;
@@ -530,9 +542,9 @@ private:
 template <typename T>
 class lockfree_list : public internal::x_lockfree_list<T> {
 public:
-	lockfree_list( void ) = default;
-	lockfree_list( size_t reserve_size ) noexcept
-	  : lockfree_list()
+	lockfree_list( void ) noexcept = default;
+	lockfree_list( size_t reserve_size )
+	  : internal::x_lockfree_list<T>( reserve_size )
 	{
 	}
 };
@@ -541,9 +553,9 @@ class lockfree_list<T[]> : public internal::x_lockfree_list<T*> {
 public:
 	using value_type = T[];
 
-	lockfree_list( void ) = default;
-	lockfree_list( size_t reserve_size ) noexcept
-	  : lockfree_list()
+	lockfree_list( void ) noexcept = default;
+	lockfree_list( size_t reserve_size )
+	  : internal::x_lockfree_list<T*>( reserve_size )
 	{
 	}
 };
@@ -552,9 +564,9 @@ class lockfree_list<T[N]> : public internal::x_lockfree_list<std::array<T, N>> {
 public:
 	using value_type = T[N];
 
-	lockfree_list( void ) = default;
-	lockfree_list( size_t reserve_size ) noexcept
-	  : lockfree_list()
+	lockfree_list( void ) noexcept = default;
+	lockfree_list( size_t reserve_size )
+	  : internal::x_lockfree_list<std::array<T, N>>( reserve_size )
 	{
 	}
 };

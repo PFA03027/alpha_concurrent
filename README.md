@@ -8,67 +8,39 @@ If you are possible to design the necessary memory size, semi lock-free algorith
 ## Supplement
 C++17 or newer C++ standard is better to compile.
 
-# fifo_list class in lf_fifo.hpp
+# Semi-lock free storage class
+
+## fifo_list class in lf_fifo.hpp
 Semi-lock free FIFO type queue
 
-Template 1st parameter T should be copy assignable.
-
-In case of no avialable free node that carries a value, new node is allocated from heap internally.
-In this case, this queue may be locked. And push() may trigger this behavior.
-
-On the other hand, used free node will be recycled without a memory allocation. In this case, push() is lock free.
-
-To reduce lock behavior, pre-allocated nodes are effective.
-get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
-
-# stack_list class in lf_stack.hpp
+## stack_list class in lf_stack.hpp
 Semi-lock free Stack type queue
 
-Template 1st parameter T should be copy assignable.
-
-In case of no avialable free node that carries a value, new node is allocated from heap internally.
-In this case, this queue may be locked. And push() may trigger this behavior.
-
-On the other hand, used free node will be recycled without a memory allocation. In this case, push() is lock free.
-
-To reduce lock behavior, pre-allocated nodes are effective.
-get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
-
-# lockfree_list class in lf_list.hpp
+## lockfree_list class in lf_list.hpp
 Semi-lock free list
 
-Template 1st parameter T should be copy assignable.
+## Common characteristics of these classes
+Template 1st parameter T is required below
+* copy constructible and copy assignable.
 
-In case of no avialable free node that carries a value, new node is allocated from heap internally.
+or
+
+* move constructible and move assignable.
+
+In case of no available free node that carries a value, new node is allocated from heap internally.
 In this case, this queue may be locked. And push_front()/push_back()/insert() may trigger this behavior.
 
 On the other hand, used free node will be recycled without a memory allocation. In this case, push_front()/push_back()/insert() is lock free.
 
-To reduce lock behavior, pre-allocated nodes are effective.
-get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
-
-# one_side_deque class in lf_one_side_deque.hpp
-Semi-lock free one side deque
-
-Template 1st parameter T should be copy assignable.
-
-In case of no avialable free node that carries a value, new node is allocated from heap internally.
-In this case, this queue may be locked. And push_front()/push_back() may trigger this behavior.
-
-On the other hand, used free node will be recycled without a memory allocation. In this case, push_front()/push_back() is lock free.
-
-To reduce lock behavior, pre-allocated nodes are effective.
-get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
-
-# Supplement
-To resolve ABA issue, this FIFO / Stack / list uses hazard pointer approach.
-
-Non lock free behavior cases are below;
+Below use-case has the possiblity that mmap system call leads blocking behavior;
 
 * Construct a instance itself.
 * Any initial API call by each thread.
 * pop_front()/push_front()/push_back() call in case of no free internal node.
-  * In case that template parameter ALLOW_TO_ALLOCATE is false, these API does not allocate internal node. therefore push()/push_front()/push_back()/insert() is lock free.
+
+To reduce blocking behavior possibility, pre-allocated nodes are effective.
+get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
+To make get_allocated_num() valid behavior , please enable compile option ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE.
 
 
 # dynamic_tls class in dynamic_tls.hpp
@@ -83,10 +55,13 @@ To avoid race condtion b/w dynamic_tls class and thread local storage destructor
 # general memory allocator class that is semi lock-free in lf_mem_alloc.hpp
 This is general memory allocator to get lock-free behavior and to avoid memory fragmentation.
 
-Configured of memory is kept to re-use.
-If the required size is over the max size of configuration paramter, it is allocated directly by mmap() and free it by munmap() also.
+This memory allocator is not use malloc/free. Instead of that, this memroy allocator uses mmap()/munmap().
 
-general_mem_allocator::prune() and gmem_prune() is introduce to release the allocated memory if that is release by general_mem_allocator::deallocate() or gmem_deallocate().
+Small size memory is not release back to system until process end to reduce blocking behavior possibility by mmap().
+
+On the other hand, if the required size is over the pre-defined max size, it is allocated directly by mmap() and free it by munmap() also.
+This means big size memory allocation is not lock-free.
+
 
 # Build
 There is 2way for build
@@ -99,9 +74,6 @@ This build way builds not only libalconcurrent but also test code is possible to
 ### How to build libalconcurrent.a by make
 1. Change the current directory to libalconcurrent
 2. Execute "make all"
-
-There is no platform specific code. Therefore I expect to build this regardless Linux/Windows.
-If you would like to build this library as a shared library on your platform, please modify Makefile.
 
 ### To install your system
 Current libalconcurrent builder is not prepared installing logic.
@@ -118,6 +90,8 @@ In case of Windows system, please download cmake windows binary from https://cma
 After install, please copy xxx/CMake/yyy to zzz/migwin/.  
 Cmake is installed into C:\Program Files\CMake normally. And E.g, the eclipse environment is C:\Eclipse\pleiades\eclipse\mingw.  
 In this case, Copy all folders in C:\Program Files\CMake to C:\Eclipse\pleiades\eclipse\mingw.
+
+To build on Windows, you should replace mmap()/munmap() to other suitable API.
 
 ### Build by cmake for library only build
 type command in the prepared directory  
@@ -188,4 +162,4 @@ Please see "LICENSE.txt"
 
 # TODO
 * 全般的な改善
--- mmap()によるメモリ確保処理を、別スレッドで行い、mmap()処理を隠す
+-- mmap()によるメモリ確保/解放処理を、別スレッドで行い、mmap()処理を隠す
