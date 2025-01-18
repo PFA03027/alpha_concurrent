@@ -43,7 +43,10 @@ od_lockfree_stack::~od_lockfree_stack()
 	}
 
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
-	LogOutput( log_type::DUMP, "od_lockfree_stack push/pop: call count = %zu, loop count = %zu", pushpop_call_count_.load(), pushpop_loop_count_.load() );
+	auto   call_cnt_val = pushpop_call_count_.load();
+	auto   loop_cnt_val = pushpop_loop_count_.load();
+	double ratio_val    = static_cast<double>( loop_cnt_val ) / static_cast<double>( call_cnt_val );
+	LogOutput( log_type::DUMP, "od_lockfree_stack push/pop: call count = %zu, loop count = %zu, ratio = %4.2f", call_cnt_val, loop_cnt_val, ratio_val );
 #endif
 }
 
