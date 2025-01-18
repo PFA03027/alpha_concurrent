@@ -12,7 +12,6 @@
 #ifndef ALCONCURRENT_INC_INTERNAL_HAZARD_PTR_INTERNAL_HPP_
 #define ALCONCURRENT_INC_INTERNAL_HAZARD_PTR_INTERNAL_HPP_
 
-#include <array>
 #include <atomic>
 #include <functional>
 #include <list>

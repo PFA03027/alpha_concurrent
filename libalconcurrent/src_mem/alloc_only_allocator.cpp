@@ -9,12 +9,10 @@
  *
  */
 
+#include <atomic>
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>
-
-#include <atomic>
-#include <new>
 #include <stdexcept>
 
 #include "alconcurrent/conf_logger.hpp"
