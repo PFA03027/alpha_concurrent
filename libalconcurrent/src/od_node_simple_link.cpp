@@ -97,7 +97,7 @@ void od_node_simple_link::operator delete[]( void* ptr, void* ) noexcept   // de
 	// nothing to do
 }
 
-#if __cpp_aligned_new
+#if __cpp_aligned_new >= 201606
 ALCC_INTERNAL_NODISCARD_ATTR void* od_node_simple_link::operator new( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
 {
 	void* p_ans = gmem_allocate( size, static_cast<size_t>( alignment ) );

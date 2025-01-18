@@ -1,8 +1,6 @@
 
 # Common compile options
 
-include(common.cmake)
-
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DALCONCURRENT_CONF_USE_THREAD_LOCAL")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DALCONCURRENT_CONF_LOGGER_INTERNAL_ENABLE_OUTPUT_DUMP")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE")   # To use this option, it is better to define  -rdynamic. This option is also enable double free check

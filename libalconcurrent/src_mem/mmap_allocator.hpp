@@ -22,6 +22,32 @@ namespace concurrent {
 namespace internal {
 
 /**
+ * @brief is power of 2 ?
+ *
+ * @param v
+ * @return true
+ * @return false
+ */
+template <typename T>
+constexpr bool is_power_of_2( T v )
+{
+	static_assert( std::is_integral<T>::value, "T should be integral type" );
+#if ( __cpp_constexpr >= 201304 )
+	// 2のn乗かどうかを判定する。
+	if ( v < 1 ) return false;
+	if ( v == 1 ) return true;   // 2のゼロ乗と考えてtrueを返す。
+
+	// step1: 最も下位に1が立っているビットのみ残した値を抽出する
+	T v2 = -v & v;
+	// step2: 2のn乗の数値は、ビットが1つだけ立っている。よって、2のn乗の数値は最も下位のビットが1つだけ。よって、v2はvと同じになる。
+	bool ans = ( v == v2 );
+	return ans;
+#else
+	return ( ( v == ( -v & v ) ) && ( v >= 2 ) ) || ( v == 1 );
+#endif
+}
+
+/**
  * @brief allocate result by allocate_by_mmap()
  *
  */
@@ -34,7 +60,7 @@ struct allocate_result {
  * @brief allocate memory by mmap()
  *
  * @param req_alloc_size requet memory size to allocate
- * @param align_size alignment size of the allocated memorry address
+ * @param align_size alignment size of the allocated memory address. If this value is little or equal to 4096(page size), it should be powers of 2. If this value is greater than 4096, it should be multiple of 4096.
  * @return allocate_result
  */
 allocate_result allocate_by_mmap( size_t req_alloc_size, size_t align_size ) noexcept;

@@ -32,6 +32,12 @@ constexpr size_t atomic_variable_align = std::hardware_destructive_interference_
 constexpr size_t atomic_variable_align = 64;   // it is better to be equal to std::hardware_destructive_interference_size
 #endif
 
+#if __cpp_aligned_new >= 201606
+#define ALIGNAS_ATOMIC_VARIABLE_ALIGN alignas( atomic_variable_align )
+#else
+#define ALIGNAS_ATOMIC_VARIABLE_ALIGN
+#endif
+
 #ifdef ALCONCURRENT_CONF_ENABLE_HAZARD_PTR_PROFILE
 extern std::atomic<size_t> call_count_hazard_ptr_get_;
 extern std::atomic<size_t> loop_count_in_hazard_ptr_get_;

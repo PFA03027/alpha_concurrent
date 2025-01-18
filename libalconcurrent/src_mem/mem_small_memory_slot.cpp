@@ -10,6 +10,7 @@
  */
 
 #include "mem_small_memory_slot.hpp"
+#include "alloc_only_allocator.hpp"
 #include "mem_allocated_mem_top.hpp"
 #include "mmap_allocator.hpp"
 
@@ -17,7 +18,13 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
-memory_slot_group* slot_link_info::check_validity_to_ownwer_and_get( void ) noexcept
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+// configuration value
+constexpr size_t          conf_pre_mmap_size = 1024 * 1024;
+static alloc_only_chamber gmem_alloc_only_inst( false, conf_pre_mmap_size );   // グローバルインスタンスは、プロセス終了までメモリ領域を維持するために、デストラクタが呼ばれてもmmapした領域を解放しない。
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+memory_slot_group* slot_link_info::check_validity_to_owner_and_get( void ) noexcept
 {
 	memory_slot_group* p_slot_owner = link_to_memory_slot_group_.load_addr<memory_slot_group>();
 	if ( p_slot_owner == nullptr ) {
@@ -29,6 +36,31 @@ memory_slot_group* slot_link_info::check_validity_to_ownwer_and_get( void ) noex
 	return p_slot_owner;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+memory_slot_group_statistics memory_slot_group::get_statistics( void ) const noexcept
+{
+	size_t total_slots  = 0;
+	size_t in_use_slots = 0;
+	size_t free_slots   = 0;
+
+	for ( size_t i = 0; i < num_slots_; i++ ) {
+		const slot_link_info* p_i_sli   = get_slot_pointer( i );
+		const slot_link_info* p_end_sli = reinterpret_cast<const slot_link_info*>( ap_unassigned_slot_.load() );
+		if ( p_end_sli <= p_i_sli ) break;
+
+		total_slots++;
+		unziped_allocation_info<void> alloc_info = p_i_sli->link_to_memory_slot_group_.load_allocation_info<void>();
+		if ( alloc_info.is_used_ ) {
+			in_use_slots++;
+		} else {
+			free_slots++;
+		}
+	}
+
+	return { total_slots, in_use_slots, free_slots };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 slot_link_info* memory_slot_group_list::allocate_impl( void ) noexcept
 {
 	// 回収済み、再割り当て待ちリストからスロットの取得を試みる
@@ -98,7 +130,7 @@ bool memory_slot_group_list::deallocate( slot_link_info* p ) noexcept
 		LogOutput( log_type::DEBUG, "memory_slot_group_list::deallocate() with nullptr" );
 		return false;
 	}
-	auto p_slot_owner = p->check_validity_to_ownwer_and_get();
+	auto p_slot_owner = p->check_validity_to_owner_and_get();
 	if ( p_slot_owner == nullptr ) {
 		LogOutput( log_type::WARN, "memory_slot_group_list::deallocate() invalid slot_link_info" );
 		bt_info::record_backtrace().dump_to_log( log_type::WARN, 'i', 2 );
@@ -148,11 +180,11 @@ bool memory_slot_group_list::deallocate( slot_link_info* p ) noexcept
 void memory_slot_group_list::request_allocate_memory_slot_group( void ) noexcept
 {
 	size_t cur_allocating_buffer_bytes = next_allocating_buffer_bytes_.load( std::memory_order_acquire );
-	auto   buffer_ret                  = allocate_by_mmap( cur_allocating_buffer_bytes, allocated_mem_top::min_alignment_size_ );
-	if ( buffer_ret.p_allocated_addr_ == nullptr ) {
+	auto   p_buffer_ret                = gmem_alloc_only_inst.allocate( cur_allocating_buffer_bytes, allocated_mem_top::min_alignment_size_ );
+	if ( p_buffer_ret == nullptr ) {
 		return;
 	}
-	memory_slot_group* p_new_group = memory_slot_group::emplace_on_mem( buffer_ret.p_allocated_addr_, this, buffer_ret.allocated_size_, allocatable_bytes_ );
+	memory_slot_group* p_new_group = memory_slot_group::emplace_on_mem( p_buffer_ret, this, cur_allocating_buffer_bytes, allocatable_bytes_ );
 	memory_slot_group* p_cur_head  = ap_head_memory_slot_group_.load( std::memory_order_acquire );
 	do {
 		p_new_group->ap_next_group_ = p_cur_head;
@@ -169,14 +201,54 @@ void memory_slot_group_list::request_allocate_memory_slot_group( void ) noexcept
 
 void memory_slot_group_list::clear_for_test( void ) noexcept
 {
+	retrieved_small_slots_array_mgr::reset_for_test();
 	memory_slot_group* p_cur = ap_head_memory_slot_group_.load( std::memory_order_acquire );
 	while ( p_cur != nullptr ) {
 		memory_slot_group* p_next = p_cur->ap_next_group_;
-		deallocate_by_munmap( p_cur, p_cur->buffer_size_ );
+		gmem_alloc_only_inst.deallocate( p_cur );
 		p_cur = p_next;
 	}
 	ap_head_memory_slot_group_.store( nullptr, std::memory_order_release );
 	ap_cur_assigning_memory_slot_group_.store( nullptr, std::memory_order_release );
+}
+
+void memory_slot_group_list::dump_status( log_type lt, char c, int id ) noexcept
+{
+	LogOutput( lt,
+	           "[%c-%d] idx=%zu, allocatable_bytes_=%zu, limit_bytes_for_one_memory_slot_group_=%zu, next_allocating_buffer_bytes_=%zu, ap_head_memory_slot_group_=%p",
+	           c, id, retrieved_array_idx_,
+	           allocatable_bytes_,
+	           limit_bytes_for_one_memory_slot_group_,
+	           next_allocating_buffer_bytes_.load(),
+	           ap_head_memory_slot_group_.load() );
+
+	size_t             memory_slot_group_count = 0;
+	size_t             total_slots             = 0;
+	size_t             in_use_slots            = 0;
+	size_t             free_slots              = 0;
+	memory_slot_group* p_cur_msg               = ap_head_memory_slot_group_.load();
+	while ( p_cur_msg != nullptr ) {
+		memory_slot_group_count++;
+		memory_slot_group_statistics ret = p_cur_msg->get_statistics();
+		total_slots += ret.total_slots_;
+		in_use_slots += ret.in_use_slots_;
+		free_slots += ret.free_slots_;
+
+		p_cur_msg = p_cur_msg->ap_next_group_.load();
+	}
+
+	LogOutput( lt,
+	           "[%c-%d] idx=%zu, memory_slot_group_count=%zu, total_slots=%zu, in_use_slots=%zu, free_slots=%zu",
+	           c, id, retrieved_array_idx_,
+	           memory_slot_group_count,
+	           total_slots,
+	           in_use_slots,
+	           free_slots );
+}
+
+void memory_slot_group_list::dump_log( log_type lt, char c, int id ) noexcept
+{
+	gmem_alloc_only_inst.dump_to_log( lt, c, id );
 }
 
 }   // namespace internal

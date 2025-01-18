@@ -52,7 +52,7 @@ public:
 	{
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 		if ( node_pool_t::profile_info_count() != 0 ) {
-			internal::LogOutput( log_type::TEST, "%s", node_pool_t::profile_info_string().c_str() );
+			internal::LogOutput( log_type::DUMP, "%s", node_pool_t::profile_info_string().c_str() );
 			node_pool_t::clear_as_possible_as();
 		}
 		internal::LogOutput( log_type::DUMP, "x_lockfree_stack: allocated_node_count = %zu", allocated_node_count_.load() );

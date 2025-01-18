@@ -19,9 +19,9 @@
 #include <tuple>
 
 #include "alconcurrent/conf_logger.hpp"
-#include "alconcurrent/internal/alloc_only_allocator.hpp"
 #include "alconcurrent/internal/cpp_std_configure.hpp"
 #include "alconcurrent/internal/hazard_ptr_internal.hpp"
+#include "alloc_only_allocator.hpp"
 
 #include "hazard_ptr_impl.hpp"
 
@@ -244,12 +244,10 @@ void hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( hazard_ptr_grou
 
 	// 削除アクセス中のスレッドがいなくなるまでビジーループ
 	while ( p_hpg_arg->is_any_deleting_accesser() ) {
-#ifdef ALCONCURRENT_CONF_ENABLE_YIELD_IN_HAZARD_POINTER_THREAD_DESTRUCTION
 		// ビジーループでも成立するが、スレッドの実行権を一回放棄した方が、システム負荷は下がる。
 		// ただし、lock-freeとは言えなくなる。
 		// しかしながら、このAPIが使用されるのは、スレッド終了時のみであるため、すでにlock-free要請はなくなっていると考えてよい。
 		std::this_thread::yield();
-#endif
 	}
 
 	return;
@@ -394,7 +392,7 @@ void hazard_ptr_group::operator delete[]( void* ptr, void* ) noexcept   // delet
 	// nothing to do
 }
 
-#if __cpp_aligned_new
+#if __cpp_aligned_new >= 201606
 ALCC_INTERNAL_NODISCARD_ATTR void* hazard_ptr_group::operator new( std::size_t size, std::align_val_t alignment )   // possible throw std::bad_alloc, from C++17
 {
 	void* p_ans = g_alloc_only_inst_for_hzrd_ptr_module.allocate( size, static_cast<size_t>( alignment ) );

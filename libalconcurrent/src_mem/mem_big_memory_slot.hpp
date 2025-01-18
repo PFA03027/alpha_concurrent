@@ -53,7 +53,7 @@ struct big_memory_slot {
 		return new ( p_mem ) big_memory_slot( mt_arg, buffer_size );
 	}
 
-	big_memory_slot* check_validity_to_ownwer_and_get( void ) const noexcept;
+	big_memory_slot* check_validity_to_owner_and_get( void ) const noexcept;
 	constexpr size_t max_allocatable_size( void ) const noexcept
 	{
 		return buffer_size_ - ( sizeof( big_memory_slot ) - sizeof( big_memory_slot* ) );

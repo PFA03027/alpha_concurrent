@@ -1,3 +1,3 @@
-set(EXEC_TARGET test_mem_alloc2)
+set(EXEC_TARGET test_mem_alloc)
 
 include(../build_test.cmake)

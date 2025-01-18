@@ -29,6 +29,12 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
+struct memory_slot_group_statistics {
+	size_t total_slots_;
+	size_t in_use_slots_;
+	size_t free_slots_;
+};
+
 struct memory_slot_group;
 
 struct slot_link_info {
@@ -44,7 +50,7 @@ struct slot_link_info {
 		return new ( p_mem ) slot_link_info( p_owner );
 	}
 
-	memory_slot_group* check_validity_to_ownwer_and_get( void ) noexcept;
+	memory_slot_group* check_validity_to_owner_and_get( void ) noexcept;
 
 	/**
 	 * @brief Get the aligned allocated mem top object
@@ -149,6 +155,16 @@ struct memory_slot_group {
 #endif
 		return reinterpret_cast<slot_link_info*>( p_ans );
 	}
+	const slot_link_info* get_slot_pointer( size_t slot_idx ) const noexcept
+	{
+		unsigned char* p_ans = p_slot_begin_ + ( slot_idx * one_slot_bytes_ );
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+		if ( p_slot_end_ <= p_ans ) {
+			std::terminate();
+		}
+#endif
+		return reinterpret_cast<const slot_link_info*>( p_ans );
+	}
 
 	/**
 	 * @brief assign a memory slot from unassigned slots
@@ -192,6 +208,8 @@ struct memory_slot_group {
 		return calc_begin_of_btinfo( data_ )[slot_idx];
 	}
 #endif
+
+	memory_slot_group_statistics get_statistics( void ) const noexcept;
 
 private:
 	constexpr memory_slot_group( memory_slot_group_list* p_list_mgr_arg, size_t buffer_size, size_t calced_one_slot_bytes_arg ) noexcept
@@ -317,8 +335,8 @@ struct memory_slot_group_list {
 
 	constexpr memory_slot_group_list(
 		const size_t allocatable_bytes_arg,                        //!< [in] max allocatable bytes by allocation
-		const size_t limit_bytes_for_one_memory_slot_group_arg,    //!< [in] limitation to allocate one memory_slot_group
 		const size_t init_buffer_bytes_of_memory_slot_group_arg,   //!< [in] buffer size of one memory_slot_group when 1st allocation
+		const size_t limit_bytes_for_one_memory_slot_group_arg,    //!< [in] limitation to allocate one memory_slot_group
 		const size_t retrieved_array_idx_arg = 0                   //!< [in] index of memory_slot_group_list in g_memory_slot_group_list_array
 		) noexcept
 	  : retrieved_array_idx_( retrieved_array_idx_arg )
@@ -344,6 +362,10 @@ struct memory_slot_group_list {
 	 *
 	 */
 	void clear_for_test( void ) noexcept;
+
+	void dump_status( log_type lt, char c, int id ) noexcept;
+
+	static void dump_log( log_type lt, char c, int id ) noexcept;
 
 private:
 	static constexpr size_t check_init_buffer_size( size_t requested_allocatable_bytes_of_a_slot, size_t request_init_buffer_size ) noexcept
@@ -373,7 +395,7 @@ inline slot_link_info* memory_slot_group_list::allocate( void ) noexcept
 
 #ifdef ALCONCURRENT_CONF_ENABLE_RECORD_BACKTRACE_CHECK_DOUBLE_FREE
 	if ( p_ans != nullptr ) {
-		auto p_slot_owner = p_ans->check_validity_to_ownwer_and_get();
+		auto p_slot_owner = p_ans->check_validity_to_owner_and_get();
 		if ( p_slot_owner == nullptr ) {
 			LogOutput( log_type::WARN, "retrieved_slots_mgr_impl<SLOT_T>::request_reuse() invalid SLOT_T" );
 			return nullptr;

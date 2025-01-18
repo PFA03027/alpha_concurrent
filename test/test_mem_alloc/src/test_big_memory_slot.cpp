@@ -31,7 +31,7 @@ TEST( Test_BigMemorySlot, CanConstruct )
 	auto unzip_info = p_ret->link_to_big_memory_slot_.load_allocation_info<tut>();
 	EXPECT_EQ( unzip_info.mt_, alpha::concurrent::internal::mem_type::BIG_MEM );
 	EXPECT_TRUE( unzip_info.is_used_ );
-	EXPECT_NE( p_ret->check_validity_to_ownwer_and_get(), nullptr );
+	EXPECT_NE( p_ret->check_validity_to_owner_and_get(), nullptr );
 }
 
 TEST( Test_BigMemorySlotList, CanConstruct )

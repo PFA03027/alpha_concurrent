@@ -24,6 +24,8 @@
 #include "alconcurrent/lf_fifo.hpp"
 #include "alconcurrent/lf_stack.hpp"
 
+#include "mem_small_memory_slot.hpp"
+
 #include "../../../sample/inc_common/perf_pushpop_NtoN.hpp"
 
 #include "test_lf_fixture.hpp"
@@ -40,6 +42,8 @@ TEST_F( TestLF_2_HighLoad, TC_STACK_Profile1 )
 
 	std::cout << "--- pre-cpu kicking stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::stack_list<TestType>, SUT_N>( THREAD_N, 1 );
+
+	// alpha::concurrent::internal::memory_slot_group_list::dump_log( alpha::concurrent::log_type::DUMP, 'a', 1 );
 }
 TEST_F( TestLF_2_HighLoad, TC_STACK_Profile2 )
 {
@@ -48,6 +52,8 @@ TEST_F( TestLF_2_HighLoad, TC_STACK_Profile2 )
 
 	std::cout << "--- pre-cpu kicking stack_list " << std::to_string( SUT_N ) << " ---" << std::endl;
 	nwoker_perf_test_pushpop_NtoN<alpha::concurrent::stack_list<TestType>, 2>( 2, 1 );
+
+	// alpha::concurrent::internal::memory_slot_group_list::dump_log( alpha::concurrent::log_type::DUMP, 'a', 1 );
 }
 #endif
 #if 0

@@ -19,10 +19,9 @@
 
 #include "alconcurrent/conf_logger.hpp"
 
-#include "alconcurrent/internal/alloc_only_allocator.hpp"
+#include "alloc_only_allocator.hpp"
 
 #include "mmap_allocator.hpp"
-#include "utility.hpp"
 
 namespace alpha {
 namespace concurrent {
@@ -722,9 +721,9 @@ void* alloc_only_chamber::chked_allocate( size_t req_size, size_t req_align ) no
 {
 	void* p_ans = try_allocate( req_size, req_align );
 
-	while ( p_ans == nullptr ) {
+	if ( p_ans == nullptr ) {
 		size_t cur_pre_alloc_size = pre_alloc_size_;
-		if ( cur_pre_alloc_size < req_size ) {
+		if ( cur_pre_alloc_size < ( req_size + sizeof( alloc_chamber ) ) ) {
 			cur_pre_alloc_size = req_size * 2 + sizeof( alloc_chamber );
 #if 0
 			internal::LogOutput( log_type::DEBUG, "requested size is over pre allocation size: req=0x%zx, therefore try to allocate double size: try=0x%zu", req_size, cur_pre_alloc_size );
@@ -778,15 +777,15 @@ alloc_chamber_statistics alloc_only_chamber::get_statistics( void ) const noexce
 
 void alloc_only_chamber::dump_to_log( log_type lt, char c, int id ) const noexcept
 {
-	alloc_chamber_statistics total_statistics;
-
+#ifdef ALCONCURRENT_CONF_ENABLE_GMEM_PROFILE
 	auto p_cur_chamber = head_.load( std::memory_order_acquire );
 	while ( p_cur_chamber != nullptr ) {
 		p_cur_chamber->dump_to_log( lt, c, id );
 		p_cur_chamber = p_cur_chamber->next_.load( std::memory_order_acquire );
 	}
+#endif
 
-	total_statistics = get_statistics();
+	alloc_chamber_statistics total_statistics = get_statistics();
 	internal::LogOutput( lt, "[%d-%c] alloc_chamber_statistics %s", id, c, total_statistics.print().c_str() );
 }
 

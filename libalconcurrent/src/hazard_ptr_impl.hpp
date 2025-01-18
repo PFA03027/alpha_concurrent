@@ -46,7 +46,7 @@ static inline bool is_del_marked( std::uintptr_t addr_hpg_arg )
 	return ( ( addr_hpg_arg & ( static_cast<std::uintptr_t>( 1U ) ) ) != 0 );
 }
 
-class alignas( atomic_variable_align ) del_markable_pointer {
+class ALIGNAS_ATOMIC_VARIABLE_ALIGN del_markable_pointer {
 public:
 	class writer_accesser {
 	public:
@@ -342,11 +342,11 @@ public:
 	}
 
 private:
-	alignas( atomic_variable_align ) std::atomic<std::uintptr_t> aaddr_next_;
-	alignas( atomic_variable_align ) std::atomic<int> writer_accesser_cnt_;   // instead of hazard pointer
+	ALIGNAS_ATOMIC_VARIABLE_ALIGN std::atomic<std::uintptr_t> aaddr_next_;
+	ALIGNAS_ATOMIC_VARIABLE_ALIGN std::atomic<int> writer_accesser_cnt_;   // instead of hazard pointer
 };
 
-class alignas( atomic_variable_align ) hazard_ptr_group {
+class ALIGNAS_ATOMIC_VARIABLE_ALIGN hazard_ptr_group {
 public:
 	static constexpr size_t kArraySize = 7;
 	using hzrd_p_array_t               = std::array<std::atomic<const void*>, kArraySize>;   // std::atomic<void*>をクラスでラップしてアライメントを調整した場合でも、処理負荷は変わらなかった。
@@ -458,7 +458,7 @@ public:
 	void operator delete( void* ptr, void* ) noexcept;     // delete for area that is initialized by placement new.
 	void operator delete[]( void* ptr, void* ) noexcept;   // delete for area that is initialized by placement new.
 
-#if __cpp_aligned_new
+#if __cpp_aligned_new >= 201606
 	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment );                                     // possible throw std::bad_alloc, from C++17
 	ALCC_INTERNAL_NODISCARD_ATTR void* operator new( std::size_t size, std::align_val_t alignment, const std::nothrow_t& ) noexcept;     // possible return nullptr, instead of throwing exception, from C++17
 	ALCC_INTERNAL_NODISCARD_ATTR void* operator new[]( std::size_t size, std::align_val_t alignment );                                   // possible throw std::bad_alloc, from C++17
@@ -504,10 +504,10 @@ private:
 		return hzrd_ptr_array_.end();
 	}
 
-	del_markable_pointer delmarkable_valid_chain_next_;
-	std::atomic<bool>    is_using_;
-	alignas( atomic_variable_align ) hzrd_p_array_t hzrd_ptr_array_;
-	iterator next_assign_hint_it_;
+	del_markable_pointer                         delmarkable_valid_chain_next_;
+	std::atomic<bool>                            is_using_;
+	ALIGNAS_ATOMIC_VARIABLE_ALIGN hzrd_p_array_t hzrd_ptr_array_;
+	iterator                                     next_assign_hint_it_;
 };
 
 /**
@@ -516,7 +516,7 @@ private:
  * スレッドローカルストレージで使用される前提
  *
  */
-class alignas( atomic_variable_align ) bind_hazard_ptr_list {
+class ALIGNAS_ATOMIC_VARIABLE_ALIGN bind_hazard_ptr_list {
 public:
 	constexpr bind_hazard_ptr_list( void )                    = default;
 	bind_hazard_ptr_list( bind_hazard_ptr_list&& )            = default;
@@ -538,7 +538,7 @@ private:
 };
 
 /////////////////////////////////////////////////////////////////
-class alignas( atomic_variable_align ) global_scope_hazard_ptr_chain {
+class ALIGNAS_ATOMIC_VARIABLE_ALIGN global_scope_hazard_ptr_chain {
 public:
 	constexpr global_scope_hazard_ptr_chain( void )
 	  : ap_top_hzrd_ptr_chain_( nullptr )
