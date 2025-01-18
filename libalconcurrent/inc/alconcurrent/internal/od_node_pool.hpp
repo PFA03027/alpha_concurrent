@@ -36,6 +36,9 @@ struct countermeasure_gcc_bug_deletable_obj_abst {
 };
 #endif
 
+constexpr size_t scan_check_trial_threshold       = 50;
+constexpr size_t aggressive_aggregation_threshold = 20;
+
 struct is_member_function_callable_impl {
 	template <typename T>
 	static auto check_reset_value( T* ) -> decltype( std::declval<T>().reset_value(), std::true_type() );
@@ -69,7 +72,7 @@ public:
 		if ( hazard_ptr_mgr::CheckPtrIsHazardPtr( p_nd->get_pointer_of_hazard_check() ) ) {
 			// スレッドローカルのハザードポインタ登録中のリストが大きくなりすぎていたら、まとめて棚卸をする。
 			tl_od_node_list& tl_odn_list_still_in_hazard = get_tl_odn_list_still_in_hazard();
-			if ( tl_odn_list_still_in_hazard.size() >= 50 ) {
+			if ( tl_odn_list_still_in_hazard.size() >= scan_check_trial_threshold ) {
 				tl_od_node_list& tl_odn_list_no_in_hazard = get_tl_odn_list_no_in_hazard();
 				node_pointer     p_ans                    = try_pop_from_still_in_hazard_list(
                     tl_odn_list_still_in_hazard.move_to(),
@@ -100,8 +103,12 @@ public:
 			return;
 		}
 
-		g_odn_lockfree_list_no_in_hazard_.push_front( p_nd );
-		// tl_odn_list_no_in_hazard.push_back( p_nd );   // スレッドローカルな変数に保存する。
+		if ( tl_odn_list_no_in_hazard.size() >= aggressive_aggregation_threshold ) {
+			g_odn_lockfree_list_no_in_hazard_.push_front( p_nd );
+			g_odn_lockfree_list_no_in_hazard_.push_front( static_cast<node_pointer>( tl_odn_list_no_in_hazard.pop_front() ) );
+		} else {
+			tl_odn_list_no_in_hazard.push_back( p_nd );   // スレッドローカルな変数に保存する。
+		}
 		return;
 	}
 
@@ -122,10 +129,14 @@ public:
 			if ( lk.owns_lock() ) {
 				p_ans_baseclass_node = lk.ref().pop_front();
 				if ( p_ans_baseclass_node != nullptr ) {
+					if ( lk.ref().size() >= aggressive_aggregation_threshold ) {
+						for ( size_t i = 0; i < aggressive_aggregation_threshold; i++ ) {
+							g_odn_lockfree_list_no_in_hazard_.push_front( static_cast<node_pointer>( lk.ref().pop_front() ) );
+						}
+					}
 #ifdef ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE
 					--node_count_total_;
 #endif
-					// tl_odn_list_no_in_hazard.merge_push_back( std::move( lk.ref() ) );
 					return static_cast<node_pointer>( p_ans_baseclass_node );
 				}
 			}
@@ -444,6 +455,30 @@ private:
 		}
 
 		return nullptr;
+	}
+
+	/**
+	 * @brief still_in_hazard_listを検査し、ハザードポインタ登録されていないのノードを取り出す。
+	 *
+	 * @param input_still_in_hazard_list_arg ノードの取り出しを試みるリスト
+	 * @return node_pointer ハザードポインタ登録されていないノードのリスト
+	 */
+	static raw_list laundering_still_in_hazard_list( raw_list& still_in_hazard_list )
+	{
+		raw_list ans_odn_list;
+
+		hazard_ptr_mgr::ScanHazardPtrs( [&ans_odn_list, &still_in_hazard_list]( const void* p_in_hazard ) {
+			ans_odn_list = still_in_hazard_list.split_if( [p_in_hazard]( auto p_cur_node ) -> bool {
+				// cur_nodeの型は、od_node_simple_linkへの参照型で渡される。
+				// cur_nodeの本来の型は、od_node_poolが保持する型node_typeである。
+				// よって、ハザードポインタに登録されているポインタは、od_node_poolが保持する型node_typeへのポインタである。
+				// 従って、比較すべきポインタは、od_node_poolが保持する型node_typeのポインター型である必要がある。
+				return p_in_hazard == static_cast<const_node_pointer>( p_cur_node )->get_pointer_of_hazard_check();   // pointerが同じならtrueを返す。
+			} );
+			still_in_hazard_list.swap( ans_odn_list );
+		} );
+
+		return ans_odn_list;
 	}
 
 	static tl_od_node_list& get_tl_odn_list_still_in_hazard( void );
