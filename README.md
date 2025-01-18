@@ -40,7 +40,6 @@ Below use-case has the possiblity that mmap system call leads blocking behavior;
 
 To reduce blocking behavior possibility, pre-allocated nodes are effective.
 get_allocated_num() provides the number of the allocated nodes. This value is hint to configuration.
-To make get_allocated_num() valid behavior , please enable compile option ALCONCURRENT_CONF_ENABLE_OD_NODE_PROFILE.
 
 
 # dynamic_tls class in dynamic_tls.hpp
