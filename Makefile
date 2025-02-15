@@ -26,7 +26,7 @@ BUILDTYPE?=Release
 ALCONCURRENT_BUILD_SHARED_LIBS?=OFF
 
 # Sanitizer test option:
-# SANITIZER_TYPE= 1 ~ 20 or ""
+# SANITIZER_TYPE= 1 ~ 11 or ""
 #
 # Please see normal.cmake for detail
 # 
