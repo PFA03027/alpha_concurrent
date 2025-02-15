@@ -177,6 +177,10 @@ private:
 
 template <typename T>
 class nts_weak_ptr;
+template <typename T>
+class atomic_shared_ptr;
+template <typename T>
+class atomic_weak_ptr;
 
 /**
  * @brief Non Thread Safe shared pointer
@@ -388,6 +392,10 @@ private:
 	friend class nts_shared_ptr;
 	template <class U>
 	friend class nts_weak_ptr;
+	template <class U>
+	friend class atomic_shared_ptr;
+	template <class U>
+	friend class atomic_weak_ptr;
 };
 
 template <typename T>
@@ -549,6 +557,8 @@ private:
 	friend class nts_shared_ptr;
 	template <class U>
 	friend class nts_weak_ptr;
+	template <class U>
+	friend class atomic_weak_ptr;
 };
 
 template <class T>
@@ -564,6 +574,470 @@ inline bool nts_weak_ptr<T>::owner_before( const nts_shared_ptr<U>& b ) const no
 {
 	return p_dataholder_ < b.p_dataholder_;
 }
+
+template <typename T>
+class atomic_shared_ptr {
+public:
+	using element_type = typename std::remove_extent<T>::type;
+	using shared_type  = nts_shared_ptr<T>;
+	using weak_type    = nts_weak_ptr<T>;
+
+	constexpr atomic_shared_ptr( void ) noexcept
+	  : hph_dataholder_ { nullptr }
+	{
+	}
+
+	template <typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
+	explicit atomic_shared_ptr( Y* p )
+	  : hph_dataholder_ { nullptr }
+	{
+		if ( p == nullptr ) return;
+
+		std::unique_ptr<Y> up_data { p };
+
+		auto p_tmp = new control_block<Y>( p );
+		up_data.release();
+		hph_dataholder_.store( p_tmp );
+	}
+	template <typename Deleter, typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
+	atomic_shared_ptr( Y* p, Deleter d )
+	  : hph_dataholder_ { nullptr }
+	{
+		if ( p == nullptr ) return;
+
+		std::unique_ptr<Y, Deleter> up_data { p, d };
+
+		auto p_tmp = new control_block<Y, Deleter>( p, d );
+		up_data.release();
+		hph_dataholder_.store( p_tmp );
+	}
+	template <typename Deleter, typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
+	explicit atomic_shared_ptr( std::unique_ptr<Y, Deleter> up_arg )
+	  : hph_dataholder_ { nullptr }
+	{
+		if ( up_arg == nullptr ) return;
+
+		auto p_tmp = new control_block<Y, Deleter>( up_arg.get(), up_arg.get_deleter() );
+		up_arg.release();
+		hph_dataholder_.store( p_tmp );
+	}
+	template <typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
+	explicit atomic_shared_ptr( const nts_shared_ptr<Y>& sp_arg )
+	  : hph_dataholder_ { nullptr }
+	{
+		if ( sp_arg.p_dataholder_ == nullptr ) return;
+		if ( !sp_arg.p_dataholder_->increment_ref_of_shared() ) return;
+
+		hph_dataholder_.store( sp_arg.p_dataholder_ );
+	}
+	template <typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
+	explicit atomic_shared_ptr( nts_shared_ptr<Y>&& sp_arg )
+	  : hph_dataholder_ { nullptr }
+	{
+		if ( sp_arg.p_dataholder_ == nullptr ) return;
+
+		hph_dataholder_.store( sp_arg.p_dataholder_ );
+		sp_arg.p_dataholder_ = nullptr;
+	}
+
+	~atomic_shared_ptr()
+	{
+		auto hp_tmp = hph_dataholder_.load();
+		if ( hp_tmp == nullptr ) {
+			return;
+		}
+
+		hp_tmp->decrement_ref_of_shared_then_if_zero_release_this();
+	}
+
+	atomic_shared_ptr( const atomic_shared_ptr& src )
+	  : hph_dataholder_ { nullptr }
+	{
+		auto hp_tmp = src.hph_dataholder_.get_to_verify_exchange();
+		do {
+			if ( hp_tmp == nullptr ) {
+				return;
+			}
+		} while ( !src.hph_dataholder_.verify_exchange( hp_tmp ) );
+
+		if ( !hp_tmp->increment_ref_of_shared() ) {
+			return;
+		}
+
+		hph_dataholder_.store( hp_tmp.get() );
+	}
+
+	atomic_shared_ptr( atomic_shared_ptr&& src )
+	  : hph_dataholder_ { nullptr }
+	{
+		auto hp_tmp = src.hph_dataholder_.get_to_verify_exchange();
+		do {
+			if ( hp_tmp == nullptr ) {
+				return;
+			}
+		} while ( !src.hph_dataholder_.verify_exchange( hp_tmp ) );
+
+		if ( !hp_tmp->increment_ref_of_shared() ) {
+			return;
+		}
+
+		hph_dataholder_.store( hp_tmp.get() );
+
+		auto p_tmp = src.hph_dataholder_.exchange( nullptr );
+		if ( p_tmp != nullptr ) {
+			p_tmp->decrement_ref_of_shared_then_if_zero_release_this();
+		}
+	}
+	atomic_shared_ptr& operator=( const atomic_shared_ptr& src ) = delete;
+	atomic_shared_ptr& operator=( atomic_shared_ptr&& src )      = delete;
+
+	nts_shared_ptr<T> load( void ) const noexcept
+	{
+		nts_shared_ptr<T> ans;
+
+		auto hp_tmp = hph_dataholder_.get_to_verify_exchange();
+		do {
+			if ( hp_tmp == nullptr ) {
+				return ans;   // return empty nts_shared_ptr
+			}
+		} while ( !hph_dataholder_.verify_exchange( hp_tmp ) );
+
+		if ( !hp_tmp->increment_ref_of_shared() ) {
+			// control_block has been already retired.
+			return ans;   // return empty nts_shared_ptr
+		}
+
+		ans.p_dataholder_ = hp_tmp.get();
+		return ans;
+	}
+
+	void store( const nts_shared_ptr<T>& p ) noexcept
+	{
+		if ( p.p_dataholder_ != nullptr ) {
+			p.p_dataholder_->increment_ref_of_shared();
+		}
+		auto p_tmp = hph_dataholder_.exchange( p.p_dataholder_ );
+		if ( p_tmp != nullptr ) {
+			p_tmp->decrement_ref_of_shared_then_if_zero_release_this();
+		}
+	}
+
+	void store( nts_shared_ptr<T>&& p ) noexcept
+	{
+		auto p_tmp = hph_dataholder_.exchange( p.p_dataholder_ );
+		if ( p_tmp != nullptr ) {
+			p_tmp->decrement_ref_of_shared_then_if_zero_release_this();
+		}
+		p.p_dataholder_ = nullptr;
+	}
+	nts_shared_ptr<T> exchange( const nts_shared_ptr<T>& desired, std::memory_order order = std::memory_order_acq_rel ) noexcept
+	{
+		if ( desired.p_dataholder_ != nullptr ) {
+			desired.p_dataholder_->increment_ref_of_shared();
+		}
+		nts_shared_ptr<T> ans;
+		ans.p_dataholder_ = hph_dataholder_.exchange( desired.p_dataholder_, order );
+		return ans;
+	}
+	nts_shared_ptr<T> exchange( nts_shared_ptr<T>&& desired, std::memory_order order = std::memory_order_acq_rel ) noexcept
+	{
+		nts_shared_ptr<T> ans;
+		ans.p_dataholder_     = hph_dataholder_.exchange( desired.p_dataholder_, order );
+		desired.p_dataholder_ = nullptr;
+		return ans;
+	}
+
+	bool compare_exchange_weak( nts_shared_ptr<T>&       expected,
+	                            const nts_shared_ptr<T>& desired,
+	                            std::memory_order        order = std::memory_order_acq_rel ) noexcept
+	{
+		return compare_exchange_impl( false, expected, desired, order );
+	}
+	bool compare_exchange_strong( nts_shared_ptr<T>&       expected,
+	                              const nts_shared_ptr<T>& desired,
+	                              std::memory_order        order = std::memory_order_acq_rel ) noexcept
+	{
+		return compare_exchange_impl( true, expected, desired, order );
+	}
+
+private:
+	bool compare_exchange_impl( bool                     is_strong,
+	                            nts_shared_ptr<T>&       expected,
+	                            const nts_shared_ptr<T>& desired,
+	                            std::memory_order        order = std::memory_order_acq_rel ) noexcept
+	{
+		bool                      ex_ret            = false;
+		control_block_base* const p_backup_expected = expected.p_dataholder_;
+		auto                      hp_backup_of_this = hph_dataholder_.get_to_verify_exchange();
+		if ( desired.p_dataholder_ != nullptr ) {
+			// compare_exchange_weak()で、desired.p_dataholder_を参照するオブジェクトが増える可能性があるので、参照カウントを先に増やしておく。
+			desired.p_dataholder_->increment_ref_of_shared();
+		}
+		while ( true ) {
+			if ( is_strong ) {
+				ex_ret = hph_dataholder_.compare_exchange_strong( expected.p_dataholder_, desired.p_dataholder_, order );
+			} else {
+				ex_ret = hph_dataholder_.compare_exchange_weak( expected.p_dataholder_, desired.p_dataholder_, order );
+			}
+			if ( ex_ret ) {
+				if ( expected.p_dataholder_ != nullptr ) {
+					expected.p_dataholder_->decrement_ref_of_shared_then_if_zero_release_this();
+					// hph_dataholder_がexpected.p_dataholder_と同じで、それがdesired.p_dataholder_に置き換わった。
+					// よって、置き換わる前の値と同じexpected.p_dataholder_を使用して参照カウントを減らす。
+				}
+			} else {
+				if ( p_backup_expected != nullptr ) {
+					p_backup_expected->decrement_ref_of_shared_then_if_zero_release_this();
+				}
+				if ( hp_backup_of_this == expected.p_dataholder_ ) {
+					// この場合は、ハザードポインタ登録済みのポインタに置き換わったので、そのまま進められる。
+					if ( desired.p_dataholder_ != nullptr ) {
+						// 余分に増やしているので、元に戻す。
+						desired.p_dataholder_->decrement_ref_of_shared_then_if_zero_release_this();
+					}
+					if ( expected.p_dataholder_ != nullptr ) {
+						if ( !expected.p_dataholder_->increment_ref_of_shared() ) {
+							// unfortunatly, control_block has been already retired by other thread after compare_exchange_weak().
+							expected.p_dataholder_ = nullptr;
+						}
+					}
+				} else {
+					// この場合は、ハザードポインタ登録されていないポインタに置き換わっているので、
+					// expected.p_dataholder_ に入っているポインタは、すでに解放済みの可能性がある。
+					// そのため、そのまま処理を進められない。
+					// よって最初からやり直す。
+					expected.p_dataholder_ = p_backup_expected;
+					hph_dataholder_.reuse_to_verify_exchange( hp_backup_of_this );
+					continue;
+				}
+			}
+			break;
+		}
+
+		return ex_ret;
+	}
+
+	hazard_ptr_handler<control_block_base> hph_dataholder_;
+};
+
+template <typename T>
+class atomic_weak_ptr {
+public:
+	using element_type = typename std::remove_extent<T>::type;
+	using shared_type  = nts_shared_ptr<T>;
+	using weak_type    = nts_weak_ptr<T>;
+
+	constexpr atomic_weak_ptr( void ) noexcept
+	  : hph_dataholder_ { nullptr }
+	{
+	}
+	template <typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
+	explicit atomic_weak_ptr( const nts_shared_ptr<Y>& sp_arg )
+	  : hph_dataholder_ { nullptr }
+	{
+		if ( sp_arg.p_dataholder_ == nullptr ) return;
+		if ( !sp_arg.p_dataholder_->increment_ref_of_weak() ) return;
+
+		hph_dataholder_.store( sp_arg.p_dataholder_ );
+	}
+	template <typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
+	explicit atomic_weak_ptr( const nts_weak_ptr<Y>& sp_arg )
+	  : hph_dataholder_ { nullptr }
+	{
+		if ( sp_arg.p_dataholder_ == nullptr ) return;
+		if ( !sp_arg.p_dataholder_->increment_ref_of_weak() ) return;
+
+		hph_dataholder_.store( sp_arg.p_dataholder_ );
+	}
+	template <typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
+	explicit atomic_weak_ptr( nts_weak_ptr<Y>&& sp_arg )
+	  : hph_dataholder_ { nullptr }
+	{
+		if ( sp_arg.p_dataholder_ == nullptr ) return;
+
+		hph_dataholder_.store( sp_arg.p_dataholder_ );
+		sp_arg.p_dataholder_ = nullptr;
+	}
+
+	~atomic_weak_ptr()
+	{
+		auto hp_tmp = hph_dataholder_.load();
+		if ( hp_tmp == nullptr ) {
+			return;
+		}
+
+		hp_tmp->decrement_ref_of_weak_then_if_zero_release_this();
+	}
+
+	atomic_weak_ptr( const atomic_weak_ptr& src )
+	  : hph_dataholder_ { nullptr }
+	{
+		auto hp_tmp = src.hph_dataholder_.get_to_verify_exchange();
+		do {
+			if ( hp_tmp == nullptr ) {
+				return;
+			}
+		} while ( !src.hph_dataholder_.verify_exchange( hp_tmp ) );
+
+		if ( !hp_tmp->increment_ref_of_weak() ) {
+			return;
+		}
+
+		hph_dataholder_.store( hp_tmp.get() );
+	}
+
+	atomic_weak_ptr( atomic_weak_ptr&& src )
+	  : hph_dataholder_ { nullptr }
+	{
+		auto hp_tmp = src.hph_dataholder_.get_to_verify_exchange();
+		do {
+			if ( hp_tmp == nullptr ) {
+				return;
+			}
+		} while ( !src.hph_dataholder_.verify_exchange( hp_tmp ) );
+
+		if ( !hp_tmp->increment_ref_of_weak() ) {
+			return;
+		}
+
+		hph_dataholder_.store( hp_tmp.get() );
+
+		auto p_tmp = src.hph_dataholder_.exchange( nullptr );
+		if ( p_tmp != nullptr ) {
+			p_tmp->decrement_ref_of_weak_then_if_zero_release_this();
+		}
+	}
+	atomic_weak_ptr& operator=( const atomic_weak_ptr& src ) = delete;
+	atomic_weak_ptr& operator=( atomic_weak_ptr&& src )      = delete;
+
+	nts_weak_ptr<T> load( void ) const noexcept
+	{
+		nts_weak_ptr<T> ans;
+
+		auto hp_tmp = hph_dataholder_.get_to_verify_exchange();
+		do {
+			if ( hp_tmp == nullptr ) {
+				return ans;   // return empty nts_weak_ptr
+			}
+		} while ( !hph_dataholder_.verify_exchange( hp_tmp ) );
+
+		if ( !hp_tmp->increment_ref_of_weak() ) {
+			// control_block has been already retired.
+			return ans;   // return empty nts_weak_ptr
+		}
+
+		ans.p_dataholder_ = hp_tmp.get();
+		return ans;
+	}
+
+	void store( const nts_weak_ptr<T>& p ) noexcept
+	{
+		if ( p.p_dataholder_ != nullptr ) {
+			p.p_dataholder_->increment_ref_of_weak();
+		}
+		auto p_tmp = hph_dataholder_.exchange( p.p_dataholder_ );
+		if ( p_tmp != nullptr ) {
+			p_tmp->decrement_ref_of_weak_then_if_zero_release_this();
+		}
+	}
+
+	void store( nts_weak_ptr<T>&& p ) noexcept
+	{
+		auto p_tmp = hph_dataholder_.exchange( p.p_dataholder_ );
+		if ( p_tmp != nullptr ) {
+			p_tmp->decrement_ref_of_weak_then_if_zero_release_this();
+		}
+		p.p_dataholder_ = nullptr;
+	}
+	nts_weak_ptr<T> exchange( const nts_weak_ptr<T>& desired, std::memory_order order = std::memory_order_acq_rel ) noexcept
+	{
+		if ( desired.p_dataholder_ != nullptr ) {
+			desired.p_dataholder_->increment_ref_of_weak();
+		}
+		nts_weak_ptr<T> ans;
+		ans.p_dataholder_ = hph_dataholder_.exchange( desired.p_dataholder_, order );
+		return ans;
+	}
+	nts_weak_ptr<T> exchange( nts_weak_ptr<T>&& desired, std::memory_order order = std::memory_order_acq_rel ) noexcept
+	{
+		nts_weak_ptr<T> ans;
+		ans.p_dataholder_     = hph_dataholder_.exchange( desired.p_dataholder_, order );
+		desired.p_dataholder_ = nullptr;
+		return ans;
+	}
+
+	bool compare_exchange_weak( nts_weak_ptr<T>&       expected,
+	                            const nts_weak_ptr<T>& desired,
+	                            std::memory_order      order = std::memory_order_acq_rel ) noexcept
+	{
+		return compare_exchange_impl( false, expected, desired, order );
+	}
+	bool compare_exchange_strong( nts_weak_ptr<T>&       expected,
+	                              const nts_weak_ptr<T>& desired,
+	                              std::memory_order      order = std::memory_order_acq_rel ) noexcept
+	{
+		return compare_exchange_impl( true, expected, desired, order );
+	}
+
+private:
+	bool compare_exchange_impl( bool                   is_strong,
+	                            nts_weak_ptr<T>&       expected,
+	                            const nts_weak_ptr<T>& desired,
+	                            std::memory_order      order = std::memory_order_acq_rel ) noexcept
+	{
+		bool                      ex_ret            = false;
+		control_block_base* const p_backup_expected = expected.p_dataholder_;
+		auto                      hp_backup_of_this = hph_dataholder_.get_to_verify_exchange();
+		if ( desired.p_dataholder_ != nullptr ) {
+			// compare_exchange_weak()で、desired.p_dataholder_を参照するオブジェクトが増える可能性があるので、参照カウントを先に増やしておく。
+			desired.p_dataholder_->increment_ref_of_weak();
+		}
+		while ( true ) {
+			if ( is_strong ) {
+				ex_ret = hph_dataholder_.compare_exchange_strong( expected.p_dataholder_, desired.p_dataholder_, order );
+			} else {
+				ex_ret = hph_dataholder_.compare_exchange_weak( expected.p_dataholder_, desired.p_dataholder_, order );
+			}
+			if ( ex_ret ) {
+				if ( expected.p_dataholder_ != nullptr ) {
+					expected.p_dataholder_->decrement_ref_of_weak_then_if_zero_release_this();
+					// hph_dataholder_がexpected.p_dataholder_と同じで、それがdesired.p_dataholder_に置き換わった。
+					// よって、置き換わる前の値と同じexpected.p_dataholder_を使用して参照カウントを減らす。
+				}
+			} else {
+				if ( p_backup_expected != nullptr ) {
+					p_backup_expected->decrement_ref_of_weak_then_if_zero_release_this();
+				}
+				if ( hp_backup_of_this == expected.p_dataholder_ ) {
+					// この場合は、ハザードポインタ登録済みのポインタに置き換わったので、そのまま進められる。
+					if ( desired.p_dataholder_ != nullptr ) {
+						// 余分に増やしているので、元に戻す。
+						desired.p_dataholder_->decrement_ref_of_weak_then_if_zero_release_this();
+					}
+					if ( expected.p_dataholder_ != nullptr ) {
+						if ( !expected.p_dataholder_->increment_ref_of_weak() ) {
+							// unfortunatly, control_block has been already retired by other thread after compare_exchange_weak().
+							expected.p_dataholder_ = nullptr;
+						}
+					}
+				} else {
+					// この場合は、ハザードポインタ登録されていないポインタに置き換わっているので、
+					// expected.p_dataholder_ に入っているポインタは、すでに解放済みの可能性がある。
+					// そのため、そのまま処理を進められない。
+					// よって最初からやり直す。
+					expected.p_dataholder_ = p_backup_expected;
+					hph_dataholder_.reuse_to_verify_exchange( hp_backup_of_this );
+					continue;
+				}
+			}
+			break;
+		}
+
+		return ex_ret;
+	}
+
+	hazard_ptr_handler<control_block_base> hph_dataholder_;
+};
 
 }   // namespace internal
 }   // namespace concurrent

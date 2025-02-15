@@ -364,12 +364,8 @@ public:
 	{
 	}
 	hazard_ptr_handler( hazard_ptr_handler&& src ) noexcept
-	  : ap_target_p_()
+	  : ap_target_p_( src.ap_target_p_.exchange( nullptr, std::memory_order_acq_rel ) )
 	{
-		pointer p_expect = src.ap_target_p_.load( std::memory_order_acquire );
-		do {
-			ap_target_p_.store( p_expect, std::memory_order_release );
-		} while ( !src.ap_target_p_.compare_exchange_weak( p_expect, nullptr, std::memory_order_acq_rel, std::memory_order_acquire ) );
 	}
 	hazard_ptr_handler& operator=( const hazard_ptr_handler& src ) noexcept
 	{
@@ -383,12 +379,19 @@ public:
 	{
 		if ( this == &src ) return *this;
 
-		pointer p_expect = src.ap_target_p_.load( std::memory_order_acquire );
-		do {
-			ap_target_p_.store( p_expect, std::memory_order_release );
-		} while ( !src.ap_target_p_.compare_exchange_weak( p_expect, nullptr, std::memory_order_acq_rel, std::memory_order_acquire ) );
+		ap_target_p_.store( src.ap_target_p_.exchange( nullptr, std::memory_order_acq_rel ), std::memory_order_release );
 
 		return *this;
+	}
+
+	/**
+	 * @brief Get hazard pointer object for verify_exchange()
+	 *
+	 * @return hazard_pointer
+	 */
+	hazard_pointer get_to_verify_exchange( void ) const noexcept
+	{
+		return hazard_pointer( ap_target_p_.load( std::memory_order_acquire ) );
 	}
 
 	/**
@@ -411,11 +414,6 @@ public:
 		return ret;
 	}
 
-	hazard_pointer get_to_verify_exchange( void ) const noexcept
-	{
-		return hazard_pointer( ap_target_p_.load( std::memory_order_acquire ) );
-	}
-
 	void reuse_to_verify_exchange( hazard_pointer& hp_reuse ) const noexcept
 	{
 		pointer p_expect = ap_target_p_.load( std::memory_order_acquire );
@@ -432,6 +430,11 @@ public:
 	void store( pointer p_desired, std::memory_order order = std::memory_order_release ) noexcept
 	{
 		ap_target_p_.store( p_desired, order );
+	}
+
+	pointer exchange( pointer desired, std::memory_order order = std::memory_order_acq_rel ) noexcept
+	{
+		return ap_target_p_.exchange( desired, order );
 	}
 
 	inline bool compare_exchange_weak( pointer&          expected,
