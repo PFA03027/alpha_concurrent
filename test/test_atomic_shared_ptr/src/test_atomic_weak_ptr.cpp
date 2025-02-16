@@ -9,7 +9,7 @@
  *
  */
 
-#include "alconcurrent/experiment/internal/atomic_shared_ptr.hpp"
+#include "alconcurrent/experiment/internal/lf_shared_ptr.hpp"
 
 #include "gtest/gtest.h"
 
