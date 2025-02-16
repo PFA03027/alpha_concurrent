@@ -1,5 +1,5 @@
 /**
- * @file atomic_shared_ptr.hpp
+ * @file lf_shared_ptr.hpp
  * @author Teruaki Ata (PFA03027@nifty.com)
  * @brief Atomic shared pointer
  * @version 0.1
@@ -178,9 +178,9 @@ private:
 template <typename T>
 class nts_weak_ptr;
 template <typename T>
-class atomic_shared_ptr;
+class lf_shared_ptr;
 template <typename T>
-class atomic_weak_ptr;
+class lf_weak_ptr;
 
 /**
  * @brief Non Thread Safe shared pointer
@@ -393,9 +393,9 @@ private:
 	template <class U>
 	friend class nts_weak_ptr;
 	template <class U>
-	friend class atomic_shared_ptr;
+	friend class lf_shared_ptr;
 	template <class U>
-	friend class atomic_weak_ptr;
+	friend class lf_weak_ptr;
 };
 
 template <typename T>
@@ -558,7 +558,7 @@ private:
 	template <class U>
 	friend class nts_weak_ptr;
 	template <class U>
-	friend class atomic_weak_ptr;
+	friend class lf_weak_ptr;
 };
 
 template <class T>
@@ -576,19 +576,19 @@ inline bool nts_weak_ptr<T>::owner_before( const nts_shared_ptr<U>& b ) const no
 }
 
 template <typename T>
-class atomic_shared_ptr {
+class lf_shared_ptr {
 public:
 	using element_type = typename std::remove_extent<T>::type;
 	using shared_type  = nts_shared_ptr<T>;
 	using weak_type    = nts_weak_ptr<T>;
 
-	constexpr atomic_shared_ptr( void ) noexcept
+	constexpr lf_shared_ptr( void ) noexcept
 	  : hph_dataholder_ { nullptr }
 	{
 	}
 
 	template <typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
-	explicit atomic_shared_ptr( Y* p )
+	explicit lf_shared_ptr( Y* p )
 	  : hph_dataholder_ { nullptr }
 	{
 		if ( p == nullptr ) return;
@@ -600,7 +600,7 @@ public:
 		hph_dataholder_.store( p_tmp );
 	}
 	template <typename Deleter, typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
-	atomic_shared_ptr( Y* p, Deleter d )
+	lf_shared_ptr( Y* p, Deleter d )
 	  : hph_dataholder_ { nullptr }
 	{
 		if ( p == nullptr ) return;
@@ -612,7 +612,7 @@ public:
 		hph_dataholder_.store( p_tmp );
 	}
 	template <typename Deleter, typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
-	explicit atomic_shared_ptr( std::unique_ptr<Y, Deleter> up_arg )
+	explicit lf_shared_ptr( std::unique_ptr<Y, Deleter> up_arg )
 	  : hph_dataholder_ { nullptr }
 	{
 		if ( up_arg == nullptr ) return;
@@ -622,7 +622,7 @@ public:
 		hph_dataholder_.store( p_tmp );
 	}
 	template <typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
-	explicit atomic_shared_ptr( const nts_shared_ptr<Y>& sp_arg )
+	explicit lf_shared_ptr( const nts_shared_ptr<Y>& sp_arg )
 	  : hph_dataholder_ { nullptr }
 	{
 		if ( sp_arg.p_dataholder_ == nullptr ) return;
@@ -631,7 +631,7 @@ public:
 		hph_dataholder_.store( sp_arg.p_dataholder_ );
 	}
 	template <typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
-	explicit atomic_shared_ptr( nts_shared_ptr<Y>&& sp_arg )
+	explicit lf_shared_ptr( nts_shared_ptr<Y>&& sp_arg )
 	  : hph_dataholder_ { nullptr }
 	{
 		if ( sp_arg.p_dataholder_ == nullptr ) return;
@@ -640,7 +640,7 @@ public:
 		sp_arg.p_dataholder_ = nullptr;
 	}
 
-	~atomic_shared_ptr()
+	~lf_shared_ptr()
 	{
 		auto hp_tmp = hph_dataholder_.load();
 		if ( hp_tmp == nullptr ) {
@@ -650,7 +650,7 @@ public:
 		hp_tmp->decrement_ref_of_shared_then_if_zero_release_this();
 	}
 
-	atomic_shared_ptr( const atomic_shared_ptr& src )
+	lf_shared_ptr( const lf_shared_ptr& src )
 	  : hph_dataholder_ { nullptr }
 	{
 		auto hp_tmp = src.hph_dataholder_.get_to_verify_exchange();
@@ -667,7 +667,7 @@ public:
 		hph_dataholder_.store( hp_tmp.get() );
 	}
 
-	atomic_shared_ptr( atomic_shared_ptr&& src )
+	lf_shared_ptr( lf_shared_ptr&& src )
 	  : hph_dataholder_ { nullptr }
 	{
 		auto hp_tmp = src.hph_dataholder_.get_to_verify_exchange();
@@ -688,8 +688,8 @@ public:
 			p_tmp->decrement_ref_of_shared_then_if_zero_release_this();
 		}
 	}
-	atomic_shared_ptr& operator=( const atomic_shared_ptr& src ) = delete;
-	atomic_shared_ptr& operator=( atomic_shared_ptr&& src )      = delete;
+	lf_shared_ptr& operator=( const lf_shared_ptr& src ) = delete;
+	lf_shared_ptr& operator=( lf_shared_ptr&& src )      = delete;
 
 	nts_shared_ptr<T> load( void ) const noexcept
 	{
@@ -821,27 +821,18 @@ private:
 };
 
 template <typename T>
-class atomic_weak_ptr {
+class lf_weak_ptr {
 public:
 	using element_type = typename std::remove_extent<T>::type;
 	using shared_type  = nts_shared_ptr<T>;
 	using weak_type    = nts_weak_ptr<T>;
 
-	constexpr atomic_weak_ptr( void ) noexcept
+	constexpr lf_weak_ptr( void ) noexcept
 	  : hph_dataholder_ { nullptr }
 	{
 	}
 	template <typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
-	explicit atomic_weak_ptr( const nts_shared_ptr<Y>& sp_arg )
-	  : hph_dataholder_ { nullptr }
-	{
-		if ( sp_arg.p_dataholder_ == nullptr ) return;
-		if ( !sp_arg.p_dataholder_->increment_ref_of_weak() ) return;
-
-		hph_dataholder_.store( sp_arg.p_dataholder_ );
-	}
-	template <typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
-	explicit atomic_weak_ptr( const nts_weak_ptr<Y>& sp_arg )
+	explicit lf_weak_ptr( const nts_shared_ptr<Y>& sp_arg )
 	  : hph_dataholder_ { nullptr }
 	{
 		if ( sp_arg.p_dataholder_ == nullptr ) return;
@@ -850,7 +841,16 @@ public:
 		hph_dataholder_.store( sp_arg.p_dataholder_ );
 	}
 	template <typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
-	explicit atomic_weak_ptr( nts_weak_ptr<Y>&& sp_arg )
+	explicit lf_weak_ptr( const nts_weak_ptr<Y>& sp_arg )
+	  : hph_dataholder_ { nullptr }
+	{
+		if ( sp_arg.p_dataholder_ == nullptr ) return;
+		if ( !sp_arg.p_dataholder_->increment_ref_of_weak() ) return;
+
+		hph_dataholder_.store( sp_arg.p_dataholder_ );
+	}
+	template <typename Y = T, typename std::enable_if<std::is_convertible<Y*, T*>::value>::type* = nullptr>
+	explicit lf_weak_ptr( nts_weak_ptr<Y>&& sp_arg )
 	  : hph_dataholder_ { nullptr }
 	{
 		if ( sp_arg.p_dataholder_ == nullptr ) return;
@@ -859,7 +859,7 @@ public:
 		sp_arg.p_dataholder_ = nullptr;
 	}
 
-	~atomic_weak_ptr()
+	~lf_weak_ptr()
 	{
 		auto hp_tmp = hph_dataholder_.load();
 		if ( hp_tmp == nullptr ) {
@@ -869,7 +869,7 @@ public:
 		hp_tmp->decrement_ref_of_weak_then_if_zero_release_this();
 	}
 
-	atomic_weak_ptr( const atomic_weak_ptr& src )
+	lf_weak_ptr( const lf_weak_ptr& src )
 	  : hph_dataholder_ { nullptr }
 	{
 		auto hp_tmp = src.hph_dataholder_.get_to_verify_exchange();
@@ -886,7 +886,7 @@ public:
 		hph_dataholder_.store( hp_tmp.get() );
 	}
 
-	atomic_weak_ptr( atomic_weak_ptr&& src )
+	lf_weak_ptr( lf_weak_ptr&& src )
 	  : hph_dataholder_ { nullptr }
 	{
 		auto hp_tmp = src.hph_dataholder_.get_to_verify_exchange();
@@ -907,8 +907,8 @@ public:
 			p_tmp->decrement_ref_of_weak_then_if_zero_release_this();
 		}
 	}
-	atomic_weak_ptr& operator=( const atomic_weak_ptr& src ) = delete;
-	atomic_weak_ptr& operator=( atomic_weak_ptr&& src )      = delete;
+	lf_weak_ptr& operator=( const lf_weak_ptr& src ) = delete;
+	lf_weak_ptr& operator=( lf_weak_ptr&& src )      = delete;
 
 	nts_weak_ptr<T> load( void ) const noexcept
 	{
