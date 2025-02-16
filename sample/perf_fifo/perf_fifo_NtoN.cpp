@@ -68,7 +68,7 @@ public:
 		return alpha::concurrent::alcc_optional<value_type> { ans };
 	}
 
-	size_t get_allocated_num( void ) const
+	size_t get_allocated_num( void ) const noexcept
 	{
 		return 0;
 	}
@@ -106,7 +106,7 @@ public:
 		return alpha::concurrent::alcc_optional<value_type> { ans };
 	}
 
-	size_t get_allocated_num( void ) const
+	size_t get_allocated_num( void ) const noexcept
 	{
 		return 0;
 	}
