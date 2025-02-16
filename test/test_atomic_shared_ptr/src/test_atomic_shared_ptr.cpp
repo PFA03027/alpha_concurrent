@@ -9,7 +9,7 @@
  *
  */
 
-#include "alconcurrent/experiment/internal/lf_shared_ptr.hpp"
+#include "alconcurrent/experiment/lf_shared_ptr.hpp"
 
 #include "gtest/gtest.h"
 
@@ -20,7 +20,7 @@ TEST( AtomicSharedPtr_Class, CanConstruct )
 	// Arrange
 
 	// Act
-	alpha::concurrent::internal::lf_shared_ptr<int> sut;
+	alpha::concurrent::lf_shared_ptr<int> sut;
 
 	// Assert
 	auto sp = sut.load();
@@ -33,7 +33,7 @@ TEST( AtomicSharedPtr_Class, CanConstructWithPointer )
 	int* p = new int;
 
 	// Act
-	alpha::concurrent::internal::lf_shared_ptr<int> sut( p );
+	alpha::concurrent::lf_shared_ptr<int> sut( p );
 
 	// Assert
 	auto sp = sut.load();
@@ -47,7 +47,7 @@ TEST( AtomicSharedPtr_Class, CanConstructWithPointerAndDeleter )
 	auto deleter = []( int* p_arg ) { delete p_arg; };
 
 	// Act
-	alpha::concurrent::internal::lf_shared_ptr<int> sut( p, deleter );
+	alpha::concurrent::lf_shared_ptr<int> sut( p, deleter );
 
 	// Assert
 	auto sp = sut.load();
@@ -61,7 +61,7 @@ TEST( AtomicSharedPtr_Class, CanConstructWithUniquePtr )
 	std::unique_ptr<int> up( p );
 
 	// Act
-	alpha::concurrent::internal::lf_shared_ptr<int> sut( std::move( up ) );
+	alpha::concurrent::lf_shared_ptr<int> sut( std::move( up ) );
 
 	// Assert
 	auto sp = sut.load();
@@ -75,17 +75,17 @@ TEST( AtomicSharedPtr_Class, CanDestruct )
 
 	// Act
 	{
-		alpha::concurrent::internal::lf_shared_ptr<int> sut( p );
+		alpha::concurrent::lf_shared_ptr<int> sut( p );
 	}
 }
 
 TEST( AtomicSharedPtr_Class, CanCopyConstructFromEmpty )
 {
 	// Arrange
-	alpha::concurrent::internal::lf_shared_ptr<int> sut1;
+	alpha::concurrent::lf_shared_ptr<int> sut1;
 
 	// Act
-	alpha::concurrent::internal::lf_shared_ptr<int> sut2( sut1 );
+	alpha::concurrent::lf_shared_ptr<int> sut2( sut1 );
 
 	// Assert
 	auto sp1 = sut1.load();
@@ -97,11 +97,11 @@ TEST( AtomicSharedPtr_Class, CanCopyConstructFromEmpty )
 TEST( AtomicSharedPtr_Class, CanCopyConstructFromValid )
 {
 	// Arrange
-	int*                                            p = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int> sut1( p );
+	int*                                  p = new int;
+	alpha::concurrent::lf_shared_ptr<int> sut1( p );
 
 	// Act
-	alpha::concurrent::internal::lf_shared_ptr<int> sut2( sut1 );
+	alpha::concurrent::lf_shared_ptr<int> sut2( sut1 );
 
 	// Assert
 	auto sp1 = sut1.load();
@@ -113,10 +113,10 @@ TEST( AtomicSharedPtr_Class, CanCopyConstructFromValid )
 TEST( AtomicSharedPtr_Class, CanMoveConstructFromEmpty )
 {
 	// Arrange
-	alpha::concurrent::internal::lf_shared_ptr<int> sut1;
+	alpha::concurrent::lf_shared_ptr<int> sut1;
 
 	// Act
-	alpha::concurrent::internal::lf_shared_ptr<int> sut2( std::move( sut1 ) );
+	alpha::concurrent::lf_shared_ptr<int> sut2( std::move( sut1 ) );
 
 	// Assert
 	auto sp1 = sut1.load();
@@ -128,11 +128,11 @@ TEST( AtomicSharedPtr_Class, CanMoveConstructFromEmpty )
 TEST( AtomicSharedPtr_Class, CanMoveConstructFromValid )
 {
 	// Arrange
-	int*                                            p = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int> sut1( p );
+	int*                                  p = new int;
+	alpha::concurrent::lf_shared_ptr<int> sut1( p );
 
 	// Act
-	alpha::concurrent::internal::lf_shared_ptr<int> sut2( std::move( sut1 ) );
+	alpha::concurrent::lf_shared_ptr<int> sut2( std::move( sut1 ) );
 
 	// Assert
 	auto sp1 = sut1.load();
@@ -144,8 +144,8 @@ TEST( AtomicSharedPtr_Class, CanMoveConstructFromValid )
 TEST( AtomicSharedPtr_Class, Empty_CanCopyStoreFromEmptySharedPtr )
 {
 	// Arrange
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1;
+	alpha::concurrent::lf_shared_ptr<int>  sut;
+	alpha::concurrent::nts_shared_ptr<int> sp1;
 
 	// Act
 	sut.store( sp1 );
@@ -159,9 +159,9 @@ TEST( AtomicSharedPtr_Class, Empty_CanCopyStoreFromEmptySharedPtr )
 TEST( AtomicSharedPtr_Class, Empty_CanCopyStoreFromValidSharedPtr )
 {
 	// Arrange
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut;
-	int*                                             p = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1( p );
+	alpha::concurrent::lf_shared_ptr<int>  sut;
+	int*                                   p = new int;
+	alpha::concurrent::nts_shared_ptr<int> sp1( p );
 
 	// Act
 	sut.store( sp1 );
@@ -175,9 +175,9 @@ TEST( AtomicSharedPtr_Class, Empty_CanCopyStoreFromValidSharedPtr )
 TEST( AtomicSharedPtr_Class, Valid_CanCopyStoreFromEmptySharedPtr )
 {
 	// Arrange
-	int*                                             p = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut( p );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1;
+	int*                                   p = new int;
+	alpha::concurrent::lf_shared_ptr<int>  sut( p );
+	alpha::concurrent::nts_shared_ptr<int> sp1;
 
 	// Act
 	sut.store( sp1 );
@@ -191,10 +191,10 @@ TEST( AtomicSharedPtr_Class, Valid_CanCopyStoreFromEmptySharedPtr )
 TEST( AtomicSharedPtr_Class, Valid_CanCopyStoreFromValidSharedPtr )
 {
 	// Arrange
-	int*                                             p1 = new int;
-	int*                                             p2 = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut( p1 );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1( p2 );
+	int*                                   p1 = new int;
+	int*                                   p2 = new int;
+	alpha::concurrent::lf_shared_ptr<int>  sut( p1 );
+	alpha::concurrent::nts_shared_ptr<int> sp1( p2 );
 
 	// Act
 	sut.store( sp1 );
@@ -208,8 +208,8 @@ TEST( AtomicSharedPtr_Class, Valid_CanCopyStoreFromValidSharedPtr )
 TEST( AtomicSharedPtr_Class, Empty_CanMoveStoreFromEmptySharedPtr )
 {
 	// Arrange
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1;
+	alpha::concurrent::lf_shared_ptr<int>  sut;
+	alpha::concurrent::nts_shared_ptr<int> sp1;
 
 	// Act
 	sut.store( std::move( sp1 ) );
@@ -223,9 +223,9 @@ TEST( AtomicSharedPtr_Class, Empty_CanMoveStoreFromEmptySharedPtr )
 TEST( AtomicSharedPtr_Class, Empty_CanMoveStoreFromValidSharedPtr )
 {
 	// Arrange
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut;
-	int*                                             p = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1( p );
+	alpha::concurrent::lf_shared_ptr<int>  sut;
+	int*                                   p = new int;
+	alpha::concurrent::nts_shared_ptr<int> sp1( p );
 
 	// Act
 	sut.store( std::move( sp1 ) );
@@ -239,9 +239,9 @@ TEST( AtomicSharedPtr_Class, Empty_CanMoveStoreFromValidSharedPtr )
 TEST( AtomicSharedPtr_Class, Valid_CanMoveStoreFromEmptySharedPtr )
 {
 	// Arrange
-	int*                                             p = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut( p );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1;
+	int*                                   p = new int;
+	alpha::concurrent::lf_shared_ptr<int>  sut( p );
+	alpha::concurrent::nts_shared_ptr<int> sp1;
 
 	// Act
 	sut.store( std::move( sp1 ) );
@@ -255,10 +255,10 @@ TEST( AtomicSharedPtr_Class, Valid_CanMoveStoreFromEmptySharedPtr )
 TEST( AtomicSharedPtr_Class, Valid_CanMoveStoreFromValidSharedPtr )
 {
 	// Arrange
-	int*                                             p1 = new int;
-	int*                                             p2 = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut( p1 );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1( p2 );
+	int*                                   p1 = new int;
+	int*                                   p2 = new int;
+	alpha::concurrent::lf_shared_ptr<int>  sut( p1 );
+	alpha::concurrent::nts_shared_ptr<int> sp1( p2 );
 
 	// Act
 	sut.store( std::move( sp1 ) );
@@ -272,8 +272,8 @@ TEST( AtomicSharedPtr_Class, Valid_CanMoveStoreFromValidSharedPtr )
 TEST( AtomicSharedPtr_Class, Empty_CanExchangeCopyFromEmptySharedPtr )
 {
 	// Arrange
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1;
+	alpha::concurrent::lf_shared_ptr<int>  sut;
+	alpha::concurrent::nts_shared_ptr<int> sp1;
 
 	// Act
 	auto sp2 = sut.exchange( sp1 );
@@ -288,9 +288,9 @@ TEST( AtomicSharedPtr_Class, Empty_CanExchangeCopyFromEmptySharedPtr )
 TEST( AtomicSharedPtr_Class, Empty_CanExchangeCopyFromValidSharedPtr )
 {
 	// Arrange
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut;
-	int*                                             p = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1( p );
+	alpha::concurrent::lf_shared_ptr<int>  sut;
+	int*                                   p = new int;
+	alpha::concurrent::nts_shared_ptr<int> sp1( p );
 
 	// Act
 	auto sp2 = sut.exchange( sp1 );
@@ -305,9 +305,9 @@ TEST( AtomicSharedPtr_Class, Empty_CanExchangeCopyFromValidSharedPtr )
 TEST( AtomicSharedPtr_Class, Valid_CanExchangeCopyFromEmptySharedPtr )
 {
 	// Arrange
-	int*                                             p = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut( p );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1;
+	int*                                   p = new int;
+	alpha::concurrent::lf_shared_ptr<int>  sut( p );
+	alpha::concurrent::nts_shared_ptr<int> sp1;
 
 	// Act
 	auto sp2 = sut.exchange( sp1 );
@@ -322,10 +322,10 @@ TEST( AtomicSharedPtr_Class, Valid_CanExchangeCopyFromEmptySharedPtr )
 TEST( AtomicSharedPtr_Class, Valid_CanExchangeCopyFromValidSharedPtr )
 {
 	// Arrange
-	int*                                             p1 = new int;
-	int*                                             p2 = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut( p1 );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1( p2 );
+	int*                                   p1 = new int;
+	int*                                   p2 = new int;
+	alpha::concurrent::lf_shared_ptr<int>  sut( p1 );
+	alpha::concurrent::nts_shared_ptr<int> sp1( p2 );
 
 	// Act
 	auto sp2 = sut.exchange( sp1 );
@@ -340,8 +340,8 @@ TEST( AtomicSharedPtr_Class, Valid_CanExchangeCopyFromValidSharedPtr )
 TEST( AtomicSharedPtr_Class, Empty_CanExchangeMoveFromEmptySharedPtr )
 {
 	// Arrange
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1;
+	alpha::concurrent::lf_shared_ptr<int>  sut;
+	alpha::concurrent::nts_shared_ptr<int> sp1;
 
 	// Act
 	auto sp2 = sut.exchange( std::move( sp1 ) );
@@ -356,9 +356,9 @@ TEST( AtomicSharedPtr_Class, Empty_CanExchangeMoveFromEmptySharedPtr )
 TEST( AtomicSharedPtr_Class, Empty_CanExchangeMoveFromValidSharedPtr )
 {
 	// Arrange
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut;
-	int*                                             p = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1( p );
+	alpha::concurrent::lf_shared_ptr<int>  sut;
+	int*                                   p = new int;
+	alpha::concurrent::nts_shared_ptr<int> sp1( p );
 
 	// Act
 	auto sp2 = sut.exchange( std::move( sp1 ) );
@@ -373,9 +373,9 @@ TEST( AtomicSharedPtr_Class, Empty_CanExchangeMoveFromValidSharedPtr )
 TEST( AtomicSharedPtr_Class, Valid_CanExchangeMoveFromEmptySharedPtr )
 {
 	// Arrange
-	int*                                             p = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut( p );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1;
+	int*                                   p = new int;
+	alpha::concurrent::lf_shared_ptr<int>  sut( p );
+	alpha::concurrent::nts_shared_ptr<int> sp1;
 
 	// Act
 	auto sp2 = sut.exchange( std::move( sp1 ) );
@@ -390,10 +390,10 @@ TEST( AtomicSharedPtr_Class, Valid_CanExchangeMoveFromEmptySharedPtr )
 TEST( AtomicSharedPtr_Class, Valid_CanExchangeMoveFromValidSharedPtr )
 {
 	// Arrange
-	int*                                             p1 = new int;
-	int*                                             p2 = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut( p1 );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1( p2 );
+	int*                                   p1 = new int;
+	int*                                   p2 = new int;
+	alpha::concurrent::lf_shared_ptr<int>  sut( p1 );
+	alpha::concurrent::nts_shared_ptr<int> sp1( p2 );
 
 	// Act
 	auto sp2 = sut.exchange( std::move( sp1 ) );
@@ -408,9 +408,9 @@ TEST( AtomicSharedPtr_Class, Valid_CanExchangeMoveFromValidSharedPtr )
 TEST( AtomicSharedPtr_Class, Empty_CanCompareExchangeWeakWithEmptySharedPtrAndEmptySharedPtr_Then_ReturnTrue )
 {
 	// Arrange
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp2;
+	alpha::concurrent::lf_shared_ptr<int>  sut;
+	alpha::concurrent::nts_shared_ptr<int> sp1;
+	alpha::concurrent::nts_shared_ptr<int> sp2;
 
 	// Act
 	auto result = sut.compare_exchange_weak( sp1, sp2 );
@@ -426,10 +426,10 @@ TEST( AtomicSharedPtr_Class, Empty_CanCompareExchangeWeakWithEmptySharedPtrAndEm
 TEST( AtomicSharedPtr_Class, Empty_CanCompareExchangeWeakWithEmptySharedPtrAndValidSharedPtr_Then_ReturnTrue )
 {
 	// Arrange
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1;
-	int*                                             p = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp2( p );
+	alpha::concurrent::lf_shared_ptr<int>  sut;
+	alpha::concurrent::nts_shared_ptr<int> sp1;
+	int*                                   p = new int;
+	alpha::concurrent::nts_shared_ptr<int> sp2( p );
 
 	// Act
 	auto result = sut.compare_exchange_weak( sp1, sp2 );
@@ -445,10 +445,10 @@ TEST( AtomicSharedPtr_Class, Empty_CanCompareExchangeWeakWithEmptySharedPtrAndVa
 TEST( AtomicSharedPtr_Class, Empty_CanCompareExchangeWeakWithValidSharedPtrAndEmptySharedPtr_Then_ReturnFalse )
 {
 	// Arrange
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut;
-	int*                                             p = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1( p );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp2;
+	alpha::concurrent::lf_shared_ptr<int>  sut;
+	int*                                   p = new int;
+	alpha::concurrent::nts_shared_ptr<int> sp1( p );
+	alpha::concurrent::nts_shared_ptr<int> sp2;
 
 	// Act
 	auto result = sut.compare_exchange_weak( sp1, sp2 );
@@ -464,11 +464,11 @@ TEST( AtomicSharedPtr_Class, Empty_CanCompareExchangeWeakWithValidSharedPtrAndEm
 TEST( AtomicSharedPtr_Class, Empty_CanCompareExchangeWeakWithValidSharedPtrAndValidSharedPtr_Then_ReturnFalse )
 {
 	// Arrange
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut;
-	int*                                             p1 = new int;
-	int*                                             p2 = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1( p1 );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp2( p2 );
+	alpha::concurrent::lf_shared_ptr<int>  sut;
+	int*                                   p1 = new int;
+	int*                                   p2 = new int;
+	alpha::concurrent::nts_shared_ptr<int> sp1( p1 );
+	alpha::concurrent::nts_shared_ptr<int> sp2( p2 );
 
 	// Act
 	auto result = sut.compare_exchange_weak( sp1, sp2 );
@@ -484,10 +484,10 @@ TEST( AtomicSharedPtr_Class, Empty_CanCompareExchangeWeakWithValidSharedPtrAndVa
 TEST( AtomicSharedPtr_Class, Valid_CanCompareExchangeWeakWithEmptySharedPtrAndEmptySharedPtr_Then_ReturnFalse )
 {
 	// Arrange
-	int*                                             p = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut( p );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp2;
+	int*                                   p = new int;
+	alpha::concurrent::lf_shared_ptr<int>  sut( p );
+	alpha::concurrent::nts_shared_ptr<int> sp1;
+	alpha::concurrent::nts_shared_ptr<int> sp2;
 
 	// Act
 	auto result = sut.compare_exchange_weak( sp1, sp2 );
@@ -503,11 +503,11 @@ TEST( AtomicSharedPtr_Class, Valid_CanCompareExchangeWeakWithEmptySharedPtrAndEm
 TEST( AtomicSharedPtr_Class, Valid_CanCompareExchangeWeakWithEmptySharedPtrAndValidSharedPtr_Then_ReturnFalse )
 {
 	// Arrange
-	int*                                             p = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut( p );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1;
-	int*                                             p2 = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp2( p2 );
+	int*                                   p = new int;
+	alpha::concurrent::lf_shared_ptr<int>  sut( p );
+	alpha::concurrent::nts_shared_ptr<int> sp1;
+	int*                                   p2 = new int;
+	alpha::concurrent::nts_shared_ptr<int> sp2( p2 );
 
 	// Act
 	auto result = sut.compare_exchange_weak( sp1, sp2 );
@@ -523,11 +523,11 @@ TEST( AtomicSharedPtr_Class, Valid_CanCompareExchangeWeakWithEmptySharedPtrAndVa
 TEST( AtomicSharedPtr_Class, Valid_CanCompareExchangeWeakWithDifferentValidSharedPtrAndEmptySharedPtr_Then_ReturnFalse )
 {
 	// Arrange
-	int*                                             p1 = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut( p1 );
-	int*                                             p2 = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1( p2 );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp2;
+	int*                                   p1 = new int;
+	alpha::concurrent::lf_shared_ptr<int>  sut( p1 );
+	int*                                   p2 = new int;
+	alpha::concurrent::nts_shared_ptr<int> sp1( p2 );
+	alpha::concurrent::nts_shared_ptr<int> sp2;
 
 	// Act
 	auto result = sut.compare_exchange_weak( sp1, sp2 );
@@ -543,10 +543,10 @@ TEST( AtomicSharedPtr_Class, Valid_CanCompareExchangeWeakWithDifferentValidShare
 TEST( AtomicSharedPtr_Class, Valid_CanCompareExchangeWeakWithSameValidSharedPtrAndEmptySharedPtr_Then_ReturnTrue )
 {
 	// Arrange
-	int*                                             p = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut( p );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1( sut.load() );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp2;
+	int*                                   p = new int;
+	alpha::concurrent::lf_shared_ptr<int>  sut( p );
+	alpha::concurrent::nts_shared_ptr<int> sp1( sut.load() );
+	alpha::concurrent::nts_shared_ptr<int> sp2;
 
 	// Act
 	auto result = sut.compare_exchange_weak( sp1, sp2 );
@@ -562,12 +562,12 @@ TEST( AtomicSharedPtr_Class, Valid_CanCompareExchangeWeakWithSameValidSharedPtrA
 TEST( AtomicSharedPtr_Class, Valid_CanCompareExchangeWeakWithDifferentValidSharedPtrAndValidSharedPtr_Then_ReturnFalse )
 {
 	// Arrange
-	int*                                             p1 = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut( p1 );
-	int*                                             p2 = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1( p2 );
-	int*                                             p3 = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp2( p3 );
+	int*                                   p1 = new int;
+	alpha::concurrent::lf_shared_ptr<int>  sut( p1 );
+	int*                                   p2 = new int;
+	alpha::concurrent::nts_shared_ptr<int> sp1( p2 );
+	int*                                   p3 = new int;
+	alpha::concurrent::nts_shared_ptr<int> sp2( p3 );
 
 	// Act
 	auto result = sut.compare_exchange_weak( sp1, sp2 );
@@ -583,11 +583,11 @@ TEST( AtomicSharedPtr_Class, Valid_CanCompareExchangeWeakWithDifferentValidShare
 TEST( AtomicSharedPtr_Class, Valid_CanCompareExchangeWeakWithSameValidSharedPtrAndValidSharedPtr_Then_ReturnTrue )
 {
 	// Arrange
-	int*                                             p1 = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut( p1 );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1( sut.load() );
-	int*                                             p2 = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp2( p2 );
+	int*                                   p1 = new int;
+	alpha::concurrent::lf_shared_ptr<int>  sut( p1 );
+	alpha::concurrent::nts_shared_ptr<int> sp1( sut.load() );
+	int*                                   p2 = new int;
+	alpha::concurrent::nts_shared_ptr<int> sp2( p2 );
 
 	// Act
 	auto result = sut.compare_exchange_weak( sp1, sp2 );
@@ -603,11 +603,11 @@ TEST( AtomicSharedPtr_Class, Valid_CanCompareExchangeWeakWithSameValidSharedPtrA
 TEST( AtomicSharedPtr_Class, Valid_CanCompareExchangeStrongWithSameValidSharedPtrAndValidSharedPtr_Then_ReturnTrue )
 {
 	// Arrange
-	int*                                             p1 = new int;
-	alpha::concurrent::internal::lf_shared_ptr<int>  sut( p1 );
-	alpha::concurrent::internal::nts_shared_ptr<int> sp1( sut.load() );
-	int*                                             p2 = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sp2( p2 );
+	int*                                   p1 = new int;
+	alpha::concurrent::lf_shared_ptr<int>  sut( p1 );
+	alpha::concurrent::nts_shared_ptr<int> sp1( sut.load() );
+	int*                                   p2 = new int;
+	alpha::concurrent::nts_shared_ptr<int> sp2( p2 );
 
 	// Act
 	auto result = sut.compare_exchange_strong( sp1, sp2 );

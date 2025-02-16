@@ -11,7 +11,7 @@
 
 #include <deque>
 
-#include "alconcurrent/experiment/internal/lf_shared_ptr.hpp"
+#include "alconcurrent/experiment/lf_shared_ptr.hpp"
 #include "alconcurrent/hazard_ptr.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
 

@@ -134,8 +134,8 @@ private:
 	// defered reclamation
 	static void retire( control_block_base* p );
 
-	sticky_counter sc_res_;   //!< sticky counter for resource
-	sticky_counter sc_ctb_;   //!< sticky counter for my control_block
+	internal::sticky_counter sc_res_;   //!< sticky counter for resource
+	internal::sticky_counter sc_ctb_;   //!< sticky counter for my control_block
 };
 
 template <typename T, typename Deleter = std::default_delete<T>>
@@ -175,6 +175,8 @@ private:
 	Deleter my_deleter_;
 };
 
+}   // namespace internal
+
 template <typename T>
 class nts_weak_ptr;
 template <typename T>
@@ -206,7 +208,7 @@ public:
 
 		std::unique_ptr<Y> up_data { p };
 
-		auto p_tmp = new control_block<Y>( p );
+		auto p_tmp = new internal::control_block<Y>( p );
 		up_data.release();
 		p_dataholder_ = p_tmp;
 	}
@@ -218,7 +220,7 @@ public:
 
 		std::unique_ptr<Y, Deleter> up_data { p, d };
 
-		auto p_tmp = new control_block<Y, Deleter>( p, d );
+		auto p_tmp = new internal::control_block<Y, Deleter>( p, d );
 		up_data.release();
 		p_dataholder_ = p_tmp;
 	}
@@ -228,7 +230,7 @@ public:
 	{
 		if ( up_arg == nullptr ) return;
 
-		auto p_tmp = new control_block<Y, Deleter>( up_arg.get(), up_arg.get_deleter() );
+		auto p_tmp = new internal::control_block<Y, Deleter>( up_arg.get(), up_arg.get_deleter() );
 		up_arg.release();
 		p_dataholder_ = p_tmp;
 	}
@@ -245,7 +247,7 @@ public:
 	nts_shared_ptr( const nts_shared_ptr& src )
 	  : p_dataholder_ { nullptr }
 	{
-		control_block_base* p_tmp = src.p_dataholder_;
+		control_block_base_t* p_tmp = src.p_dataholder_;
 		if ( p_tmp == nullptr ) {
 			return;
 		}
@@ -286,7 +288,7 @@ public:
 	nts_shared_ptr( const nts_shared_ptr<Y>& src ) noexcept
 	  : p_dataholder_ { nullptr }
 	{
-		control_block_base* p_tmp = src.p_dataholder_;
+		control_block_base_t* p_tmp = src.p_dataholder_;
 		if ( p_tmp == nullptr ) {
 			return;
 		}
@@ -357,9 +359,9 @@ public:
 
 	void swap( nts_shared_ptr& src ) noexcept
 	{
-		control_block_base* p_tmp = src.p_dataholder_;
-		src.p_dataholder_         = p_dataholder_;
-		p_dataholder_             = p_tmp;
+		control_block_base_t* p_tmp = src.p_dataholder_;
+		src.p_dataholder_           = p_dataholder_;
+		p_dataholder_               = p_tmp;
 	}
 
 	T& operator*() const noexcept
@@ -386,7 +388,9 @@ public:
 	bool owner_before( const nts_weak_ptr<U>& b ) const noexcept;
 
 private:
-	control_block_base* p_dataholder_;
+	using control_block_base_t = internal::control_block_base;
+
+	control_block_base_t* p_dataholder_;
 
 	template <class U>
 	friend class nts_shared_ptr;
@@ -417,7 +421,7 @@ public:
 	nts_weak_ptr( const nts_weak_ptr& src ) noexcept
 	  : p_dataholder_ { nullptr }
 	{
-		control_block_base* p_tmp = src.p_dataholder_;
+		control_block_base_t* p_tmp = src.p_dataholder_;
 		if ( p_tmp == nullptr ) {
 			return;
 		}
@@ -452,7 +456,7 @@ public:
 	nts_weak_ptr( const nts_weak_ptr<Y>& src ) noexcept
 	  : p_dataholder_ { nullptr }
 	{
-		control_block_base* p_tmp = src.p_dataholder_;
+		control_block_base_t* p_tmp = src.p_dataholder_;
 		if ( p_tmp == nullptr ) {
 			return;
 		}
@@ -474,7 +478,7 @@ public:
 	nts_weak_ptr( const nts_shared_ptr<Y>& src ) noexcept
 	  : p_dataholder_ { nullptr }
 	{
-		control_block_base* p_tmp = src.p_dataholder_;
+		control_block_base_t* p_tmp = src.p_dataholder_;
 		if ( p_tmp == nullptr ) {
 			return;
 		}
@@ -536,9 +540,9 @@ public:
 
 	void swap( nts_weak_ptr& src ) noexcept
 	{
-		control_block_base* p_tmp = src.p_dataholder_;
-		src.p_dataholder_         = p_dataholder_;
-		p_dataholder_             = p_tmp;
+		control_block_base_t* p_tmp = src.p_dataholder_;
+		src.p_dataholder_           = p_dataholder_;
+		p_dataholder_               = p_tmp;
 	}
 
 	template <class U>
@@ -551,7 +555,9 @@ public:
 	}
 
 private:
-	control_block_base* p_dataholder_;
+	using control_block_base_t = internal::control_block_base;
+
+	control_block_base_t* p_dataholder_;
 
 	template <class U>
 	friend class nts_shared_ptr;
@@ -595,7 +601,7 @@ public:
 
 		std::unique_ptr<Y> up_data { p };
 
-		auto p_tmp = new control_block<Y>( p );
+		auto p_tmp = new internal::control_block<Y>( p );
 		up_data.release();
 		hph_dataholder_.store( p_tmp );
 	}
@@ -607,7 +613,7 @@ public:
 
 		std::unique_ptr<Y, Deleter> up_data { p, d };
 
-		auto p_tmp = new control_block<Y, Deleter>( p, d );
+		auto p_tmp = new internal::control_block<Y, Deleter>( p, d );
 		up_data.release();
 		hph_dataholder_.store( p_tmp );
 	}
@@ -617,7 +623,7 @@ public:
 	{
 		if ( up_arg == nullptr ) return;
 
-		auto p_tmp = new control_block<Y, Deleter>( up_arg.get(), up_arg.get_deleter() );
+		auto p_tmp = new internal::control_block<Y, Deleter>( up_arg.get(), up_arg.get_deleter() );
 		up_arg.release();
 		hph_dataholder_.store( p_tmp );
 	}
@@ -761,14 +767,16 @@ public:
 	}
 
 private:
+	using control_block_base_t = internal::control_block_base;
+
 	bool compare_exchange_impl( bool                     is_strong,
 	                            nts_shared_ptr<T>&       expected,
 	                            const nts_shared_ptr<T>& desired,
 	                            std::memory_order        order = std::memory_order_acq_rel ) noexcept
 	{
-		bool                      ex_ret            = false;
-		control_block_base* const p_backup_expected = expected.p_dataholder_;
-		auto                      hp_backup_of_this = hph_dataholder_.get_to_verify_exchange();
+		bool                        ex_ret            = false;
+		control_block_base_t* const p_backup_expected = expected.p_dataholder_;
+		auto                        hp_backup_of_this = hph_dataholder_.get_to_verify_exchange();
 		if ( desired.p_dataholder_ != nullptr ) {
 			// compare_exchange_weak()で、desired.p_dataholder_を参照するオブジェクトが増える可能性があるので、参照カウントを先に増やしておく。
 			desired.p_dataholder_->increment_ref_of_shared();
@@ -817,7 +825,7 @@ private:
 		return ex_ret;
 	}
 
-	hazard_ptr_handler<control_block_base> hph_dataholder_;
+	hazard_ptr_handler<control_block_base_t> hph_dataholder_;
 };
 
 template <typename T>
@@ -980,14 +988,16 @@ public:
 	}
 
 private:
+	using control_block_base_t = internal::control_block_base;
+
 	bool compare_exchange_impl( bool                   is_strong,
 	                            nts_weak_ptr<T>&       expected,
 	                            const nts_weak_ptr<T>& desired,
 	                            std::memory_order      order = std::memory_order_acq_rel ) noexcept
 	{
-		bool                      ex_ret            = false;
-		control_block_base* const p_backup_expected = expected.p_dataholder_;
-		auto                      hp_backup_of_this = hph_dataholder_.get_to_verify_exchange();
+		bool                        ex_ret            = false;
+		control_block_base_t* const p_backup_expected = expected.p_dataholder_;
+		auto                        hp_backup_of_this = hph_dataholder_.get_to_verify_exchange();
 		if ( desired.p_dataholder_ != nullptr ) {
 			// compare_exchange_weak()で、desired.p_dataholder_を参照するオブジェクトが増える可能性があるので、参照カウントを先に増やしておく。
 			desired.p_dataholder_->increment_ref_of_weak();
@@ -1036,10 +1046,15 @@ private:
 		return ex_ret;
 	}
 
-	hazard_ptr_handler<control_block_base> hph_dataholder_;
+	hazard_ptr_handler<control_block_base_t> hph_dataholder_;
 };
 
-}   // namespace internal
+template <typename T, typename... Args>
+nts_shared_ptr<T> make_nts_shared( Args&&... args )
+{
+	return nts_shared_ptr<T>( new T( std::forward<Args>( args )... ) );
+}
+
 }   // namespace concurrent
 }   // namespace alpha
 

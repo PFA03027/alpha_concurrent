@@ -9,7 +9,7 @@
  *
  */
 
-#include "alconcurrent/experiment/internal/lf_shared_ptr.hpp"
+#include "alconcurrent/experiment/lf_shared_ptr.hpp"
 
 #include "gtest/gtest.h"
 
@@ -20,7 +20,7 @@ TEST( NTS_SharedPtr_Class, CanConstruct )
 	// Arrange
 
 	// Act
-	alpha::concurrent::internal::nts_shared_ptr<int> sut;
+	alpha::concurrent::nts_shared_ptr<int> sut;
 
 	// Assert
 	EXPECT_EQ( nullptr, sut.get() );
@@ -32,7 +32,7 @@ TEST( NTS_SharedPtr_Class, CanConstructWithPointer )
 	int* p = new int;
 
 	// Act
-	alpha::concurrent::internal::nts_shared_ptr<int> sut( p );
+	alpha::concurrent::nts_shared_ptr<int> sut( p );
 
 	// Assert
 	EXPECT_EQ( p, sut.get() );
@@ -45,7 +45,7 @@ TEST( NTS_SharedPtr_Class, CanConstructWithPointerAndDeleter )
 	auto deleter = []( int* p_arg ) { delete p_arg; };
 
 	// Act
-	alpha::concurrent::internal::nts_shared_ptr<int> sut( p, deleter );
+	alpha::concurrent::nts_shared_ptr<int> sut( p, deleter );
 
 	// Assert
 	EXPECT_EQ( p, sut.get() );
@@ -58,7 +58,7 @@ TEST( NTS_SharedPtr_Class, CanConstructWithUniquePtr )
 	std::unique_ptr<int> up( p );
 
 	// Act
-	alpha::concurrent::internal::nts_shared_ptr<int> sut( std::move( up ) );
+	alpha::concurrent::nts_shared_ptr<int> sut( std::move( up ) );
 
 	// Assert
 	EXPECT_EQ( p, sut.get() );
@@ -71,7 +71,7 @@ TEST( NTS_SharedPtr_Class, CanDestruct )
 
 	// Act
 	{
-		alpha::concurrent::internal::nts_shared_ptr<int> sut( p );
+		alpha::concurrent::nts_shared_ptr<int> sut( p );
 	}
 
 	// Assert
@@ -80,11 +80,11 @@ TEST( NTS_SharedPtr_Class, CanDestruct )
 TEST( NTS_SharedPtr_Class, CanCopyConstructFromValid )
 {
 	// Arrange
-	int*                                             p = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut1( p );
+	int*                                   p = new int;
+	alpha::concurrent::nts_shared_ptr<int> sut1( p );
 
 	// Act
-	alpha::concurrent::internal::nts_shared_ptr<int> sut2( sut1 );
+	alpha::concurrent::nts_shared_ptr<int> sut2( sut1 );
 
 	// Assert
 	EXPECT_EQ( p, sut1.get() );
@@ -94,10 +94,10 @@ TEST( NTS_SharedPtr_Class, CanCopyConstructFromValid )
 TEST( NTS_SharedPtr_Class, CanCopyConstructFromEmpty )
 {
 	// Arrange
-	alpha::concurrent::internal::nts_shared_ptr<int> sut1;
+	alpha::concurrent::nts_shared_ptr<int> sut1;
 
 	// Act
-	alpha::concurrent::internal::nts_shared_ptr<int> sut2( sut1 );
+	alpha::concurrent::nts_shared_ptr<int> sut2( sut1 );
 
 	// Assert
 	EXPECT_EQ( nullptr, sut1.get() );
@@ -107,11 +107,11 @@ TEST( NTS_SharedPtr_Class, CanCopyConstructFromEmpty )
 TEST( NTS_SharedPtr_Class, CanMoveConstructFromValid )
 {
 	// Arrange
-	int*                                             p = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut1( p );
+	int*                                   p = new int;
+	alpha::concurrent::nts_shared_ptr<int> sut1( p );
 
 	// Act
-	alpha::concurrent::internal::nts_shared_ptr<int> sut2( std::move( sut1 ) );
+	alpha::concurrent::nts_shared_ptr<int> sut2( std::move( sut1 ) );
 
 	// Assert
 	EXPECT_EQ( nullptr, sut1.get() );
@@ -121,10 +121,10 @@ TEST( NTS_SharedPtr_Class, CanMoveConstructFromValid )
 TEST( NTS_SharedPtr_Class, CanMoveConstructFromEmpty )
 {
 	// Arrange
-	alpha::concurrent::internal::nts_shared_ptr<int> sut1;
+	alpha::concurrent::nts_shared_ptr<int> sut1;
 
 	// Act
-	alpha::concurrent::internal::nts_shared_ptr<int> sut2( std::move( sut1 ) );
+	alpha::concurrent::nts_shared_ptr<int> sut2( std::move( sut1 ) );
 
 	// Assert
 	EXPECT_EQ( nullptr, sut1.get() );
@@ -134,8 +134,8 @@ TEST( NTS_SharedPtr_Class, CanMoveConstructFromEmpty )
 TEST( NTS_SharedPtr_Class, Empty_CanCopyAssignFromEmpty )
 {
 	// Arrange
-	alpha::concurrent::internal::nts_shared_ptr<int> sut1;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut2;
+	alpha::concurrent::nts_shared_ptr<int> sut1;
+	alpha::concurrent::nts_shared_ptr<int> sut2;
 
 	// Act
 	sut1 = sut2;
@@ -148,9 +148,9 @@ TEST( NTS_SharedPtr_Class, Empty_CanCopyAssignFromEmpty )
 TEST( NTS_SharedPtr_Class, Empty_CanCopyAssignFromValid )
 {
 	// Arrange
-	int*                                             p = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut1;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut2( p );
+	int*                                   p = new int;
+	alpha::concurrent::nts_shared_ptr<int> sut1;
+	alpha::concurrent::nts_shared_ptr<int> sut2( p );
 
 	// Act
 	sut1 = sut2;
@@ -162,9 +162,9 @@ TEST( NTS_SharedPtr_Class, Empty_CanCopyAssignFromValid )
 TEST( NTS_SharedPtr_Class, Valid_CanCopyAssignFromEmpty )
 {
 	// Arrange
-	int*                                             p = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut1( p );
-	alpha::concurrent::internal::nts_shared_ptr<int> sut2;
+	int*                                   p = new int;
+	alpha::concurrent::nts_shared_ptr<int> sut1( p );
+	alpha::concurrent::nts_shared_ptr<int> sut2;
 
 	// Act
 	sut1 = sut2;
@@ -177,10 +177,10 @@ TEST( NTS_SharedPtr_Class, Valid_CanCopyAssignFromEmpty )
 TEST( NTS_SharedPtr_Class, Valid_CanCopyAssignFromValid )
 {
 	// Arrange
-	int*                                             p1 = new int;
-	int*                                             p2 = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut1( p1 );
-	alpha::concurrent::internal::nts_shared_ptr<int> sut2( p2 );
+	int*                                   p1 = new int;
+	int*                                   p2 = new int;
+	alpha::concurrent::nts_shared_ptr<int> sut1( p1 );
+	alpha::concurrent::nts_shared_ptr<int> sut2( p2 );
 
 	// Act
 	sut1 = sut2;
@@ -193,8 +193,8 @@ TEST( NTS_SharedPtr_Class, Valid_CanCopyAssignFromValid )
 TEST( NTS_SharedPtr_Class, Empty_CanMoveAssignFromEmpty )
 {
 	// Arrange
-	alpha::concurrent::internal::nts_shared_ptr<int> sut1;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut2;
+	alpha::concurrent::nts_shared_ptr<int> sut1;
+	alpha::concurrent::nts_shared_ptr<int> sut2;
 
 	// Act
 	sut1 = std::move( sut2 );
@@ -207,9 +207,9 @@ TEST( NTS_SharedPtr_Class, Empty_CanMoveAssignFromEmpty )
 TEST( NTS_SharedPtr_Class, Empty_CanMoveAssignFromValid )
 {
 	// Arrange
-	int*                                             p = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut1;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut2( p );
+	int*                                   p = new int;
+	alpha::concurrent::nts_shared_ptr<int> sut1;
+	alpha::concurrent::nts_shared_ptr<int> sut2( p );
 
 	// Act
 	sut1 = std::move( sut2 );
@@ -222,9 +222,9 @@ TEST( NTS_SharedPtr_Class, Empty_CanMoveAssignFromValid )
 TEST( NTS_SharedPtr_Class, Valid_CanMoveAssignFromEmpty )
 {
 	// Arrange
-	int*                                             p = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut1( p );
-	alpha::concurrent::internal::nts_shared_ptr<int> sut2;
+	int*                                   p = new int;
+	alpha::concurrent::nts_shared_ptr<int> sut1( p );
+	alpha::concurrent::nts_shared_ptr<int> sut2;
 
 	// Act
 	sut1 = std::move( sut2 );
@@ -237,10 +237,10 @@ TEST( NTS_SharedPtr_Class, Valid_CanMoveAssignFromEmpty )
 TEST( NTS_SharedPtr_Class, Valid_CanMoveAssignFromValid )
 {
 	// Arrange
-	int*                                             p1 = new int;
-	int*                                             p2 = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut1( p1 );
-	alpha::concurrent::internal::nts_shared_ptr<int> sut2( p2 );
+	int*                                   p1 = new int;
+	int*                                   p2 = new int;
+	alpha::concurrent::nts_shared_ptr<int> sut1( p1 );
+	alpha::concurrent::nts_shared_ptr<int> sut2( p2 );
 
 	// Act
 	sut1 = std::move( sut2 );
@@ -253,11 +253,11 @@ TEST( NTS_SharedPtr_Class, Valid_CanMoveAssignFromValid )
 TEST( NTS_SharedPtr_Class, CanCopyConstructFromValidDerived )
 {
 	// Arrange
-	test_derived*                                             p = new test_derived;
-	alpha::concurrent::internal::nts_shared_ptr<test_derived> sut1( p );
+	test_derived*                                   p = new test_derived;
+	alpha::concurrent::nts_shared_ptr<test_derived> sut1( p );
 
 	// Act
-	alpha::concurrent::internal::nts_shared_ptr<test_base> sut2( sut1 );
+	alpha::concurrent::nts_shared_ptr<test_base> sut2( sut1 );
 
 	// Assert
 	EXPECT_EQ( p, sut1.get() );
@@ -267,10 +267,10 @@ TEST( NTS_SharedPtr_Class, CanCopyConstructFromValidDerived )
 TEST( NTS_SharedPtr_Class, CanCopyConstructFromEmptyDerived )
 {
 	// Arrange
-	alpha::concurrent::internal::nts_shared_ptr<test_derived> sut1;
+	alpha::concurrent::nts_shared_ptr<test_derived> sut1;
 
 	// Act
-	alpha::concurrent::internal::nts_shared_ptr<test_base> sut2( sut1 );
+	alpha::concurrent::nts_shared_ptr<test_base> sut2( sut1 );
 
 	// Assert
 	EXPECT_EQ( nullptr, sut1.get() );
@@ -280,11 +280,11 @@ TEST( NTS_SharedPtr_Class, CanCopyConstructFromEmptyDerived )
 TEST( NTS_SharedPtr_Class, CanMoveConstructFromValidDerived )
 {
 	// Arrange
-	test_derived*                                             p = new test_derived;
-	alpha::concurrent::internal::nts_shared_ptr<test_derived> sut1( p );
+	test_derived*                                   p = new test_derived;
+	alpha::concurrent::nts_shared_ptr<test_derived> sut1( p );
 
 	// Act
-	alpha::concurrent::internal::nts_shared_ptr<test_base> sut2( std::move( sut1 ) );
+	alpha::concurrent::nts_shared_ptr<test_base> sut2( std::move( sut1 ) );
 
 	// Assert
 	EXPECT_EQ( nullptr, sut1.get() );
@@ -294,10 +294,10 @@ TEST( NTS_SharedPtr_Class, CanMoveConstructFromValidDerived )
 TEST( NTS_SharedPtr_Class, CanMoveConstructFromEmptyDerived )
 {
 	// Arrange
-	alpha::concurrent::internal::nts_shared_ptr<test_derived> sut1;
+	alpha::concurrent::nts_shared_ptr<test_derived> sut1;
 
 	// Act
-	alpha::concurrent::internal::nts_shared_ptr<test_base> sut2( std::move( sut1 ) );
+	alpha::concurrent::nts_shared_ptr<test_base> sut2( std::move( sut1 ) );
 
 	// Assert
 	EXPECT_EQ( nullptr, sut1.get() );
@@ -307,8 +307,8 @@ TEST( NTS_SharedPtr_Class, CanMoveConstructFromEmptyDerived )
 TEST( NTS_SharedPtr_Class, Empty_CanCopyAssignFromEmptyDerived )
 {
 	// Arrange
-	alpha::concurrent::internal::nts_shared_ptr<test_base>    sut1;
-	alpha::concurrent::internal::nts_shared_ptr<test_derived> sut2;
+	alpha::concurrent::nts_shared_ptr<test_base>    sut1;
+	alpha::concurrent::nts_shared_ptr<test_derived> sut2;
 
 	// Act
 	sut1 = sut2;
@@ -321,9 +321,9 @@ TEST( NTS_SharedPtr_Class, Empty_CanCopyAssignFromEmptyDerived )
 TEST( NTS_SharedPtr_Class, Empty_CanCopyAssignFromValidDerived )
 {
 	// Arrange
-	test_derived*                                             p = new test_derived;
-	alpha::concurrent::internal::nts_shared_ptr<test_base>    sut1;
-	alpha::concurrent::internal::nts_shared_ptr<test_derived> sut2( p );
+	test_derived*                                   p = new test_derived;
+	alpha::concurrent::nts_shared_ptr<test_base>    sut1;
+	alpha::concurrent::nts_shared_ptr<test_derived> sut2( p );
 
 	// Act
 	sut1 = sut2;
@@ -335,9 +335,9 @@ TEST( NTS_SharedPtr_Class, Empty_CanCopyAssignFromValidDerived )
 TEST( NTS_SharedPtr_Class, Valid_CanCopyAssignFromEmptyDerived )
 {
 	// Arrange
-	test_derived*                                             p = new test_derived;
-	alpha::concurrent::internal::nts_shared_ptr<test_base>    sut1( p );
-	alpha::concurrent::internal::nts_shared_ptr<test_derived> sut2;
+	test_derived*                                   p = new test_derived;
+	alpha::concurrent::nts_shared_ptr<test_base>    sut1( p );
+	alpha::concurrent::nts_shared_ptr<test_derived> sut2;
 
 	// Act
 	sut1 = sut2;
@@ -350,10 +350,10 @@ TEST( NTS_SharedPtr_Class, Valid_CanCopyAssignFromEmptyDerived )
 TEST( NTS_SharedPtr_Class, Valid_CanCopyAssignFromValidDerived )
 {
 	// Arrange
-	test_derived*                                             p1 = new test_derived;
-	test_derived*                                             p2 = new test_derived;
-	alpha::concurrent::internal::nts_shared_ptr<test_base>    sut1( p1 );
-	alpha::concurrent::internal::nts_shared_ptr<test_derived> sut2( p2 );
+	test_derived*                                   p1 = new test_derived;
+	test_derived*                                   p2 = new test_derived;
+	alpha::concurrent::nts_shared_ptr<test_base>    sut1( p1 );
+	alpha::concurrent::nts_shared_ptr<test_derived> sut2( p2 );
 
 	// Act
 	sut1 = sut2;
@@ -366,8 +366,8 @@ TEST( NTS_SharedPtr_Class, Valid_CanCopyAssignFromValidDerived )
 TEST( NTS_SharedPtr_Class, Empty_CanMoveAssignFromEmptyDerived )
 {
 	// Arrange
-	alpha::concurrent::internal::nts_shared_ptr<test_base>    sut1;
-	alpha::concurrent::internal::nts_shared_ptr<test_derived> sut2;
+	alpha::concurrent::nts_shared_ptr<test_base>    sut1;
+	alpha::concurrent::nts_shared_ptr<test_derived> sut2;
 
 	// Act
 	sut1 = std::move( sut2 );
@@ -380,9 +380,9 @@ TEST( NTS_SharedPtr_Class, Empty_CanMoveAssignFromEmptyDerived )
 TEST( NTS_SharedPtr_Class, Empty_CanMoveAssignFromValidDerived )
 {
 	// Arrange
-	test_derived*                                             p = new test_derived;
-	alpha::concurrent::internal::nts_shared_ptr<test_base>    sut1;
-	alpha::concurrent::internal::nts_shared_ptr<test_derived> sut2( p );
+	test_derived*                                   p = new test_derived;
+	alpha::concurrent::nts_shared_ptr<test_base>    sut1;
+	alpha::concurrent::nts_shared_ptr<test_derived> sut2( p );
 
 	// Act
 	sut1 = std::move( sut2 );
@@ -395,9 +395,9 @@ TEST( NTS_SharedPtr_Class, Empty_CanMoveAssignFromValidDerived )
 TEST( NTS_SharedPtr_Class, Valid_CanMoveAssignFromEmptyDerived )
 {
 	// Arrange
-	test_derived*                                             p = new test_derived;
-	alpha::concurrent::internal::nts_shared_ptr<test_base>    sut1( p );
-	alpha::concurrent::internal::nts_shared_ptr<test_derived> sut2;
+	test_derived*                                   p = new test_derived;
+	alpha::concurrent::nts_shared_ptr<test_base>    sut1( p );
+	alpha::concurrent::nts_shared_ptr<test_derived> sut2;
 
 	// Act
 	sut1 = std::move( sut2 );
@@ -410,10 +410,10 @@ TEST( NTS_SharedPtr_Class, Valid_CanMoveAssignFromEmptyDerived )
 TEST( NTS_SharedPtr_Class, Valid_CanMoveAssignFromValidDerived )
 {
 	// Arrange
-	test_derived*                                             p1 = new test_derived;
-	test_derived*                                             p2 = new test_derived;
-	alpha::concurrent::internal::nts_shared_ptr<test_base>    sut1( p1 );
-	alpha::concurrent::internal::nts_shared_ptr<test_derived> sut2( p2 );
+	test_derived*                                   p1 = new test_derived;
+	test_derived*                                   p2 = new test_derived;
+	alpha::concurrent::nts_shared_ptr<test_base>    sut1( p1 );
+	alpha::concurrent::nts_shared_ptr<test_derived> sut2( p2 );
 
 	// Act
 	sut1 = std::move( sut2 );
@@ -426,8 +426,8 @@ TEST( NTS_SharedPtr_Class, Valid_CanMoveAssignFromValidDerived )
 TEST( NTS_SharedPTr_Class, Empty_CanMoveAssignFromEmptyDerivedUniquePtr )
 {
 	// Arrange
-	alpha::concurrent::internal::nts_shared_ptr<test_base> sut1;
-	std::unique_ptr<test_derived>                          up_sut2;
+	alpha::concurrent::nts_shared_ptr<test_base> sut1;
+	std::unique_ptr<test_derived>                up_sut2;
 
 	// Act
 	sut1 = std::move( up_sut2 );
@@ -440,9 +440,9 @@ TEST( NTS_SharedPTr_Class, Empty_CanMoveAssignFromEmptyDerivedUniquePtr )
 TEST( NTS_SharedPtr_Class, Empty_CanMoveAssignFromValidDerivedUniquePtr )
 {
 	// Arrange
-	alpha::concurrent::internal::nts_shared_ptr<test_base> sut1;
-	test_derived*                                          p = new test_derived;
-	std::unique_ptr<test_derived>                          up_sut2( p );
+	alpha::concurrent::nts_shared_ptr<test_base> sut1;
+	test_derived*                                p = new test_derived;
+	std::unique_ptr<test_derived>                up_sut2( p );
 
 	// Act
 	sut1 = std::move( up_sut2 );
@@ -455,9 +455,9 @@ TEST( NTS_SharedPtr_Class, Empty_CanMoveAssignFromValidDerivedUniquePtr )
 TEST( NTS_SharedPtr_Class, Valid_CanMoveAssignFromEmptyDerivedUniquePtr )
 {
 	// Arrange
-	test_derived*                                          p = new test_derived;
-	alpha::concurrent::internal::nts_shared_ptr<test_base> sut1( p );
-	std::unique_ptr<test_derived>                          up_sut2;
+	test_derived*                                p = new test_derived;
+	alpha::concurrent::nts_shared_ptr<test_base> sut1( p );
+	std::unique_ptr<test_derived>                up_sut2;
 
 	// Act
 	sut1 = std::move( up_sut2 );
@@ -470,10 +470,10 @@ TEST( NTS_SharedPtr_Class, Valid_CanMoveAssignFromEmptyDerivedUniquePtr )
 TEST( NTS_SharedPtr_Class, Valid_CanMoveAssignFromValidDerivedUniquePtr )
 {
 	// Arrange
-	test_derived*                                          p1 = new test_derived;
-	test_derived*                                          p2 = new test_derived;
-	alpha::concurrent::internal::nts_shared_ptr<test_base> sut1( p1 );
-	std::unique_ptr<test_derived>                          up_sut2( p2 );
+	test_derived*                                p1 = new test_derived;
+	test_derived*                                p2 = new test_derived;
+	alpha::concurrent::nts_shared_ptr<test_base> sut1( p1 );
+	std::unique_ptr<test_derived>                up_sut2( p2 );
 
 	// Act
 	sut1 = std::move( up_sut2 );
@@ -486,7 +486,7 @@ TEST( NTS_SharedPtr_Class, Valid_CanMoveAssignFromValidDerivedUniquePtr )
 TEST( NTS_SharedPtr_Class, Empty_CanResetWithoutArgument )
 {
 	// Arrange
-	alpha::concurrent::internal::nts_shared_ptr<int> sut;
+	alpha::concurrent::nts_shared_ptr<int> sut;
 
 	// Act
 	sut.reset();
@@ -498,8 +498,8 @@ TEST( NTS_SharedPtr_Class, Empty_CanResetWithoutArgument )
 TEST( NTS_SharedPtr_Class, Valid_CanResetWithoutArgument )
 {
 	// Arrange
-	int*                                             p = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut( p );
+	int*                                   p = new int;
+	alpha::concurrent::nts_shared_ptr<int> sut( p );
 
 	// Act
 	sut.reset();
@@ -511,8 +511,8 @@ TEST( NTS_SharedPtr_Class, Valid_CanResetWithoutArgument )
 TEST( NTS_SharedPtr_Class, Empty_CanResetWithArgument )
 {
 	// Arrange
-	int*                                             p = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut;
+	int*                                   p = new int;
+	alpha::concurrent::nts_shared_ptr<int> sut;
 
 	// Act
 	sut.reset( p );
@@ -524,9 +524,9 @@ TEST( NTS_SharedPtr_Class, Empty_CanResetWithArgument )
 TEST( NTS_SharedPtr_Class, Valid_CanResetWithArgument )
 {
 	// Arrange
-	int*                                             p1 = new int;
-	int*                                             p2 = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut( p1 );
+	int*                                   p1 = new int;
+	int*                                   p2 = new int;
+	alpha::concurrent::nts_shared_ptr<int> sut( p1 );
 
 	// Act
 	sut.reset( p2 );
@@ -538,9 +538,9 @@ TEST( NTS_SharedPtr_Class, Valid_CanResetWithArgument )
 TEST( NTS_SharedPtr_Class, Empty_CanResetWithArgumentAndDeleter )
 {
 	// Arrange
-	int*                                             p       = new int;
-	auto                                             deleter = []( int* p_arg ) { delete p_arg; };
-	alpha::concurrent::internal::nts_shared_ptr<int> sut;
+	int*                                   p       = new int;
+	auto                                   deleter = []( int* p_arg ) { delete p_arg; };
+	alpha::concurrent::nts_shared_ptr<int> sut;
 
 	// Act
 	sut.reset( p, deleter );
@@ -552,10 +552,10 @@ TEST( NTS_SharedPtr_Class, Empty_CanResetWithArgumentAndDeleter )
 TEST( NTS_SharedPtr_Class, Valid_CanResetWithArgumentAndDeleter )
 {
 	// Arrange
-	int*                                             p1      = new int;
-	int*                                             p2      = new int;
-	auto                                             deleter = []( int* p_arg ) { delete p_arg; };
-	alpha::concurrent::internal::nts_shared_ptr<int> sut( p1 );
+	int*                                   p1      = new int;
+	int*                                   p2      = new int;
+	auto                                   deleter = []( int* p_arg ) { delete p_arg; };
+	alpha::concurrent::nts_shared_ptr<int> sut( p1 );
 
 	// Act
 	sut.reset( p2, deleter );
@@ -567,10 +567,10 @@ TEST( NTS_SharedPtr_Class, Valid_CanResetWithArgumentAndDeleter )
 TEST( NTS_SharedPtr_Class, CanSwap )
 {
 	// Arrange
-	int*                                             p1 = new int;
-	int*                                             p2 = new int;
-	alpha::concurrent::internal::nts_shared_ptr<int> sut1( p1 );
-	alpha::concurrent::internal::nts_shared_ptr<int> sut2( p2 );
+	int*                                   p1 = new int;
+	int*                                   p2 = new int;
+	alpha::concurrent::nts_shared_ptr<int> sut1( p1 );
+	alpha::concurrent::nts_shared_ptr<int> sut2( p2 );
 
 	// Act
 	sut1.swap( sut2 );
@@ -588,7 +588,7 @@ TEST( NTS_SharedPtr_Class, Valid_CanOperatorArrow )
 	};
 	test* p  = new test;
 	p->value = 123;
-	alpha::concurrent::internal::nts_shared_ptr<test> sut( p );
+	alpha::concurrent::nts_shared_ptr<test> sut( p );
 
 	// Act
 	int value = sut->value;
