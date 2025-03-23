@@ -25,7 +25,7 @@ namespace alpha {
 namespace concurrent {
 namespace internal {
 
-#ifdef __cpp_lib_hardware_interference_size
+#if defined( __cpp_lib_hardware_interference_size ) && defined( ALCONCURRENT_CONF_ENABLE_FORCE_USE_INTERFERENCE_SIZE )
 constexpr size_t atomic_variable_align = std::hardware_destructive_interference_size;   // it is better to be equal to std::hardware_destructive_interference_size
 #else
 constexpr size_t atomic_variable_align = 64;   // it is better to be equal to std::hardware_destructive_interference_size

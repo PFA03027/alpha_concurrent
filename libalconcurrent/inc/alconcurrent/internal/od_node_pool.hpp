@@ -259,7 +259,7 @@ public:
 
 		{
 			tl_od_node_list& tl_odn_list_still_in_hazard = get_tl_odn_list_still_in_hazard();
-			raw_list         check_target_list           = std::move( tl_odn_list_still_in_hazard.move_to() );
+			raw_list         check_target_list           = tl_odn_list_still_in_hazard.move_to();
 			check_hazard_then_clear( check_target_list );
 			tl_odn_list_still_in_hazard.merge_push_back( std::move( check_target_list ) );
 		}
