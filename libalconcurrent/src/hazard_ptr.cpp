@@ -550,7 +550,7 @@ void global_scope_hazard_ptr_chain::register_new_hazard_ptr_group( hazard_ptr_gr
 	// push p_phg_arg to top of chain like stack(LILO, even if not allow out)
 	hazard_ptr_group* p_cur_top_hpg = ap_top_hzrd_ptr_chain_.load( std::memory_order_acquire );
 	p_hpg_arg->ap_chain_next_.store( p_cur_top_hpg, std::memory_order_release );
-	while ( !ap_top_hzrd_ptr_chain_.compare_exchange_weak( p_cur_top_hpg, p_hpg_arg, std::memory_order_release, std::memory_order_release ) ) {
+	while ( !ap_top_hzrd_ptr_chain_.compare_exchange_weak( p_cur_top_hpg, p_hpg_arg, std::memory_order_release, std::memory_order_acquire ) ) {
 		p_hpg_arg->ap_chain_next_.store( p_cur_top_hpg, std::memory_order_release );
 	}
 }

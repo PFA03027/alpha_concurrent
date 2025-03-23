@@ -14,6 +14,7 @@
 
 #include <condition_variable>
 #include <functional>
+#include <stdexcept>
 
 #include "alconcurrent/hazard_ptr.hpp"
 #include "alconcurrent/internal/od_node_essence.hpp"

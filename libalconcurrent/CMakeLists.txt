@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.16)
 project(libalconcurrent CXX)
 
 file(GLOB SOURCES src/*.cpp src_mem/*.cpp )
