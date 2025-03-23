@@ -328,14 +328,14 @@ TEST( TestType_ReturnOptional_WithMoveOnlyType, NotHaveValue_DoMoveAssignment_Th
 	EXPECT_EQ( sut.value().get(), p_data );
 }
 
-TEST( TestType_ReturnOptional_WithMoveOnlyType, ConvertibleType_DoMoveConstruct_Then_HasValue )
+TEST( TestType_ReturnOptional_WithMoveOnlyType, ConvertibleType1_DoMoveConstruct_Then_HasValue )
 {
 	// Arrange
 	int*                                                   p_data = new int( 1 );
 	alpha::concurrent::alcc_optional<std::unique_ptr<int>> data { std::unique_ptr<int>( p_data ) };
 
 	// Act
-	alpha::concurrent::alcc_optional<std::shared_ptr<int>> sut { std::move( data ) };
+	alpha::concurrent::alcc_optional<std::unique_ptr<int>> sut( std::move( data ) );
 
 	// Assert
 	EXPECT_TRUE( data.has_value() );
@@ -345,6 +345,36 @@ TEST( TestType_ReturnOptional_WithMoveOnlyType, ConvertibleType_DoMoveConstruct_
 	EXPECT_TRUE( sut.has_value() );
 	ASSERT_NO_THROW( sut.value() );
 	EXPECT_EQ( sut.value().get(), p_data );
+}
+
+TEST( TestType_ReturnOptional_WithMoveOnlyType, ConvertibleType2_DoMoveConstruct_Then_HasValue )
+{
+	// Arrange
+	struct TestA {
+		TestA( int x )
+		  : v_( x ) {}
+
+		const int v_;
+	};
+	struct TestB {
+		TestB( TestA&& src )
+		  : vv_( src.v_ + 1 ) {}
+
+		const int vv_;
+	};
+	alpha::concurrent::alcc_optional<TestA> data { TestA { 1 } };
+
+	// Act
+	alpha::concurrent::alcc_optional<TestB> sut( std::move( data ) );
+
+	// Assert
+	EXPECT_TRUE( data.has_value() );
+	ASSERT_NO_THROW( data.value() );
+	EXPECT_EQ( data.value().v_, 1 );
+
+	EXPECT_TRUE( sut.has_value() );
+	ASSERT_NO_THROW( sut.value() );
+	EXPECT_EQ( sut.value().vv_, 2 );
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////

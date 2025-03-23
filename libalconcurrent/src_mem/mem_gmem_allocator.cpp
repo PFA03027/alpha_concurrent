@@ -9,6 +9,8 @@
  *
  */
 
+#include <stdexcept>
+
 #include "alconcurrent/lf_mem_alloc.hpp"
 
 #include "mem_big_memory_slot.hpp"

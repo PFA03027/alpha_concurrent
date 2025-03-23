@@ -60,6 +60,11 @@ public:
 		return alpha::concurrent::alcc_optional<value_type> { ans };
 	}
 
+	size_t get_allocated_num( void ) const
+	{
+		return 0;
+	}
+
 private:
 	std::mutex              mtx_;
 	std::vector<value_type> vec_;
@@ -90,6 +95,11 @@ public:
 		value_type ans = l_.back();
 		l_.pop_back();
 		return alpha::concurrent::alcc_optional<value_type> { ans };
+	}
+
+	size_t get_allocated_num( void ) const
+	{
+		return 0;
 	}
 
 private:

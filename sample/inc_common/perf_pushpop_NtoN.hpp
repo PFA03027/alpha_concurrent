@@ -120,7 +120,12 @@ bool nwoker_perf_test_pushpop_NtoN( unsigned int nworker, unsigned int exec_sec 
 		total_sum += sum_ret;
 	}
 
-	std::cout << "result is count_sum: " << count_sum << "\t\ttotal sum: " << total_sum << "\t\t" << ( ( count_sum == total_sum ) ? "Good" : "FAILED" ) << std::endl;
+	std::size_t allocated_node_sum = 0;
+	for ( auto& e : sut ) {
+		allocated_node_sum += e.get_allocated_num();
+	}
+
+	std::cout << "result is count_sum: " << count_sum << "\t\ttotal sum: " << total_sum << "\t\t" << ( ( count_sum == total_sum ) ? "Good" : "FAILED" ) << "\tallocated_node_sum: " << allocated_node_sum << std::endl;
 
 	return ( count_sum == total_sum );
 }
