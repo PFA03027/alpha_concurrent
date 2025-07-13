@@ -777,11 +777,14 @@ private:
 		bool                        ex_ret            = false;
 		control_block_base_t* const p_backup_expected = expected.p_dataholder_;
 		auto                        hp_backup_of_this = hph_dataholder_.get_to_verify_exchange();
+
 		if ( desired.p_dataholder_ != nullptr ) {
 			// compare_exchange_weak()で、desired.p_dataholder_を参照するオブジェクトが増える可能性があるので、参照カウントを先に増やしておく。
 			desired.p_dataholder_->increment_ref_of_shared();
 		}
 		while ( true ) {
+			while ( !hph_dataholder_.verify_exchange( hp_backup_of_this ) ) {}
+
 			if ( is_strong ) {
 				ex_ret = hph_dataholder_.compare_exchange_strong( expected.p_dataholder_, desired.p_dataholder_, order );
 			} else {
@@ -794,20 +797,24 @@ private:
 					// よって、置き換わる前の値と同じexpected.p_dataholder_を使用して参照カウントを減らす。
 				}
 			} else {
-				if ( p_backup_expected != nullptr ) {
-					p_backup_expected->decrement_ref_of_shared_then_if_zero_release_this();
-				}
 				if ( hp_backup_of_this == expected.p_dataholder_ ) {
+					if ( expected.p_dataholder_ != nullptr ) {
+						if ( !expected.p_dataholder_->increment_ref_of_shared() ) {
+							// unfortunatly, control_block has been already retired by other thread after compare_exchange_weak().
+							// そのため、置き換えがうまくいかなかったので、最初からやり直す。
+							expected.p_dataholder_ = p_backup_expected;
+							hph_dataholder_.reuse_to_verify_exchange( hp_backup_of_this );
+							continue;
+						}
+					}
+
+					if ( p_backup_expected != nullptr ) {
+						p_backup_expected->decrement_ref_of_shared_then_if_zero_release_this();
+					}
 					// この場合は、ハザードポインタ登録済みのポインタに置き換わったので、そのまま進められる。
 					if ( desired.p_dataholder_ != nullptr ) {
 						// 余分に増やしているので、元に戻す。
 						desired.p_dataholder_->decrement_ref_of_shared_then_if_zero_release_this();
-					}
-					if ( expected.p_dataholder_ != nullptr ) {
-						if ( !expected.p_dataholder_->increment_ref_of_shared() ) {
-							// unfortunatly, control_block has been already retired by other thread after compare_exchange_weak().
-							expected.p_dataholder_ = nullptr;
-						}
 					}
 				} else {
 					// この場合は、ハザードポインタ登録されていないポインタに置き換わっているので、

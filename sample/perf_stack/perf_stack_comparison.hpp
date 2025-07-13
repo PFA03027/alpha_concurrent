@@ -65,8 +65,20 @@ public:
 		return 0;
 	}
 
+	bool is_empty( void ) const noexcept
+	{
+		std::lock_guard<std::mutex> lk( mtx_ );
+		return ( head_idx_ <= 0 );
+	}
+
+	size_t count_size( void ) const noexcept
+	{
+		std::lock_guard<std::mutex> lk( mtx_ );
+		return head_idx_;
+	}
+
 private:
-	std::mutex              mtx_;
+	mutable std::mutex      mtx_;
 	std::vector<value_type> vec_;
 	std::size_t             head_idx_;
 };
@@ -102,8 +114,20 @@ public:
 		return 0;
 	}
 
+	bool is_empty( void ) const noexcept
+	{
+		std::lock_guard<std::mutex> lk( mtx_ );
+		return l_.empty();
+	}
+
+	size_t count_size( void ) const noexcept
+	{
+		std::lock_guard<std::mutex> lk( mtx_ );
+		return l_.size();
+	}
+
 private:
-	std::mutex            mtx_;
+	mutable std::mutex    mtx_;
 	std::list<value_type> l_;
 };
 

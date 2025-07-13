@@ -338,11 +338,11 @@ TEST( TestType_ReturnOptional_WithMoveOnlyType, ConvertibleType1_DoMoveConstruct
 	alpha::concurrent::alcc_optional<std::unique_ptr<int>> sut( std::move( data ) );
 
 	// Assert
-	EXPECT_TRUE( data.has_value() );
+	ASSERT_TRUE( data.has_value() );
 	ASSERT_NO_THROW( data.value() );
 	EXPECT_EQ( data.value().get(), nullptr );
 
-	EXPECT_TRUE( sut.has_value() );
+	ASSERT_TRUE( sut.has_value() );
 	ASSERT_NO_THROW( sut.value() );
 	EXPECT_EQ( sut.value().get(), p_data );
 }
