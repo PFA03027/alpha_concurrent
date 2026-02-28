@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
-project(alpha_concurrent CXX)
+project(
+    alpha_concurrent
+    #
+    DESCRIPTION "libalconcurrent is Semi lock-free concurrent software asset"
+    LANGUAGES CXX
+    VERSION 2.0.5
+    )
+
 set(CMAKE_VERBOSE_MAKEFILE 1)
 
 include(common.cmake)
