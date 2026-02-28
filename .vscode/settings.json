@@ -67,11 +67,11 @@
         "latch": "cpp",
         "future": "cpp",
         "cinttypes": "cpp",
-        "future": "cpp",
-        "latch": "cpp",
-        "cinttypes": "cpp",
         "cassert": "cpp",
-        "cerrno": "cpp"
+        "cerrno": "cpp",
+        "charconv": "cpp",
+        "format": "cpp",
+        "span": "cpp"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
     "testMate.cpp.test.advancedExecutables": [
