@@ -626,6 +626,7 @@ void global_scope_hazard_ptr_chain::remove_all( void )
 {
 	tl_bhpl = bind_hazard_ptr_list();
 
+	aaddr_top_hzrd_ptr_valid_chain_.store( 0, std::memory_order_release );
 	hazard_ptr_group* p_cur_chain = ap_top_hzrd_ptr_chain_.load( std::memory_order_acquire );
 	ap_top_hzrd_ptr_chain_.store( nullptr, std::memory_order_release );
 
