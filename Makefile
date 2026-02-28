@@ -97,15 +97,15 @@ test: build-test
 test-no-sanitizer: build-test-no-sanitizer
 	setarch $(uname -m) -R ctest --test-dir ${BUILD_DIR} -j ${JOBS} -v
 
-build-test: configure-cmake
+build-test: configure-cmake.1.sanitizer
 	cmake --build ${BUILD_DIR} -j ${JOBS} -v --target build-test
 
 build-test-no-sanitizer: configure-cmake-no-sanitizer
 	cmake --build ${BUILD_DIR} -j ${JOBS} -v --target build-test
 
 #############################################################################################
-configure-cmake:
-	cmake -S . -B ${BUILD_DIR} -G "${CMAKE_GENERATE_TARGET}" ${CMAKE_CONFIGURE_OPTS} -DSANITIZER_TYPE=1
+configure-cmake.%.sanitizer:
+	cmake -S . -B ${BUILD_DIR} -G "${CMAKE_GENERATE_TARGET}" ${CMAKE_CONFIGURE_OPTS} -DSANITIZER_TYPE=$*
 
 configure-cmake-no-sanitizer:
 	cmake -S . -B ${BUILD_DIR} -G "${CMAKE_GENERATE_TARGET}" ${CMAKE_CONFIGURE_OPTS} -DSANITIZER_TYPE=
@@ -117,7 +117,7 @@ sample: build-sample
 	build/sample/perf_stack/perf_stack
 	build/sample/perf_fifo/perf_fifo
 
-build-sample: configure-cmake
+build-sample: configure-cmake.1.sanitizer
 	cmake --build ${BUILD_DIR} -j ${JOBS} -v --target build-sample
 
 #############################################################################################
@@ -163,7 +163,7 @@ coverage: exec-coverage
 	genhtml --branch-coverage -o OUTPUT -p . -f output.info
 
 exec-coverage: clean
-	$(MAKE) BUILD_CONFIG=codecoverage BUILDTYPE=Debug test
+	$(MAKE) BUILD_CONFIG=codecoverage BUILDTYPE=Debug test-no-sanitizer
 
 #############################################################################################
 sanitizer:
@@ -173,16 +173,17 @@ sanitizer:
 		echo $$i / 8 done; \
 	done
 
-sanitizer.%.sanitizer:
-	$(MAKE) BUILD_CONFIG=normal BUILDTYPE=Debug SANITIZER_TYPE=$* test
+sanitizer.%.sanitizer: configure-cmake.%.sanitizer
+	cmake --build ${BUILD_DIR} -j ${JOBS} -v --target build-test
+	setarch $(uname -m) -R ctest --test-dir ${BUILD_DIR} -j ${JOBS} -v
 
 #############################################################################################
-tidy-fix: configure-cmake
+tidy-fix: configure-cmake-no-sanitizer
 	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build --fix
 	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-format -i
 	find ./ -name '*.hpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-format -i
 
-tidy: configure-cmake
+tidy: configure-cmake-no-sanitizer
 	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=${BUILD_DIR}
 
 .PHONY: all clean test test-release test-debug sample coverage profile sanitizer sanitizer.p tidy-fix tidy

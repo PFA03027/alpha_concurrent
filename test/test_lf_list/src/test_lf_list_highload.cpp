@@ -200,8 +200,10 @@ typename test_list::value_type func_test_list_push_front( test_list* p_test_obj,
 
 /**
  * 各スレッドが、最後に追加する。
+ *
+ * @returns 各スレッドが最後に追加した値の合計、および、追加した回数
  */
-typename test_list::value_type func_test_list_push_back( test_list* p_test_obj, pthread_barrier_t* p_barrier, std::atomic<bool>* p_loop_flag )
+std::pair<typename test_list::value_type, std::uintptr_t> func_test_list_push_back( test_list* p_test_obj, pthread_barrier_t* p_barrier, std::atomic<bool>* p_loop_flag )
 {
 	pthread_barrier_wait( p_barrier );
 
@@ -213,7 +215,7 @@ typename test_list::value_type func_test_list_push_back( test_list* p_test_obj, 
 		i++;
 	}
 
-	return v;
+	return std::pair<typename test_list::value_type, std::uintptr_t>( v, i );
 }
 
 TEST_F( lflistHighLoadTest, TC0_1_ManyElements_DoPopBack_Then_Empty )
@@ -406,14 +408,14 @@ TEST_F( lflistHighLoadTest, TC0_4_Empty_DoPushBack_Then_ManyElements )
 	constexpr unsigned int tmp_num_thread = 12;   // Tested until 128.
 	std::atomic<bool>      loop_flag( true );
 
-	test_list                                   count_list;
-	pthread_barrier_t                           barrier;
-	std::future<typename test_list::value_type> results_of_threads[tmp_num_thread];
+	test_list                                                              count_list;
+	pthread_barrier_t                                                      barrier;
+	std::future<std::pair<typename test_list::value_type, std::uintptr_t>> results_of_threads[tmp_num_thread];
 
 	pthread_barrier_init( &barrier, NULL, tmp_num_thread + 1 );
 
 	for ( auto& cur_future : results_of_threads ) {
-		std::packaged_task<typename test_list::value_type( test_list*, pthread_barrier_t*, std::atomic<bool>* )> cur_task( func_test_list_push_back );
+		std::packaged_task<std::pair<typename test_list::value_type, std::uintptr_t>( test_list*, pthread_barrier_t*, std::atomic<bool>* )> cur_task( func_test_list_push_back );
 		cur_future             = cur_task.get_future();
 		std::thread cur_thread = std::thread( std::move( cur_task ), &count_list, &barrier, &loop_flag );
 		cur_thread.detach();
@@ -425,18 +427,20 @@ TEST_F( lflistHighLoadTest, TC0_4_Empty_DoPushBack_Then_ManyElements )
 	std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );   // Let the threads run for a while.
 	loop_flag.store( false );                                          // Signal the threads to stop.
 
-	typename test_list::value_type expect = 0;
-	unsigned int                   idx    = 0;
+	typename test_list::value_type expect           = 0;
+	std::uintptr_t                 total_push_count = 0;
+	unsigned int                   idx              = 0;
 	for ( auto& cur_future : results_of_threads ) {
-		uintptr_t e = cur_future.get();
-		std::cout << "Thread " << idx << ": last func_test_list_push_front dequeued = " << e << std::endl;
-		expect += e;
+		auto e = cur_future.get();
+		std::cout << "Thread " << idx << ": last func_test_list_push_back dequeued = " << e.first << ", count = " << e.second << std::endl;
+		expect += e.first;
+		total_push_count += e.second;
 
 		idx++;
 	}
 
 	uintptr_t sum = 0;
-	for ( size_t i = 0; i < tmp_num_thread * loop_num; i++ ) {
+	for ( size_t i = 0; i < total_push_count; i++ ) {
 		auto ret = count_list.pop_front();
 		if ( !ret.has_value() ) {
 			printf( "Bugggggggyyyy  TC0_2_Empty_DoPushFront_Then_ManyElements() by pop_back!!!  %s\n", std::to_string( i ).c_str() );
@@ -457,12 +461,9 @@ TEST_F( lflistHighLoadTest, TC0_4_Empty_DoPushBack_Then_ManyElements )
 	// に等しくなるはず。
 	EXPECT_EQ( expect, sum ) << "Expect: " << std::to_string( expect ) << std::endl
 							 << "Sum:    " << sum << std::endl;
-	EXPECT_EQ( count_list.count_size(), 0 );
+	EXPECT_EQ( count_list.count_size(), 0 ) << "remained value:    " << count_list.pop_back().value() << std::endl;
 
-	if ( count_list.count_size() > 0 ) {
-		auto ret = count_list.pop_back();
-		std::cout << "remained value:    " << ret.value() << std::endl;
-	}
+	pthread_barrier_destroy( &barrier );
 
 	return;
 }

@@ -178,6 +178,7 @@ public:
 			delete p_cur;
 			p_cur = p_nxt;
 		}
+		p_head_ = nullptr;
 	}
 
 	void push( countermeasure_gcc_bug_deletable_obj_abst* p )
