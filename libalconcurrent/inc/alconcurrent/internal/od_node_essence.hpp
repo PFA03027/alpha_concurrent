@@ -14,6 +14,7 @@
 
 #include "alconcurrent/hazard_ptr.hpp"
 #include "alconcurrent/internal/alcc_optional.hpp"
+#include "cpp_std_configure.hpp"
 
 namespace alpha {
 namespace concurrent {

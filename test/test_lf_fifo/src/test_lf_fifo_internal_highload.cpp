@@ -84,6 +84,8 @@ struct Nthread_push_pop_task_of_x_fifo_list {
 
 		std::vector<result_future_t> tasks_result1( thread_num_ );
 		std::vector<result_future_t> tasks_result2( thread_num_ );
+		std::vector<std::thread>     workers1( thread_num_ );
+		std::vector<std::thread>     workers2( thread_num_ );
 		for ( auto& t : tasks_result1 ) {
 			std::packaged_task<std::tuple<bool, size_t, size_t>( void )> task(
 				[this]() {
@@ -91,8 +93,7 @@ struct Nthread_push_pop_task_of_x_fifo_list {
 				} );   // 非同期実行する関数を登録する
 			t = task.get_future();
 
-			std::thread worker_( std::move( task ) );
-			worker_.detach();
+			workers1.emplace_back( std::thread( std::move( task ) ) );
 		}
 		for ( auto& t : tasks_result2 ) {
 			std::packaged_task<std::tuple<bool, size_t, size_t>( void )> task(
@@ -101,8 +102,7 @@ struct Nthread_push_pop_task_of_x_fifo_list {
 				} );   // 非同期実行する関数を登録する
 			t = task.get_future();
 
-			std::thread worker_( std::move( task ) );
-			worker_.detach();
+			workers2.emplace_back( std::thread( std::move( task ) ) );
 		}
 
 		start_sync_latch_.arrive_and_wait();
@@ -110,6 +110,17 @@ struct Nthread_push_pop_task_of_x_fifo_list {
 		std::this_thread::sleep_for( std::chrono::milliseconds( test_milliseconds ) );
 		loop_flag_.store( false, std::memory_order_release );
 		printf( "spend waiting time %zu msec\n", test_milliseconds );
+
+		for ( auto& t : workers1 ) {
+			if ( t.joinable() ) {
+				t.join();
+			}
+		}
+		for ( auto& t : workers2 ) {
+			if ( t.joinable() ) {
+				t.join();
+			}
+		}
 
 		bool   total_ret           = true;
 		size_t total_loop_count    = 0;

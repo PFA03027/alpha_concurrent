@@ -25,6 +25,10 @@
 #include "mem_allocated_mem_top.hpp"
 #include "mem_retrieved_slot_array_mgr.hpp"
 
+#ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
+#include "mmap_allocator.hpp"
+#endif
+
 namespace alpha {
 namespace concurrent {
 namespace internal {

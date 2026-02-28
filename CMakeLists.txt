@@ -1,13 +1,20 @@
 cmake_minimum_required(VERSION 3.16)
-project(alpha_concurrent CXX)
+project(
+    alpha_concurrent
+    #
+    DESCRIPTION "libalconcurrent is Semi lock-free concurrent software asset"
+    LANGUAGES CXX
+    VERSION 2.0.5
+    )
+
 set(CMAKE_VERBOSE_MAKEFILE 1)
 
 include(common.cmake)
 
 # Switch build target
-set(BUILD_TARGET normal CACHE STRING "Build target?")
-message("[BUILD] ${BUILD_TARGET}")
-include(${BUILD_TARGET}.cmake)
+set(BUILD_CONFIG normal CACHE STRING "Build target?")
+message("[BUILD] ${BUILD_CONFIG}")
+include(${BUILD_CONFIG}.cmake)
 
 
 enable_testing()

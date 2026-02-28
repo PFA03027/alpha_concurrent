@@ -21,7 +21,7 @@
 #include <tuple>
 
 template <typename FIFOType, size_t N>
-void one_cycle_pushpop(
+bool one_cycle_pushpop(
 	std::array<FIFOType, N>& sut,
 	std::array<size_t, N>&   cur_access_idxs_pop,
 	std::array<size_t, N>&   cur_access_idxs_push,
@@ -30,8 +30,13 @@ void one_cycle_pushpop(
 	for ( size_t i = 0; i < N; i++ ) {
 		auto ret = sut[cur_access_idxs_pop[i]].pop();
 		if ( !ret.has_value() ) {
-			std::cout << "SUT has bug!!!" << std::endl;
-			abort();
+			std::cout << "SUT has bug!!! i= " << i << "\tidx= " << cur_access_idxs_pop[i] << std::endl;
+			for ( size_t j = 0; j < N; j++ ) {
+				bool   is_empty      = sut[j].is_empty();
+				size_t remained_size = sut[j].count_size();
+				std::cout << "[NGG] j = " << j << "\tis_empty = " << ( is_empty ? "true " : "false" ) << "\tremained_size = " << remained_size << std::endl;
+			}
+			return false;
 		}
 		auto pop_value = ret.value();
 		pop_value += 1;
@@ -39,6 +44,7 @@ void one_cycle_pushpop(
 
 		count++;
 	}
+	return true;
 }
 
 template <typename FIFOType, size_t N>
@@ -58,6 +64,11 @@ std::tuple<std::size_t, typename FIFOType::value_type> worker_task_pushpop_NtoN(
 		cur_access_idxs_push[i] = i;
 		sut[i].push( 0 );
 	}
+	// for ( size_t i = 0; i < N; i++ ) {
+	// 	bool   is_empty      = sut[i].is_empty();
+	// 	size_t remained_size = sut[i].count_size();
+	// 	std::cout << "[1st] i = " << i << "\tis_empty = " << ( is_empty ? "true " : "false" ) << "\tremained_size = " << remained_size << std::endl;
+	// }
 
 	start_sync_latch.arrive_and_wait();
 	while ( loop_flag.load( std::memory_order_acquire ) ) {
@@ -65,14 +76,24 @@ std::tuple<std::size_t, typename FIFOType::value_type> worker_task_pushpop_NtoN(
 		std::shuffle( cur_access_idxs_pop.begin(), cur_access_idxs_pop.end(), engine );
 		std::shuffle( cur_access_idxs_push.begin(), cur_access_idxs_push.end(), engine );
 
-		one_cycle_pushpop( sut, cur_access_idxs_pop, cur_access_idxs_push, count );
+		bool ret = one_cycle_pushpop( sut, cur_access_idxs_pop, cur_access_idxs_push, count );
+		if ( !ret ) {
+			return { count, 0 };
+		}
 	}
+	// for ( size_t i = 0; i < N; i++ ) {
+	// 	bool   is_empty      = sut[i].is_empty();
+	// 	size_t remained_size = sut[i].count_size();
+	// 	std::cout << "[2nd] i = " << i << "\tis_empty = " << ( is_empty ? "true " : "false" ) << "\tremained_size = " << remained_size << std::endl;
+	// }
 	size_t pop_value_sum = 0;
 	for ( size_t i = 0; i < N; i++ ) {
 		auto ret = sut[cur_access_idxs_pop[i]].pop();
 		if ( !ret.has_value() ) {
-			std::cout << "SUT has bug in completion phase!!!" << std::endl;
-			abort();
+			bool   is_empty      = sut[cur_access_idxs_pop[i]].is_empty();
+			size_t remained_size = sut[cur_access_idxs_pop[i]].count_size();
+			std::cout << "SUT has bug in completion phase!!! x: i = " << i << "\tis_empty = " << ( is_empty ? "true " : "false" ) << "\tremained_size = " << remained_size << std::endl;
+			break;
 		}
 		pop_value_sum += ret.value();
 	}
@@ -91,27 +112,20 @@ bool nwoker_perf_test_pushpop_NtoN( unsigned int nworker, unsigned int exec_sec 
 	std::atomic_bool loop_flag( true );
 	using result_type = decltype( worker_task_pushpop_NtoN<FIFOType, N>( start_sync_latch, loop_flag, sut ) );
 
-	std::vector<std::future<result_type>> rets;
-	rets.reserve( nworker );
-	std::vector<std::thread> task_threads( nworker );
-	for ( auto& t : task_threads ) {
+	std::vector<std::future<result_type>> rets( nworker );
+	for ( auto& e_f_r : rets ) {
 		std::packaged_task<result_type()> task(
 			[&start_sync_latch, &loop_flag, &sut]() {
 				return worker_task_pushpop_NtoN<FIFOType, N>( start_sync_latch, loop_flag, sut );
 			} );   // 非同期実行する関数を登録する
-		rets.emplace_back( task.get_future() );
-		t = std::thread( std::move( task ) );
+		e_f_r = task.get_future();
+		std::thread( std::move( task ) ).detach();
 	}
 
 	start_sync_latch.arrive_and_wait();
 	sleep( exec_sec );
 	loop_flag.store( false, std::memory_order_release );
 
-	for ( auto& t : task_threads ) {
-		if ( t.joinable() ) {
-			t.join();
-		}
-	}
 	std::size_t count_sum = 0;
 	std::size_t total_sum = 0;
 	for ( auto& r : rets ) {
@@ -148,7 +162,7 @@ std::tuple<std::size_t, typename FIFOType::value_type> worker_task_pushpop_One(
 		// シャッフル
 		auto [sf, pop_value] = sut.pop();
 		if ( !sf ) {
-			std::cout << "SUT has bug!!!" << std::endl;
+			// std::cout << "SUT has bug!!!" << std::endl;
 			abort();
 		}
 		pop_value += 1;
@@ -160,7 +174,7 @@ std::tuple<std::size_t, typename FIFOType::value_type> worker_task_pushpop_One(
 
 	auto [sf, pop_value] = sut.pop();
 	if ( !sf ) {
-		std::cout << "SUT has bug in completion phase!!!" << std::endl;
+		std::cout << "SUT has bug in completion phase!!! y" << std::endl;
 		abort();
 	}
 	pop_value_sum += pop_value;

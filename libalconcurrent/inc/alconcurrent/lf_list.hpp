@@ -432,7 +432,7 @@ public:
 	 * @warning
 	 * This List will be access by several thread concurrently. So, true number of this List may be changed when caller uses the returned value.
 	 */
-	size_t get_allocated_num( void )
+	size_t get_allocated_num( void ) const noexcept
 	{
 		return allocated_node_count_.load();
 	}

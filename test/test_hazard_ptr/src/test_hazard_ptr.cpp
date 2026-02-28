@@ -642,8 +642,10 @@ TEST_F( TestHazardPtrGroup, CallSearchWithDelMarkAt2nd3rd )
 TEST_F( TestHazardPtrGroup, HighLoadValidChainWithWriterOnly )
 {
 	// Arrange
-	constexpr int                                 array_size = 10;
-	constexpr int                                 th_num     = 8;
+	constexpr int     array_size = 10;
+	constexpr int     th_num     = 8;
+	std::atomic<bool> loop_flag { true };
+
 	std::atomic<std::uintptr_t>                   sut( 0 );
 	alpha::concurrent::internal::hazard_ptr_group hpg[array_size * th_num];
 	std::thread                                   test_load_th_obj[th_num];
@@ -652,16 +654,15 @@ TEST_F( TestHazardPtrGroup, HighLoadValidChainWithWriterOnly )
 
 	struct load_object {
 		void operator()(
-			int                                                  my_tid,
+			std::atomic<bool>* const                             p_loop_flag,
 			pthread_barrier_t* const                             p_barrier,
 			std::atomic<std::uintptr_t>* const                   p_addr_top,
 			alpha::concurrent::internal::hazard_ptr_group* const p_begin,
 			alpha::concurrent::internal::hazard_ptr_group* const p_end )
 		{
-			constexpr int loop_num = 100000;
 
 			pthread_barrier_wait( p_barrier );
-			for ( int i = 0; i < loop_num; i++ ) {
+			while ( p_loop_flag->load( std::memory_order_acquire ) ) {
 				int                                            j = 0;
 				alpha::concurrent::internal::hazard_ptr_group* p_cur;
 				for ( p_cur = p_begin; p_cur != p_end; p_cur++ ) {
@@ -681,12 +682,10 @@ TEST_F( TestHazardPtrGroup, HighLoadValidChainWithWriterOnly )
 					alpha::concurrent::internal::hazard_ptr_group::remove_hazard_ptr_group_from_valid_chain( p_cur, p_addr_top );
 					std::uintptr_t tmp_addr2 = p_cur->get_valid_chain_next_reader_accesser().load_address();
 					if ( !alpha::concurrent::internal::is_del_marked( tmp_addr2 ) ) {
-						// if ( my_tid == 0 ) {
 						std::cout << std::string( "should be del marked  " ) + std::to_string( j ) + std::string( "  " ) +
 										 std::to_string( tmp_addr1 ) + std::string( "  " ) + std::to_string( tmp_addr2 )
 								  << std::endl;
 						throw std::logic_error( std::string( "should be del marked  " ) + std::to_string( tmp_addr1 ) + std::string( "  " ) + std::to_string( tmp_addr2 ) );
-						// }
 					}
 					j++;
 				}
@@ -697,11 +696,13 @@ TEST_F( TestHazardPtrGroup, HighLoadValidChainWithWriterOnly )
 		}
 	};
 	for ( int i = 0; i < th_num; i++ ) {
-		test_load_th_obj[i] = std::thread( load_object {}, i, &barrier2, &sut, &( hpg[i * array_size] ), &( hpg[( i + 1 ) * array_size] ) );
+		test_load_th_obj[i] = std::thread( load_object {}, &loop_flag, &barrier2, &sut, &( hpg[i * array_size] ), &( hpg[( i + 1 ) * array_size] ) );
 	}
 
 	// Act
 	pthread_barrier_wait( &barrier2 );
+	std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );
+	loop_flag.store( false );
 	for ( int i = 0; i < th_num; i++ ) {
 		if ( test_load_th_obj[i].joinable() ) {
 			test_load_th_obj[i].join();
@@ -716,9 +717,9 @@ TEST_F( TestHazardPtrGroup, HighLoadValidChainWithWriterOnly )
 TEST_F( TestHazardPtrGroup, HighLoadValidChainWithReaderAndWriter )
 {
 	// Arrange
-	constexpr int array_size = 10;
-	constexpr int th_num     = 4;
-	constexpr int loop_num   = 100000;
+	constexpr int     array_size = 10;
+	constexpr int     th_num     = 4;
+	std::atomic<bool> loop_flag { true };
 
 	std::atomic<std::uintptr_t>                   sut( 0 );
 	alpha::concurrent::internal::hazard_ptr_group hpg[array_size * th_num];
@@ -729,14 +730,14 @@ TEST_F( TestHazardPtrGroup, HighLoadValidChainWithReaderAndWriter )
 
 	struct load_writer_object {
 		void operator()(
-			int                                                  loop_num,
+			std::atomic<bool>* const                             p_loop_flag,
 			pthread_barrier_t* const                             p_barrier,
 			std::atomic<std::uintptr_t>* const                   p_addr_top,
 			alpha::concurrent::internal::hazard_ptr_group* const p_begin,
 			alpha::concurrent::internal::hazard_ptr_group* const p_end )
 		{
 			pthread_barrier_wait( p_barrier );
-			for ( int i = 0; i < loop_num; i++ ) {
+			while ( p_loop_flag->load( std::memory_order_acquire ) ) {
 				int                                            j = 0;
 				alpha::concurrent::internal::hazard_ptr_group* p_cur;
 				for ( p_cur = p_begin; p_cur != p_end; p_cur++ ) {
@@ -771,16 +772,14 @@ TEST_F( TestHazardPtrGroup, HighLoadValidChainWithReaderAndWriter )
 	};
 	struct load_reader_object {
 		void operator()(
-			int                                                  loop_num,
+			std::atomic<bool>*                                   p_loop_flag,
 			pthread_barrier_t* const                             p_barrier,
 			std::atomic<std::uintptr_t>* const                   p_addr_top,
 			alpha::concurrent::internal::hazard_ptr_group* const p_begin,
 			alpha::concurrent::internal::hazard_ptr_group* const p_end )
 		{
-			int loop_num2 = loop_num * 2;
-
 			pthread_barrier_wait( p_barrier );
-			for ( int i = 0; i < loop_num2; i++ ) {
+			while ( p_loop_flag->load( std::memory_order_acquire ) ) {
 				int                                            j = 0;
 				alpha::concurrent::internal::hazard_ptr_group* p_cur;
 				for ( p_cur = p_begin; p_cur != p_end; p_cur++ ) {
@@ -792,14 +791,16 @@ TEST_F( TestHazardPtrGroup, HighLoadValidChainWithReaderAndWriter )
 	};
 
 	for ( int i = 0; i < th_num; i++ ) {
-		test_load_th_writer_obj[i] = std::thread( load_writer_object {}, loop_num, &barrier2, &sut, &( hpg[i * array_size] ), &( hpg[( i + 1 ) * array_size] ) );
+		test_load_th_writer_obj[i] = std::thread( load_writer_object {}, &loop_flag, &barrier2, &sut, &( hpg[i * array_size] ), &( hpg[( i + 1 ) * array_size] ) );
 	}
 	for ( int i = 0; i < th_num; i++ ) {
-		test_load_th_reader_obj[i] = std::thread( load_reader_object {}, loop_num, &barrier2, &sut, &( hpg[i * array_size] ), &( hpg[( i + 1 ) * array_size] ) );
+		test_load_th_reader_obj[i] = std::thread( load_reader_object {}, &loop_flag, &barrier2, &sut, &( hpg[i * array_size] ), &( hpg[( i + 1 ) * array_size] ) );
 	}
 
 	// Act
 	pthread_barrier_wait( &barrier2 );
+	std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );
+	loop_flag.store( false );
 	for ( int i = 0; i < th_num; i++ ) {
 		if ( test_load_th_writer_obj[i].joinable() ) {
 			test_load_th_writer_obj[i].join();

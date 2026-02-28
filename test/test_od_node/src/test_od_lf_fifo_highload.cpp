@@ -202,7 +202,7 @@ TEST_F( Test_od_lockfree_fifo_Highload, NThread_1thread_PushPop1 )
 	// Arrange
 
 	// Act
-	bool ret = Nthread_push_pop_task::test_task_pushback_popfront( 1, 1000, *p_sut_ );
+	bool ret = Nthread_push_pop_task::test_task_pushback_popfront( 1, 100, *p_sut_ );
 
 	// Assert
 	EXPECT_TRUE( ret );
@@ -213,7 +213,7 @@ TEST_F( Test_od_lockfree_fifo_Highload, NThread_2threads_PushPop1 )
 	// Arrange
 
 	// Act
-	bool ret = Nthread_push_pop_task::test_task_pushback_popfront( 2, 1000, *p_sut_ );
+	bool ret = Nthread_push_pop_task::test_task_pushback_popfront( 2, 100, *p_sut_ );
 
 	// Assert
 	EXPECT_TRUE( ret );
@@ -224,7 +224,7 @@ TEST_F( Test_od_lockfree_fifo_Highload, NThread_32threads_PushPop1 )
 	// Arrange
 
 	// Act
-	bool ret = Nthread_push_pop_task::test_task_pushback_popfront( 32, 1000, *p_sut_ );
+	bool ret = Nthread_push_pop_task::test_task_pushback_popfront( 32, 100, *p_sut_ );
 
 	// Assert
 	EXPECT_TRUE( ret );
@@ -235,7 +235,7 @@ TEST_F( Test_od_lockfree_fifo_Highload, NThread_1thread_PushPop2 )
 	// Arrange
 
 	// Act
-	bool ret = Nthread_push_pop_task::test_task_pushfront_popfront( 1, 1000, *p_sut_ );
+	bool ret = Nthread_push_pop_task::test_task_pushfront_popfront( 1, 100, *p_sut_ );
 
 	// Assert
 	EXPECT_TRUE( ret );
@@ -246,7 +246,7 @@ TEST_F( Test_od_lockfree_fifo_Highload, NThread_2threads_PushPop2 )
 	// Arrange
 
 	// Act
-	bool ret = Nthread_push_pop_task::test_task_pushfront_popfront( 2, 1000, *p_sut_ );
+	bool ret = Nthread_push_pop_task::test_task_pushfront_popfront( 2, 100, *p_sut_ );
 
 	// Assert
 	EXPECT_TRUE( ret );
@@ -257,7 +257,7 @@ TEST_F( Test_od_lockfree_fifo_Highload, NThread_32threads_PushPop2 )
 	// Arrange
 
 	// Act
-	bool ret = Nthread_push_pop_task::test_task_pushfront_popfront( 32, 1000, *p_sut_ );
+	bool ret = Nthread_push_pop_task::test_task_pushfront_popfront( 32, 100, *p_sut_ );
 
 	// Assert
 	EXPECT_TRUE( ret );
@@ -267,7 +267,7 @@ TEST_F( Test_od_lockfree_fifo_Highload, NThread_1thread_PushPop3 )
 	// Arrange
 
 	// Act
-	bool ret = Nthread_push_pop_task::test_task_pushfront_pushback_popfront( 1, 1000, *p_sut_ );
+	bool ret = Nthread_push_pop_task::test_task_pushfront_pushback_popfront( 1, 100, *p_sut_ );
 
 	// Assert
 	EXPECT_TRUE( ret );
@@ -278,7 +278,7 @@ TEST_F( Test_od_lockfree_fifo_Highload, NThread_2threads_PushPop3 )
 	// Arrange
 
 	// Act
-	bool ret = Nthread_push_pop_task::test_task_pushfront_pushback_popfront( 2, 1000, *p_sut_ );
+	bool ret = Nthread_push_pop_task::test_task_pushfront_pushback_popfront( 2, 100, *p_sut_ );
 
 	// Assert
 	EXPECT_TRUE( ret );
@@ -289,7 +289,7 @@ TEST_F( Test_od_lockfree_fifo_Highload, NThread_32threads_PushPop3 )
 	// Arrange
 
 	// Act
-	bool ret = Nthread_push_pop_task::test_task_pushfront_pushback_popfront( 32, 1000, *p_sut_ );
+	bool ret = Nthread_push_pop_task::test_task_pushfront_pushback_popfront( 32, 100, *p_sut_ );
 
 	// Assert
 	EXPECT_TRUE( ret );

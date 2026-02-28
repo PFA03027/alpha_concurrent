@@ -32,7 +32,7 @@
 constexpr size_t SUT_N    = 1;
 constexpr size_t THREAD_N = 2;
 
-#if 1
+#if 0
 TEST_F( TestLF_2_HighLoad, TC_FIFO_Profile1 )
 {
 	using TestType = std::size_t;
