@@ -131,7 +131,7 @@ typename test_list::value_type func_test_list_back2front( test_list* p_test_obj,
 /**
  * 各スレッドが、最後から取り出し、合計を計算する。
  */
-typename test_list::value_type func_test_list_pop_front( test_list* p_test_obj, pthread_barrier_t* p_barrier, const std::uintptr_t loop_num_arg )
+typename test_list::value_type func_test_list_pop_front( test_list* p_test_obj, pthread_barrier_t* p_barrier, const std::uintptr_t loop_num_arg, test_list::value_type expected_max_value )
 {
 	pthread_barrier_wait( p_barrier );
 
@@ -139,11 +139,11 @@ typename test_list::value_type func_test_list_pop_front( test_list* p_test_obj, 
 	for ( std::uintptr_t i = 0; i < loop_num_arg; i++ ) {
 		auto ret = p_test_obj->pop_front();
 		if ( !ret.has_value() ) {
-			printf( "Bugggggggyyyy  func_test_list_pop_front() by pop_back!!!  %s\n", std::to_string( v ).c_str() );
+			printf( "Bugggggggyyyy  func_test_list_pop_front() by pop_front!!!  %s\n", std::to_string( v ).c_str() );
 			printf( "list size count: %zu\n", p_test_obj->count_size() );
 			break;
 		}
-		if ( ( ret.value() <= 0 ) || ( ret.value() > ( num_thread * loop_num ) ) ) {
+		if ( ( ret.value() <= 0 ) || ( ret.value() > ( expected_max_value ) ) ) {
 			printf( "Bugggggggyyyy read by func_test_list_pop_front()!!!  %s\n", std::to_string( ret.value() ).c_str() );
 			printf( "list size count: %zu\n", p_test_obj->count_size() );
 			break;
@@ -158,7 +158,7 @@ typename test_list::value_type func_test_list_pop_front( test_list* p_test_obj, 
 /**
  * 各スレッドが、最後から取り出し、合計を計算する。
  */
-typename test_list::value_type func_test_list_pop_back( test_list* p_test_obj, pthread_barrier_t* p_barrier, const std::uintptr_t loop_num_arg )
+typename test_list::value_type func_test_list_pop_back( test_list* p_test_obj, pthread_barrier_t* p_barrier, const std::uintptr_t loop_num_arg, test_list::value_type expected_max_value )
 {
 	pthread_barrier_wait( p_barrier );
 
@@ -170,7 +170,7 @@ typename test_list::value_type func_test_list_pop_back( test_list* p_test_obj, p
 			printf( "list size count: %zu\n", p_test_obj->count_size() );
 			break;
 		}
-		if ( ( ret.value() <= 0 ) || ( ret.value() > ( num_thread * loop_num ) ) ) {
+		if ( ( ret.value() <= 0 ) || ( ret.value() > ( expected_max_value ) ) ) {
 			printf( "Bugggggggyyyy read by func_test_list_pop_back()!!!  %s\n", std::to_string( ret.value() ).c_str() );
 			printf( "list size count: %zu\n", p_test_obj->count_size() );
 			break;
@@ -201,14 +201,16 @@ typename test_list::value_type func_test_list_push_front( test_list* p_test_obj,
 /**
  * 各スレッドが、最後に追加する。
  */
-typename test_list::value_type func_test_list_push_back( test_list* p_test_obj, pthread_barrier_t* p_barrier, const std::uintptr_t loop_num_arg )
+typename test_list::value_type func_test_list_push_back( test_list* p_test_obj, pthread_barrier_t* p_barrier, std::atomic<bool>* p_loop_flag )
 {
 	pthread_barrier_wait( p_barrier );
 
 	typename test_list::value_type v = 0;
-	for ( std::uintptr_t i = 0; i < loop_num_arg; i++ ) {
+	std::uintptr_t                 i = 0;
+	while ( p_loop_flag->load( std::memory_order_acquire ) ) {
 		p_test_obj->push_back( i + 1 );
 		v += i + 1;
+		i++;
 	}
 
 	return v;
@@ -217,58 +219,55 @@ typename test_list::value_type func_test_list_push_back( test_list* p_test_obj, 
 TEST_F( lflistHighLoadTest, TC0_1_ManyElements_DoPopBack_Then_Empty )
 {
 	// Arrange
-	constexpr unsigned int tmp_num_thread = 12;   // Tested until 128.
+	constexpr unsigned int   tmp_num_thread        = 12;   // Tested until 128.
+	constexpr std::uintptr_t loop_num_in_this_func = 20;
+	test_list                count_list;
 
-	test_list                                   count_list;
-	pthread_barrier_t                           barrier;
-	std::future<typename test_list::value_type> results_of_threads[tmp_num_thread];
+	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now() + std::chrono::milliseconds( 200 );   // 少し余裕をもって開始時間を設定する。
 
-	pthread_barrier_init( &barrier, NULL, tmp_num_thread + 1 );
+	do {
+		pthread_barrier_t                           barrier;
+		std::future<typename test_list::value_type> results_of_threads[tmp_num_thread];
 
-	for ( auto& cur_future : results_of_threads ) {
-		std::packaged_task<typename test_list::value_type( test_list*, pthread_barrier_t*, const std::uintptr_t )> cur_task( func_test_list_pop_back );
-		cur_future             = cur_task.get_future();
-		std::thread cur_thread = std::thread( std::move( cur_task ), &count_list, &barrier, loop_num );
-		cur_thread.detach();
-	}
+		pthread_barrier_init( &barrier, NULL, tmp_num_thread + 1 );
 
-	typename test_list::value_type expect = 0;
-	for ( size_t i = 0; i < tmp_num_thread * loop_num; i++ ) {
-		count_list.push_front( i + 1 );
-		expect += i + 1;
-	}
+		for ( auto& cur_future : results_of_threads ) {
+			std::packaged_task<typename test_list::value_type( test_list*, pthread_barrier_t*, const std::uintptr_t, test_list::value_type )> cur_task( func_test_list_pop_back );
+			cur_future             = cur_task.get_future();
+			std::thread cur_thread = std::thread( std::move( cur_task ), &count_list, &barrier, loop_num_in_this_func, tmp_num_thread * loop_num_in_this_func );
+			cur_thread.detach();
+		}
 
-	// Act
-	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-	pthread_barrier_wait( &barrier );
+		typename test_list::value_type expect = 0;
+		for ( size_t i = 0; i < tmp_num_thread * loop_num_in_this_func; i++ ) {
+			count_list.push_front( i + 1 );
+			expect += i + 1;
+		}
 
-	typename test_list::value_type sum = 0;
-	unsigned int                   i   = 0;
-	for ( auto& cur_future : results_of_threads ) {
-		uintptr_t e = cur_future.get();
-		std::cout << "Thread " << i << ": last func_test_list_pop_back dequeued = " << e << std::endl;
-		sum += e;
+		// Act
+		pthread_barrier_wait( &barrier );
 
-		i++;
-	}
+		// Assert
+		typename test_list::value_type sum = 0;
+		unsigned int                   i   = 0;
+		for ( auto& cur_future : results_of_threads ) {
+			uintptr_t e = cur_future.get();
+			std::cout << "Thread " << i << ": last func_test_list_pop_back dequeued = " << e << std::endl;
+			sum += e;
 
-	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
+			i++;
+		}
 
-	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
-	std::cout << "thread is " << tmp_num_thread << "  Exec time: " << diff.count() << " msec" << std::endl;
+		// 各スレッドが最後にdequeueした値の合計は tmp_num_thread * num_loop
+		// に等しくなるはず。
+		EXPECT_EQ( expect, sum ) << "Expect: " << std::to_string( expect ) << std::endl
+								 << "Sum:    " << sum << std::endl;
+		EXPECT_EQ( count_list.count_size(), 0 ) << "remained value:    " << count_list.pop_back().value() << std::endl;
+
+		pthread_barrier_destroy( &barrier );
+	} while ( std::chrono::steady_clock::now() < end_time_point );
+
 	std::cout << "Allocated node num:    " << count_list.get_allocated_num() << std::endl;
-
-	// Assert
-	// 各スレッドが最後にdequeueした値の合計は tmp_num_thread * num_loop
-	// に等しくなるはず。
-	EXPECT_EQ( expect, sum ) << "Expect: " << std::to_string( expect ) << std::endl
-							 << "Sum:    " << sum << std::endl;
-	EXPECT_EQ( count_list.count_size(), 0 );
-
-	if ( count_list.count_size() > 0 ) {
-		auto ret = count_list.pop_back();
-		std::cout << "remained value:    " << ret.value() << std::endl;
-	}
 
 	return;
 }
@@ -276,58 +275,55 @@ TEST_F( lflistHighLoadTest, TC0_1_ManyElements_DoPopBack_Then_Empty )
 TEST_F( lflistHighLoadTest, TC0_2_ManyElements_DoPopFront_Then_Empty )
 {
 	// Arrange
-	constexpr unsigned int tmp_num_thread = 12;   // Tested until 128.
+	constexpr unsigned int   tmp_num_thread        = 12;   // Tested until 128.
+	constexpr std::uintptr_t loop_num_in_this_func = 20;
+	test_list                count_list;
 
-	test_list                                   count_list;
-	pthread_barrier_t                           barrier;
-	std::future<typename test_list::value_type> results_of_threads[tmp_num_thread];
+	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now() + std::chrono::milliseconds( 200 );   // 少し余裕をもって開始時間を設定する。
 
-	pthread_barrier_init( &barrier, NULL, tmp_num_thread + 1 );
+	do {
+		pthread_barrier_t                           barrier;
+		std::future<typename test_list::value_type> results_of_threads[tmp_num_thread];
 
-	for ( auto& cur_future : results_of_threads ) {
-		std::packaged_task<typename test_list::value_type( test_list*, pthread_barrier_t*, const std::uintptr_t )> cur_task( func_test_list_pop_front );
-		cur_future             = cur_task.get_future();
-		std::thread cur_thread = std::thread( std::move( cur_task ), &count_list, &barrier, loop_num );
-		cur_thread.detach();
-	}
+		pthread_barrier_init( &barrier, NULL, tmp_num_thread + 1 );
 
-	typename test_list::value_type expect = 0;
-	for ( size_t i = 0; i < tmp_num_thread * loop_num; i++ ) {
-		count_list.push_front( i + 1 );
-		expect += i + 1;
-	}
+		for ( auto& cur_future : results_of_threads ) {
+			std::packaged_task<typename test_list::value_type( test_list*, pthread_barrier_t*, const std::uintptr_t, test_list::value_type )> cur_task( func_test_list_pop_front );
+			cur_future             = cur_task.get_future();
+			std::thread cur_thread = std::thread( std::move( cur_task ), &count_list, &barrier, loop_num_in_this_func, tmp_num_thread * loop_num_in_this_func );
+			cur_thread.detach();
+		}
 
-	// Act
-	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
-	pthread_barrier_wait( &barrier );
+		typename test_list::value_type expect = 0;
+		for ( size_t i = 0; i < tmp_num_thread * loop_num_in_this_func; i++ ) {
+			count_list.push_front( i + 1 );
+			expect += i + 1;
+		}
 
-	typename test_list::value_type sum = 0;
-	unsigned int                   i   = 0;
-	for ( auto& cur_future : results_of_threads ) {
-		uintptr_t e = cur_future.get();
-		std::cout << "Thread " << i << ": last func_test_list_pop_back dequeued = " << e << std::endl;
-		sum += e;
+		// Act
+		pthread_barrier_wait( &barrier );
 
-		i++;
-	}
+		// Assert
+		typename test_list::value_type sum = 0;
+		unsigned int                   i   = 0;
+		for ( auto& cur_future : results_of_threads ) {
+			uintptr_t e = cur_future.get();
+			std::cout << "Thread " << i << ": last func_test_list_pop_front dequeued = " << e << std::endl;
+			sum += e;
 
-	std::chrono::steady_clock::time_point end_time_point = std::chrono::steady_clock::now();
+			i++;
+		}
 
-	std::chrono::milliseconds diff = std::chrono::duration_cast<std::chrono::milliseconds>( end_time_point - start_time_point );
-	std::cout << "thread is " << tmp_num_thread << "  Exec time: " << diff.count() << " msec" << std::endl;
+		// 各スレッドが最後にdequeueした値の合計は tmp_num_thread * num_loop
+		// に等しくなるはず。
+		EXPECT_EQ( expect, sum ) << "Expect: " << std::to_string( expect ) << std::endl
+								 << "Sum:    " << sum << std::endl;
+		EXPECT_EQ( count_list.count_size(), 0 ) << "remained value:    " << count_list.pop_front().value() << std::endl;
+
+		pthread_barrier_destroy( &barrier );
+	} while ( std::chrono::steady_clock::now() < end_time_point );
+
 	std::cout << "Allocated node num:    " << count_list.get_allocated_num() << std::endl;
-
-	// Assert
-	// 各スレッドが最後にdequeueした値の合計は tmp_num_thread * num_loop
-	// に等しくなるはず。
-	EXPECT_EQ( expect, sum ) << "Expect: " << std::to_string( expect ) << std::endl
-							 << "Sum:    " << sum << std::endl;
-	EXPECT_EQ( count_list.count_size(), 0 );
-
-	if ( count_list.count_size() > 0 ) {
-		auto ret = count_list.pop_back();
-		std::cout << "remained value:    " << ret.value() << std::endl;
-	}
 
 	return;
 }
@@ -408,6 +404,7 @@ TEST_F( lflistHighLoadTest, TC0_4_Empty_DoPushBack_Then_ManyElements )
 {
 	// Arrange
 	constexpr unsigned int tmp_num_thread = 12;   // Tested until 128.
+	std::atomic<bool>      loop_flag( true );
 
 	test_list                                   count_list;
 	pthread_barrier_t                           barrier;
@@ -416,15 +413,17 @@ TEST_F( lflistHighLoadTest, TC0_4_Empty_DoPushBack_Then_ManyElements )
 	pthread_barrier_init( &barrier, NULL, tmp_num_thread + 1 );
 
 	for ( auto& cur_future : results_of_threads ) {
-		std::packaged_task<typename test_list::value_type( test_list*, pthread_barrier_t*, const std::uintptr_t )> cur_task( func_test_list_push_back );
+		std::packaged_task<typename test_list::value_type( test_list*, pthread_barrier_t*, std::atomic<bool>* )> cur_task( func_test_list_push_back );
 		cur_future             = cur_task.get_future();
-		std::thread cur_thread = std::thread( std::move( cur_task ), &count_list, &barrier, loop_num );
+		std::thread cur_thread = std::thread( std::move( cur_task ), &count_list, &barrier, &loop_flag );
 		cur_thread.detach();
 	}
 
 	// Act
 	std::chrono::steady_clock::time_point start_time_point = std::chrono::steady_clock::now();
 	pthread_barrier_wait( &barrier );
+	std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );   // Let the threads run for a while.
+	loop_flag.store( false );                                          // Signal the threads to stop.
 
 	typename test_list::value_type expect = 0;
 	unsigned int                   idx    = 0;
