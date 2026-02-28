@@ -179,12 +179,11 @@ sanitizer.%.sanitizer: configure-cmake.%.sanitizer
 
 #############################################################################################
 tidy-fix: configure-cmake-no-sanitizer
-	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build --fix
-	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-format -i
-	find ./ -name '*.hpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-format -i
+	find ./ -name '*.cpp' -or -name '*.hpp'|grep ./libalconcurrent|xargs -t -P${JOBS} -n1 clang-tidy -p=${BUILD_DIR} --fix
+	find ./ -name '*.cpp' -or -name '*.hpp'|grep ./libalconcurrent|xargs -t -P${JOBS} -n1 clang-format -i
 
 tidy: configure-cmake-no-sanitizer
-	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=${BUILD_DIR}
+	find ./ -name '*.cpp' -or -name '*.hpp'|grep ./libalconcurrent|xargs -t -P${JOBS} -n1 clang-tidy -p=${BUILD_DIR}
 
 .PHONY: all clean test test-release test-debug sample coverage profile sanitizer sanitizer.p tidy-fix tidy
 

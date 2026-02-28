@@ -229,7 +229,7 @@ static std::string demangle_symbol( char* p_raw_symbol_str )
 	}
 
 	size_t demangled_sz  = 1024;
-	char*  demangled_str = (char*)malloc( demangled_sz );
+	char*  demangled_str = static_cast<char*>(malloc( demangled_sz ));
 	if ( !demangled_str ) {
 		perror( "malloc() returns NULL" );
 		return std::string( "malloc() returns NULL for symbol demangle" );

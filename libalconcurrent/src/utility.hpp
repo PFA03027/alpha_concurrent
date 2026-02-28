@@ -9,9 +9,8 @@
  *
  */
 
-#ifndef ALCONCCURRENT_SRC__UTILITY_HPP_
-#define ALCONCCURRENT_SRC__UTILITY_HPP_
-
+#ifndef ALCONCCURRENT_SRC_UTILITY_HPP_
+#define ALCONCCURRENT_SRC_UTILITY_HPP_
 #include <atomic>
 
 namespace alpha {
