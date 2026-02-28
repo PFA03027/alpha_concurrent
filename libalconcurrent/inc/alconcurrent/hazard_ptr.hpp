@@ -17,6 +17,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <stdexcept>
 #include <thread>
 #include <tuple>
 #include <type_traits>
@@ -137,7 +138,7 @@ public:
 			RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
 			cur_bt.dump_to_log( log_type::ERR, 'd', 1 );
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-			throw std::logic_error( "slot of hazard pointer in hazard_ptr is nullptr" );
+			std::abort();
 #else
 #endif
 		}
@@ -157,7 +158,7 @@ private:
 			RECORD_BACKTRACE_GET_BACKTRACE( cur_bt );
 			cur_bt.dump_to_log( log_type::ERR, 'd', 1 );
 #ifdef ALCONCURRENT_CONF_ENABLE_THROW_LOGIC_ERROR_TERMINATION
-			throw std::logic_error( "slot of hazard pointer in hazard_ptr is nullptr" );
+			std::abort();
 #else
 #endif
 		}

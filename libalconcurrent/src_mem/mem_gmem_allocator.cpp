@@ -11,6 +11,7 @@
 
 #include <stdexcept>
 
+#include "alconcurrent/conf_logger.hpp"
 #include "alconcurrent/lf_mem_alloc.hpp"
 
 #include "mem_big_memory_slot.hpp"
@@ -158,7 +159,7 @@ inline size_t calc_init_slot_entry( size_t needed_bytes )
 {
 #ifdef ALCONCURRENT_CONF_ENABLE_CHECK_LOGIC_ERROR
 	if ( needed_bytes == 0 ) {
-		LogOutput( log_type::ERR, "slot index calction is called by the incorrect value" );
+		internal::LogOutput( log_type::ERR, "slot index calction is called by the incorrect value" );
 		return 0;
 	}
 #endif

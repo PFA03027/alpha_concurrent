@@ -5,9 +5,9 @@ set(CMAKE_VERBOSE_MAKEFILE 1)
 include(common.cmake)
 
 # Switch build target
-set(BUILD_TARGET normal CACHE STRING "Build target?")
-message("[BUILD] ${BUILD_TARGET}")
-include(${BUILD_TARGET}.cmake)
+set(BUILD_CONFIG normal CACHE STRING "Build target?")
+message("[BUILD] ${BUILD_CONFIG}")
+include(${BUILD_CONFIG}.cmake)
 
 
 enable_testing()

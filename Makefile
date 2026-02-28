@@ -2,12 +2,8 @@
 # If you would like to build with target or environment specific configuration:
 # 1. please prepare XXXX.cmake that includes build options
 # 2. provide file information of XXXX.cmake like below to CMakeLists.txt
-#    with -D option like below
-#        $ cmake -D BUILD_TARGET=XXXX
-#    or
 #        $ make BUILD_CONFIG=XXXX
 # 
-#    common.cmake is common configurations
 #    normal.cmake is the configuration for normal build
 #    gprof.cmake is the configuration for profile and analysis
 #    codecoverage.cmake is the configuration for code coverage of gcov
@@ -26,7 +22,7 @@ BUILDTYPE?=Release
 ALCONCURRENT_BUILD_SHARED_LIBS?=ON
 
 # Sanitizer test option:
-# SANITIZER_TYPE= 1 ~ 11 or ""
+# SANITIZER_TYPE= 1 ~ 8 or ""
 #
 # Please see normal.cmake for detail
 # 
@@ -50,7 +46,7 @@ BUILD_DIR?=build
 #MAKEFILE_DIR := $(dir $(lastword $(MAKEFILE_LIST)))	# 相対パス名を得るならこちら。
 #MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))	# 絶対パス名を得るならこちら。
 
-SANITIZER_ALL_IDS=$(shell seq 1 11)
+SANITIZER_ALL_IDS=$(shell seq 1 8)
 SANITIZER_P_ALL_TARGETS=$(addprefix sanitizer.p.,$(SANITIZER_ALL_IDS))
 
 #TEST_EXECS = $(shell find ${BUILD_DIR} -type f -executable -name "test_*")
@@ -58,7 +54,7 @@ TEST_EXECS = $(shell find . -type f -executable -name "test_*")
 
 CMAKE_CONFIGURE_OPTS  = -DCMAKE_EXPORT_COMPILE_COMMANDS=ON  # for clang-tidy
 CMAKE_CONFIGURE_OPTS += -DCMAKE_BUILD_TYPE=${BUILDTYPE}
-CMAKE_CONFIGURE_OPTS += -DBUILD_TARGET=${BUILD_CONFIG}
+CMAKE_CONFIGURE_OPTS += -DBUILD_CONFIG=${BUILD_CONFIG}
 CMAKE_CONFIGURE_OPTS += -DALCONCURRENT_BUILD_SHARED_LIBS=${ALCONCURRENT_BUILD_SHARED_LIBS} 
 
 CPUS=$(shell grep cpu.cores /proc/cpuinfo | sort -u | sed 's/[^0-9]//g')
@@ -128,78 +124,14 @@ build-sample: configure-cmake
 profile: build-profile
 	$(MAKE) -j ${JOBS} make-profile-out
 
-build-profile:
-	$(MAKE) BUILD_CONFIG=gprof BUILDTYPE=${BUILDTYPE} build-test
-
 exec-profile: build-profile
-	set -e; \
-	cd ${BUILD_DIR}; \
-	setarch $(uname -m) -R ctest -j ${JOBS} -v
+	setarch $(uname -m) -R ctest --test-dir ${BUILD_DIR} -j ${JOBS} -v
 
-#############################################################################################
-coverage: clean
-	set -e; \
-	$(MAKE) BUILD_CONFIG=codecoverage BUILDTYPE=Debug exec-test;  \
-	cd ${BUILD_DIR}; \
-	find . -type f -name "*.gcda" | xargs -P${JOBS} -I@ gcov -l -b @; \
-	lcov --rc lcov_branch_coverage=1 -c -d . -o tmp.info; \
-	lcov --rc lcov_branch_coverage=1 -b -c -d . -r tmp.info  '/usr/include/*' -o tmp2.info; \
-	lcov --rc lcov_branch_coverage=1 -b -c -d . -r tmp2.info  '*/test/*' -o output.info; \
-	genhtml --branch-coverage -o OUTPUT -p . -f output.info
+build-profile:
+	$(MAKE) BUILD_CONFIG=gprof BUILDTYPE=${BUILDTYPE} build-test-no-sanitizer
 
-#############################################################################################
-sanitizer:
-	set -e; \
-	for i in $(SANITIZER_ALL_IDS); do \
-		$(MAKE) sanitizer.$$i.sanitizer; \
-		echo $$i / 11 done; \
-	done
-
-sanitizer.p:
-	$(MAKE) -j2 sanitizer.p_internal
-
-sanitizer.%.sanitizer: build-test-sanitizer.%.sanitizer
-	$(MAKE)  exec-test
-
-tidy-fix: configure-cmake
-	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build --fix
-	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-format -i
-	find ./ -name '*.hpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-format -i
-
-tidy: configure-cmake
-	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build
-
-.PHONY: all clean test test-release test-debug sample coverage profile sanitizer sanitizer.p tidy-fix tidy
-
-
-############################################################################
-
-build-test-sanitizer.%.sanitizer: clean
-	$(MAKE) BUILD_CONFIG=normal BUILDTYPE=Debug SANITIZER_TYPE=$* build-test
-
-
-#############################################################################################
-sanitizer.p_internal: $(SANITIZER_P_ALL_TARGETS)
-
-define SANITIZER_P_TEMPLATE
-sanitizer.p.configure-cmake.$(1):
-	$(MAKE) BUILD_DIR=build.p/$(1) BUILD_CONFIG=normal BUILDTYPE=Debug SANITIZER_TYPE=$(1) configure-cmake
-
-sanitizer.p.$(1): sanitizer.p.configure-cmake.$(1)
-	$(MAKE) BUILD_DIR=build.p/$(1) BUILD_CONFIG=normal BUILDTYPE=Debug SANITIZER_TYPE=$(1) sanitizer.p.test
-
-sanitizer.p.configure-cmake.$(shell expr $(1) + 1): sanitizer.p.configure-cmake.$(1)
-
-endef
-
-$(foreach pgm,$(SANITIZER_ALL_IDS),$(eval $(call SANITIZER_P_TEMPLATE,$(pgm))))
-
-#############################################################################################
 ifeq ($(strip $(TEST_EXECS)),)
 ## $(TEST_EXECS)が空の場合＝buildが実行されていない状況
-test.%: build-test
-	$(MAKE) test.$*
-
 profile.%: build-profile
 	$(MAKE) profile.$*
 
@@ -209,9 +141,6 @@ else
 # 第2引数: テスト実行ファイルのあるディレクトリ名
 # 第3引数: テスト実行ファイルのフルパス名
 define TEST_EXEC_TEMPLATE
-test.$(1): build-test
-	$(3) $(TEST_OPTS)
-
 profile.$(1): build-profile
 	-rm -f $(2)gmon.out
 	set -e; (cd $(2); ./$(1) $(TEST_OPTS))
@@ -226,9 +155,40 @@ endif
 
 make-profile-out: $(addprefix profile.,$(notdir $(TEST_EXECS)))
 
-sanitizer.p.test:
-	set -e; \
+#############################################################################################
+coverage: exec-coverage
 	cd ${BUILD_DIR}; \
-	cmake --build . --target build-test; \
-	setarch $(uname -m) -R ctest -j $(shell expr ${JOBS} / 2) -v
+	find . -type f -name "*.gcda" | xargs -P${JOBS} -I@ gcov -l -b @; \
+	lcov --rc lcov_branch_coverage=1 -c -d . -o tmp.info; \
+	lcov --rc lcov_branch_coverage=1 -b -c -d . -r tmp.info  '/usr/include/*' -o tmp2.info; \
+	lcov --rc lcov_branch_coverage=1 -b -c -d . -r tmp2.info  '*/test/*' -o output.info; \
+	genhtml --branch-coverage -o OUTPUT -p . -f output.info
+
+exec-coverage: clean
+	$(MAKE) BUILD_CONFIG=codecoverage BUILDTYPE=Debug test
+
+#############################################################################################
+sanitizer:
+	set -e; \
+	for i in $(SANITIZER_ALL_IDS); do \
+		$(MAKE) sanitizer.$$i.sanitizer; \
+		echo $$i / 8 done; \
+	done
+
+sanitizer.%.sanitizer:
+	$(MAKE) BUILD_CONFIG=normal BUILDTYPE=Debug SANITIZER_TYPE=$* test
+
+#############################################################################################
+tidy-fix: configure-cmake
+	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=build --fix
+	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-format -i
+	find ./ -name '*.hpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-format -i
+
+tidy: configure-cmake
+	find ./ -name '*.cpp'|grep -v googletest|grep -v ./build/|xargs -t -P${JOBS} -n1 clang-tidy -p=${BUILD_DIR}
+
+.PHONY: all clean test test-release test-debug sample coverage profile sanitizer sanitizer.p tidy-fix tidy
+
+
+############################################################################
 

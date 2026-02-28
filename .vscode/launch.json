@@ -55,31 +55,6 @@
             "preLaunchTask": "make build-test with -g"
         },
         {
-            "name": "(gdb) test_atomic_shared_ptr起動 with sanitizer",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/test/test_atomic_shared_ptr/test_atomic_shared_ptr",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${fileDirname}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "setupCommands": [
-                {
-                    "description": "gdb の再フォーマットを有効にする",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "逆アセンブリ フレーバーを Intel に設定",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ],
-            "preLaunchTask": "build with a sanitizer"
-        },
-        {
             "name": "(gdb) test_mem_alloc_sanitize起動",
             "type": "cppdbg",
             "request": "launch",
