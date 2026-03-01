@@ -11,8 +11,8 @@ set(CMAKE_VERBOSE_MAKEFILE 1)
 
 include(common.cmake)
 
-# Switch build target
-set(BUILD_CONFIG normal CACHE STRING "Build target?")
+# Switch build configuration
+set(BUILD_CONFIG normal CACHE STRING "Build configuration?")
 message("[BUILD] ${BUILD_CONFIG}")
 include(${BUILD_CONFIG}.cmake)
 
